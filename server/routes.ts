@@ -50,6 +50,19 @@ export async function registerRoutes(
     })
   );
 
+  // All available pages for admin/superadmin
+  const ALL_PAGES = [
+    'dashboard',
+    'event-calendar',
+    'team-calendar',
+    'event-database',
+    'event-milestones',
+    'daybook',
+    'oak-book',
+    'hr',
+    'admin',
+  ];
+
   // Auth endpoints
   app.post('/api/auth/login', async (req, res) => {
     try {
@@ -60,7 +73,15 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      const permissions = await storage.getUserPermissions(user.id);
+      // Admin and superadmin get all pages automatically
+      let permissionsList: string[];
+      if (user.role === 'admin' || user.role === 'superadmin') {
+        permissionsList = ALL_PAGES;
+      } else {
+        const permissions = await storage.getUserPermissions(user.id);
+        permissionsList = permissions.map(p => p.pageId);
+      }
+      
       (req.session as any).userId = user.id;
       
       res.json({ 
@@ -71,7 +92,7 @@ export async function registerRoutes(
           role: user.role,
           avatar: user.avatar,
         },
-        permissions: permissions.map(p => p.pageId)
+        permissions: permissionsList
       });
     } catch (error) {
       res.status(500).json({ error: 'Login failed' });
@@ -95,7 +116,15 @@ export async function registerRoutes(
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const permissions = await storage.getUserPermissions(user.id);
+    // Admin and superadmin get all pages automatically
+    let permissionsList: string[];
+    if (user.role === 'admin' || user.role === 'superadmin') {
+      permissionsList = ALL_PAGES;
+    } else {
+      const permissions = await storage.getUserPermissions(user.id);
+      permissionsList = permissions.map(p => p.pageId);
+    }
+
     res.json({ 
       user: {
         id: user.id,
@@ -104,7 +133,7 @@ export async function registerRoutes(
         role: user.role,
         avatar: user.avatar,
       },
-      permissions: permissions.map(p => p.pageId)
+      permissions: permissionsList
     });
   });
 
