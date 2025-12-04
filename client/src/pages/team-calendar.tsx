@@ -6,14 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Clock, Plus, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Plus, User, Pencil, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 export default function TeamCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const currentDateStr = format(currentDate, 'yyyy-MM-dd');
 
@@ -41,6 +45,39 @@ export default function TeamCalendar() {
       setIsDialogOpen(false);
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Meeting> }) => {
+      const res = await fetch(`/api/meetings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update meeting');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+      setEditingMeeting(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete meeting');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+    },
+  });
+
+  const handleDelete = (id: string, title: string) => {
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const nextDay = () => setCurrentDate(addDays(currentDate, 1));
   const prevDay = () => setCurrentDate(subDays(currentDate, 1));
@@ -73,6 +110,42 @@ export default function TeamCalendar() {
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending}>
           {createMutation.isPending ? 'Scheduling...' : 'Schedule Meeting'}
+        </Button>
+      </form>
+    );
+  };
+
+  const EditMeetingForm = ({ meeting, onClose }: { meeting: Meeting; onClose: () => void }) => {
+    const { register, handleSubmit } = useForm<Partial<Meeting>>({
+      defaultValues: {
+        title: meeting.title,
+        time: meeting.time,
+        attendees: meeting.attendees,
+      }
+    });
+    
+    const onSubmit = (data: any) => {
+      updateMutation.mutate({ id: meeting.id, data });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="edit-title">Meeting Title</Label>
+          <Input id="edit-title" {...register("title")} required />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="edit-time">Time</Label>
+            <Input id="edit-time" type="time" {...register("time")} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-attendees">Attendees</Label>
+            <Input id="edit-attendees" {...register("attendees")} placeholder="e.g. John, Sarah" />
+          </div>
+        </div>
+        <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     );
@@ -130,11 +203,37 @@ export default function TeamCalendar() {
                  </div>
                  <div className="flex-1 relative pt-1 pl-2 sm:pl-4">
                    {todaysMeetings.filter(m => parseInt(m.time.split(':')[0]) === hour).map(m => (
-                     <div key={m.id} className="absolute left-1 sm:left-2 right-1 sm:right-2 bg-secondary border-l-4 border-primary p-1.5 sm:p-2 rounded text-xs shadow-sm">
-                        <div className="font-semibold text-[11px] sm:text-xs truncate">{m.title}</div>
-                        <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
-                          <Clock className="h-3 w-3 flex-shrink-0" /> {m.time}
-                          {m.attendees && <span className="hidden sm:inline"><User className="h-3 w-3 ml-2" /> {m.attendees}</span>}
+                     <div key={m.id} className="absolute left-1 sm:left-2 right-1 sm:right-2 bg-secondary border-l-4 border-primary p-1.5 sm:p-2 rounded text-xs shadow-sm group">
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-[11px] sm:text-xs truncate">{m.title}</div>
+                            <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
+                              <Clock className="h-3 w-3 flex-shrink-0" /> {m.time}
+                              {m.attendees && <span className="hidden sm:inline"><User className="h-3 w-3 ml-2" /> {m.attendees}</span>}
+                            </div>
+                          </div>
+                          {isSuperAdmin && (
+                            <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-5 w-5 sm:h-6 sm:w-6"
+                                onClick={() => setEditingMeeting(m)}
+                                data-testid={`button-edit-meeting-${m.id}`}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-5 w-5 sm:h-6 sm:w-6 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(m.id, m.title)}
+                                data-testid={`button-delete-meeting-${m.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                      </div>
                    ))}
@@ -156,7 +255,7 @@ export default function TeamCalendar() {
             ) : (
               <div className="space-y-3 sm:space-y-4">
                 {todaysMeetings.map(m => (
-                  <div key={m.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 rounded-lg border">
+                  <div key={m.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 rounded-lg border group">
                     <div className="flex flex-col items-center justify-center min-w-[50px] sm:min-w-[60px] bg-card rounded border p-1.5 sm:p-2">
                       <span className="text-sm sm:text-lg font-bold text-primary">{m.time}</span>
                     </div>
@@ -166,6 +265,28 @@ export default function TeamCalendar() {
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">{m.attendees}</p>
                       )}
                     </div>
+                    {isSuperAdmin && (
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setEditingMeeting(m)}
+                          data-testid={`button-edit-agenda-${m.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => handleDelete(m.id, m.title)}
+                          data-testid={`button-delete-agenda-${m.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -173,6 +294,17 @@ export default function TeamCalendar() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!editingMeeting} onOpenChange={(open) => !open && setEditingMeeting(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Meeting</DialogTitle>
+          </DialogHeader>
+          {editingMeeting && (
+            <EditMeetingForm meeting={editingMeeting} onClose={() => setEditingMeeting(null)} />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
