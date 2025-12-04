@@ -29,6 +29,8 @@ const ICONS: Record<string, any> = {
   admin: Shield,
 };
 
+import logo from "@assets/oakstreet_white_1764858814551.png";
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [location] = useLocation();
@@ -41,9 +43,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="p-6">
-        <h1 className="text-2xl font-bold tracking-tight font-serif text-sidebar-primary">
-          Oak Event
-        </h1>
+        <img src={logo} alt="Oak Event" className="h-16 w-auto mb-2" />
         <p className="text-xs text-sidebar-foreground/60 mt-1">Management System</p>
       </div>
 

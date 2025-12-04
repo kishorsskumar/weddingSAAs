@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowRight, Shield, User, Briefcase } from "lucide-react";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
+import logo from "@assets/oakstreet_white_1764858814551.png";
 
 export default function Login() {
   const { login, user, isLoading } = useAuth();
@@ -21,7 +22,7 @@ export default function Login() {
         <div className="bg-sidebar p-12 flex flex-col justify-between text-sidebar-foreground relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1519167758481-83f550bb49b3?q=80&w=1000')] bg-cover bg-center opacity-10 mix-blend-overlay"></div>
           <div className="relative z-10">
-            <h1 className="text-4xl font-bold font-serif text-sidebar-primary mb-2">Oak Event</h1>
+            <img src={logo} alt="Oak Event" className="h-24 w-auto mb-4" />
             <p className="text-sidebar-foreground/80 text-lg">Management System</p>
           </div>
           <div className="relative z-10">
