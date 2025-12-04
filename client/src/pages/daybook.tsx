@@ -7,17 +7,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 export default function Daybook() {
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">("daily");
   const [currentDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
+  const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -50,6 +55,60 @@ export default function Daybook() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       setIsDialogOpen(false);
+    },
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/daybook/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+    },
+  });
+
+  const createBankMutation = useMutation({
+    mutationFn: async (data: { name: string; balance: string }) => {
+      const res = await fetch('/api/banks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create bank');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      setIsBankDialogOpen(false);
+    },
+  });
+
+  const updateBankMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Bank> }) => {
+      const res = await fetch(`/api/banks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update bank');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      setEditingBank(null);
+    },
+  });
+
+  const deleteBankMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/banks/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete bank');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
     },
   });
 
@@ -93,6 +152,56 @@ export default function Daybook() {
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending}>
           {createMutation.isPending ? 'Adding...' : 'Add Entry'}
+        </Button>
+      </form>
+    );
+  };
+
+  const AddBankForm = () => {
+    const { register, handleSubmit } = useForm<{ name: string; balance: string }>();
+    
+    const onSubmit = (data: any) => {
+      createBankMutation.mutate(data);
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Bank Name</Label>
+          <Input {...register("name")} required placeholder="e.g. HDFC Bank" />
+        </div>
+        <div className="space-y-2">
+          <Label>Opening Balance (₹)</Label>
+          <Input type="number" {...register("balance")} required placeholder="0" />
+        </div>
+        <Button type="submit" className="w-full" disabled={createBankMutation.isPending}>
+          {createBankMutation.isPending ? 'Adding...' : 'Add Bank'}
+        </Button>
+      </form>
+    );
+  };
+
+  const EditBankForm = ({ bank, onClose }: { bank: Bank; onClose: () => void }) => {
+    const { register, handleSubmit } = useForm<{ name: string; balance: string }>({
+      defaultValues: { name: bank.name, balance: bank.balance }
+    });
+    
+    const onSubmit = (data: any) => {
+      updateBankMutation.mutate({ id: bank.id, data });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Bank Name</Label>
+          <Input {...register("name")} required />
+        </div>
+        <div className="space-y-2">
+          <Label>Balance (₹)</Label>
+          <Input type="number" {...register("balance")} required />
+        </div>
+        <Button type="submit" className="w-full" disabled={updateBankMutation.isPending}>
+          {updateBankMutation.isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     );
@@ -154,14 +263,65 @@ export default function Daybook() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1 h-fit">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-serif text-lg">Bank Balances</CardTitle>
+            {isAdmin && (
+              <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="gap-1" data-testid="button-add-bank">
+                    <Plus className="h-3 w-3" /> Add
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Bank Account</DialogTitle>
+                  </DialogHeader>
+                  <AddBankForm />
+                </DialogContent>
+              </Dialog>
+            )}
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {banks.map((bank) => (
-              <div key={bank.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border">
-                <span className="font-medium">{bank.name}</span>
-                <span className="font-bold font-mono">₹{Number(bank.balance).toLocaleString()}</span>
+              <div key={bank.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border group">
+                <div>
+                  <span className="font-medium">{bank.name}</span>
+                  <div className="font-bold font-mono text-lg">₹{Number(bank.balance).toLocaleString()}</div>
+                </div>
+                {isAdmin && (
+                  <div className="flex gap-1">
+                    <Dialog open={editingBank?.id === bank.id} onOpenChange={(open) => !open && setEditingBank(null)}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8"
+                          onClick={() => setEditingBank(bank)}
+                          data-testid={`button-edit-bank-${bank.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Edit Bank Balance</DialogTitle>
+                        </DialogHeader>
+                        <EditBankForm bank={bank} onClose={() => setEditingBank(null)} />
+                      </DialogContent>
+                    </Dialog>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (confirm(`Delete ${bank.name}?`)) deleteBankMutation.mutate(bank.id);
+                      }}
+                      data-testid={`button-delete-bank-${bank.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
             {banks.length === 0 && (
@@ -192,12 +352,13 @@ export default function Daybook() {
                   <TableHead>Description</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  {isAdmin && <TableHead className="w-10"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No transactions found.</TableCell>
+                    <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-8 text-muted-foreground">No transactions found.</TableCell>
                   </TableRow>
                 ) : (
                   entries.map((entry) => (
@@ -213,6 +374,21 @@ export default function Daybook() {
                       )}>
                         {entry.type === "income" ? "+" : "-"}₹{Number(entry.amount).toLocaleString()}
                       </TableCell>
+                      {isAdmin && (
+                        <TableCell>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                            }}
+                            data-testid={`button-delete-entry-${entry.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
