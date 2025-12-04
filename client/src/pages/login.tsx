@@ -80,12 +80,6 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg text-sm">
-            <p className="font-semibold mb-2">Demo Accounts:</p>
-            <p className="text-muted-foreground">admin@oakevent.com / demo123</p>
-            <p className="text-muted-foreground">manager@oakevent.com / demo123</p>
-            <p className="text-muted-foreground">finance@oakevent.com / demo123</p>
-          </div>
         </div>
       </div>
     </div>
