@@ -1,18 +1,65 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/context/auth-context";
+import Layout from "@/components/layout";
+import Login from "@/pages/login";
+import Dashboard from "@/pages/dashboard";
+import EventCalendar from "@/pages/event-calendar";
+import TeamCalendar from "@/pages/team-calendar";
+import EventDatabase from "@/pages/event-database";
+import Daybook from "@/pages/daybook";
+import HR from "@/pages/hr";
+import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
+import { useEffect } from "react";
 
-function Router() {
+function PrivateRoute({ component: Component, path }: { component: any; path: string }) {
+  const { user, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/login");
+    }
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading || !user) return null; 
+
+  return <Component />;
+}
+
+function AppRoutes() {
   return (
-    <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
-      <Route component={NotFound} />
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/">
+          <PrivateRoute component={Dashboard} path="/" />
+        </Route>
+        <Route path="/events">
+          <PrivateRoute component={EventCalendar} path="/events" />
+        </Route>
+        <Route path="/team">
+           <PrivateRoute component={TeamCalendar} path="/team" />
+        </Route>
+        <Route path="/database">
+           <PrivateRoute component={EventDatabase} path="/database" />
+        </Route>
+        <Route path="/daybook">
+           <PrivateRoute component={Daybook} path="/daybook" />
+        </Route>
+        <Route path="/hr">
+           <PrivateRoute component={HR} path="/hr" />
+        </Route>
+        <Route path="/admin">
+           <PrivateRoute component={Admin} path="/admin" />
+        </Route>
+        <Route component={NotFound} />
+      </Switch>
+    </Layout>
   );
 }
 
@@ -20,8 +67,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <AuthProvider>
+          <AppRoutes />
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
