@@ -128,7 +128,7 @@ export default function Daybook() {
           <Label>Description</Label>
           <Input {...register("description")} required />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Type</Label>
             <Select onValueChange={(v) => setValue("type", v as any)}>
@@ -142,7 +142,7 @@ export default function Daybook() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Amount (₹)</Label>
+            <Label>Amount</Label>
             <Input type="number" {...register("amount")} required />
           </div>
         </div>
@@ -171,7 +171,7 @@ export default function Daybook() {
           <Input {...register("name")} required placeholder="e.g. HDFC Bank" />
         </div>
         <div className="space-y-2">
-          <Label>Opening Balance (₹)</Label>
+          <Label>Opening Balance</Label>
           <Input type="number" {...register("balance")} required placeholder="0" />
         </div>
         <Button type="submit" className="w-full" disabled={createBankMutation.isPending}>
@@ -197,7 +197,7 @@ export default function Daybook() {
           <Input {...register("name")} required />
         </div>
         <div className="space-y-2">
-          <Label>Balance (₹)</Label>
+          <Label>Balance</Label>
           <Input type="number" {...register("balance")} required />
         </div>
         <Button type="submit" className="w-full" disabled={updateBankMutation.isPending}>
@@ -211,68 +211,66 @@ export default function Daybook() {
   const totalExpense = entries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold font-serif text-primary">Daybook</h1>
-          <p className="text-muted-foreground">Financial Overview & Cash Flow</p>
+          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Daybook</h1>
+          <p className="text-sm text-muted-foreground">Financial Overview & Cash Flow</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card">
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
-          </div>
+        <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card w-fit">
+          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs sm:text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <Card className="border-l-4 border-l-green-600">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Income</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total Income</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-600" />
-              <span className="text-2xl font-bold text-green-700">₹{totalIncome.toLocaleString()}</span>
+              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
+              <span className="text-lg sm:text-2xl font-bold text-green-700">₹{totalIncome.toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-red-600">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-red-600" />
-              <span className="text-2xl font-bold text-red-700">₹{totalExpense.toLocaleString()}</span>
+              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
+              <span className="text-lg sm:text-2xl font-bold text-red-700">₹{totalExpense.toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-primary">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Net Cash Flow</CardTitle>
+          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Net Cash Flow</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
             <div className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-primary" />
-              <span className="text-2xl font-bold">₹{(totalIncome - totalExpense).toLocaleString()}</span>
+              <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              <span className="text-lg sm:text-2xl font-bold">₹{(totalIncome - totalExpense).toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1 h-fit">
-          <CardHeader className="flex flex-row items-center justify-between">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="lg:col-span-1 h-fit order-1">
+          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
             <CardTitle className="font-serif text-lg">Bank Balances</CardTitle>
             {isAdmin && (
               <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1" data-testid="button-add-bank">
+                  <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" data-testid="button-add-bank">
                     <Plus className="h-3 w-3" /> Add
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-[95vw] sm:max-w-md">
                   <DialogHeader>
                     <DialogTitle>Add Bank Account</DialogTitle>
                   </DialogHeader>
@@ -281,15 +279,15 @@ export default function Daybook() {
               </Dialog>
             )}
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2 sm:space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
             {banks.map((bank) => (
-              <div key={bank.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border group">
-                <div>
-                  <span className="font-medium">{bank.name}</span>
-                  <div className="font-bold font-mono text-lg">₹{Number(bank.balance).toLocaleString()}</div>
+              <div key={bank.id} className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-muted/30 border group">
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium text-sm truncate block">{bank.name}</span>
+                  <div className="font-bold font-mono text-base sm:text-lg">₹{Number(bank.balance).toLocaleString()}</div>
                 </div>
                 {isAdmin && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-shrink-0">
                     <Dialog open={editingBank?.id === bank.id} onOpenChange={(open) => !open && setEditingBank(null)}>
                       <DialogTrigger asChild>
                         <Button 
@@ -302,7 +300,7 @@ export default function Daybook() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="max-w-[95vw] sm:max-w-md">
                         <DialogHeader>
                           <DialogTitle>Edit Bank Balance</DialogTitle>
                         </DialogHeader>
@@ -325,19 +323,19 @@ export default function Daybook() {
               </div>
             ))}
             {banks.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">No banks added yet</p>
+              <p className="text-center text-muted-foreground py-4 text-sm">No banks added yet</p>
             )}
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="lg:col-span-2 order-2">
+          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
             <CardTitle className="font-serif text-lg">Transactions</CardTitle>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2" data-testid="button-add-entry"><Plus className="h-4 w-4"/> Add Entry</Button>
+                <Button size="sm" className="gap-1 h-8 text-xs sm:text-sm" data-testid="button-add-entry"><Plus className="h-3 w-3 sm:h-4 sm:w-4"/> Add</Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-[95vw] sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Add Daybook Entry</DialogTitle>
                 </DialogHeader>
@@ -345,55 +343,59 @@ export default function Daybook() {
               </DialogContent>
             </Dialog>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  {isAdmin && <TableHead className="w-10"></TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {entries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-8 text-muted-foreground">No transactions found.</TableCell>
-                  </TableRow>
-                ) : (
-                  entries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{entry.description}</TableCell>
-                      <TableCell>
-                        <span className="px-2 py-1 rounded bg-muted text-xs text-muted-foreground">
-                          {entry.category}
-                        </span>
-                      </TableCell>
-                      <TableCell className={cn("text-right font-mono font-medium", 
-                        entry.type === "income" ? "text-green-600" : "text-red-600"
-                      )}>
-                        {entry.type === "income" ? "+" : "-"}₹{Number(entry.amount).toLocaleString()}
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell>
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                            }}
-                            data-testid={`button-delete-entry-${entry.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      )}
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <div className="min-w-[350px] px-4 sm:px-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-xs sm:text-sm">Description</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Category</TableHead>
+                      <TableHead className="text-right text-xs sm:text-sm">Amount</TableHead>
+                      {isAdmin && <TableHead className="w-10"></TableHead>}
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-8 text-muted-foreground text-sm">No transactions found.</TableCell>
+                      </TableRow>
+                    ) : (
+                      entries.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="font-medium text-xs sm:text-sm">{entry.description}</TableCell>
+                          <TableCell>
+                            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded bg-muted text-[10px] sm:text-xs text-muted-foreground">
+                              {entry.category}
+                            </span>
+                          </TableCell>
+                          <TableCell className={cn("text-right font-mono font-medium text-xs sm:text-sm", 
+                            entry.type === "income" ? "text-green-600" : "text-red-600"
+                          )}>
+                            {entry.type === "income" ? "+" : "-"}₹{Number(entry.amount).toLocaleString()}
+                          </TableCell>
+                          {isAdmin && (
+                            <TableCell>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                }}
+                                data-testid={`button-delete-entry-${entry.id}`}
+                              >
+                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                              </Button>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

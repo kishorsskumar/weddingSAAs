@@ -61,7 +61,7 @@ export default function TeamCalendar() {
           <Label htmlFor="title">Meeting Title</Label>
           <Input id="title" {...register("title")} required />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="time">Time</Label>
             <Input id="time" type="time" {...register("time")} required />
@@ -82,31 +82,31 @@ export default function TeamCalendar() {
   const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold font-serif text-primary">Team Calendar</h1>
-          <p className="text-muted-foreground">Manage daily schedules and meetings</p>
+          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Team Calendar</h1>
+          <p className="text-sm text-muted-foreground">Manage daily schedules and meetings</p>
         </div>
-        <div className="flex items-center gap-4">
-           <div className="flex items-center gap-2 bg-card border rounded-md p-1">
-            <Button variant="ghost" size="icon" onClick={prevDay}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+           <div className="flex items-center gap-2 bg-card border rounded-md p-1 justify-center">
+            <Button variant="ghost" size="icon" onClick={prevDay} className="h-8 w-8">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium min-w-[120px] text-center">
-              {format(currentDate, "EEEE, MMM d")}
+            <span className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[120px] text-center">
+              {format(currentDate, "EEE, MMM d")}
             </span>
-            <Button variant="ghost" size="icon" onClick={nextDay}>
+            <Button variant="ghost" size="icon" onClick={nextDay} className="h-8 w-8">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-add-meeting">
+              <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-meeting">
                 <Plus className="h-4 w-4" /> Add Meeting
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Schedule Meeting</DialogTitle>
               </DialogHeader>
@@ -116,25 +116,25 @@ export default function TeamCalendar() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-serif">Daily Timeline</CardTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <Card className="lg:col-span-2 order-2 lg:order-1">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="font-serif text-lg">Daily Timeline</CardTitle>
           </CardHeader>
-          <CardContent className="relative min-h-[600px]">
-             <div className="absolute left-16 top-0 bottom-0 w-px bg-border" />
+          <CardContent className="relative min-h-[400px] sm:min-h-[600px] p-4 sm:p-6 pt-0 sm:pt-0">
+             <div className="absolute left-12 sm:left-16 top-0 bottom-0 w-px bg-border" />
              {hours.map(hour => (
-               <div key={hour} className="flex items-start h-20 border-b border-dashed last:border-0">
-                 <div className="w-16 text-xs text-muted-foreground text-right pr-4 pt-1">
+               <div key={hour} className="flex items-start h-14 sm:h-20 border-b border-dashed last:border-0">
+                 <div className="w-12 sm:w-16 text-[10px] sm:text-xs text-muted-foreground text-right pr-2 sm:pr-4 pt-1">
                    {hour}:00
                  </div>
-                 <div className="flex-1 relative pt-1 pl-4">
+                 <div className="flex-1 relative pt-1 pl-2 sm:pl-4">
                    {todaysMeetings.filter(m => parseInt(m.time.split(':')[0]) === hour).map(m => (
-                     <div key={m.id} className="absolute left-2 right-2 bg-secondary border-l-4 border-primary p-2 rounded text-xs shadow-sm">
-                        <div className="font-semibold">{m.title}</div>
-                        <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                          <Clock className="h-3 w-3" /> {m.time}
-                          {m.attendees && <><User className="h-3 w-3 ml-2" /> {m.attendees}</>}
+                     <div key={m.id} className="absolute left-1 sm:left-2 right-1 sm:right-2 bg-secondary border-l-4 border-primary p-1.5 sm:p-2 rounded text-xs shadow-sm">
+                        <div className="font-semibold text-[11px] sm:text-xs truncate">{m.title}</div>
+                        <div className="flex items-center gap-1 sm:gap-2 text-muted-foreground mt-0.5 sm:mt-1 text-[10px] sm:text-xs">
+                          <Clock className="h-3 w-3 flex-shrink-0" /> {m.time}
+                          {m.attendees && <span className="hidden sm:inline"><User className="h-3 w-3 ml-2" /> {m.attendees}</span>}
                         </div>
                      </div>
                    ))}
@@ -144,26 +144,26 @@ export default function TeamCalendar() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-serif">Agenda</CardTitle>
+        <Card className="order-1 lg:order-2">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="font-serif text-lg">Agenda</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             {todaysMeetings.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm">
                 No meetings scheduled for today.
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {todaysMeetings.map(m => (
-                  <div key={m.id} className="flex gap-4 p-4 bg-muted/20 rounded-lg border">
-                    <div className="flex flex-col items-center justify-center min-w-[60px] bg-card rounded border p-2">
-                      <span className="text-lg font-bold text-primary">{m.time}</span>
+                  <div key={m.id} className="flex gap-3 sm:gap-4 p-3 sm:p-4 bg-muted/20 rounded-lg border">
+                    <div className="flex flex-col items-center justify-center min-w-[50px] sm:min-w-[60px] bg-card rounded border p-1.5 sm:p-2">
+                      <span className="text-sm sm:text-lg font-bold text-primary">{m.time}</span>
                     </div>
-                    <div>
-                      <h3 className="font-medium">{m.title}</h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-sm truncate">{m.title}</h3>
                       {m.attendees && (
-                        <p className="text-sm text-muted-foreground mt-1">{m.attendees}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">{m.attendees}</p>
                       )}
                     </div>
                   </div>
