@@ -124,10 +124,14 @@ export default function EventCalendar() {
           <Label htmlFor="customer">Customer Name</Label>
           <Input id="customer" {...register("customer")} required placeholder="e.g. Rahul Sharma" data-testid="input-customer" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="date">Event Date</Label>
             <Input id="date" type="date" {...register("date")} required data-testid="input-date" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="time">Event Time</Label>
+            <Input id="time" type="time" {...register("time")} data-testid="input-time" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Type of Event</Label>

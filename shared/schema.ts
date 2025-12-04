@@ -24,6 +24,7 @@ export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   date: date("date").notNull(),
+  time: text("time"), // Event time e.g. "18:00"
   type: text("type").notNull(), // 'wedding' | 'corporate' | 'birthday' | 'other'
   planner: text("planner").notNull(),
   customer: text("customer").notNull(),
@@ -95,6 +96,18 @@ export const leaveRequests = pgTable("leave_requests", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const eventMilestones = pgTable("event_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  phase: integer("phase").notNull(), // 1-7
+  phaseName: text("phase_name").notNull(),
+  name: text("name").notNull(),
+  date: date("date").notNull(),
+  time: text("time"),
+  status: text("status").notNull().default('pending'), // 'pending' | 'completed'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   permissions: many(userPermissions),
@@ -128,6 +141,7 @@ export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit(
 export const insertBankSchema = createInsertSchema(banks).omit({ id: true, createdAt: true });
 export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({ id: true, createdAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true });
+export const insertEventMilestoneSchema = createInsertSchema(eventMilestones).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -156,3 +170,6 @@ export type InsertBankTransfer = z.infer<typeof insertBankTransferSchema>;
 
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
+
+export type EventMilestone = typeof eventMilestones.$inferSelect;
+export type InsertEventMilestone = z.infer<typeof insertEventMilestoneSchema>;

@@ -9,6 +9,8 @@ import {
   insertDaybookEntrySchema,
   insertBankSchema,
   insertLeaveRequestSchema,
+  insertEventMilestoneSchema,
+  type InsertEventMilestone,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import session from "express-session";
@@ -406,6 +408,119 @@ export async function registerRoutes(
 
   app.delete('/api/leave-requests/:id', async (req, res) => {
     await storage.deleteLeaveRequest(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Event Milestones
+  app.get('/api/milestones', async (req, res) => {
+    const { eventId } = req.query;
+    if (eventId) {
+      const milestones = await storage.getMilestonesByEventId(eventId as string);
+      res.json(milestones);
+    } else {
+      const milestones = await storage.getAllMilestones();
+      res.json(milestones);
+    }
+  });
+
+  app.post('/api/milestones', async (req, res) => {
+    try {
+      const data = insertEventMilestoneSchema.parse(req.body);
+      const milestone = await storage.createMilestone(data);
+      res.json(milestone);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid milestone data' });
+    }
+  });
+
+  app.post('/api/milestones/generate/:eventId', async (req, res) => {
+    try {
+      const eventId = req.params.eventId;
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
+      await storage.deleteMilestonesByEventId(eventId);
+
+      const eventDate = new Date(event.date);
+      const eventTime = event.time || '18:00';
+
+      const addDays = (date: Date, days: number) => {
+        const result = new Date(date);
+        result.setDate(result.getDate() + days);
+        return result.toISOString().split('T')[0];
+      };
+
+      const subtractDays = (date: Date, days: number) => {
+        const result = new Date(date);
+        result.setDate(result.getDate() - days);
+        return result.toISOString().split('T')[0];
+      };
+
+      const milestones: InsertEventMilestone[] = [
+        { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Create Client Folder & CRM Entry', date: subtractDays(eventDate, 90), status: 'pending' },
+        { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Internal Kick off Meeting', date: subtractDays(eventDate, 87), status: 'pending' },
+        { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Client Kick off Meeting', date: subtractDays(eventDate, 80), status: 'pending' },
+        { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Venue Recce', date: subtractDays(eventDate, 80), status: 'pending' },
+
+        { eventId, phase: 2, phaseName: 'Design', name: 'Theme & Mood board finalization', date: subtractDays(eventDate, 70), status: 'pending' },
+        { eventId, phase: 2, phaseName: 'Design', name: '2D/3D approval', date: subtractDays(eventDate, 60), status: 'pending' },
+        { eventId, phase: 2, phaseName: 'Design', name: 'Freeze Decor Design', date: subtractDays(eventDate, 60), status: 'pending' },
+
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: '2nd Installment Payment', date: subtractDays(eventDate, 60), status: 'pending' },
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Budget approval from client', date: subtractDays(eventDate, 60), status: 'pending' },
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Production / high value purchase', date: subtractDays(eventDate, 60), status: 'pending' },
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Vendor booking', date: subtractDays(eventDate, 60), status: 'pending' },
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Any change request', date: subtractDays(eventDate, 45), status: 'pending' },
+        { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Production File & Checklist', date: subtractDays(eventDate, 45), status: 'pending' },
+
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Printables Design Approval', date: subtractDays(eventDate, 30), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: '3rd Installment Payment', date: subtractDays(eventDate, 22), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Production/Transportation plans', date: subtractDays(eventDate, 21), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Venue coordination call', date: subtractDays(eventDate, 19), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Internal Coordination meeting', date: subtractDays(eventDate, 16), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Client coordination Meeting', date: subtractDays(eventDate, 15), status: 'pending' },
+        { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Vendor coordination meeting', date: subtractDays(eventDate, 13), status: 'pending' },
+
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Printables to Printer', date: subtractDays(eventDate, 7), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Execution team briefing', date: subtractDays(eventDate, 5), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Final vendor confirmation call', date: subtractDays(eventDate, 4), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Material arrangement warehouse', date: subtractDays(eventDate, 3), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Flower/Rental arrangements', date: subtractDays(eventDate, 2), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Material loading', date: subtractDays(eventDate, 2), status: 'pending' },
+        { eventId, phase: 5, phaseName: 'Event Week', name: 'Truck departure', date: subtractDays(eventDate, 2), status: 'pending' },
+
+        { eventId, phase: 6, phaseName: 'Event Day', name: 'Wedding planner Reporting', date: event.date, time: '11:00 am', status: 'pending' },
+        { eventId, phase: 6, phaseName: 'Event Day', name: 'Venue Fully Ready', date: event.date, time: '1:00 pm', status: 'pending' },
+        { eventId, phase: 6, phaseName: 'Event Day', name: 'Guest Management Team Reporting', date: event.date, time: '2:00 pm', status: 'pending' },
+
+        { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Demobilisation', date: addDays(eventDate, 1), time: '6:00 pm', status: 'pending' },
+        { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Final payment collection', date: addDays(eventDate, 2), status: 'pending' },
+        { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Vendor settlement', date: addDays(eventDate, 7), status: 'pending' },
+        { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Feedback', date: addDays(eventDate, 8), status: 'pending' },
+        { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Close the event', date: addDays(eventDate, 10), status: 'pending' },
+      ];
+
+      const created = await storage.createManyMilestones(milestones);
+      res.json(created);
+    } catch (error) {
+      console.error('Error generating milestones:', error);
+      res.status(500).json({ error: 'Failed to generate milestones' });
+    }
+  });
+
+  app.patch('/api/milestones/:id', async (req, res) => {
+    try {
+      const milestone = await storage.updateMilestone(req.params.id, req.body);
+      res.json(milestone);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update milestone' });
+    }
+  });
+
+  app.delete('/api/milestones/:id', async (req, res) => {
+    await storage.deleteMilestone(req.params.id);
     res.json({ success: true });
   });
 

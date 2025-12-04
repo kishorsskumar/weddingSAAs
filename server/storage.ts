@@ -8,6 +8,7 @@ import {
   banks,
   bankTransfers,
   leaveRequests,
+  eventMilestones,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -26,6 +27,8 @@ import {
   type InsertBankTransfer,
   type LeaveRequest,
   type InsertLeaveRequest,
+  type EventMilestone,
+  type InsertEventMilestone,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
@@ -93,6 +96,15 @@ export interface IStorage {
   createLeaveRequest(request: InsertLeaveRequest): Promise<LeaveRequest>;
   updateLeaveRequest(id: string, request: Partial<InsertLeaveRequest>): Promise<LeaveRequest | undefined>;
   deleteLeaveRequest(id: string): Promise<void>;
+
+  // Event Milestones
+  getAllMilestones(): Promise<EventMilestone[]>;
+  getMilestonesByEventId(eventId: string): Promise<EventMilestone[]>;
+  createMilestone(milestone: InsertEventMilestone): Promise<EventMilestone>;
+  createManyMilestones(milestones: InsertEventMilestone[]): Promise<EventMilestone[]>;
+  updateMilestone(id: string, milestone: Partial<InsertEventMilestone>): Promise<EventMilestone | undefined>;
+  deleteMilestone(id: string): Promise<void>;
+  deleteMilestonesByEventId(eventId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -323,6 +335,41 @@ export class DatabaseStorage implements IStorage {
 
   async deleteLeaveRequest(id: string): Promise<void> {
     await db.delete(leaveRequests).where(eq(leaveRequests.id, id));
+  }
+
+  // Event Milestones
+  async getAllMilestones(): Promise<EventMilestone[]> {
+    return await db.select().from(eventMilestones).orderBy(eventMilestones.phase, eventMilestones.date);
+  }
+
+  async getMilestonesByEventId(eventId: string): Promise<EventMilestone[]> {
+    return await db.select().from(eventMilestones)
+      .where(eq(eventMilestones.eventId, eventId))
+      .orderBy(eventMilestones.phase, eventMilestones.date);
+  }
+
+  async createMilestone(insertMilestone: InsertEventMilestone): Promise<EventMilestone> {
+    const [milestone] = await db.insert(eventMilestones).values(insertMilestone).returning();
+    return milestone;
+  }
+
+  async createManyMilestones(milestones: InsertEventMilestone[]): Promise<EventMilestone[]> {
+    if (milestones.length === 0) return [];
+    const created = await db.insert(eventMilestones).values(milestones).returning();
+    return created;
+  }
+
+  async updateMilestone(id: string, updateData: Partial<InsertEventMilestone>): Promise<EventMilestone | undefined> {
+    const [milestone] = await db.update(eventMilestones).set(updateData).where(eq(eventMilestones.id, id)).returning();
+    return milestone || undefined;
+  }
+
+  async deleteMilestone(id: string): Promise<void> {
+    await db.delete(eventMilestones).where(eq(eventMilestones.id, id));
+  }
+
+  async deleteMilestonesByEventId(eventId: string): Promise<void> {
+    await db.delete(eventMilestones).where(eq(eventMilestones.eventId, eventId));
   }
 }
 

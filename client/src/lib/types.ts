@@ -2,6 +2,7 @@ export interface Event {
   id: string;
   title: string;
   date: string;
+  time?: string | null;
   type: "wedding" | "corporate" | "birthday" | "other";
   planner: string;
   customer: string;
@@ -69,4 +70,16 @@ export interface User {
   role: string;
   avatar: string | null;
   allowedPages?: string[];
+}
+
+export interface EventMilestone {
+  id: string;
+  eventId: string;
+  phase: number;
+  phaseName: string;
+  name: string;
+  date: string;
+  time?: string | null;
+  status: 'pending' | 'completed';
+  createdAt?: string;
 }
