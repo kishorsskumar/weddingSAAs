@@ -55,12 +55,28 @@ export default function EventCalendar() {
   });
 
   const AddEventForm = () => {
-    const { register, handleSubmit } = useForm<Partial<Event>>();
+    const { register, handleSubmit, watch } = useForm<Partial<Event>>();
+    
+    const customer = watch("customer") || "";
+    const venue = watch("venue") || "";
+    const date = watch("date") || "";
+    
+    const generateEventId = () => {
+      const firstName = customer.split(' ')[0] || "";
+      const venueShort = venue.split(' ')[0] || "";
+      const dateFormatted = date ? format(new Date(date), "ddMMM") : "";
+      if (firstName && venueShort && dateFormatted) {
+        return `${firstName}-${venueShort}-${dateFormatted}`.toUpperCase();
+      }
+      return "";
+    };
+    
+    const eventId = generateEventId();
     
     const onSubmit = (data: any) => {
       createMutation.mutate({
         ...data,
-        title: data.customer + ' - ' + data.type,
+        title: eventId || (data.customer + ' - ' + data.type),
         salesValue: '0',
         paymentReceived: '0',
         cost: '0',
@@ -69,6 +85,12 @@ export default function EventCalendar() {
 
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {eventId && (
+          <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 text-center">
+            <p className="text-xs text-muted-foreground mb-1">Event ID</p>
+            <p className="text-lg font-bold text-primary font-mono">{eventId}</p>
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="customer">Customer Name</Label>
           <Input id="customer" {...register("customer")} required placeholder="e.g. Rahul Sharma" data-testid="input-customer" />
