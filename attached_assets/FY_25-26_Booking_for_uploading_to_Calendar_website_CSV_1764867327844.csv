@@ -1,0 +1,82 @@
+id,date,financial_year,quarter,month,wedding_planner,customer_name,event_type,venue,sales_value,payment_received
+1,2025-06-04,2025-26,Q2,Jun,Fida,Abhinaya,Hindu wedding reception,Bolgatty Event Center,263945,263945
+2,2025-06-14,2025-26,Q2,Jun,Fida,Nancy ,Birthday ,CIAL Golf Club,1729294,1729294
+3,2025-07-06,2025-26,Q2,Jul,Fida,Ayana and Kevin,X'an wedding reception & church décor,Vijaya Convention Center,310072,300000
+4,2025-07-13,2025-26,Q2,Jul,Femina,Arjun,House Warming,Kent Villa Kakkanad,416955,416955
+5,2025-07-10,2025-26,Q2,Jul,Femina,Nimi,Engagement,Chackolas,44850,44850
+6,2025-07-20,2025-26,Q2,Jul,Fida,Fiyona,X'an Engagement,Chackolas _Jade,111650,102850
+7,2025-07-20,2025-26,Q2,Jul,Fida,Nandamohan ,Sangeet,Chackolas- Galleria,85050,85050
+8,2025-07-21,2025-26,Q2,Jul,Fida,Nandamohan ,Hindu wedding,Chackolas- GBR,633273,633273
+9,2025-07-21,2025-26,Q2,Jul,Femina,Sana ,Haldi,Abad- Haldi,381304,381304
+10,2025-07-23,2025-26,Q2,Jul,Fida,Austin/Fiona,X'an wedding reception & church décor,Ramada Resort,366124,366124
+12,2025-07-26,2025-26,Q2,Jul,Femina,Sana ,Muslim Wedding,Trinita Casa,381304,381304
+13,2025-07-26,2025-26,Q2,Jul,Femina,Jinsy,Birthday ,Edam Art Café,17000,17000
+14,2025-08-02,2025-26,Q2,Aug,Femina,Bernard,Birthday ,Cochin Club,82800,82800
+15,2025-08-03,2025-26,Q2,Aug,Fida,Jaseena,Muslim Wedding," Atsk Garden,Kollam",344872,344872
+16,2025-08-09,2025-26,Q2,Aug,Femina,Mariam/ Hyatt Tcr,Birthday ,Hyatt,83820,83820
+17,2025-08-15,2025-26,Q2,Aug,Fida,Kavya,Sangeet,Periyar club,102520,93397
+18,2025-08-17,2025-26,Q2,Aug,Fida,Jessica,Wedding eve,Home - Thodupuzha,278678,278678
+19,2025-08-17,2025-26,Q2,Aug,Femina,Aiswarya,Hindu Wedding,Chackolas -Jade,158500,158500
+20,2025-08-17,2025-26,Q2,Aug,Fida,Pranav,Hindu Engagement,Taj Vivanta,199640,185356
+21,2025-08-17,2025-26,Q2,Aug,Femina,Kiran George,Hindu Wedding,Chackolas -Jade,466298,360000
+22,2025-08-22,2025-26,Q2,Aug,Femina,Mishal- Haldi,Muslim Wedding,Palakkad,1000000,1000000
+25,2025-08-24,2025-26,Q2,Aug,Fida,Kuttikrishan,Hindu wedding,Bolgatty Palace,341474,341474
+26,2025-08-30,2025-26,Q2,Aug,Femina,Dr.Anjana,Engagement,Joys Palace,77660,76000
+27,2025-08-30,2025-26,Q2,Aug,Fida,Dr.Alfred,Dr.Reuinion,Nihara,99187,35000
+28,2025-08-31,2025-26,Q2,Aug,Femina,Varsha,Haldi,Vivanta- Trivandrum,198221,172557
+29,2025-09-04,2025-26,Q2,Sep,Femina,Unnimaya,Hindu Engagement,Ramavarma club,80402,12000
+30,2025-09-06,2025-26,Q2,Sep,Femina,Greeny,Christian engagement,Chittilappally,472480,60000
+31,2025-09-07,2025-26,Q2,Sep,Femina,Varsha ,Hindu Wedding,Trivandrum,1010240,500000
+32,2025-09-07,2025-26,Q2,Sep,Fida,Sneha/Kannur,Hindu Engagement,"Mascot,Kannur",230406,133448
+34,2025-09-11,2025-26,Q2,Sep,Femina,Archana,Hindu Wedding,Chittur,224290,10000
+35,2025-09-13,2025-26,Q2,Sep,Fida,Kaltra & Arpit,Haldi/Sangeet,KLR- Kumarakom,771518,475005
+37,2025-09-14,2025-26,Q2,Sep,Kishor,Keerthana,Hindu Engagement,Janaki nadh-Thrissur,200000,200000
+38,2025-09-14,2025-26,Q2,Sep,Femina,Gokul,Hindu wedding,Kannur,815318,215000
+39,2025-10-04,2025-26,Q3,Oct,Femina,Jijo,Xian Wedding,Countour Backwaters ,1253956,904849
+40,2025-11-01,2025-26,Q3,Nov,Fida,Anjali,Mehandi/Sangeet,Nihara,664886,340000
+41,2025-11-01,2025-26,Q3,Nov,Femina,Sabu ,House Warming,Kent Kaloor,68574,0
+44,2025-11-02,2025-26,Q3,Nov,Femina,Nithiya,Sangeet,World Backwater,265845,0
+46,2025-11-06,2025-26,Q3,Nov,Fida,Shrishti,Haldi/Sangeet,Gokulam - Kumarakom,666523,368148
+48,2025-11-06,2025-26,Q3,Nov,Fida,Vijaya & Nikhil,Haldi/Sangeet,Deja Blu,177927,100000
+50,2025-11-09,2025-26,Q3,Nov,Femina,Akshara,Hindu Wedding,Periyar club,140415,20000
+52,2025-11-20,2025-26,Q3,Nov,Fida,Nikitha,Haldi/Sangeet,Ramada Resort,2123027,1036000
+55,2025-11-23,2025-26,Q3,Nov,Femina,Anjaly,Christian engagement,Chackolas GBR,235470,0
+56,2025-11-24,2025-26,Q3,Nov,Fida,James,Christian engagement,Edassery,211344,116537
+57,2025-11-25,2025-26,Q3,Nov,Femina,Nishanth,Wedding Reception,Baymass Panangad,180384,10000
+59,2025-11-29,2025-26,Q3,Nov,Fida,Preetha,Engagement,Bolgatty Panthal,332605,59366
+62,2025-12-01,2025-26,Q3,Dec,Fida,Sudha,Iyengar wedding,Bolgatty Panthal,156676,50000
+63,2025-12-11,2025-26,Q3,Dec,Fida,Yash/Malavika,Welcome Party & Sangeet,Baymass Panangad,424039,0
+64,2025-12-11,2025-26,Q3,Dec,Femina,Soorya,Mehandi,Backwater Ripples,90376,10000
+66,2025-12-12,2025-26,Q3,Dec,Fida,Malavika,Haldi/Sangeet,Baymass Panangad,663113,0
+67,2025-12-13,2025-26,Q3,Dec,Fida,Malavika,Hindu Wedding & North Indian,Bolgatty Palace,874236,118475
+68,2025-12-13,2025-26,Q3,Dec,Femina,Sharukh,Wedding Reception,Village Canopy,173877,5000
+69,2025-12-14,2025-26,Q3,Dec,Fida,Vandana,Welcome Party & Sangeet,Backwater Ripples,764381,100000
+71,2025-12-15,2025-26,Q3,Dec,Femina,Unnimaya,Hindu Wedding,Bolgatty,297264,0
+74,2025-12-18,2025-26,Q3,Dec,Femina,Mehak,Wedding Eve,Blue serene/Bhasuri,772200,100000
+75,2025-12-21,2025-26,Q3,Dec,Femina,Megha,Wedding Eve,Nihara,494714,84282
+77,2025-12-22,2025-26,Q3,Dec,Femina,Gopika,Hindu Wedding,Neelambari,171941,15000
+78,2025-12-23,2025-26,Q3,Dec,Fida,Abhinanth,Reception,"Puzhayoram, Thrissur",199528,10000
+79,2025-12-23,2025-26,Q3,Dec,Fida,Dr.Akhil,Hindu wedding reception,Bolgatty EC,262752,38572
+80,2025-12-24,2025-26,Q3,Dec,Femina,Unnikrishnan,Hindu Wedding,Lailac,500000,75000
+81,2025-12-24,2025-26,Q3,Dec,Fida,Thara,Madhuramveppu,Gymkhana club,168604,93000
+83,2025-12-26,2025-26,Q3,Dec,Fida,Mathew,Madhuramveppu,Home,156800,0
+84,2025-12-27,2025-26,Q3,Dec,Fida,Manoj,Madhuramveppu,Mansoon Empress,335687,33028
+85,2025-12-27,2025-26,Q3,Dec,Fida,Krish,Civil Ceremony/Mehandi/Sangeet,Le-Meridien,1808238,261372
+86,2025-12-27,2025-26,Q3,Dec,Femina,Neenu,X'an wedding reception & church décor,CSI Heritage- FortKochi,292446,44000
+88,2025-12-28,2025-26,Q3,Dec,Femina,Basil,X'an wedding reception & church décor,Palmgrove-Kottaya m,1000000,35000
+89,2025-12-28,2025-26,Q3,Dec,Fida,Latha/Manoj/Mathew,X'an wedding reception & church décor,GBR Chakolas,785917,100000
+91,2025-12-29,2025-26,Q3,Dec,Fida,Irine,Indian Wedding & reception,"Kadavu resort,Calicut",254878,20000
+92,2025-01-02,2025-26,Q4,Jan,Femina,Nikita,"Haldi ,Sangeet",Nihara,206921,31039
+93,2025-01-02,2025-26,Q4,Jan,Femina,Anuja,Wedding Reception,Riveria Portico,181280,10000
+96,2026-01-11,2025-26,Q4,Jan,Femina,Susan,Christian  Wedding,Holiday Inn,198033,29704
+97,2026-01-11,2025-26,Q4,Jan,Fida,Dr.Martin,Wedding Reception,Heartland,329872,49000
+98,2026-01-12,2025-26,Q4,Jan,Femina,Megha,Christian wedding,MCP,318384,47756
+99,2026-01-15,2025-26,Q4,Jan,Fida,Dr.Sonia Firoz,Nikah,KTDC Samudsra,441166,66174
+101,2026-01-22,2025-26,Q4,Jan,Fida,Sindhu,Wedding Reception,Taj Wayanad,806355,80000
+103,2026-01-25,2025-26,Q4,Jan,Fida,Akshay,Engagement,Wayanad,108752,5000
+104,2026-01-25,2025-26,Q4,Jan,Fida,Abhirami,Hindu Wedding,Gokulam Thrissur,250000,137880
+105,2026-02-04,2025-26,Q4,Feb,Fida,Anjaleena,"Mhndi,Sangeet",Abad Kumarakom,594133,90000
+107,2026-02-07,2025-26,Q4,Feb,Fida,Amala,Engagement,Base 11,193981,29097
+108,2026-02-15,2025-26,Q4,Feb,Fida,Roshni,Reception,Chackolas GBR,336795,50519
+109,2026-03-20,2025-26,Q4,Mar,Femina,Pooja,Hindu Wedding,Sri padma kalyana mandapam,248258,28839
+111,2026-03-20,2025-26,Q4,Mar,Fida,Shruthi,Hindu Wedding,Gokulam Grand,883305,104229
