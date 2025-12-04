@@ -60,35 +60,36 @@ export default function EventCalendar() {
     const onSubmit = (data: any) => {
       createMutation.mutate({
         ...data,
+        title: data.customer + ' - ' + data.type,
         salesValue: '0',
         paymentReceived: '0',
         cost: '0',
-        planner: 'Current User',
-        customer: data.customer || 'New Customer',
-        venue: data.venue || 'TBD',
       });
     };
 
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Event Title</Label>
-          <Input id="title" {...register("title")} required placeholder="e.g. Smith Wedding" />
+          <Label htmlFor="customer">Customer Name</Label>
+          <Input id="customer" {...register("customer")} required placeholder="e.g. Rahul Sharma" data-testid="input-customer" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="date">Date</Label>
-            <Input id="date" type="date" {...register("date")} required />
+            <Label htmlFor="date">Event Date</Label>
+            <Input id="date" type="date" {...register("date")} required data-testid="input-date" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
-            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" {...register("type")}>
-              <option value="wedding">Wedding</option>
-              <option value="corporate">Corporate</option>
-              <option value="birthday">Birthday</option>
-              <option value="other">Other</option>
-            </select>
+            <Label htmlFor="type">Type of Event</Label>
+            <Input id="type" {...register("type")} required placeholder="e.g. Wedding, Corporate" data-testid="input-type" />
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="venue">Venue</Label>
+          <Input id="venue" {...register("venue")} required placeholder="e.g. Grand Oak Hall" data-testid="input-venue" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="planner">Wedding Planner</Label>
+          <Input id="planner" {...register("planner")} required placeholder="e.g. Sarah Jenkins" data-testid="input-planner" />
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending}>
           {createMutation.isPending ? 'Creating...' : 'Create Event'}
