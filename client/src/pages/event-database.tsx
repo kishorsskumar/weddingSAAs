@@ -19,7 +19,7 @@ export default function EventDatabase() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],

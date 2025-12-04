@@ -17,7 +17,7 @@ export default function EventCalendar() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],

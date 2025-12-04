@@ -110,6 +110,7 @@ export default function Admin() {
             <option value="employee">Employee</option>
             <option value="manager">Manager</option>
             <option value="admin">Admin</option>
+            <option value="superadmin">Super Admin</option>
           </select>
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending}>
@@ -177,7 +178,7 @@ export default function Admin() {
                       <Checkbox 
                         checked={user.allowedPages?.includes(page.id)}
                         onCheckedChange={() => togglePermission(user.id, page.id, user.allowedPages || [])}
-                        disabled={user.role === 'admin'}
+                        disabled={user.role === 'admin' || user.role === 'superadmin'}
                         data-testid={`checkbox-${user.id}-${page.id}`}
                       />
                     </TableCell>
@@ -186,7 +187,7 @@ export default function Admin() {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      disabled={user.role === 'admin'}
+                      disabled={user.role === 'admin' || user.role === 'superadmin'}
                       onClick={() => deleteMutation.mutate(user.id)}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
