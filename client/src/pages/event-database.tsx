@@ -371,10 +371,30 @@ export default function EventDatabase() {
           <p className="text-sm text-muted-foreground">Track financials and details for all events</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none">
-            <Upload className="h-4 w-4" /> <span className="hidden sm:inline">Import</span>
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept=".csv"
+            onChange={handleImport}
+            className="hidden"
+            data-testid="input-import-file"
+          />
+          <Button 
+            variant="outline" 
+            className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            data-testid="button-import"
+          >
+            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            <span className="hidden sm:inline">{isImporting ? 'Importing...' : 'Import'}</span>
           </Button>
-          <Button variant="outline" className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none">
+          <Button 
+            variant="outline" 
+            className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
+            onClick={handleExport}
+            data-testid="button-export"
+          >
             <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
           </Button>
         </div>
