@@ -16,7 +16,9 @@ const ALL_PAGES = [
   { id: "event-calendar", label: "Event Calendar" },
   { id: "team-calendar", label: "Team Calendar" },
   { id: "event-database", label: "Event Database" },
+  { id: "event-milestones", label: "Event Milestones" },
   { id: "daybook", label: "Daybook" },
+  { id: "oak-book", label: "Oak Book" },
   { id: "hr", label: "HR" },
   { id: "admin", label: "Admin" },
 ];

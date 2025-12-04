@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, date, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, date, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -108,6 +108,131 @@ export const eventMilestones = pgTable("event_milestones", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Oak Book - Customers
+export const customers = pgTable("customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  gstNumber: text("gst_number"),
+  billingAddress: text("billing_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Vendors
+export const vendors = pgTable("vendors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  gstNumber: text("gst_number"),
+  category: text("category"), // 'catering' | 'decoration' | 'photography' | 'venue' | 'other'
+  billingAddress: text("billing_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Line item type for estimates and invoices
+export const lineItemSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  quantity: z.number(),
+  rate: z.number(),
+  taxRate: z.number().optional().default(0),
+  total: z.number(),
+});
+
+export type LineItem = z.infer<typeof lineItemSchema>;
+
+// Oak Book - Estimates
+export const estimates = pgTable("estimates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // EST-001
+  customerId: varchar("customer_id").references(() => customers.id),
+  eventId: varchar("event_id").references(() => events.id),
+  date: date("date").notNull(),
+  dueDate: date("due_date"),
+  status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'accepted' | 'declined' | 'converted'
+  lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default('0'),
+  taxTotal: decimal("tax_total", { precision: 12, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull().default('0'),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Invoices
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // INV-001
+  customerId: varchar("customer_id").references(() => customers.id),
+  eventId: varchar("event_id").references(() => events.id),
+  estimateId: varchar("estimate_id").references(() => estimates.id),
+  date: date("date").notNull(),
+  dueDate: date("due_date"),
+  status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
+  lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default('0'),
+  taxTotal: decimal("tax_total", { precision: 12, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull().default('0'),
+  balanceDue: decimal("balance_due", { precision: 12, scale: 2 }).notNull().default('0'),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Customer Payments (Payment Receipts)
+export const customerPayments = pgTable("customer_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // REC-001
+  customerId: varchar("customer_id").references(() => customers.id),
+  invoiceId: varchar("invoice_id").references(() => invoices.id),
+  eventId: varchar("event_id").references(() => events.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  date: date("date").notNull(),
+  paymentMode: text("payment_mode").notNull(), // 'cash' | 'bank_transfer' | 'cheque' | 'upi' | 'card'
+  bankId: varchar("bank_id").references(() => banks.id),
+  reference: text("reference"),
+  notes: text("notes"),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Expenses
+export const expenses = pgTable("expenses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // EXP-001
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  eventId: varchar("event_id").references(() => events.id),
+  category: text("category").notNull(), // 'catering' | 'decoration' | 'photography' | 'venue' | 'travel' | 'salary' | 'other'
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+  date: date("date").notNull(),
+  status: text("status").notNull().default('recorded'), // 'recorded' | 'paid'
+  bankId: varchar("bank_id").references(() => banks.id),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Vendor Payments
+export const vendorPayments = pgTable("vendor_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // VPY-001
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  expenseId: varchar("expense_id").references(() => expenses.id),
+  eventId: varchar("event_id").references(() => events.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  date: date("date").notNull(),
+  paymentMode: text("payment_mode").notNull(), // 'cash' | 'bank_transfer' | 'cheque' | 'upi' | 'card'
+  bankId: varchar("bank_id").references(() => banks.id),
+  reference: text("reference"),
+  notes: text("notes"),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   permissions: many(userPermissions),
@@ -143,6 +268,19 @@ export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true });
 export const insertEventMilestoneSchema = createInsertSchema(eventMilestones).omit({ id: true, createdAt: true });
 
+// Oak Book Insert Schemas
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
+export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true, createdAt: true });
+export const insertEstimateSchema = createInsertSchema(estimates).omit({ id: true, createdAt: true }).extend({
+  lineItems: z.array(lineItemSchema).optional().default([]),
+});
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true }).extend({
+  lineItems: z.array(lineItemSchema).optional().default([]),
+});
+export const insertCustomerPaymentSchema = createInsertSchema(customerPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, daybookEntryId: true });
+export const insertVendorPaymentSchema = createInsertSchema(vendorPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -173,3 +311,25 @@ export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
 
 export type EventMilestone = typeof eventMilestones.$inferSelect;
 export type InsertEventMilestone = z.infer<typeof insertEventMilestoneSchema>;
+
+// Oak Book Types
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+
+export type Vendor = typeof vendors.$inferSelect;
+export type InsertVendor = z.infer<typeof insertVendorSchema>;
+
+export type Estimate = typeof estimates.$inferSelect;
+export type InsertEstimate = z.infer<typeof insertEstimateSchema>;
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+
+export type CustomerPayment = typeof customerPayments.$inferSelect;
+export type InsertCustomerPayment = z.infer<typeof insertCustomerPaymentSchema>;
+
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
+
+export type VendorPayment = typeof vendorPayments.$inferSelect;
+export type InsertVendorPayment = z.infer<typeof insertVendorPaymentSchema>;

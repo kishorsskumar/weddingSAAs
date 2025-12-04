@@ -10,6 +10,13 @@ import {
   insertBankSchema,
   insertLeaveRequestSchema,
   insertEventMilestoneSchema,
+  insertCustomerSchema,
+  insertVendorSchema,
+  insertEstimateSchema,
+  insertInvoiceSchema,
+  insertCustomerPaymentSchema,
+  insertExpenseSchema,
+  insertVendorPaymentSchema,
   type InsertEventMilestone,
 } from "@shared/schema";
 import bcrypt from "bcryptjs";
@@ -521,6 +528,335 @@ export async function registerRoutes(
 
   app.delete('/api/milestones/:id', async (req, res) => {
     await storage.deleteMilestone(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Customers
+  app.get('/api/customers', async (req, res) => {
+    const customers = await storage.getAllCustomers();
+    res.json(customers);
+  });
+
+  app.get('/api/customers/:id', async (req, res) => {
+    const customer = await storage.getCustomer(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+    res.json(customer);
+  });
+
+  app.post('/api/customers', async (req, res) => {
+    try {
+      const data = insertCustomerSchema.parse(req.body);
+      const customer = await storage.createCustomer(data);
+      res.json(customer);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid customer data' });
+    }
+  });
+
+  app.patch('/api/customers/:id', async (req, res) => {
+    try {
+      const customer = await storage.updateCustomer(req.params.id, req.body);
+      res.json(customer);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update customer' });
+    }
+  });
+
+  app.delete('/api/customers/:id', async (req, res) => {
+    await storage.deleteCustomer(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Vendors
+  app.get('/api/vendors', async (req, res) => {
+    const vendors = await storage.getAllVendors();
+    res.json(vendors);
+  });
+
+  app.get('/api/vendors/:id', async (req, res) => {
+    const vendor = await storage.getVendor(req.params.id);
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor not found' });
+    }
+    res.json(vendor);
+  });
+
+  app.post('/api/vendors', async (req, res) => {
+    try {
+      const data = insertVendorSchema.parse(req.body);
+      const vendor = await storage.createVendor(data);
+      res.json(vendor);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid vendor data' });
+    }
+  });
+
+  app.patch('/api/vendors/:id', async (req, res) => {
+    try {
+      const vendor = await storage.updateVendor(req.params.id, req.body);
+      res.json(vendor);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update vendor' });
+    }
+  });
+
+  app.delete('/api/vendors/:id', async (req, res) => {
+    await storage.deleteVendor(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Estimates
+  app.get('/api/estimates', async (req, res) => {
+    const estimates = await storage.getAllEstimates();
+    res.json(estimates);
+  });
+
+  app.get('/api/estimates/next-number', async (req, res) => {
+    const number = await storage.getNextEstimateNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/estimates/:id', async (req, res) => {
+    const estimate = await storage.getEstimate(req.params.id);
+    if (!estimate) {
+      return res.status(404).json({ error: 'Estimate not found' });
+    }
+    res.json(estimate);
+  });
+
+  app.post('/api/estimates', async (req, res) => {
+    try {
+      const data = insertEstimateSchema.parse(req.body);
+      const estimate = await storage.createEstimate(data);
+      res.json(estimate);
+    } catch (error) {
+      console.error('Estimate creation error:', error);
+      res.status(400).json({ error: 'Invalid estimate data' });
+    }
+  });
+
+  app.patch('/api/estimates/:id', async (req, res) => {
+    try {
+      const estimate = await storage.updateEstimate(req.params.id, req.body);
+      res.json(estimate);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update estimate' });
+    }
+  });
+
+  app.post('/api/estimates/:id/convert', async (req, res) => {
+    try {
+      const estimate = await storage.getEstimate(req.params.id);
+      if (!estimate) {
+        return res.status(404).json({ error: 'Estimate not found' });
+      }
+
+      const invoiceNumber = await storage.getNextInvoiceNumber();
+      const invoice = await storage.createInvoice({
+        number: invoiceNumber,
+        customerId: estimate.customerId,
+        eventId: estimate.eventId,
+        estimateId: estimate.id,
+        date: new Date().toISOString().split('T')[0],
+        dueDate: estimate.dueDate,
+        status: 'sent',
+        lineItems: estimate.lineItems,
+        subtotal: estimate.subtotal,
+        taxTotal: estimate.taxTotal,
+        total: estimate.total,
+        balanceDue: estimate.total,
+        notes: estimate.notes,
+        terms: estimate.terms,
+      });
+
+      await storage.updateEstimate(estimate.id, { status: 'converted' });
+      res.json(invoice);
+    } catch (error) {
+      console.error('Convert estimate error:', error);
+      res.status(400).json({ error: 'Failed to convert estimate to invoice' });
+    }
+  });
+
+  app.delete('/api/estimates/:id', async (req, res) => {
+    await storage.deleteEstimate(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Invoices
+  app.get('/api/invoices', async (req, res) => {
+    const invoices = await storage.getAllInvoices();
+    res.json(invoices);
+  });
+
+  app.get('/api/invoices/next-number', async (req, res) => {
+    const number = await storage.getNextInvoiceNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/invoices/:id', async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    res.json(invoice);
+  });
+
+  app.post('/api/invoices', async (req, res) => {
+    try {
+      const data = insertInvoiceSchema.parse(req.body);
+      const invoice = await storage.createInvoice({
+        ...data,
+        balanceDue: data.total,
+      });
+      res.json(invoice);
+    } catch (error) {
+      console.error('Invoice creation error:', error);
+      res.status(400).json({ error: 'Invalid invoice data' });
+    }
+  });
+
+  app.patch('/api/invoices/:id', async (req, res) => {
+    try {
+      const invoice = await storage.updateInvoice(req.params.id, req.body);
+      res.json(invoice);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update invoice' });
+    }
+  });
+
+  app.delete('/api/invoices/:id', async (req, res) => {
+    await storage.deleteInvoice(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Customer Payments (Receipts)
+  app.get('/api/customer-payments', async (req, res) => {
+    const payments = await storage.getAllCustomerPayments();
+    res.json(payments);
+  });
+
+  app.get('/api/customer-payments/next-number', async (req, res) => {
+    const number = await storage.getNextReceiptNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/customer-payments/:id', async (req, res) => {
+    const payment = await storage.getCustomerPayment(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+    res.json(payment);
+  });
+
+  app.post('/api/customer-payments', async (req, res) => {
+    try {
+      const data = insertCustomerPaymentSchema.parse(req.body);
+      let customerName = 'Customer';
+      if (data.customerId) {
+        const customer = await storage.getCustomer(data.customerId);
+        if (customer) customerName = customer.name;
+      }
+      const payment = await storage.createCustomerPaymentWithDaybook(data, customerName);
+      res.json(payment);
+    } catch (error) {
+      console.error('Customer payment error:', error);
+      res.status(400).json({ error: 'Invalid payment data' });
+    }
+  });
+
+  app.delete('/api/customer-payments/:id', async (req, res) => {
+    await storage.deleteCustomerPayment(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Expenses
+  app.get('/api/expenses', async (req, res) => {
+    const expenses = await storage.getAllExpenses();
+    res.json(expenses);
+  });
+
+  app.get('/api/expenses/next-number', async (req, res) => {
+    const number = await storage.getNextExpenseNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/expenses/:id', async (req, res) => {
+    const expense = await storage.getExpense(req.params.id);
+    if (!expense) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+    res.json(expense);
+  });
+
+  app.post('/api/expenses', async (req, res) => {
+    try {
+      const data = insertExpenseSchema.parse(req.body);
+      let vendorName = 'Vendor';
+      if (data.vendorId) {
+        const vendor = await storage.getVendor(data.vendorId);
+        if (vendor) vendorName = vendor.name;
+      }
+      const expense = await storage.createExpenseWithDaybook(data, vendorName);
+      res.json(expense);
+    } catch (error) {
+      console.error('Expense creation error:', error);
+      res.status(400).json({ error: 'Invalid expense data' });
+    }
+  });
+
+  app.patch('/api/expenses/:id', async (req, res) => {
+    try {
+      const expense = await storage.updateExpense(req.params.id, req.body);
+      res.json(expense);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update expense' });
+    }
+  });
+
+  app.delete('/api/expenses/:id', async (req, res) => {
+    await storage.deleteExpense(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Vendor Payments
+  app.get('/api/vendor-payments', async (req, res) => {
+    const payments = await storage.getAllVendorPayments();
+    res.json(payments);
+  });
+
+  app.get('/api/vendor-payments/next-number', async (req, res) => {
+    const number = await storage.getNextVendorPaymentNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/vendor-payments/:id', async (req, res) => {
+    const payment = await storage.getVendorPayment(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ error: 'Vendor payment not found' });
+    }
+    res.json(payment);
+  });
+
+  app.post('/api/vendor-payments', async (req, res) => {
+    try {
+      const data = insertVendorPaymentSchema.parse(req.body);
+      let vendorName = 'Vendor';
+      if (data.vendorId) {
+        const vendor = await storage.getVendor(data.vendorId);
+        if (vendor) vendorName = vendor.name;
+      }
+      const payment = await storage.createVendorPaymentWithDaybook(data, vendorName);
+      res.json(payment);
+    } catch (error) {
+      console.error('Vendor payment error:', error);
+      res.status(400).json({ error: 'Invalid vendor payment data' });
+    }
+  });
+
+  app.delete('/api/vendor-payments/:id', async (req, res) => {
+    await storage.deleteVendorPayment(req.params.id);
     res.json({ success: true });
   });
 

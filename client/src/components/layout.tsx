@@ -12,7 +12,8 @@ import {
   LogOut,
   Menu,
   Briefcase,
-  CheckSquare
+  CheckSquare,
+  Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,6 +27,7 @@ const ALL_PAGES = [
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
+  { id: "oak-book", label: "Oak Book", path: "/oak-book" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
@@ -37,6 +39,7 @@ const ICONS: Record<string, any> = {
   "event-database": Database,
   "event-milestones": CheckSquare,
   daybook: BookOpen,
+  "oak-book": Receipt,
   hr: Briefcase,
   admin: Shield,
 };

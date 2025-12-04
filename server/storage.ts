@@ -9,6 +9,13 @@ import {
   bankTransfers,
   leaveRequests,
   eventMilestones,
+  customers,
+  vendors,
+  estimates,
+  invoices,
+  customerPayments,
+  expenses,
+  vendorPayments,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -29,9 +36,23 @@ import {
   type InsertLeaveRequest,
   type EventMilestone,
   type InsertEventMilestone,
+  type Customer,
+  type InsertCustomer,
+  type Vendor,
+  type InsertVendor,
+  type Estimate,
+  type InsertEstimate,
+  type Invoice,
+  type InsertInvoice,
+  type CustomerPayment,
+  type InsertCustomerPayment,
+  type Expense,
+  type InsertExpense,
+  type VendorPayment,
+  type InsertVendorPayment,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -105,6 +126,58 @@ export interface IStorage {
   updateMilestone(id: string, milestone: Partial<InsertEventMilestone>): Promise<EventMilestone | undefined>;
   deleteMilestone(id: string): Promise<void>;
   deleteMilestonesByEventId(eventId: string): Promise<void>;
+
+  // Oak Book - Customers
+  getAllCustomers(): Promise<Customer[]>;
+  getCustomer(id: string): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, customer: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<void>;
+
+  // Oak Book - Vendors
+  getAllVendors(): Promise<Vendor[]>;
+  getVendor(id: string): Promise<Vendor | undefined>;
+  createVendor(vendor: InsertVendor): Promise<Vendor>;
+  updateVendor(id: string, vendor: Partial<InsertVendor>): Promise<Vendor | undefined>;
+  deleteVendor(id: string): Promise<void>;
+
+  // Oak Book - Estimates
+  getAllEstimates(): Promise<Estimate[]>;
+  getEstimate(id: string): Promise<Estimate | undefined>;
+  createEstimate(estimate: InsertEstimate): Promise<Estimate>;
+  updateEstimate(id: string, estimate: Partial<InsertEstimate>): Promise<Estimate | undefined>;
+  deleteEstimate(id: string): Promise<void>;
+  getNextEstimateNumber(): Promise<string>;
+
+  // Oak Book - Invoices
+  getAllInvoices(): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  createInvoice(invoice: InsertInvoice): Promise<Invoice>;
+  updateInvoice(id: string, invoice: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<void>;
+  getNextInvoiceNumber(): Promise<string>;
+
+  // Oak Book - Customer Payments
+  getAllCustomerPayments(): Promise<CustomerPayment[]>;
+  getCustomerPayment(id: string): Promise<CustomerPayment | undefined>;
+  createCustomerPaymentWithDaybook(payment: InsertCustomerPayment, customerName: string): Promise<CustomerPayment>;
+  deleteCustomerPayment(id: string): Promise<void>;
+  getNextReceiptNumber(): Promise<string>;
+
+  // Oak Book - Expenses
+  getAllExpenses(): Promise<Expense[]>;
+  getExpense(id: string): Promise<Expense | undefined>;
+  createExpenseWithDaybook(expense: InsertExpense, vendorName: string): Promise<Expense>;
+  updateExpense(id: string, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: string): Promise<void>;
+  getNextExpenseNumber(): Promise<string>;
+
+  // Oak Book - Vendor Payments
+  getAllVendorPayments(): Promise<VendorPayment[]>;
+  getVendorPayment(id: string): Promise<VendorPayment | undefined>;
+  createVendorPaymentWithDaybook(payment: InsertVendorPayment, vendorName: string): Promise<VendorPayment>;
+  deleteVendorPayment(id: string): Promise<void>;
+  getNextVendorPaymentNumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -370,6 +443,314 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMilestonesByEventId(eventId: string): Promise<void> {
     await db.delete(eventMilestones).where(eq(eventMilestones.eventId, eventId));
+  }
+
+  // Oak Book - Customers
+  async getAllCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(desc(customers.createdAt));
+  }
+
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
+  }
+
+  async createCustomer(insertCustomer: InsertCustomer): Promise<Customer> {
+    const [customer] = await db.insert(customers).values(insertCustomer).returning();
+    return customer;
+  }
+
+  async updateCustomer(id: string, updateData: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [customer] = await db.update(customers).set(updateData).where(eq(customers.id, id)).returning();
+    return customer || undefined;
+  }
+
+  async deleteCustomer(id: string): Promise<void> {
+    await db.delete(customers).where(eq(customers.id, id));
+  }
+
+  // Oak Book - Vendors
+  async getAllVendors(): Promise<Vendor[]> {
+    return await db.select().from(vendors).orderBy(desc(vendors.createdAt));
+  }
+
+  async getVendor(id: string): Promise<Vendor | undefined> {
+    const [vendor] = await db.select().from(vendors).where(eq(vendors.id, id));
+    return vendor || undefined;
+  }
+
+  async createVendor(insertVendor: InsertVendor): Promise<Vendor> {
+    const [vendor] = await db.insert(vendors).values(insertVendor).returning();
+    return vendor;
+  }
+
+  async updateVendor(id: string, updateData: Partial<InsertVendor>): Promise<Vendor | undefined> {
+    const [vendor] = await db.update(vendors).set(updateData).where(eq(vendors.id, id)).returning();
+    return vendor || undefined;
+  }
+
+  async deleteVendor(id: string): Promise<void> {
+    await db.delete(vendors).where(eq(vendors.id, id));
+  }
+
+  // Oak Book - Estimates
+  async getAllEstimates(): Promise<Estimate[]> {
+    return await db.select().from(estimates).orderBy(desc(estimates.createdAt));
+  }
+
+  async getEstimate(id: string): Promise<Estimate | undefined> {
+    const [estimate] = await db.select().from(estimates).where(eq(estimates.id, id));
+    return estimate || undefined;
+  }
+
+  async createEstimate(insertEstimate: InsertEstimate): Promise<Estimate> {
+    const [estimate] = await db.insert(estimates).values(insertEstimate).returning();
+    return estimate;
+  }
+
+  async updateEstimate(id: string, updateData: Partial<InsertEstimate>): Promise<Estimate | undefined> {
+    const [estimate] = await db.update(estimates).set(updateData).where(eq(estimates.id, id)).returning();
+    return estimate || undefined;
+  }
+
+  async deleteEstimate(id: string): Promise<void> {
+    await db.delete(estimates).where(eq(estimates.id, id));
+  }
+
+  async getNextEstimateNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(estimates);
+    const count = Number(result?.count || 0) + 1;
+    return `EST-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Invoices
+  async getAllInvoices(): Promise<Invoice[]> {
+    return await db.select().from(invoices).orderBy(desc(invoices.createdAt));
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+    return invoice || undefined;
+  }
+
+  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
+    const [invoice] = await db.insert(invoices).values(insertInvoice).returning();
+    return invoice;
+  }
+
+  async updateInvoice(id: string, updateData: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const [invoice] = await db.update(invoices).set(updateData).where(eq(invoices.id, id)).returning();
+    return invoice || undefined;
+  }
+
+  async deleteInvoice(id: string): Promise<void> {
+    await db.delete(invoices).where(eq(invoices.id, id));
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(invoices);
+    const count = Number(result?.count || 0) + 1;
+    return `INV-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Customer Payments
+  async getAllCustomerPayments(): Promise<CustomerPayment[]> {
+    return await db.select().from(customerPayments).orderBy(desc(customerPayments.createdAt));
+  }
+
+  async getCustomerPayment(id: string): Promise<CustomerPayment | undefined> {
+    const [payment] = await db.select().from(customerPayments).where(eq(customerPayments.id, id));
+    return payment || undefined;
+  }
+
+  async createCustomerPaymentWithDaybook(insertPayment: InsertCustomerPayment, customerName: string): Promise<CustomerPayment> {
+    const daybookEntry = await db.insert(daybookEntries).values({
+      date: insertPayment.date,
+      description: `Payment from ${customerName} - ${insertPayment.reference || insertPayment.number}`,
+      type: 'income',
+      amount: insertPayment.amount,
+      category: 'Sales Receipt',
+      bankId: insertPayment.bankId || null,
+    }).returning();
+
+    if (insertPayment.bankId) {
+      await db.update(banks)
+        .set({ balance: sql`${banks.balance} + ${insertPayment.amount}` })
+        .where(eq(banks.id, insertPayment.bankId));
+    }
+
+    if (insertPayment.invoiceId) {
+      const invoice = await this.getInvoice(insertPayment.invoiceId);
+      if (invoice) {
+        const newBalanceDue = Number(invoice.balanceDue) - Number(insertPayment.amount);
+        const newStatus = newBalanceDue <= 0 ? 'paid' : 'partial';
+        await db.update(invoices)
+          .set({ balanceDue: String(Math.max(0, newBalanceDue)), status: newStatus })
+          .where(eq(invoices.id, insertPayment.invoiceId));
+      }
+    }
+
+    const [payment] = await db.insert(customerPayments).values({
+      ...insertPayment,
+      daybookEntryId: daybookEntry[0].id,
+    }).returning();
+    return payment;
+  }
+
+  async deleteCustomerPayment(id: string): Promise<void> {
+    const payment = await this.getCustomerPayment(id);
+    if (payment) {
+      if (payment.daybookEntryId) {
+        await db.delete(daybookEntries).where(eq(daybookEntries.id, payment.daybookEntryId));
+      }
+      if (payment.bankId) {
+        await db.update(banks)
+          .set({ balance: sql`${banks.balance} - ${payment.amount}` })
+          .where(eq(banks.id, payment.bankId));
+      }
+      if (payment.invoiceId) {
+        const invoice = await this.getInvoice(payment.invoiceId);
+        if (invoice) {
+          const newBalanceDue = Number(invoice.balanceDue) + Number(payment.amount);
+          const newStatus = newBalanceDue >= Number(invoice.total) ? 'sent' : 'partial';
+          await db.update(invoices)
+            .set({ balanceDue: String(newBalanceDue), status: newStatus })
+            .where(eq(invoices.id, payment.invoiceId));
+        }
+      }
+    }
+    await db.delete(customerPayments).where(eq(customerPayments.id, id));
+  }
+
+  async getNextReceiptNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(customerPayments);
+    const count = Number(result?.count || 0) + 1;
+    return `REC-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Expenses
+  async getAllExpenses(): Promise<Expense[]> {
+    return await db.select().from(expenses).orderBy(desc(expenses.createdAt));
+  }
+
+  async getExpense(id: string): Promise<Expense | undefined> {
+    const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
+    return expense || undefined;
+  }
+
+  async createExpenseWithDaybook(insertExpense: InsertExpense, vendorName: string): Promise<Expense> {
+    const daybookEntry = await db.insert(daybookEntries).values({
+      date: insertExpense.date,
+      description: `${insertExpense.category}: ${insertExpense.description} - ${vendorName}`,
+      type: 'expense',
+      amount: insertExpense.total,
+      category: insertExpense.category,
+      bankId: insertExpense.bankId || null,
+    }).returning();
+
+    if (insertExpense.bankId) {
+      await db.update(banks)
+        .set({ balance: sql`${banks.balance} - ${insertExpense.total}` })
+        .where(eq(banks.id, insertExpense.bankId));
+    }
+
+    const [expense] = await db.insert(expenses).values({
+      ...insertExpense,
+      daybookEntryId: daybookEntry[0].id,
+      status: insertExpense.bankId ? 'paid' : 'recorded',
+    }).returning();
+    return expense;
+  }
+
+  async updateExpense(id: string, updateData: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const [expense] = await db.update(expenses).set(updateData).where(eq(expenses.id, id)).returning();
+    return expense || undefined;
+  }
+
+  async deleteExpense(id: string): Promise<void> {
+    const expense = await this.getExpense(id);
+    if (expense) {
+      if (expense.daybookEntryId) {
+        await db.delete(daybookEntries).where(eq(daybookEntries.id, expense.daybookEntryId));
+      }
+      if (expense.bankId && expense.status === 'paid') {
+        await db.update(banks)
+          .set({ balance: sql`${banks.balance} + ${expense.total}` })
+          .where(eq(banks.id, expense.bankId));
+      }
+    }
+    await db.delete(expenses).where(eq(expenses.id, id));
+  }
+
+  async getNextExpenseNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(expenses);
+    const count = Number(result?.count || 0) + 1;
+    return `EXP-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Vendor Payments
+  async getAllVendorPayments(): Promise<VendorPayment[]> {
+    return await db.select().from(vendorPayments).orderBy(desc(vendorPayments.createdAt));
+  }
+
+  async getVendorPayment(id: string): Promise<VendorPayment | undefined> {
+    const [payment] = await db.select().from(vendorPayments).where(eq(vendorPayments.id, id));
+    return payment || undefined;
+  }
+
+  async createVendorPaymentWithDaybook(insertPayment: InsertVendorPayment, vendorName: string): Promise<VendorPayment> {
+    const daybookEntry = await db.insert(daybookEntries).values({
+      date: insertPayment.date,
+      description: `Payment to ${vendorName} - ${insertPayment.reference || insertPayment.number}`,
+      type: 'expense',
+      amount: insertPayment.amount,
+      category: 'Vendor Payment',
+      bankId: insertPayment.bankId || null,
+    }).returning();
+
+    if (insertPayment.bankId) {
+      await db.update(banks)
+        .set({ balance: sql`${banks.balance} - ${insertPayment.amount}` })
+        .where(eq(banks.id, insertPayment.bankId));
+    }
+
+    if (insertPayment.expenseId) {
+      await db.update(expenses)
+        .set({ status: 'paid' })
+        .where(eq(expenses.id, insertPayment.expenseId));
+    }
+
+    const [payment] = await db.insert(vendorPayments).values({
+      ...insertPayment,
+      daybookEntryId: daybookEntry[0].id,
+    }).returning();
+    return payment;
+  }
+
+  async deleteVendorPayment(id: string): Promise<void> {
+    const payment = await this.getVendorPayment(id);
+    if (payment) {
+      if (payment.daybookEntryId) {
+        await db.delete(daybookEntries).where(eq(daybookEntries.id, payment.daybookEntryId));
+      }
+      if (payment.bankId) {
+        await db.update(banks)
+          .set({ balance: sql`${banks.balance} + ${payment.amount}` })
+          .where(eq(banks.id, payment.bankId));
+      }
+      if (payment.expenseId) {
+        await db.update(expenses)
+          .set({ status: 'recorded' })
+          .where(eq(expenses.id, payment.expenseId));
+      }
+    }
+    await db.delete(vendorPayments).where(eq(vendorPayments.id, id));
+  }
+
+  async getNextVendorPaymentNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(vendorPayments);
+    const count = Number(result?.count || 0) + 1;
+    return `VPY-${String(count).padStart(4, '0')}`;
   }
 }
 

@@ -12,6 +12,7 @@ import TeamCalendar from "@/pages/team-calendar";
 import EventDatabase from "@/pages/event-database";
 import EventMilestones from "@/pages/event-milestones";
 import Daybook from "@/pages/daybook";
+import OakBook from "@/pages/oak-book";
 import HR from "@/pages/hr";
 import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
@@ -54,6 +55,9 @@ function AppRoutes() {
         </Route>
         <Route path="/daybook">
            <PrivateRoute component={Daybook} path="/daybook" />
+        </Route>
+        <Route path="/oak-book">
+           <PrivateRoute component={OakBook} path="/oak-book" />
         </Route>
         <Route path="/hr">
            <PrivateRoute component={HR} path="/hr" />
