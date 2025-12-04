@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,9 @@ import { useAuth } from "@/context/auth-context";
 export default function EventDatabase() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPlanner, setSelectedPlanner] = useState<string>("all");
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [selectedQuarter, setSelectedQuarter] = useState<string>("all");
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -63,12 +66,95 @@ export default function EventDatabase() {
     }
   };
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          event.customer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPlanner = selectedPlanner === "all" || event.planner === selectedPlanner;
-    return matchesSearch && matchesPlanner;
-  });
+  const getFinancialYear = (date: Date) => {
+    const month = date.getMonth();
+    const year = date.getFullYear();
+    if (month >= 3) {
+      return `FY ${year}-${(year + 1).toString().slice(-2)}`;
+    }
+    return `FY ${year - 1}-${year.toString().slice(-2)}`;
+  };
+
+  const getQuarter = (date: Date) => {
+    const month = date.getMonth();
+    if (month >= 3 && month <= 5) return "Q1";
+    if (month >= 6 && month <= 8) return "Q2";
+    if (month >= 9 && month <= 11) return "Q3";
+    return "Q4";
+  };
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    events.forEach(e => {
+      const date = new Date(e.date);
+      years.add(getFinancialYear(date));
+    });
+    return Array.from(years).sort();
+  }, [events]);
+
+  const availablePlanners = useMemo(() => {
+    return Array.from(new Set(events.map(e => e.planner))).sort();
+  }, [events]);
+
+  const months = [
+    { value: "0", label: "January" },
+    { value: "1", label: "February" },
+    { value: "2", label: "March" },
+    { value: "3", label: "April" },
+    { value: "4", label: "May" },
+    { value: "5", label: "June" },
+    { value: "6", label: "July" },
+    { value: "7", label: "August" },
+    { value: "8", label: "September" },
+    { value: "9", label: "October" },
+    { value: "10", label: "November" },
+    { value: "11", label: "December" },
+  ];
+
+  const filteredEvents = useMemo(() => {
+    return events.filter(event => {
+      const eventDate = new Date(event.date);
+      const matchesSearch = event.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            event.title.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesPlanner = selectedPlanner === "all" || event.planner === selectedPlanner;
+      const matchesYear = selectedYear === "all" || getFinancialYear(eventDate) === selectedYear;
+      const matchesQuarter = selectedQuarter === "all" || getQuarter(eventDate) === selectedQuarter;
+      const matchesMonth = selectedMonth === "all" || eventDate.getMonth().toString() === selectedMonth;
+      return matchesSearch && matchesPlanner && matchesYear && matchesQuarter && matchesMonth;
+    });
+  }, [events, searchTerm, selectedPlanner, selectedYear, selectedQuarter, selectedMonth]);
+
+  const yearFilteredEvents = useMemo(() => {
+    if (selectedYear === "all") return events;
+    return events.filter(event => {
+      const eventDate = new Date(event.date);
+      return getFinancialYear(eventDate) === selectedYear;
+    });
+  }, [events, selectedYear]);
+
+  const calculateTotals = (eventList: Event[]) => {
+    const salesValue = eventList.reduce((sum, e) => sum + Number(e.salesValue || 0), 0);
+    const paymentReceived = eventList.reduce((sum, e) => sum + Number(e.paymentReceived || 0), 0);
+    const actualCost = eventList.reduce((sum, e) => sum + Number(e.cost || 0), 0);
+    const balance = salesValue - paymentReceived;
+    const profit = salesValue - actualCost;
+    const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
+    return { salesValue, paymentReceived, balance, actualCost, profit, profitPercent };
+  };
+
+  const fyTotals = calculateTotals(yearFilteredEvents);
+  const filteredTotals = calculateTotals(filteredEvents);
+
+  const formatCurrency = (value: number) => {
+    return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const generateEventId = (event: Event) => {
+    const date = new Date(event.date);
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = date.toLocaleString('en', { month: 'short' }).toUpperCase();
+    return `${event.customer.substring(0, 3).toUpperCase()}-${event.venue.substring(0, 3).toUpperCase()}-${day}${month}`;
+  };
 
   const EditEventForm = ({ event, onClose }: { event: Event; onClose: () => void }) => {
     const { register, handleSubmit, watch } = useForm<Event>({ defaultValues: event });
@@ -151,82 +237,206 @@ export default function EventDatabase() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <div className="flex flex-col gap-3 sm:gap-4">
-            <CardTitle className="text-lg font-serif">All Events</CardTitle>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search..."
-                  className="pl-8 text-sm"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  data-testid="input-search"
-                />
-              </div>
+      <div className="relative">
+        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search by customer name..."
+          className="pl-10 bg-card border"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          data-testid="input-search"
+        />
+      </div>
+
+      <Card className="bg-card">
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Financial Year</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="text-sm" data-testid="select-year">
+                  <SelectValue placeholder="All Years" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Years</SelectItem>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Quarter</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger className="text-sm" data-testid="select-quarter">
+                  <SelectValue placeholder="All Quarters" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Quarters</SelectItem>
+                  <SelectItem value="Q1">Q1 (Apr-Jun)</SelectItem>
+                  <SelectItem value="Q2">Q2 (Jul-Sep)</SelectItem>
+                  <SelectItem value="Q3">Q3 (Oct-Dec)</SelectItem>
+                  <SelectItem value="Q4">Q4 (Jan-Mar)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Month</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="text-sm" data-testid="select-month">
+                  <SelectValue placeholder="All Months" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Months</SelectItem>
+                  {months.map(month => (
+                    <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground mb-1.5 block">Wedding Planner</Label>
               <Select value={selectedPlanner} onValueChange={setSelectedPlanner}>
-                <SelectTrigger className="w-full sm:w-[160px] text-sm">
-                  <SelectValue placeholder="Filter Planner" />
+                <SelectTrigger className="text-sm" data-testid="select-planner">
+                  <SelectValue placeholder="All Planners" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Planners</SelectItem>
-                  {Array.from(new Set(events.map(e => e.planner))).map(planner => (
+                  {availablePlanners.map(planner => (
                     <SelectItem key={planner} value={planner}>{planner}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-l-4 border-l-purple-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-purple-500 text-base font-medium">
+              Selected FY Total {selectedYear === "all" ? "(All)" : `(${selectedYear})`}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sales Value:</span>
+              <span className="font-medium">{formatCurrency(fyTotals.salesValue)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Payment Received:</span>
+              <span className="font-medium">{formatCurrency(fyTotals.paymentReceived)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Balance Payment:</span>
+              <span className="font-medium">{formatCurrency(fyTotals.balance)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Actual Cost:</span>
+              <span className="font-medium">{formatCurrency(fyTotals.actualCost)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Profit:</span>
+              <span className="font-medium text-purple-500">{formatCurrency(fyTotals.profit)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Profit %:</span>
+              <span className="font-medium text-purple-500">{fyTotals.profitPercent.toFixed(2)}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-l-4 border-l-green-500">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-green-500 text-base font-medium">Filtered Total</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sales Value:</span>
+              <span className="font-medium">{formatCurrency(filteredTotals.salesValue)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Payment Received:</span>
+              <span className="font-medium">{formatCurrency(filteredTotals.paymentReceived)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Balance Payment:</span>
+              <span className="font-medium">{formatCurrency(filteredTotals.balance)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Actual Cost:</span>
+              <span className="font-medium">{formatCurrency(filteredTotals.actualCost)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Profit:</span>
+              <span className="font-medium text-green-500">{formatCurrency(filteredTotals.profit)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Profit %:</span>
+              <span className="font-medium text-green-500">{filteredTotals.profitPercent.toFixed(2)}%</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-lg font-serif">All Events ({filteredEvents.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
           <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <div className="min-w-[600px] px-4 sm:px-0">
+            <div className="min-w-[900px] px-4 sm:px-0">
               <div className="rounded-md border">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs sm:text-sm">Event</TableHead>
-                      <TableHead className="text-xs sm:text-sm">Date</TableHead>
-                      <TableHead className="text-xs sm:text-sm hidden md:table-cell">Planner</TableHead>
-                      <TableHead className="text-right text-xs sm:text-sm">Sales</TableHead>
-                      <TableHead className="text-right text-xs sm:text-sm">Profit</TableHead>
-                      <TableHead className="text-right text-xs sm:text-sm">Status</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs font-semibold">Wedding Planner</TableHead>
+                      <TableHead className="text-xs font-semibold">Client Name</TableHead>
+                      <TableHead className="text-xs font-semibold">Event ID</TableHead>
+                      <TableHead className="text-xs font-semibold">Venue</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Sales Value</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Payment Received</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Balance</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Total Cost</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Profit</TableHead>
+                      <TableHead className="text-right text-xs font-semibold">Profit %</TableHead>
                       <TableHead className="w-20"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredEvents.map((event) => {
-                        const profit = Number(event.salesValue) - Number(event.cost);
-                        const isProfitable = profit > 0;
-                        const balance = Number(event.salesValue) - Number(event.paymentReceived);
+                        const salesValue = Number(event.salesValue) || 0;
+                        const paymentReceived = Number(event.paymentReceived) || 0;
+                        const cost = Number(event.cost) || 0;
+                        const balance = salesValue - paymentReceived;
+                        const profit = salesValue - cost;
+                        const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
+                        const isProfitable = profit >= 0;
                         
                         return (
-                        <TableRow key={event.id}>
-                            <TableCell className="font-medium">
-                                <div className="text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">{event.title}</div>
-                                <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{event.customer}</div>
+                        <TableRow key={event.id} className="hover:bg-muted/30">
+                            <TableCell className="text-xs">{event.planner}</TableCell>
+                            <TableCell className="text-xs font-medium">{event.customer}</TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{generateEventId(event)}</TableCell>
+                            <TableCell className="text-xs">{event.venue}</TableCell>
+                            <TableCell className="text-right text-xs">{formatCurrency(salesValue)}</TableCell>
+                            <TableCell className="text-right text-xs">{formatCurrency(paymentReceived)}</TableCell>
+                            <TableCell className={cn("text-right text-xs font-medium", balance > 0 ? "text-amber-600" : "text-green-600")}>
+                              {formatCurrency(balance)}
                             </TableCell>
-                            <TableCell className="text-xs sm:text-sm">{new Date(event.date).toLocaleDateString()}</TableCell>
-                            <TableCell className="text-xs sm:text-sm hidden md:table-cell">{event.planner}</TableCell>
-                            <TableCell className="text-right text-xs sm:text-sm">₹{Number(event.salesValue).toLocaleString()}</TableCell>
-                            <TableCell className={cn("text-right font-medium text-xs sm:text-sm", isProfitable ? "text-green-600" : "text-red-600")}>
-                                ₹{profit.toLocaleString()}
+                            <TableCell className="text-right text-xs">{formatCurrency(cost)}</TableCell>
+                            <TableCell className={cn("text-right text-xs font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
+                              {formatCurrency(profit)}
                             </TableCell>
-                            <TableCell className="text-right">
-                                 <span className={cn(
-                                    "px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs",
-                                    balance <= 0 ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                                 )}>
-                                    {balance <= 0 ? "Paid" : "Due"}
-                                 </span>
+                            <TableCell className={cn("text-right text-xs font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
+                              {profitPercent.toFixed(2)}%
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-1">
                                   <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
                                       <DialogTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
+                                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
                                       </DialogTrigger>
                                       <DialogContent className="max-w-[95vw] sm:max-w-lg">
                                           <DialogHeader>
@@ -239,11 +449,11 @@ export default function EventDatabase() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                       onClick={() => handleDelete(event.id, event.title)}
                                       data-testid={`button-delete-${event.id}`}
                                     >
-                                      <Trash2 className="h-4 w-4" />
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
                                 </div>
@@ -253,7 +463,7 @@ export default function EventDatabase() {
                     })}
                     {filteredEvents.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
+                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
                           No events found
                         </TableCell>
                       </TableRow>
