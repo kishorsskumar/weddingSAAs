@@ -6,15 +6,18 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 export default function EventCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -40,6 +43,24 @@ export default function EventCalendar() {
       setIsDialogOpen(false);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+    },
+  });
+
+  const handleDelete = (e: React.MouseEvent, id: string, title: string) => {
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete "${title}"?`)) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -189,14 +210,25 @@ export default function EventCalendar() {
                     <div
                       key={event.id}
                       className={cn(
-                        "text-xs px-2 py-1 rounded truncate cursor-pointer border-l-2",
-                        event.type === "wedding" && "bg-rose-100 text-rose-800 border-rose-500",
-                        event.type === "corporate" && "bg-blue-100 text-blue-800 border-blue-500",
-                        event.type === "birthday" && "bg-amber-100 text-amber-800 border-amber-500",
-                        event.type === "other" && "bg-gray-100 text-gray-800 border-gray-500"
+                        "text-xs px-2 py-1 rounded cursor-pointer border-l-2 group flex items-center justify-between gap-1",
+                        event.type?.toLowerCase().includes("wedding") && "bg-rose-100 text-rose-800 border-rose-500",
+                        event.type?.toLowerCase().includes("corporate") && "bg-blue-100 text-blue-800 border-blue-500",
+                        event.type?.toLowerCase().includes("birthday") && "bg-amber-100 text-amber-800 border-amber-500",
+                        !event.type?.toLowerCase().includes("wedding") && 
+                        !event.type?.toLowerCase().includes("corporate") && 
+                        !event.type?.toLowerCase().includes("birthday") && "bg-gray-100 text-gray-800 border-gray-500"
                       )}
                     >
-                      {event.title}
+                      <span className="truncate">{event.title}</span>
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => handleDelete(e, event.id, event.title)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity"
+                          data-testid={`button-delete-calendar-${event.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -7,16 +7,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Download, Upload } from "lucide-react";
+import { Search, Download, Upload, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 export default function EventDatabase() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPlanner, setSelectedPlanner] = useState<string>("all");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -42,6 +45,23 @@ export default function EventDatabase() {
       setEditingEvent(null);
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+    },
+  });
+
+  const handleDelete = (id: string, title: string) => {
+    if (confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -201,17 +221,30 @@ export default function EventDatabase() {
                              </span>
                         </TableCell>
                         <TableCell>
-                            <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
-                                <DialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-lg">
-                                    <DialogHeader>
-                                        <DialogTitle>Edit Event Financials</DialogTitle>
-                                    </DialogHeader>
-                                    <EditEventForm event={event} onClose={() => setEditingEvent(null)} />
-                                </DialogContent>
-                            </Dialog>
+                            <div className="flex items-center gap-1">
+                              <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
+                                  <DialogTrigger asChild>
+                                      <Button variant="ghost" size="sm" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-lg">
+                                      <DialogHeader>
+                                          <DialogTitle>Edit Event Financials</DialogTitle>
+                                      </DialogHeader>
+                                      <EditEventForm event={event} onClose={() => setEditingEvent(null)} />
+                                  </DialogContent>
+                              </Dialog>
+                              {isAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete(event.id, event.title)}
+                                  data-testid={`button-delete-${event.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                         </TableCell>
                     </TableRow>
                     );
