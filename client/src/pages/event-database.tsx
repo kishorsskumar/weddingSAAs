@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Download, Upload, Trash2 } from "lucide-react";
+import { Search, Download, Upload, Trash2, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function EventDatabase() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,8 +21,11 @@ export default function EventDatabase() {
   const [selectedQuarter, setSelectedQuarter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: events = [] } = useQuery<Event[]>({
@@ -154,6 +158,145 @@ export default function EventDatabase() {
     const day = date.getDate().toString().padStart(2, '0');
     const month = date.toLocaleString('en', { month: 'short' }).toUpperCase();
     return `${event.customer.substring(0, 3).toUpperCase()}-${event.venue.substring(0, 3).toUpperCase()}-${day}${month}`;
+  };
+
+  const handleExport = () => {
+    const headers = ['Wedding Planner', 'Client Name', 'Event ID', 'Date', 'Event Type', 'Venue', 'Sales Value', 'Payment Received', 'Balance', 'Total Cost', 'Profit', 'Profit %'];
+    
+    const csvRows = filteredEvents.map(event => {
+      const salesValue = Number(event.salesValue) || 0;
+      const paymentReceived = Number(event.paymentReceived) || 0;
+      const cost = Number(event.cost) || 0;
+      const balance = salesValue - paymentReceived;
+      const profit = salesValue - cost;
+      const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100).toFixed(2) : '0';
+      
+      return [
+        event.planner,
+        event.customer,
+        generateEventId(event),
+        event.date,
+        event.type,
+        event.venue,
+        salesValue,
+        paymentReceived,
+        balance,
+        cost,
+        profit,
+        profitPercent
+      ].map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
+    });
+    
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `events_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Successful",
+      description: `Exported ${filteredEvents.length} events to CSV file.`,
+    });
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setIsImporting(true);
+    
+    try {
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+      
+      const eventsData: any[] = [];
+      
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]);
+        if (values.length < 5) continue;
+        
+        const eventData: any = {};
+        headers.forEach((header, index) => {
+          const value = values[index]?.trim() || '';
+          if (header.includes('date')) eventData.date = value;
+          else if (header.includes('planner')) eventData.planner = value;
+          else if (header.includes('customer') || header.includes('client')) eventData.customer = value;
+          else if (header.includes('type')) eventData.type = value;
+          else if (header.includes('venue')) eventData.venue = value;
+          else if (header.includes('sales')) eventData.salesValue = parseFloat(value.replace(/[^0-9.]/g, '')) || 0;
+          else if (header.includes('payment') || header.includes('received')) eventData.paymentReceived = parseFloat(value.replace(/[^0-9.]/g, '')) || 0;
+          else if (header.includes('cost')) eventData.cost = parseFloat(value.replace(/[^0-9.]/g, '')) || 0;
+        });
+        
+        if (eventData.date && eventData.customer) {
+          eventsData.push(eventData);
+        }
+      }
+      
+      for (const eventData of eventsData) {
+        const title = `${eventData.customer?.toUpperCase().replace(/\s+/g, '-').substring(0, 15)}-${(eventData.venue || 'TBD').toUpperCase().replace(/\s+/g, '-').substring(0, 10)}`;
+        
+        await fetch('/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            date: eventData.date,
+            type: eventData.type || 'Other',
+            planner: eventData.planner || 'TBD',
+            customer: eventData.customer,
+            venue: eventData.venue || 'TBD',
+            salesValue: eventData.salesValue?.toString() || '0',
+            paymentReceived: eventData.paymentReceived?.toString() || '0',
+            cost: eventData.cost?.toString() || '0',
+          }),
+        });
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      
+      toast({
+        title: "Import Successful",
+        description: `Imported ${eventsData.length} events from CSV file.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: "Failed to import events. Please check the CSV format.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim().replace(/^"|"$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim().replace(/^"|"$/g, ''));
+    return result;
   };
 
   const EditEventForm = ({ event, onClose }: { event: Event; onClose: () => void }) => {
