@@ -1,13 +1,23 @@
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MOCK_EVENTS } from "@/lib/mock-data";
 import { Calendar, DollarSign, Users, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import type { Event } from "@/lib/types";
 
 export default function Dashboard() {
   const { user } = useAuth();
 
-  const totalSales = MOCK_EVENTS.reduce((acc, curr) => acc + curr.salesValue, 0);
-  const upcomingEvents = MOCK_EVENTS.filter((e) => new Date(e.date) > new Date()).length;
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error('Failed to fetch events');
+      return res.json();
+    },
+  });
+
+  const totalSales = events.reduce((acc, curr) => acc + parseFloat(curr.salesValue || '0'), 0);
+  const upcomingEvents = events.filter((e) => new Date(e.date) > new Date()).length;
 
   return (
     <div className="space-y-8">
@@ -86,8 +96,8 @@ export default function Dashboard() {
                 <div key={i} className="flex items-start gap-4 pb-4 border-b last:border-0 last:pb-0">
                   <div className="h-2 w-2 mt-2 rounded-full bg-primary" />
                   <div>
-                    <p className="text-sm font-medium">New event created: Sharma Wedding</p>
-                    <p className="text-xs text-muted-foreground">2 hours ago by Sarah Jenkins</p>
+                    <p className="text-sm font-medium">New event created</p>
+                    <p className="text-xs text-muted-foreground">2 hours ago</p>
                   </div>
                 </div>
               ))}
@@ -101,7 +111,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
              <div className="space-y-4">
-              {MOCK_EVENTS.slice(0, 3).map((e) => (
+              {events.slice(0, 3).map((e) => (
                 <div key={e.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
                     <p className="font-medium text-sm">{e.title}</p>
@@ -112,6 +122,9 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+              {events.length === 0 && (
+                <p className="text-center py-4 text-muted-foreground">No events scheduled</p>
+              )}
             </div>
           </CardContent>
         </Card>

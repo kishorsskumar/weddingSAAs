@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MOCK_EVENTS, Event } from "@/lib/mock-data";
+import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,17 +7,41 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Filter, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Search, Download, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function EventDatabase() {
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPlanner, setSelectedPlanner] = useState<string>("all");
-  
-  // Calculations for the selected Event
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const queryClient = useQueryClient();
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error('Failed to fetch events');
+      return res.json();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Event> }) => {
+      const res = await fetch(`/api/events/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setEditingEvent(null);
+    },
+  });
 
   const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -29,16 +53,15 @@ export default function EventDatabase() {
   const EditEventForm = ({ event, onClose }: { event: Event; onClose: () => void }) => {
     const { register, handleSubmit, watch } = useForm<Event>({ defaultValues: event });
     
-    // Watch for live profit calculation
     const salesValue = watch("salesValue");
     const cost = watch("cost");
+    const paymentReceived = watch("paymentReceived");
     const profit = (Number(salesValue) || 0) - (Number(cost) || 0);
-    const profitPercent = salesValue ? ((profit / salesValue) * 100).toFixed(2) : "0";
+    const profitPercent = salesValue ? ((profit / Number(salesValue)) * 100).toFixed(2) : "0";
+    const balance = (Number(salesValue) || 0) - (Number(paymentReceived) || 0);
 
     const onSubmit = (data: Event) => {
-      const updatedEvents = events.map(e => e.id === event.id ? { ...e, ...data } : e);
-      setEvents(updatedEvents);
-      onClose();
+      updateMutation.mutate({ id: event.id, data });
     };
 
     return (
@@ -58,14 +81,14 @@ export default function EventDatabase() {
           </div>
           <div className="space-y-2">
             <Label>Balance (₹)</Label>
-            <Input disabled value={(Number(salesValue) - Number(watch("paymentReceived"))).toString()} />
+            <Input disabled value={balance.toString()} />
           </div>
         </div>
         
         <div className="bg-muted p-4 rounded-lg flex justify-between items-center">
             <div>
                 <span className="text-sm text-muted-foreground">Estimated Profit</span>
-                <div className="text-xl font-bold text-primary">₹{profit}</div>
+                <div className="text-xl font-bold text-primary">₹{profit.toLocaleString()}</div>
             </div>
              <div className="text-right">
                 <span className="text-sm text-muted-foreground">Margin</span>
@@ -84,7 +107,9 @@ export default function EventDatabase() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full">Save Changes</Button>
+        <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </Button>
       </form>
     );
   };
@@ -118,6 +143,7 @@ export default function EventDatabase() {
                   className="pl-8"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  data-testid="input-search"
                 />
               </div>
               <Select value={selectedPlanner} onValueChange={setSelectedPlanner}>
@@ -126,8 +152,9 @@ export default function EventDatabase() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Planners</SelectItem>
-                  <SelectItem value="Sarah Jenkins">Sarah Jenkins</SelectItem>
-                  <SelectItem value="Mike Ross">Mike Ross</SelectItem>
+                  {Array.from(new Set(events.map(e => e.planner))).map(planner => (
+                    <SelectItem key={planner} value={planner}>{planner}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -149,9 +176,9 @@ export default function EventDatabase() {
               </TableHeader>
               <TableBody>
                 {filteredEvents.map((event) => {
-                    const profit = event.salesValue - event.cost;
+                    const profit = Number(event.salesValue) - Number(event.cost);
                     const isProfitable = profit > 0;
-                    const balance = event.salesValue - event.paymentReceived;
+                    const balance = Number(event.salesValue) - Number(event.paymentReceived);
                     
                     return (
                     <TableRow key={event.id}>
@@ -161,7 +188,7 @@ export default function EventDatabase() {
                         </TableCell>
                         <TableCell>{new Date(event.date).toLocaleDateString()}</TableCell>
                         <TableCell>{event.planner}</TableCell>
-                        <TableCell className="text-right">₹{event.salesValue.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">₹{Number(event.salesValue).toLocaleString()}</TableCell>
                         <TableCell className={cn("text-right font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
                             ₹{profit.toLocaleString()}
                         </TableCell>
@@ -176,7 +203,7 @@ export default function EventDatabase() {
                         <TableCell>
                             <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
                                 <DialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" onClick={() => setEditingEvent(event)}>Edit</Button>
+                                    <Button variant="ghost" size="sm" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
                                 </DialogTrigger>
                                 <DialogContent className="max-w-lg">
                                     <DialogHeader>
@@ -189,6 +216,13 @@ export default function EventDatabase() {
                     </TableRow>
                     );
                 })}
+                {filteredEvents.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No events found
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>

@@ -1,20 +1,45 @@
 import { useState } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
-import { MOCK_EVENTS, Event } from "@/lib/mock-data";
+import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function EventCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error('Failed to fetch events');
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Event>) => {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setIsDialogOpen(false);
+    },
+  });
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -33,21 +58,15 @@ export default function EventCalendar() {
     const { register, handleSubmit } = useForm<Partial<Event>>();
     
     const onSubmit = (data: any) => {
-      const newEvent: Event = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: data.title,
-        date: data.date,
-        type: data.type,
-        planner: "Current User", // Mock
-        customer: "New Customer",
-        venue: "TBD",
-        salesValue: 0,
-        paymentReceived: 0,
-        cost: 0,
-        ...data
-      };
-      setEvents([...events, newEvent]);
-      setIsDialogOpen(false);
+      createMutation.mutate({
+        ...data,
+        salesValue: '0',
+        paymentReceived: '0',
+        cost: '0',
+        planner: 'Current User',
+        customer: data.customer || 'New Customer',
+        venue: data.venue || 'TBD',
+      });
     };
 
     return (
@@ -63,7 +82,7 @@ export default function EventCalendar() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" {...register("type")}>
+            <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" {...register("type")}>
               <option value="wedding">Wedding</option>
               <option value="corporate">Corporate</option>
               <option value="birthday">Birthday</option>
@@ -71,7 +90,9 @@ export default function EventCalendar() {
             </select>
           </div>
         </div>
-        <Button type="submit" className="w-full">Create Event</Button>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Creating...' : 'Create Event'}
+        </Button>
       </form>
     );
   };
@@ -95,7 +116,7 @@ export default function EventCalendar() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" data-testid="button-add-event">
               <Plus className="h-4 w-4" /> New Event
             </Button>
           </DialogTrigger>
@@ -117,7 +138,7 @@ export default function EventCalendar() {
           ))}
         </div>
         <div className="flex-1 grid grid-cols-7 grid-rows-5 lg:grid-rows-6 overflow-y-auto">
-          {calendarDays.map((day, dayIdx) => {
+          {calendarDays.map((day) => {
             const dayEvents = events.filter((e) => isSameDay(new Date(e.date), day));
             return (
               <div

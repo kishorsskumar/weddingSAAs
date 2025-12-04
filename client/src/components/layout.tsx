@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
-import { ALL_PAGES } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import {
   Calendar,
@@ -12,12 +11,22 @@ import {
   Shield,
   LogOut,
   Menu,
-  X,
   Briefcase
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import logo from "@assets/oakstreet_white_1764858814551.png";
+
+const ALL_PAGES = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "event-calendar", label: "Oak Event Calendar", path: "/events" },
+  { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
+  { id: "event-database", label: "Oak Event Database", path: "/database" },
+  { id: "daybook", label: "Oak Daybook", path: "/daybook" },
+  { id: "hr", label: "Oak HR", path: "/hr" },
+  { id: "admin", label: "Admin Panel", path: "/admin" },
+];
 
 const ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
@@ -29,16 +38,14 @@ const ICONS: Record<string, any> = {
   admin: Shield,
 };
 
-import logo from "@assets/oakstreet_white_1764858814551.png";
-
 export default function Layout({ children }: { children: React.ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
-  const navItems = ALL_PAGES.filter((page) => user.allowedPages.includes(page.id));
+  const navItems = ALL_PAGES.filter((page) => allowedPages.includes(page.id));
 
   const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -62,6 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                 )}
                 onClick={() => setIsMobileOpen(false)}
+                data-testid={`nav-${item.id}`}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}
@@ -74,7 +82,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-2 py-2 mb-2">
           <Avatar className="h-8 w-8 border border-sidebar-border">
-            <AvatarImage src={user.avatar} />
+            <AvatarImage src={user.avatar || undefined} />
             <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
               {user.name.charAt(0)}
             </AvatarFallback>
@@ -91,6 +99,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           size="sm"
           className="w-full justify-start gap-2 text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={logout}
+          data-testid="button-logout"
         >
           <LogOut className="h-4 w-4" />
           Log Out

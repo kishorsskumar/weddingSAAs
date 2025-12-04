@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MOCK_DAYBOOK, DaybookEntry } from "@/lib/mock-data";
+import type { DaybookEntry, Bank } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,44 +7,60 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus } from "lucide-react";
-import { format, isSameDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function Daybook() {
-  const [entries, setEntries] = useState<DaybookEntry[]>(MOCK_DAYBOOK);
   const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">("daily");
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Bank Balances (Mock State)
-  const [banks, setBanks] = useState([
-    { id: 1, name: "HDFC Bank", balance: 1500000 },
-    { id: 2, name: "SBI", balance: 450000 },
-    { id: 3, name: "Cash in Hand", balance: 25000 },
-  ]);
+  const { data: entries = [] } = useQuery<DaybookEntry[]>({
+    queryKey: ['/api/daybook'],
+    queryFn: async () => {
+      const res = await fetch('/api/daybook');
+      if (!res.ok) throw new Error('Failed to fetch daybook entries');
+      return res.json();
+    },
+  });
+
+  const { data: banks = [] } = useQuery<Bank[]>({
+    queryKey: ['/api/banks'],
+    queryFn: async () => {
+      const res = await fetch('/api/banks');
+      if (!res.ok) throw new Error('Failed to fetch banks');
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<DaybookEntry>) => {
+      const res = await fetch('/api/daybook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      setIsDialogOpen(false);
+    },
+  });
 
   const AddEntryForm = () => {
-    const { register, handleSubmit } = useForm<Partial<DaybookEntry>>();
+    const { register, handleSubmit, setValue } = useForm<Partial<DaybookEntry>>();
+    
     const onSubmit = (data: any) => {
-      const newEntry: DaybookEntry = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: format(new Date(), "yyyy-MM-dd"),
+      createMutation.mutate({
         ...data,
-        amount: Number(data.amount)
-      };
-      setEntries([...entries, newEntry]);
-      
-      // Update bank balance mock logic
-      if (data.type === "income") {
-        setBanks(banks.map(b => b.name === "Cash in Hand" ? { ...b, balance: b.balance + Number(data.amount) } : b));
-      } else {
-        setBanks(banks.map(b => b.name === "Cash in Hand" ? { ...b, balance: b.balance - Number(data.amount) } : b));
-      }
-      
-      setIsDialogOpen(false);
+        date: format(new Date(), "yyyy-MM-dd"),
+      });
     };
 
     return (
@@ -56,7 +72,7 @@ export default function Daybook() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Type</Label>
-            <Select onValueChange={(v) => register("type").onChange({ target: { value: v, name: "type" } })}>
+            <Select onValueChange={(v) => setValue("type", v as any)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select Type" />
               </SelectTrigger>
@@ -75,21 +91,15 @@ export default function Daybook() {
           <Label>Category</Label>
           <Input {...register("category")} placeholder="e.g. Rent, Sales, Food" />
         </div>
-        <Button type="submit" className="w-full">Add Entry</Button>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Adding...' : 'Add Entry'}
+        </Button>
       </form>
     );
   };
 
-  const filteredEntries = entries.filter(entry => {
-    const entryDate = new Date(entry.date);
-    if (filterType === "daily") return isSameDay(entryDate, currentDate);
-    if (filterType === "weekly") return isWithinInterval(entryDate, { start: startOfWeek(currentDate), end: endOfWeek(currentDate) });
-    if (filterType === "monthly") return isWithinInterval(entryDate, { start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
-    return true;
-  });
-
-  const totalIncome = filteredEntries.filter(e => e.type === "income").reduce((acc, curr) => acc + curr.amount, 0);
-  const totalExpense = filteredEntries.filter(e => e.type === "expense").reduce((acc, curr) => acc + curr.amount, 0);
+  const totalIncome = entries.filter(e => e.type === "income").reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const totalExpense = entries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
 
   return (
     <div className="space-y-6">
@@ -99,16 +109,6 @@ export default function Daybook() {
           <p className="text-muted-foreground">Financial Overview & Cash Flow</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select value={filterType} onValueChange={(v: any) => setFilterType(v)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Daily</SelectItem>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
           <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card">
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
@@ -116,7 +116,6 @@ export default function Daybook() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-green-600">
           <CardHeader className="pb-2">
@@ -154,7 +153,6 @@ export default function Daybook() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Bank Balances */}
         <Card className="lg:col-span-1 h-fit">
           <CardHeader>
             <CardTitle className="font-serif text-lg">Bank Balances</CardTitle>
@@ -163,20 +161,21 @@ export default function Daybook() {
             {banks.map((bank) => (
               <div key={bank.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/30 border">
                 <span className="font-medium">{bank.name}</span>
-                <span className="font-bold font-mono">₹{bank.balance.toLocaleString()}</span>
+                <span className="font-bold font-mono">₹{Number(bank.balance).toLocaleString()}</span>
               </div>
             ))}
-            <Button variant="outline" className="w-full text-xs mt-4">+ Add Bank Account</Button>
+            {banks.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">No banks added yet</p>
+            )}
           </CardContent>
         </Card>
 
-        {/* Right Column: Transactions */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="font-serif text-lg">Transactions</CardTitle>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2"><Plus className="h-4 w-4"/> Add Entry</Button>
+                <Button size="sm" className="gap-2" data-testid="button-add-entry"><Plus className="h-4 w-4"/> Add Entry</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -196,12 +195,12 @@ export default function Daybook() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEntries.length === 0 ? (
+                {entries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No transactions found for this period.</TableCell>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No transactions found.</TableCell>
                   </TableRow>
                 ) : (
-                  filteredEntries.map((entry) => (
+                  entries.map((entry) => (
                     <TableRow key={entry.id}>
                       <TableCell className="font-medium">{entry.description}</TableCell>
                       <TableCell>
@@ -212,7 +211,7 @@ export default function Daybook() {
                       <TableCell className={cn("text-right font-mono font-medium", 
                         entry.type === "income" ? "text-green-600" : "text-red-600"
                       )}>
-                        {entry.type === "income" ? "+" : "-"}₹{entry.amount.toLocaleString()}
+                        {entry.type === "income" ? "+" : "-"}₹{Number(entry.amount).toLocaleString()}
                       </TableCell>
                     </TableRow>
                   ))

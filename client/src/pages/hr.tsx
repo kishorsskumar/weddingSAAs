@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MOCK_EMPLOYEES, Employee } from "@/lib/mock-data";
+import type { Employee } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,23 +9,43 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Mail, Phone, MapPin } from "lucide-react";
+import { Plus, Phone, MapPin } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function HR() {
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ['/api/employees'],
+    queryFn: async () => {
+      const res = await fetch('/api/employees');
+      if (!res.ok) throw new Error('Failed to fetch employees');
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Employee>) => {
+      const res = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create employee');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      setIsDialogOpen(false);
+    },
+  });
 
   const AddEmployeeForm = () => {
     const { register, handleSubmit } = useForm<Partial<Employee>>();
     const onSubmit = (data: any) => {
-      const newEmp: Employee = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...data,
-        salary: Number(data.salary)
-      };
-      setEmployees([...employees, newEmp]);
-      setIsDialogOpen(false);
+      createMutation.mutate(data);
     };
 
     return (
@@ -60,7 +80,9 @@ export default function HR() {
           <Label>Joining Date</Label>
           <Input type="date" {...register("joinDate")} required />
         </div>
-        <Button type="submit" className="w-full">Add Employee</Button>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Adding...' : 'Add Employee'}
+        </Button>
       </form>
     );
   };
@@ -74,7 +96,7 @@ export default function HR() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="h-4 w-4" /> New Employee</Button>
+            <Button className="gap-2" data-testid="button-add-employee"><Plus className="h-4 w-4" /> New Employee</Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
@@ -122,6 +144,11 @@ export default function HR() {
                 </CardContent>
               </Card>
             ))}
+            {employees.length === 0 && (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                No employees found. Add your first employee to get started.
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -157,17 +184,19 @@ export default function HR() {
                   {employees.map(emp => (
                     <TableRow key={emp.id}>
                       <TableCell>{emp.name}</TableCell>
-                      <TableCell>₹{emp.salary.toLocaleString()}</TableCell>
+                      <TableCell>₹{Number(emp.salary).toLocaleString()}</TableCell>
                       <TableCell>₹0</TableCell>
-                      <TableCell className="text-right font-bold">₹{emp.salary.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-bold">₹{Number(emp.salary).toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
-                  <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3}>Total Payroll (Due 5th)</TableCell>
-                    <TableCell className="text-right text-primary">
-                      ₹{employees.reduce((acc, curr) => acc + curr.salary, 0).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
+                  {employees.length > 0 && (
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell colSpan={3}>Total Payroll (Due 5th)</TableCell>
+                      <TableCell className="text-right text-primary">
+                        ₹{employees.reduce((acc, curr) => acc + Number(curr.salary), 0).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

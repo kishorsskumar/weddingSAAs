@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { format, addDays, subDays, isSameDay } from "date-fns";
+import { format, addDays, subDays } from "date-fns";
+import type { Meeting } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -7,36 +8,39 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Clock, Plus, User } from "lucide-react";
 import { useForm } from "react-hook-form";
-
-interface Meeting {
-  id: string;
-  title: string;
-  time: string;
-  attendees: string;
-  date: string;
-}
-
-const MOCK_MEETINGS: Meeting[] = [
-  {
-    id: "m1",
-    title: "Team Sync",
-    time: "09:00",
-    attendees: "All Staff",
-    date: new Date().toISOString().split('T')[0]
-  },
-  {
-    id: "m2",
-    title: "Client Call - Sharma",
-    time: "14:30",
-    attendees: "Sarah, Mike",
-    date: new Date().toISOString().split('T')[0]
-  }
-];
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function TeamCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [meetings, setMeetings] = useState<Meeting[]>(MOCK_MEETINGS);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const currentDateStr = format(currentDate, 'yyyy-MM-dd');
+
+  const { data: meetings = [] } = useQuery<Meeting[]>({
+    queryKey: ['/api/meetings', currentDateStr],
+    queryFn: async () => {
+      const res = await fetch(`/api/meetings?date=${currentDateStr}`);
+      if (!res.ok) throw new Error('Failed to fetch meetings');
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Meeting>) => {
+      const res = await fetch('/api/meetings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create meeting');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+      setIsDialogOpen(false);
+    },
+  });
 
   const nextDay = () => setCurrentDate(addDays(currentDate, 1));
   const prevDay = () => setCurrentDate(subDays(currentDate, 1));
@@ -45,15 +49,10 @@ export default function TeamCalendar() {
     const { register, handleSubmit } = useForm<Partial<Meeting>>();
     
     const onSubmit = (data: any) => {
-      const newMeeting: Meeting = {
-        id: Math.random().toString(36).substr(2, 9),
-        title: data.title,
-        time: data.time,
-        attendees: data.attendees,
-        date: format(currentDate, 'yyyy-MM-dd')
-      };
-      setMeetings([...meetings, newMeeting]);
-      setIsDialogOpen(false);
+      createMutation.mutate({
+        ...data,
+        date: currentDateStr,
+      });
     };
 
     return (
@@ -72,15 +71,15 @@ export default function TeamCalendar() {
             <Input id="attendees" {...register("attendees")} placeholder="e.g. John, Sarah" />
           </div>
         </div>
-        <Button type="submit" className="w-full">Schedule Meeting</Button>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+          {createMutation.isPending ? 'Scheduling...' : 'Schedule Meeting'}
+        </Button>
       </form>
     );
   };
 
-  const todaysMeetings = meetings.filter(m => m.date === format(currentDate, 'yyyy-MM-dd'))
-    .sort((a, b) => a.time.localeCompare(b.time));
-
-  const hours = Array.from({ length: 13 }, (_, i) => i + 8); // 8 AM to 8 PM
+  const todaysMeetings = meetings.sort((a, b) => a.time.localeCompare(b.time));
+  const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 
   return (
     <div className="space-y-6">
@@ -103,7 +102,7 @@ export default function TeamCalendar() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" data-testid="button-add-meeting">
                 <Plus className="h-4 w-4" /> Add Meeting
               </Button>
             </DialogTrigger>
@@ -118,7 +117,6 @@ export default function TeamCalendar() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Timeline View */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-serif">Daily Timeline</CardTitle>
@@ -131,13 +129,12 @@ export default function TeamCalendar() {
                    {hour}:00
                  </div>
                  <div className="flex-1 relative pt-1 pl-4">
-                   {/* Render meetings for this hour */}
                    {todaysMeetings.filter(m => parseInt(m.time.split(':')[0]) === hour).map(m => (
                      <div key={m.id} className="absolute left-2 right-2 bg-secondary border-l-4 border-primary p-2 rounded text-xs shadow-sm">
-                        <div className="font-semibold text-primary-foreground/90">{m.title}</div>
+                        <div className="font-semibold">{m.title}</div>
                         <div className="flex items-center gap-2 text-muted-foreground mt-1">
                           <Clock className="h-3 w-3" /> {m.time}
-                          <User className="h-3 w-3 ml-2" /> {m.attendees}
+                          {m.attendees && <><User className="h-3 w-3 ml-2" /> {m.attendees}</>}
                         </div>
                      </div>
                    ))}
@@ -147,7 +144,6 @@ export default function TeamCalendar() {
           </CardContent>
         </Card>
 
-        {/* List View */}
         <Card>
           <CardHeader>
             <CardTitle className="font-serif">Agenda</CardTitle>
@@ -166,9 +162,9 @@ export default function TeamCalendar() {
                     </div>
                     <div>
                       <h3 className="font-medium">{m.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {m.attendees}
-                      </p>
+                      {m.attendees && (
+                        <p className="text-sm text-muted-foreground mt-1">{m.attendees}</p>
+                      )}
                     </div>
                   </div>
                 ))}
