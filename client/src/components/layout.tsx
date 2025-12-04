@@ -44,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className="p-6">
         <img src={logo} alt="Oak Event" className="h-16 w-auto mb-2" />
-        <p className="text-xs text-sidebar-foreground/60 mt-1">Management System</p>
+        <p className="text-xs text-sidebar-foreground/60 mt-1">Crafting your Stories</p>
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
