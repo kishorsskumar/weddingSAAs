@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Employee } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,15 +7,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Phone, MapPin } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 export default function HR() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['/api/employees'],
@@ -25,6 +28,22 @@ export default function HR() {
       return res.json();
     },
   });
+
+  const currentEmployees = useMemo(() => {
+    return employees.filter(emp => !emp.leaveDate).sort((a, b) => {
+      const idA = parseInt(a.employeeId.replace(/\D/g, '')) || 0;
+      const idB = parseInt(b.employeeId.replace(/\D/g, '')) || 0;
+      return idB - idA;
+    });
+  }, [employees]);
+
+  const pastEmployees = useMemo(() => {
+    return employees.filter(emp => emp.leaveDate).sort((a, b) => {
+      const dateA = a.leaveDate ? new Date(a.leaveDate).getTime() : 0;
+      const dateB = b.leaveDate ? new Date(b.leaveDate).getTime() : 0;
+      return dateB - dateA;
+    });
+  }, [employees]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Employee>) => {
@@ -42,133 +61,319 @@ export default function HR() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Employee> }) => {
+      const res = await fetch(`/api/employees/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update employee');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      setEditingEmployee(null);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete employee');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+    },
+  });
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    try {
+      return format(parseISO(dateStr), 'dd/MM/yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
+
   const AddEmployeeForm = () => {
     const { register, handleSubmit } = useForm<Partial<Employee>>();
     const onSubmit = (data: any) => {
-      createMutation.mutate(data);
+      const submitData = { ...data };
+      if (!submitData.leaveDate) {
+        delete submitData.leaveDate;
+      }
+      createMutation.mutate(submitData);
     };
 
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Name</Label>
-            <Input {...register("name")} required />
+            <Label>Employee ID</Label>
+            <Input {...register("employeeId")} required placeholder="e.g. OAK008" data-testid="input-employee-id" />
           </div>
           <div className="space-y-2">
-            <Label>Employee ID</Label>
-            <Input {...register("employeeId")} required />
+            <Label>Name</Label>
+            <Input {...register("name")} required placeholder="Full Name" data-testid="input-name" />
           </div>
           <div className="space-y-2">
             <Label>Designation</Label>
-            <Input {...register("designation")} required />
+            <Input {...register("designation")} required placeholder="e.g. Wedding Planner" data-testid="input-designation" />
           </div>
           <div className="space-y-2">
-            <Label>Salary</Label>
-            <Input type="number" {...register("salary")} required />
+            <Label>Salary (₹)</Label>
+            <Input type="number" {...register("salary")} required placeholder="0" data-testid="input-salary" />
+          </div>
+          <div className="space-y-2">
+            <Label>Joining Date</Label>
+            <Input type="date" {...register("joinDate")} required data-testid="input-join-date" />
+          </div>
+          <div className="space-y-2">
+            <Label>Date of Leaving (Optional)</Label>
+            <Input type="date" {...register("leaveDate")} data-testid="input-leave-date" />
           </div>
         </div>
         <div className="space-y-2">
           <Label>Address</Label>
-          <Input {...register("address")} required />
+          <Input {...register("address")} required placeholder="Full Address" data-testid="input-address" />
         </div>
         <div className="space-y-2">
           <Label>Emergency Contact</Label>
-          <Input {...register("emergencyContact")} required />
+          <Input {...register("emergencyContact")} required placeholder="Phone Number" data-testid="input-emergency-contact" />
         </div>
-        <div className="space-y-2">
-          <Label>Joining Date</Label>
-          <Input type="date" {...register("joinDate")} required />
-        </div>
-        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-employee">
           {createMutation.isPending ? 'Adding...' : 'Add Employee'}
         </Button>
       </form>
     );
   };
 
+  const EditEmployeeForm = ({ employee }: { employee: Employee }) => {
+    const { register, handleSubmit } = useForm<Partial<Employee>>({
+      defaultValues: {
+        employeeId: employee.employeeId,
+        name: employee.name,
+        designation: employee.designation,
+        salary: employee.salary,
+        joinDate: employee.joinDate,
+        leaveDate: employee.leaveDate || '',
+        address: employee.address,
+        emergencyContact: employee.emergencyContact,
+      }
+    });
+
+    const onSubmit = (data: any) => {
+      const submitData = { ...data };
+      if (!submitData.leaveDate) {
+        submitData.leaveDate = null;
+      }
+      updateMutation.mutate({ id: employee.id, data: submitData });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Employee ID</Label>
+            <Input {...register("employeeId")} required data-testid="input-edit-employee-id" />
+          </div>
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input {...register("name")} required data-testid="input-edit-name" />
+          </div>
+          <div className="space-y-2">
+            <Label>Designation</Label>
+            <Input {...register("designation")} required data-testid="input-edit-designation" />
+          </div>
+          <div className="space-y-2">
+            <Label>Salary (₹)</Label>
+            <Input type="number" {...register("salary")} required data-testid="input-edit-salary" />
+          </div>
+          <div className="space-y-2">
+            <Label>Joining Date</Label>
+            <Input type="date" {...register("joinDate")} required data-testid="input-edit-join-date" />
+          </div>
+          <div className="space-y-2">
+            <Label>Date of Leaving</Label>
+            <Input type="date" {...register("leaveDate")} data-testid="input-edit-leave-date" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Address</Label>
+          <Input {...register("address")} required data-testid="input-edit-address" />
+        </div>
+        <div className="space-y-2">
+          <Label>Emergency Contact</Label>
+          <Input {...register("emergencyContact")} required data-testid="input-edit-emergency-contact" />
+        </div>
+        <Button type="submit" className="w-full" disabled={updateMutation.isPending} data-testid="button-save-employee">
+          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+        </Button>
+      </form>
+    );
+  };
+
+  const EmployeeTable = ({ employeeList, isPast = false }: { employeeList: Employee[]; isPast?: boolean }) => (
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <div className="min-w-[600px] px-4 sm:px-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-800/50">
+              <TableHead className="text-xs sm:text-sm font-semibold">Emp. ID</TableHead>
+              <TableHead className="text-xs sm:text-sm font-semibold">Name</TableHead>
+              <TableHead className="text-xs sm:text-sm font-semibold">Designation</TableHead>
+              <TableHead className="text-xs sm:text-sm font-semibold">Salary</TableHead>
+              <TableHead className="text-xs sm:text-sm font-semibold">Joined</TableHead>
+              {isPast && <TableHead className="text-xs sm:text-sm font-semibold">Left</TableHead>}
+              {isAdmin && <TableHead className="text-xs sm:text-sm font-semibold text-center">Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {employeeList.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={isPast ? 7 : 6} className="text-center py-8 text-muted-foreground text-sm">
+                  {isPast ? "No past employees." : "No current employees."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              employeeList.map((emp) => (
+                <TableRow key={emp.id} className="border-b border-slate-700/50" data-testid={`row-employee-${emp.id}`}>
+                  <TableCell className="text-xs sm:text-sm font-mono text-amber-400">{emp.employeeId}</TableCell>
+                  <TableCell className="text-xs sm:text-sm font-medium">{emp.name}</TableCell>
+                  <TableCell className="text-xs sm:text-sm">{emp.designation}</TableCell>
+                  <TableCell className="text-xs sm:text-sm font-mono">₹{Number(emp.salary).toLocaleString()}</TableCell>
+                  <TableCell className="text-xs sm:text-sm">{formatDate(emp.joinDate)}</TableCell>
+                  {isPast && <TableCell className="text-xs sm:text-sm text-red-400">{formatDate(emp.leaveDate)}</TableCell>}
+                  {isAdmin && (
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1">
+                        <Dialog open={editingEmployee?.id === emp.id} onOpenChange={(open) => !open && setEditingEmployee(null)}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-amber-400 hover:text-amber-300 hover:bg-amber-400/10"
+                              onClick={() => setEditingEmployee(emp)}
+                              data-testid={`button-edit-employee-${emp.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                            <DialogHeader>
+                              <DialogTitle>Edit Employee</DialogTitle>
+                            </DialogHeader>
+                            <EditEmployeeForm employee={emp} />
+                          </DialogContent>
+                        </Dialog>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                          onClick={() => {
+                            if (confirm(`Delete ${emp.name}? This action cannot be undone.`)) {
+                              deleteMutation.mutate(emp.id);
+                            }
+                          }}
+                          data-testid={`button-delete-employee-${emp.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+
+  const totalCurrentSalary = currentEmployees.reduce((acc, emp) => acc + Number(emp.salary), 0);
+
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Human Resources</h1>
-          <p className="text-sm text-muted-foreground">Employee Management & Payroll</p>
+          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Oak HR</h1>
+          <p className="text-sm text-muted-foreground">Employee Management</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-employee"><Plus className="h-4 w-4" /> New Employee</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[95vw] sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
-            </DialogHeader>
-            <AddEmployeeForm />
-          </DialogContent>
-        </Dialog>
+        {isAdmin && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-employee">
+                <Plus className="h-4 w-4" /> New Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[95vw] sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+              </DialogHeader>
+              <AddEmployeeForm />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
-      <Tabs defaultValue="employees" className="space-y-4">
+      <Tabs defaultValue="current" className="space-y-4">
         <TabsList className="w-full sm:w-auto flex">
-          <TabsTrigger value="employees" className="flex-1 sm:flex-none text-xs sm:text-sm">Employees</TabsTrigger>
-          <TabsTrigger value="leaves" className="flex-1 sm:flex-none text-xs sm:text-sm">Leaves</TabsTrigger>
+          <TabsTrigger value="current" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
+            <Users className="h-4 w-4" />
+            Current ({currentEmployees.length})
+          </TabsTrigger>
+          <TabsTrigger value="past" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
+            <UserMinus className="h-4 w-4" />
+            Past ({pastEmployees.length})
+          </TabsTrigger>
           <TabsTrigger value="payroll" className="flex-1 sm:flex-none text-xs sm:text-sm">Payroll</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="employees" className="space-y-4">
-          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {employees.map((emp) => (
-              <Card key={emp.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center gap-3 sm:gap-4 pb-2 p-4 sm:p-6 sm:pb-2">
-                  <Avatar className="h-10 w-10 sm:h-12 sm:w-12">
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                      {emp.name.split(' ').map(n => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-sm sm:text-base truncate">{emp.name}</CardTitle>
-                    <p className="text-xs sm:text-sm text-muted-foreground truncate">{emp.designation}</p>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                  <div className="grid gap-2 text-xs sm:text-sm mt-2">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Badge variant="outline" className="font-mono text-[10px] sm:text-xs">{emp.employeeId}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                       <Phone className="h-3 w-3 flex-shrink-0" /> <span className="truncate">{emp.emergencyContact}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                       <MapPin className="h-3 w-3 flex-shrink-0" /> <span className="truncate">{emp.address}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {employees.length === 0 && (
-              <div className="col-span-full text-center py-8 text-muted-foreground text-sm">
-                No employees found. Add your first employee to get started.
-              </div>
-            )}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="leaves">
+        <TabsContent value="current" className="space-y-4">
           <Card>
-            <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg">Pending Leave Requests</CardTitle>
+            <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-serif flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Current Employees
+                </CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  {currentEmployees.length} employee{currentEmployees.length !== 1 ? 's' : ''}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-              <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm">
-                No pending leave requests.
+              <EmployeeTable employeeList={currentEmployees} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="past" className="space-y-4">
+          <Card>
+            <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-serif flex items-center gap-2">
+                  <UserMinus className="h-5 w-5 text-muted-foreground" />
+                  Past Employees
+                </CardTitle>
+                <div className="text-sm text-muted-foreground">
+                  {pastEmployees.length} employee{pastEmployees.length !== 1 ? 's' : ''}
+                </div>
               </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <EmployeeTable employeeList={pastEmployees} isPast />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="payroll">
-           <Card>
+          <Card>
             <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="text-lg">Payroll Estimate</CardTitle>
+              <CardTitle className="text-lg font-serif">Monthly Payroll Summary</CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
               <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -177,25 +382,30 @@ export default function HR() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="text-xs sm:text-sm">Employee</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Base Salary</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Deductions</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm">Net Payable</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Designation</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Salary</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {employees.map(emp => (
+                      {currentEmployees.map(emp => (
                         <TableRow key={emp.id}>
-                          <TableCell className="text-xs sm:text-sm">{emp.name}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">₹{Number(emp.salary).toLocaleString()}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">₹0</TableCell>
-                          <TableCell className="text-right font-bold text-xs sm:text-sm">₹{Number(emp.salary).toLocaleString()}</TableCell>
+                          <TableCell className="text-xs sm:text-sm font-medium">{emp.name}</TableCell>
+                          <TableCell className="text-xs sm:text-sm text-muted-foreground">{emp.designation}</TableCell>
+                          <TableCell className="text-right font-mono text-xs sm:text-sm">₹{Number(emp.salary).toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
-                      {employees.length > 0 && (
+                      {currentEmployees.length > 0 && (
                         <TableRow className="bg-muted/50 font-bold">
-                          <TableCell colSpan={3} className="text-xs sm:text-sm">Total Payroll</TableCell>
-                          <TableCell className="text-right text-primary text-xs sm:text-sm">
-                            ₹{employees.reduce((acc, curr) => acc + Number(curr.salary), 0).toLocaleString()}
+                          <TableCell colSpan={2} className="text-xs sm:text-sm">Total Monthly Payroll</TableCell>
+                          <TableCell className="text-right text-primary font-mono text-xs sm:text-sm">
+                            ₹{totalCurrentSalary.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {currentEmployees.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center py-8 text-muted-foreground text-sm">
+                            No current employees to show payroll.
                           </TableCell>
                         </TableRow>
                       )}
