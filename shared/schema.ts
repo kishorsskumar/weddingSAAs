@@ -63,6 +63,7 @@ export const daybookEntries = pgTable("daybook_entries", {
   type: text("type").notNull(), // 'income' | 'expense'
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   category: text("category").notNull(),
+  bankId: varchar("bank_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -70,6 +71,16 @@ export const banks = pgTable("banks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default('0'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const bankTransfers = pgTable("bank_transfers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: date("date").notNull(),
+  fromBankId: varchar("from_bank_id").notNull(),
+  toBankId: varchar("to_bank_id").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -115,6 +126,7 @@ export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true,
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
 export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit({ id: true, createdAt: true });
 export const insertBankSchema = createInsertSchema(banks).omit({ id: true, createdAt: true });
+export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({ id: true, createdAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true });
 
 // Types
@@ -138,6 +150,9 @@ export type InsertDaybookEntry = z.infer<typeof insertDaybookEntrySchema>;
 
 export type Bank = typeof banks.$inferSelect;
 export type InsertBank = z.infer<typeof insertBankSchema>;
+
+export type BankTransfer = typeof bankTransfers.$inferSelect;
+export type InsertBankTransfer = z.infer<typeof insertBankTransferSchema>;
 
 export type LeaveRequest = typeof leaveRequests.$inferSelect;
 export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;

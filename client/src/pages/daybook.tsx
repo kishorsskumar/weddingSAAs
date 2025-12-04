@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { DaybookEntry, Bank } from "@/lib/types";
+import { useState, useMemo } from "react";
+import type { DaybookEntry, Bank, BankTransfer } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,19 +7,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays } from "lucide-react";
+import { format, addDays, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 
 export default function Daybook() {
-  const [filterType, setFilterType] = useState<"daily" | "weekly" | "monthly">("daily");
-  const [currentDate] = useState(new Date());
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isIncomeDialogOpen, setIsIncomeDialogOpen] = useState(false);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [periodType, setPeriodType] = useState<"day" | "month" | "year" | "custom">("month");
+  const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -42,6 +47,58 @@ export default function Daybook() {
     },
   });
 
+  const { data: transfers = [] } = useQuery<BankTransfer[]>({
+    queryKey: ['/api/bank-transfers'],
+    queryFn: async () => {
+      const res = await fetch('/api/bank-transfers');
+      if (!res.ok) throw new Error('Failed to fetch bank transfers');
+      return res.json();
+    },
+  });
+
+  const formattedDate = format(currentDate, "yyyy-MM-dd");
+
+  const todayEntries = useMemo(() => {
+    return entries.filter(e => e.date === formattedDate);
+  }, [entries, formattedDate]);
+
+  const todayTransfers = useMemo(() => {
+    return transfers.filter(t => t.date === formattedDate);
+  }, [transfers, formattedDate]);
+
+  const incomeEntries = todayEntries.filter(e => e.type === "income");
+  const expenseEntries = todayEntries.filter(e => e.type === "expense");
+
+  const periodDateRange = useMemo(() => {
+    switch (periodType) {
+      case "day":
+        return { start: startOfDay(currentDate), end: endOfDay(currentDate) };
+      case "month":
+        return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
+      case "year":
+        return { start: startOfYear(currentDate), end: endOfYear(currentDate) };
+      case "custom":
+        return { start: parseISO(customStartDate), end: parseISO(customEndDate) };
+      default:
+        return { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
+    }
+  }, [periodType, currentDate, customStartDate, customEndDate]);
+
+  const periodEntries = useMemo(() => {
+    return entries.filter(e => {
+      const entryDate = parseISO(e.date);
+      return isWithinInterval(entryDate, { start: periodDateRange.start, end: periodDateRange.end });
+    });
+  }, [entries, periodDateRange]);
+
+  const periodIncome = periodEntries.filter(e => e.type === "income").reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const periodExpense = periodEntries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const periodNetFlow = periodIncome - periodExpense;
+
+  const totalBankBalance = banks.reduce((acc, bank) => acc + Number(bank.balance), 0);
+
+  const getBankName = (id: string) => banks.find(b => b.id === id)?.name || "Unknown";
+
   const createMutation = useMutation({
     mutationFn: async (data: Partial<DaybookEntry>) => {
       const res = await fetch('/api/daybook', {
@@ -54,7 +111,9 @@ export default function Daybook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
-      setIsDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      setIsIncomeDialogOpen(false);
+      setIsExpenseDialogOpen(false);
     },
   });
 
@@ -112,13 +171,44 @@ export default function Daybook() {
     },
   });
 
-  const AddEntryForm = () => {
-    const { register, handleSubmit, setValue } = useForm<Partial<DaybookEntry>>();
+  const createTransferMutation = useMutation({
+    mutationFn: async (data: { fromBankId: string; toBankId: string; amount: string; description?: string }) => {
+      const res = await fetch('/api/bank-transfers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, date: formattedDate }),
+      });
+      if (!res.ok) throw new Error('Failed to create transfer');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bank-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      setIsTransferDialogOpen(false);
+    },
+  });
+
+  const deleteTransferMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/bank-transfers/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete transfer');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bank-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+    },
+  });
+
+  const AddEntryForm = ({ type }: { type: "income" | "expense" }) => {
+    const { register, handleSubmit, setValue, watch } = useForm<Partial<DaybookEntry>>();
+    const selectedBankId = watch("bankId");
     
     const onSubmit = (data: any) => {
       createMutation.mutate({
         ...data,
-        date: format(new Date(), "yyyy-MM-dd"),
+        type,
+        date: formattedDate,
       });
     };
 
@@ -126,32 +216,34 @@ export default function Daybook() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <Label>Description</Label>
-          <Input {...register("description")} required />
+          <Input {...register("description")} required placeholder={type === "income" ? "e.g. Payment received" : "e.g. Office rent"} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Type</Label>
-            <Select onValueChange={(v) => setValue("type", v as any)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="income">Income</SelectItem>
-                <SelectItem value="expense">Expense</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Amount</Label>
+            <Input type="number" step="0.01" {...register("amount")} required placeholder="0.00" />
           </div>
           <div className="space-y-2">
-            <Label>Amount</Label>
-            <Input type="number" {...register("amount")} required />
+            <Label>Category</Label>
+            <Input {...register("category")} placeholder={type === "income" ? "e.g. Sales, Payment" : "e.g. Rent, Utilities"} />
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Category</Label>
-          <Input {...register("category")} placeholder="e.g. Rent, Sales, Food" />
+          <Label>Bank Account (Optional)</Label>
+          <Select onValueChange={(v) => setValue("bankId", v === "none" ? undefined : v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Bank" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No Bank</SelectItem>
+              {banks.map((bank) => (
+                <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-          {createMutation.isPending ? 'Adding...' : 'Add Entry'}
+          {createMutation.isPending ? 'Adding...' : `Add ${type === "income" ? "Income" : "Expense"}`}
         </Button>
       </form>
     );
@@ -172,7 +264,7 @@ export default function Daybook() {
         </div>
         <div className="space-y-2">
           <Label>Opening Balance</Label>
-          <Input type="number" {...register("balance")} required placeholder="0" />
+          <Input type="number" step="0.01" {...register("balance")} required placeholder="0" />
         </div>
         <Button type="submit" className="w-full" disabled={createBankMutation.isPending}>
           {createBankMutation.isPending ? 'Adding...' : 'Add Bank'}
@@ -198,7 +290,7 @@ export default function Daybook() {
         </div>
         <div className="space-y-2">
           <Label>Balance</Label>
-          <Input type="number" {...register("balance")} required />
+          <Input type="number" step="0.01" {...register("balance")} required />
         </div>
         <Button type="submit" className="w-full" disabled={updateBankMutation.isPending}>
           {updateBankMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -207,198 +299,516 @@ export default function Daybook() {
     );
   };
 
-  const totalIncome = entries.filter(e => e.type === "income").reduce((acc, curr) => acc + Number(curr.amount), 0);
-  const totalExpense = entries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const TransferForm = () => {
+    const { register, handleSubmit, setValue, watch } = useForm<{ fromBankId: string; toBankId: string; amount: string; description: string }>();
+    const fromBank = watch("fromBankId");
+    const toBank = watch("toBankId");
+    
+    const onSubmit = (data: any) => {
+      if (data.fromBankId === data.toBankId) {
+        alert("Source and destination bank cannot be the same");
+        return;
+      }
+      createTransferMutation.mutate(data);
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>From Bank</Label>
+          <Select onValueChange={(v) => setValue("fromBankId", v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Source Bank" />
+            </SelectTrigger>
+            <SelectContent>
+              {banks.map((bank) => (
+                <SelectItem key={bank.id} value={bank.id}>{bank.name} (₹{Number(bank.balance).toLocaleString()})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>To Bank</Label>
+          <Select onValueChange={(v) => setValue("toBankId", v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Destination Bank" />
+            </SelectTrigger>
+            <SelectContent>
+              {banks.map((bank) => (
+                <SelectItem key={bank.id} value={bank.id}>{bank.name} (₹{Number(bank.balance).toLocaleString()})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Amount</Label>
+          <Input type="number" step="0.01" {...register("amount")} required placeholder="0.00" />
+        </div>
+        <div className="space-y-2">
+          <Label>Description (Optional)</Label>
+          <Input {...register("description")} placeholder="e.g. Transfer for operations" />
+        </div>
+        <Button type="submit" className="w-full" disabled={createTransferMutation.isPending}>
+          {createTransferMutation.isPending ? 'Transferring...' : 'Transfer Funds'}
+        </Button>
+      </form>
+    );
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Daybook</h1>
-          <p className="text-sm text-muted-foreground">Financial Overview & Cash Flow</p>
+          <p className="text-sm text-muted-foreground">Daily Financial Tracking</p>
         </div>
-        <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card w-fit">
-          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs sm:text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setCurrentDate(subDays(currentDate, 1))}
+            data-testid="button-prev-day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card min-w-[140px] justify-center">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs sm:text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => setCurrentDate(addDays(currentDate, 1))}
+            data-testid="button-next-day"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setCurrentDate(new Date())}
+            className="hidden sm:flex"
+            data-testid="button-today"
+          >
+            Today
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <Card className="border-l-4 border-l-green-600">
-          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total Income</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
-              <span className="text-lg sm:text-2xl font-bold text-green-700">₹{totalIncome.toLocaleString()}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-red-600">
-          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
-              <span className="text-lg sm:text-2xl font-bold text-red-700">₹{totalExpense.toLocaleString()}</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-l-4 border-l-primary">
-          <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">Net Cash Flow</CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="flex items-center gap-2">
-              <Wallet className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-              <span className="text-lg sm:text-2xl font-bold">₹{(totalIncome - totalExpense).toLocaleString()}</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="daily" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 max-w-md">
+          <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily View</TabsTrigger>
+          <TabsTrigger value="summary" className="text-xs sm:text-sm">Period Summary</TabsTrigger>
+          <TabsTrigger value="banks" className="text-xs sm:text-sm">Banks</TabsTrigger>
+        </TabsList>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <Card className="lg:col-span-1 h-fit order-1">
-          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
-            <CardTitle className="font-serif text-lg">Bank Balances</CardTitle>
-            {isAdmin && (
-              <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" data-testid="button-add-bank">
-                    <Plus className="h-3 w-3" /> Add
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-[95vw] sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Add Bank Account</DialogTitle>
-                  </DialogHeader>
-                  <AddBankForm />
-                </DialogContent>
-              </Dialog>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-2 sm:space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
-            {banks.map((bank) => (
-              <div key={bank.id} className="flex justify-between items-center p-2 sm:p-3 rounded-lg bg-muted/30 border group">
-                <div className="min-w-0 flex-1">
-                  <span className="font-medium text-sm truncate block">{bank.name}</span>
-                  <div className="font-bold font-mono text-base sm:text-lg">₹{Number(bank.balance).toLocaleString()}</div>
+        <TabsContent value="daily" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="border-l-4 border-l-green-600">
+              <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  <CardTitle className="font-serif text-lg text-green-700">Income</CardTitle>
                 </div>
-                {isAdmin && (
-                  <div className="flex gap-1 flex-shrink-0">
-                    <Dialog open={editingBank?.id === bank.id} onOpenChange={(open) => !open && setEditingBank(null)}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8"
-                          onClick={() => setEditingBank(bank)}
-                          data-testid={`button-edit-bank-${bank.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-[95vw] sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Edit Bank Balance</DialogTitle>
-                        </DialogHeader>
-                        <EditBankForm bank={bank} onClose={() => setEditingBank(null)} />
-                      </DialogContent>
-                    </Dialog>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => {
-                        if (confirm(`Delete ${bank.name}?`)) deleteBankMutation.mutate(bank.id);
-                      }}
-                      data-testid={`button-delete-bank-${bank.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
+                <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1 h-8 bg-green-600 hover:bg-green-700" data-testid="button-add-income">
+                      <Plus className="h-3 w-3" /> Add
                     </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add Income Entry</DialogTitle>
+                    </DialogHeader>
+                    <AddEntryForm type="income" />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="min-w-[300px] px-4 sm:px-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Description</TableHead>
+                          <TableHead className="text-xs">Bank</TableHead>
+                          <TableHead className="text-right text-xs">Amount</TableHead>
+                          {isAdmin && <TableHead className="w-8"></TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {incomeEntries.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No income entries for this day</TableCell>
+                          </TableRow>
+                        ) : (
+                          incomeEntries.map((entry) => (
+                            <TableRow key={entry.id}>
+                              <TableCell className="text-xs sm:text-sm">
+                                <div className="font-medium">{entry.description}</div>
+                                <div className="text-muted-foreground text-[10px]">{entry.category}</div>
+                              </TableCell>
+                              <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                              <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-green-600">
+                                +₹{Number(entry.amount).toLocaleString()}
+                              </TableCell>
+                              {isAdmin && (
+                                <TableCell>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                    }}
+                                    data-testid={`button-delete-income-${entry.id}`}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                      <span className="text-sm font-medium text-muted-foreground">Total Income</span>
+                      <span className="text-lg font-bold text-green-600">
+                        ₹{incomeEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
-            {banks.length === 0 && (
-              <p className="text-center text-muted-foreground py-4 text-sm">No banks added yet</p>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="lg:col-span-2 order-2">
-          <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
-            <CardTitle className="font-serif text-lg">Transactions</CardTitle>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1 h-8 text-xs sm:text-sm" data-testid="button-add-entry"><Plus className="h-3 w-3 sm:h-4 sm:w-4"/> Add</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[95vw] sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add Daybook Entry</DialogTitle>
-                </DialogHeader>
-                <AddEntryForm />
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
-          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="min-w-[350px] px-4 sm:px-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs sm:text-sm">Description</TableHead>
-                      <TableHead className="text-xs sm:text-sm">Category</TableHead>
-                      <TableHead className="text-right text-xs sm:text-sm">Amount</TableHead>
-                      {isAdmin && <TableHead className="w-10"></TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {entries.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-8 text-muted-foreground text-sm">No transactions found.</TableCell>
-                      </TableRow>
-                    ) : (
-                      entries.map((entry) => (
-                        <TableRow key={entry.id}>
-                          <TableCell className="font-medium text-xs sm:text-sm">{entry.description}</TableCell>
-                          <TableCell>
-                            <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded bg-muted text-[10px] sm:text-xs text-muted-foreground">
-                              {entry.category}
-                            </span>
-                          </TableCell>
-                          <TableCell className={cn("text-right font-mono font-medium text-xs sm:text-sm", 
-                            entry.type === "income" ? "text-green-600" : "text-red-600"
-                          )}>
-                            {entry.type === "income" ? "+" : "-"}₹{Number(entry.amount).toLocaleString()}
-                          </TableCell>
-                          {isAdmin && (
-                            <TableCell>
+            <Card className="border-l-4 border-l-red-600">
+              <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
+                <div className="flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-red-600" />
+                  <CardTitle className="font-serif text-lg text-red-700">Expenses</CardTitle>
+                </div>
+                <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1 h-8 bg-red-600 hover:bg-red-700" data-testid="button-add-expense">
+                      <Plus className="h-3 w-3" /> Add
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add Expense Entry</DialogTitle>
+                    </DialogHeader>
+                    <AddEntryForm type="expense" />
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  <div className="min-w-[300px] px-4 sm:px-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Description</TableHead>
+                          <TableHead className="text-xs">Bank</TableHead>
+                          <TableHead className="text-right text-xs">Amount</TableHead>
+                          {isAdmin && <TableHead className="w-8"></TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenseEntries.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No expense entries for this day</TableCell>
+                          </TableRow>
+                        ) : (
+                          expenseEntries.map((entry) => (
+                            <TableRow key={entry.id}>
+                              <TableCell className="text-xs sm:text-sm">
+                                <div className="font-medium">{entry.description}</div>
+                                <div className="text-muted-foreground text-[10px]">{entry.category}</div>
+                              </TableCell>
+                              <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                              <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-red-600">
+                                -₹{Number(entry.amount).toLocaleString()}
+                              </TableCell>
+                              {isAdmin && (
+                                <TableCell>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                    }}
+                                    data-testid={`button-delete-expense-${entry.id}`}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                      <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
+                      <span className="text-lg font-bold text-red-600">
+                        ₹{expenseEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
+              <div className="flex items-center gap-2">
+                <ArrowRightLeft className="h-5 w-5 text-primary" />
+                <CardTitle className="font-serif text-lg">Bank Transfers</CardTitle>
+              </div>
+              {isAdmin && banks.length >= 2 && (
+                <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1 h-8" data-testid="button-add-transfer">
+                      <Plus className="h-3 w-3" /> Transfer
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Transfer Between Banks</DialogTitle>
+                    </DialogHeader>
+                    <TransferForm />
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              {banks.length < 2 ? (
+                <p className="text-center text-muted-foreground py-4 text-sm">Add at least 2 banks to enable transfers</p>
+              ) : todayTransfers.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4 text-sm">No transfers for this day</p>
+              ) : (
+                <div className="space-y-2">
+                  {todayTransfers.map((transfer) => (
+                    <div key={transfer.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="font-medium">{getBankName(transfer.fromBankId)}</span>
+                          <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{getBankName(transfer.toBankId)}</span>
+                        </div>
+                        {transfer.description && (
+                          <span className="text-xs text-muted-foreground">({transfer.description})</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold">₹{Number(transfer.amount).toLocaleString()}</span>
+                        {isAdmin && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm(`Delete this transfer?`)) deleteTransferMutation.mutate(transfer.id);
+                            }}
+                            data-testid={`button-delete-transfer-${transfer.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-primary">
+            <CardContent className="p-4 sm:p-6">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-5 w-5 text-primary" />
+                  <span className="font-medium">Day's Net Cash Flow</span>
+                </div>
+                <span className={cn(
+                  "text-xl font-bold font-mono",
+                  (incomeEntries.reduce((acc, e) => acc + Number(e.amount), 0) - expenseEntries.reduce((acc, e) => acc + Number(e.amount), 0)) >= 0 
+                    ? "text-green-600" 
+                    : "text-red-600"
+                )}>
+                  ₹{(incomeEntries.reduce((acc, e) => acc + Number(e.amount), 0) - expenseEntries.reduce((acc, e) => acc + Number(e.amount), 0)).toLocaleString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="summary" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                  <CardTitle className="font-serif text-lg">Period Summary</CardTitle>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={periodType} onValueChange={(v) => setPeriodType(v as any)}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Day</SelectItem>
+                      <SelectItem value="month">Month</SelectItem>
+                      <SelectItem value="year">Year</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {periodType === "custom" && (
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="date" 
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-auto"
+                      />
+                      <span className="text-muted-foreground">to</span>
+                      <Input 
+                        type="date" 
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-auto"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-sm text-muted-foreground mb-4">
+                {format(periodDateRange.start, "dd MMM yyyy")} - {format(periodDateRange.end, "dd MMM yyyy")}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-700 dark:text-green-400">Total Income</span>
+                  </div>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">₹{periodIncome.toLocaleString()}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingDown className="h-4 w-4 text-red-600" />
+                    <span className="text-sm font-medium text-red-700 dark:text-red-400">Total Expenses</span>
+                  </div>
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-400">₹{periodExpense.toLocaleString()}</p>
+                </div>
+                <div className={cn(
+                  "p-4 rounded-lg border",
+                  periodNetFlow >= 0 
+                    ? "bg-primary/5 border-primary/20" 
+                    : "bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-900"
+                )}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Net Cash Flow</span>
+                  </div>
+                  <p className={cn(
+                    "text-2xl font-bold",
+                    periodNetFlow >= 0 ? "text-primary" : "text-orange-600 dark:text-orange-400"
+                  )}>₹{periodNetFlow.toLocaleString()}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="banks" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
+              <div className="flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <CardTitle className="font-serif text-lg">Bank Accounts</CardTitle>
+              </div>
+              {isAdmin && (
+                <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1 h-8" data-testid="button-add-bank">
+                      <Plus className="h-3 w-3" /> Add Bank
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add Bank Account</DialogTitle>
+                    </DialogHeader>
+                    <AddBankForm />
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="grid gap-3">
+                {banks.map((bank) => (
+                  <div key={bank.id} className="flex justify-between items-center p-4 rounded-lg bg-muted/30 border group">
+                    <div className="min-w-0 flex-1">
+                      <span className="font-medium text-base">{bank.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="font-bold font-mono text-xl">₹{Number(bank.balance).toLocaleString()}</div>
+                      {isAdmin && (
+                        <div className="flex gap-1">
+                          <Dialog open={editingBank?.id === bank.id} onOpenChange={(open) => !open && setEditingBank(null)}>
+                            <DialogTrigger asChild>
                               <Button 
                                 size="icon" 
                                 variant="ghost" 
-                                className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
-                                onClick={() => {
-                                  if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                }}
-                                data-testid={`button-delete-entry-${entry.id}`}
+                                className="h-8 w-8"
+                                onClick={() => setEditingBank(bank)}
+                                data-testid={`button-edit-bank-${bank.id}`}
                               >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                <Pencil className="h-4 w-4" />
                               </Button>
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-[95vw] sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Edit Bank Account</DialogTitle>
+                              </DialogHeader>
+                              <EditBankForm bank={bank} onClose={() => setEditingBank(null)} />
+                            </DialogContent>
+                          </Dialog>
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              if (confirm(`Delete ${bank.name}?`)) deleteBankMutation.mutate(bank.id);
+                            }}
+                            data-testid={`button-delete-bank-${bank.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {banks.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8 text-sm">No banks added yet</p>
+                )}
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              {banks.length > 0 && (
+                <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                  <span className="font-medium text-muted-foreground">Total Bank Balance</span>
+                  <span className="text-2xl font-bold font-mono text-primary">₹{totalBankBalance.toLocaleString()}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

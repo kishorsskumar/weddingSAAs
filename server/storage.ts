@@ -6,6 +6,7 @@ import {
   employees, 
   daybookEntries, 
   banks,
+  bankTransfers,
   leaveRequests,
   type User, 
   type InsertUser,
@@ -21,6 +22,8 @@ import {
   type InsertDaybookEntry,
   type Bank,
   type InsertBank,
+  type BankTransfer,
+  type InsertBankTransfer,
   type LeaveRequest,
   type InsertLeaveRequest,
 } from "@shared/schema";
@@ -63,6 +66,7 @@ export interface IStorage {
   
   // Daybook
   getAllDaybookEntries(): Promise<DaybookEntry[]>;
+  getDaybookEntry(id: string): Promise<DaybookEntry | undefined>;
   getDaybookEntriesByDateRange(startDate: string, endDate: string): Promise<DaybookEntry[]>;
   createDaybookEntry(entry: InsertDaybookEntry): Promise<DaybookEntry>;
   updateDaybookEntry(id: string, entry: Partial<InsertDaybookEntry>): Promise<DaybookEntry | undefined>;
@@ -74,6 +78,14 @@ export interface IStorage {
   createBank(bank: InsertBank): Promise<Bank>;
   updateBank(id: string, bank: Partial<InsertBank>): Promise<Bank | undefined>;
   deleteBank(id: string): Promise<void>;
+
+  // Bank Transfers
+  getAllBankTransfers(): Promise<BankTransfer[]>;
+  getBankTransfer(id: string): Promise<BankTransfer | undefined>;
+  getBankTransfersByDate(date: string): Promise<BankTransfer[]>;
+  getBankTransfersByDateRange(startDate: string, endDate: string): Promise<BankTransfer[]>;
+  createBankTransfer(transfer: InsertBankTransfer): Promise<BankTransfer>;
+  deleteBankTransfer(id: string): Promise<void>;
   
   // Leave Requests
   getAllLeaveRequests(): Promise<LeaveRequest[]>;
@@ -203,6 +215,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(daybookEntries).orderBy(desc(daybookEntries.date));
   }
 
+  async getDaybookEntry(id: string): Promise<DaybookEntry | undefined> {
+    const [entry] = await db.select().from(daybookEntries).where(eq(daybookEntries.id, id));
+    return entry || undefined;
+  }
+
   async getDaybookEntriesByDateRange(startDate: string, endDate: string): Promise<DaybookEntry[]> {
     return await db.select().from(daybookEntries)
       .where(and(
@@ -248,6 +265,40 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBank(id: string): Promise<void> {
     await db.delete(banks).where(eq(banks.id, id));
+  }
+
+  // Bank Transfers
+  async getAllBankTransfers(): Promise<BankTransfer[]> {
+    return await db.select().from(bankTransfers).orderBy(desc(bankTransfers.date));
+  }
+
+  async getBankTransfer(id: string): Promise<BankTransfer | undefined> {
+    const [transfer] = await db.select().from(bankTransfers).where(eq(bankTransfers.id, id));
+    return transfer || undefined;
+  }
+
+  async getBankTransfersByDate(date: string): Promise<BankTransfer[]> {
+    return await db.select().from(bankTransfers).where(eq(bankTransfers.date, date));
+  }
+
+  async getBankTransfersByDateRange(startDate: string, endDate: string): Promise<BankTransfer[]> {
+    return await db.select().from(bankTransfers)
+      .where(
+        and(
+          gte(bankTransfers.date, startDate),
+          lte(bankTransfers.date, endDate)
+        )
+      )
+      .orderBy(desc(bankTransfers.date));
+  }
+
+  async createBankTransfer(insertTransfer: InsertBankTransfer): Promise<BankTransfer> {
+    const [transfer] = await db.insert(bankTransfers).values(insertTransfer).returning();
+    return transfer;
+  }
+
+  async deleteBankTransfer(id: string): Promise<void> {
+    await db.delete(bankTransfers).where(eq(bankTransfers.id, id));
   }
 
   // Leave Requests

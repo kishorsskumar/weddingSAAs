@@ -258,6 +258,15 @@ export async function registerRoutes(
     try {
       const data = insertDaybookEntrySchema.parse(req.body);
       const entry = await storage.createDaybookEntry(data);
+      if (entry.bankId) {
+        const bank = await storage.getBank(entry.bankId);
+        if (bank) {
+          const adjustment = entry.type === 'income' 
+            ? parseFloat(bank.balance) + parseFloat(entry.amount)
+            : parseFloat(bank.balance) - parseFloat(entry.amount);
+          await storage.updateBank(bank.id, { balance: adjustment.toString() });
+        }
+      }
       res.json(entry);
     } catch (error) {
       res.status(400).json({ error: 'Invalid daybook entry' });
@@ -274,6 +283,16 @@ export async function registerRoutes(
   });
 
   app.delete('/api/daybook/:id', async (req, res) => {
+    const entry = await storage.getDaybookEntry(req.params.id);
+    if (entry && entry.bankId) {
+      const bank = await storage.getBank(entry.bankId);
+      if (bank) {
+        const adjustment = entry.type === 'income' 
+          ? parseFloat(bank.balance) - parseFloat(entry.amount)
+          : parseFloat(bank.balance) + parseFloat(entry.amount);
+        await storage.updateBank(bank.id, { balance: adjustment.toString() });
+      }
+    }
     await storage.deleteDaybookEntry(req.params.id);
     res.json({ success: true });
   });
@@ -305,6 +324,58 @@ export async function registerRoutes(
 
   app.delete('/api/banks/:id', async (req, res) => {
     await storage.deleteBank(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Bank Transfers
+  app.get('/api/bank-transfers', async (req, res) => {
+    const { startDate, endDate, date } = req.query;
+    if (date) {
+      const transfers = await storage.getBankTransfersByDate(date as string);
+      res.json(transfers);
+    } else if (startDate && endDate) {
+      const transfers = await storage.getBankTransfersByDateRange(startDate as string, endDate as string);
+      res.json(transfers);
+    } else {
+      const transfers = await storage.getAllBankTransfers();
+      res.json(transfers);
+    }
+  });
+
+  app.post('/api/bank-transfers', async (req, res) => {
+    try {
+      const transfer = await storage.createBankTransfer(req.body);
+      const fromBank = await storage.getBank(transfer.fromBankId);
+      const toBank = await storage.getBank(transfer.toBankId);
+      if (fromBank) {
+        const newFromBalance = (parseFloat(fromBank.balance) - parseFloat(transfer.amount)).toString();
+        await storage.updateBank(fromBank.id, { balance: newFromBalance });
+      }
+      if (toBank) {
+        const newToBalance = (parseFloat(toBank.balance) + parseFloat(transfer.amount)).toString();
+        await storage.updateBank(toBank.id, { balance: newToBalance });
+      }
+      res.json(transfer);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid bank transfer data' });
+    }
+  });
+
+  app.delete('/api/bank-transfers/:id', async (req, res) => {
+    const transfer = await storage.getBankTransfer(req.params.id);
+    if (transfer) {
+      const fromBank = await storage.getBank(transfer.fromBankId);
+      const toBank = await storage.getBank(transfer.toBankId);
+      if (fromBank) {
+        const newFromBalance = (parseFloat(fromBank.balance) + parseFloat(transfer.amount)).toString();
+        await storage.updateBank(fromBank.id, { balance: newFromBalance });
+      }
+      if (toBank) {
+        const newToBalance = (parseFloat(toBank.balance) - parseFloat(transfer.amount)).toString();
+        await storage.updateBank(toBank.id, { balance: newToBalance });
+      }
+    }
+    await storage.deleteBankTransfer(req.params.id);
     res.json({ success: true });
   });
 

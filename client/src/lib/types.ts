@@ -41,6 +41,7 @@ export interface DaybookEntry {
   type: "income" | "expense";
   amount: string;
   category: string;
+  bankId?: string | null;
   createdAt?: string;
 }
 
@@ -48,6 +49,16 @@ export interface Bank {
   id: string;
   name: string;
   balance: string;
+  createdAt?: string;
+}
+
+export interface BankTransfer {
+  id: string;
+  date: string;
+  fromBankId: string;
+  toBankId: string;
+  amount: string;
+  description?: string | null;
   createdAt?: string;
 }
 
