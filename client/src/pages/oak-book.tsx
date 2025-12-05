@@ -453,6 +453,7 @@ export default function OakBook() {
             invoices={invoices} 
             customers={customers}
             banks={banks}
+            companySettings={companySettings}
             queryClient={queryClient} 
             toast={toast} 
           />
@@ -727,6 +728,7 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const cloneMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -765,6 +767,18 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
     },
   });
 
+  const handleViewEstimate = (estimate: Estimate) => {
+    setSelectedEstimate(estimate);
+    setIsEditMode(false);
+    setIsViewOpen(true);
+  };
+
+  const handleEditEstimate = (estimate: Estimate) => {
+    setSelectedEstimate(estimate);
+    setIsEditMode(true);
+    setIsViewOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -790,7 +804,7 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
               </thead>
               <tbody>
                 {estimates.map((estimate: Estimate) => (
-                  <tr key={estimate.id} className="border-t" data-testid={`row-quote-${estimate.id}`}>
+                  <tr key={estimate.id} className="border-t hover:bg-muted/30 cursor-pointer" data-testid={`row-quote-${estimate.id}`} onClick={() => handleViewEstimate(estimate)}>
                     <td className="p-3 font-medium">{estimate.number}</td>
                     <td className="p-3">
                       {estimate.customerId ? customers.find((c: Customer) => c.id === estimate.customerId)?.name : '—'}
@@ -802,20 +816,23 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
                         {estimate.status}
                       </Badge>
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedEstimate(estimate); setIsViewOpen(true); }}>
+                        <Button variant="ghost" size="sm" onClick={() => handleViewEstimate(estimate)} title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => cloneMutation.mutate(estimate.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => handleEditEstimate(estimate)} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => cloneMutation.mutate(estimate.id)} title="Clone">
                           <Copy className="h-4 w-4" />
                         </Button>
                         {estimate.status !== 'converted' && (
-                          <Button variant="ghost" size="sm" onClick={() => convertMutation.mutate(estimate.id)}>
+                          <Button variant="ghost" size="sm" onClick={() => convertMutation.mutate(estimate.id)} title="Convert to Invoice">
                             <ArrowRight className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(estimate.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(estimate.id)} title="Delete">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -845,12 +862,22 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
       />
 
       {selectedEstimate && (
-        <ViewQuoteDialog
+        <ViewEditQuoteDialog
           open={isViewOpen}
-          onOpenChange={setIsViewOpen}
+          onOpenChange={(open: boolean) => {
+            setIsViewOpen(open);
+            if (!open) {
+              setIsEditMode(false);
+            }
+          }}
           estimate={selectedEstimate}
-          customer={customers.find((c: Customer) => c.id === selectedEstimate.customerId)}
+          customers={customers}
           companySettings={companySettings}
+          queryClient={queryClient}
+          toast={toast}
+          initialEditMode={isEditMode}
+          onClone={() => cloneMutation.mutate(selectedEstimate.id)}
+          onConvert={() => convertMutation.mutate(selectedEstimate.id)}
         />
       )}
     </div>
@@ -1221,10 +1248,348 @@ function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, que
   );
 }
 
-function ViewQuoteDialog({ open, onOpenChange, estimate, customer, companySettings }: any) {
+function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companySettings, queryClient, toast, initialEditMode, onClone, onConvert }: any) {
+  const [isEditMode, setIsEditMode] = useState(initialEditMode);
+  const [customerId, setCustomerId] = useState(estimate.customerId || '');
+  const [date, setDate] = useState(estimate.date);
+  const [subject, setSubject] = useState(estimate.subject || '');
+  const [weddingPlannerName, setWeddingPlannerName] = useState(estimate.weddingPlannerName || '');
+  const [customerAddress, setCustomerAddress] = useState(estimate.customerAddress || '');
+  const [lineItems, setLineItems] = useState<LineItem[]>(estimate.lineItems || []);
+  const [discountPercent, setDiscountPercent] = useState(parseFloat(estimate.discountPercent || '0'));
+  const [serviceChargePercent, setServiceChargePercent] = useState(parseFloat(estimate.serviceChargePercent || '12.5'));
+  const [notes, setNotes] = useState(estimate.notes || '');
+  const [terms, setTerms] = useState(estimate.terms || DEFAULT_TERMS);
+  const [status, setStatus] = useState(estimate.status);
+
+  const customer = customers.find((c: Customer) => c.id === customerId);
+
+  useEffect(() => {
+    setIsEditMode(initialEditMode);
+    setCustomerId(estimate.customerId || '');
+    setDate(estimate.date);
+    setSubject(estimate.subject || '');
+    setWeddingPlannerName(estimate.weddingPlannerName || '');
+    setCustomerAddress(estimate.customerAddress || '');
+    setLineItems(estimate.lineItems || []);
+    setDiscountPercent(parseFloat(estimate.discountPercent || '0'));
+    setServiceChargePercent(parseFloat(estimate.serviceChargePercent || '12.5'));
+    setNotes(estimate.notes || '');
+    setTerms(estimate.terms || DEFAULT_TERMS);
+    setStatus(estimate.status);
+  }, [estimate, initialEditMode]);
+
+  const addLineItem = (isHeading: boolean = false) => {
+    setLineItems([...lineItems, {
+      slNo: isHeading ? undefined : lineItems.filter(i => !i.isHeading).length + 1,
+      name: '',
+      description: '',
+      quantity: isHeading ? 0 : 1,
+      rate: 0,
+      total: 0,
+      isHeading,
+    }]);
+  };
+
+  const updateLineItem = (index: number, field: string, value: any) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      updated[index].total = updated[index].quantity * updated[index].rate;
+    }
+    setLineItems(updated);
+  };
+
+  const removeLineItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + item.total, 0);
+  const discountAmount = subtotal * (discountPercent / 100);
+  const afterDiscount = subtotal - discountAmount;
+  const serviceChargeAmount = afterDiscount * (serviceChargePercent / 100);
+  const total = afterDiscount + serviceChargeAmount;
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`/api/estimates/${estimate.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update quote');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/estimates'] });
+      setIsEditMode(false);
+      toast({ title: 'Quote updated successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update quote', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    let itemCounter = 1;
+    const reindexedLineItems = lineItems.map(item => ({
+      ...item,
+      slNo: item.isHeading ? undefined : itemCounter++,
+      quantity: Number(item.quantity),
+      rate: Number(item.rate),
+      total: Number(item.quantity) * Number(item.rate),
+    }));
+
+    const calcSubtotal = reindexedLineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
+    const calcDiscountAmount = calcSubtotal * (discountPercent / 100);
+    const calcAfterDiscount = calcSubtotal - calcDiscountAmount;
+    const calcServiceChargeAmount = calcAfterDiscount * (serviceChargePercent / 100);
+    const calcTotal = calcAfterDiscount + calcServiceChargeAmount;
+
+    updateMutation.mutate({
+      customerId: customerId || null,
+      date,
+      subject,
+      weddingPlannerName,
+      customerAddress,
+      lineItems: reindexedLineItems,
+      subtotal: calcSubtotal.toFixed(2),
+      discountPercent: discountPercent.toFixed(2),
+      discountAmount: calcDiscountAmount.toFixed(2),
+      serviceChargePercent: serviceChargePercent.toFixed(2),
+      serviceChargeAmount: calcServiceChargeAmount.toFixed(2),
+      taxTotal: '0',
+      total: calcTotal.toFixed(2),
+      totalInWords: `Indian Rupee ${numberToWords(Math.round(calcTotal))} Only`,
+      notes,
+      terms,
+      status,
+    });
+  };
+
+  if (isEditMode) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <DialogTitle>Edit Quote - {estimate.number}</DialogTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Customer</Label>
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c: Customer) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Quote Date</Label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                    <SelectItem value="declined">Declined</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Wedding Planner Name</Label>
+                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <Label>Customer Address</Label>
+              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <Label>Subject (Event Description)</Label>
+              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <Label>Line Items</Label>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
+                    + Section Header
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
+                    + Item
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="p-2 text-left w-12">Sl No</th>
+                      <th className="p-2 text-left">Item & Description</th>
+                      <th className="p-2 text-right w-20">Qty</th>
+                      <th className="p-2 text-right w-24">Rate</th>
+                      <th className="p-2 text-right w-28">Amount</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item, index) => (
+                      <tr key={index} className={cn("border-t", item.isHeading && "bg-muted/30")}>
+                        <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                        <td className="p-2" colSpan={item.isHeading ? 4 : 1}>
+                          <Textarea
+                            value={item.name}
+                            onChange={e => updateLineItem(index, 'name', e.target.value)}
+                            className={cn("min-h-[40px]", item.isHeading && "font-bold")}
+                            rows={1}
+                          />
+                        </td>
+                        {!item.isHeading && (
+                          <>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="text-right"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.rate}
+                                onChange={e => updateLineItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                                className="text-right"
+                              />
+                            </td>
+                            <td className="p-2 text-right font-medium">
+                              {formatIndianCurrency(item.total)}
+                            </td>
+                          </>
+                        )}
+                        <td className="p-2">
+                          <Button variant="ghost" size="sm" onClick={() => removeLineItem(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="w-80 space-y-2">
+                <div className="flex justify-between">
+                  <span>Sub Total</span>
+                  <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    Discount
+                    <Input
+                      type="number"
+                      value={discountPercent}
+                      onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                      className="w-16 h-6 text-right"
+                    />
+                    %
+                  </span>
+                  <span>- {formatIndianCurrency(discountAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    Service Charge
+                    <Input
+                      type="number"
+                      value={serviceChargePercent}
+                      onChange={e => setServiceChargePercent(parseFloat(e.target.value) || 0)}
+                      className="w-16 h-6 text-right"
+                    />
+                    %
+                  </span>
+                  <span>{formatIndianCurrency(serviceChargeAmount)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span>{formatIndianCurrency(total)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <Label>Terms & Conditions</Label>
+              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={6} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Toolbar */}
+        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+          <div className="flex items-center gap-2">
+            <Badge variant={estimate.status === 'accepted' ? 'default' : estimate.status === 'converted' ? 'secondary' : 'outline'}>
+              {estimate.status}
+            </Badge>
+            <span className="font-medium">{estimate.number}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
+              <Edit className="h-4 w-4 mr-2" /> Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={onClone}>
+              <Copy className="h-4 w-4 mr-2" /> Clone
+            </Button>
+            {estimate.status !== 'converted' && (
+              <Button variant="outline" size="sm" onClick={onConvert}>
+                <ArrowRight className="h-4 w-4 mr-2" /> Convert to Invoice
+              </Button>
+            )}
+          </div>
+        </div>
+
         <div className="bg-white p-6 print:p-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
@@ -1358,7 +1723,11 @@ function ViewQuoteDialog({ open, onOpenChange, estimate, customer, companySettin
   );
 }
 
-function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any) {
+function InvoicesSection({ invoices, customers, banks, queryClient, toast, companySettings }: any) {
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
@@ -1370,6 +1739,18 @@ function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any
       toast({ title: 'Invoice deleted' });
     },
   });
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsEditMode(false);
+    setIsViewOpen(true);
+  };
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsEditMode(true);
+    setIsViewOpen(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -1394,7 +1775,7 @@ function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any
               </thead>
               <tbody>
                 {invoices.map((invoice: Invoice) => (
-                  <tr key={invoice.id} className="border-t">
+                  <tr key={invoice.id} className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => handleViewInvoice(invoice)}>
                     <td className="p-3 font-medium">{invoice.number}</td>
                     <td className="p-3">
                       {invoice.customerId ? customers.find((c: Customer) => c.id === invoice.customerId)?.name : '—'}
@@ -1407,10 +1788,18 @@ function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any
                         {invoice.status}
                       </Badge>
                     </td>
-                    <td className="p-3 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(invoice.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                    <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewInvoice(invoice)} title="View">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEditInvoice(invoice)} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(invoice.id)} title="Delete">
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1426,7 +1815,522 @@ function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any
           </div>
         </CardContent>
       </Card>
+
+      {selectedInvoice && (
+        <ViewEditInvoiceDialog
+          open={isViewOpen}
+          onOpenChange={(open: boolean) => {
+            setIsViewOpen(open);
+            if (!open) {
+              setIsEditMode(false);
+            }
+          }}
+          invoice={selectedInvoice}
+          customers={customers}
+          companySettings={companySettings}
+          queryClient={queryClient}
+          toast={toast}
+          initialEditMode={isEditMode}
+        />
+      )}
     </div>
+  );
+}
+
+function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, companySettings, queryClient, toast, initialEditMode }: any) {
+  const [isEditMode, setIsEditMode] = useState(initialEditMode);
+  const [customerId, setCustomerId] = useState(invoice.customerId || '');
+  const [date, setDate] = useState(invoice.date);
+  const [dueDate, setDueDate] = useState(invoice.dueDate || '');
+  const [subject, setSubject] = useState(invoice.subject || '');
+  const [weddingPlannerName, setWeddingPlannerName] = useState(invoice.weddingPlannerName || '');
+  const [customerAddress, setCustomerAddress] = useState(invoice.customerAddress || '');
+  const [lineItems, setLineItems] = useState<LineItem[]>(invoice.lineItems || []);
+  const [discountPercent, setDiscountPercent] = useState(parseFloat(invoice.discountPercent || '0'));
+  const [serviceChargePercent, setServiceChargePercent] = useState(parseFloat(invoice.serviceChargePercent || '12.5'));
+  const [notes, setNotes] = useState(invoice.notes || '');
+  const [terms, setTerms] = useState(invoice.terms || DEFAULT_TERMS);
+  const [status, setStatus] = useState(invoice.status);
+
+  const customer = customers.find((c: Customer) => c.id === customerId);
+
+  useEffect(() => {
+    setIsEditMode(initialEditMode);
+    setCustomerId(invoice.customerId || '');
+    setDate(invoice.date);
+    setDueDate(invoice.dueDate || '');
+    setSubject(invoice.subject || '');
+    setWeddingPlannerName(invoice.weddingPlannerName || '');
+    setCustomerAddress(invoice.customerAddress || '');
+    setLineItems(invoice.lineItems || []);
+    setDiscountPercent(parseFloat(invoice.discountPercent || '0'));
+    setServiceChargePercent(parseFloat(invoice.serviceChargePercent || '12.5'));
+    setNotes(invoice.notes || '');
+    setTerms(invoice.terms || DEFAULT_TERMS);
+    setStatus(invoice.status);
+  }, [invoice, initialEditMode]);
+
+  const addLineItem = (isHeading: boolean = false) => {
+    setLineItems([...lineItems, {
+      slNo: isHeading ? undefined : lineItems.filter(i => !i.isHeading).length + 1,
+      name: '',
+      description: '',
+      quantity: isHeading ? 0 : 1,
+      rate: 0,
+      total: 0,
+      isHeading,
+    }]);
+  };
+
+  const updateLineItem = (index: number, field: string, value: any) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      updated[index].total = updated[index].quantity * updated[index].rate;
+    }
+    setLineItems(updated);
+  };
+
+  const removeLineItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + item.total, 0);
+  const discountAmount = subtotal * (discountPercent / 100);
+  const afterDiscount = subtotal - discountAmount;
+  const serviceChargeAmount = afterDiscount * (serviceChargePercent / 100);
+  const total = afterDiscount + serviceChargeAmount;
+  const balanceDue = total - (parseFloat(invoice.total) - parseFloat(invoice.balanceDue));
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch(`/api/invoices/${invoice.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update invoice');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      setIsEditMode(false);
+      toast({ title: 'Invoice updated successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update invoice', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    let itemCounter = 1;
+    const reindexedLineItems = lineItems.map(item => ({
+      ...item,
+      slNo: item.isHeading ? undefined : itemCounter++,
+      quantity: Number(item.quantity),
+      rate: Number(item.rate),
+      total: Number(item.quantity) * Number(item.rate),
+    }));
+
+    const calcSubtotal = reindexedLineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
+    const calcDiscountAmount = calcSubtotal * (discountPercent / 100);
+    const calcAfterDiscount = calcSubtotal - calcDiscountAmount;
+    const calcServiceChargeAmount = calcAfterDiscount * (serviceChargePercent / 100);
+    const calcTotal = calcAfterDiscount + calcServiceChargeAmount;
+    
+    const originalPaid = parseFloat(invoice.total) - parseFloat(invoice.balanceDue);
+    const calcBalanceDue = Math.max(0, calcTotal - originalPaid);
+    
+    const newStatus = calcBalanceDue <= 0 ? 'paid' : 
+                      originalPaid > 0 ? 'partial' : 
+                      status;
+
+    updateMutation.mutate({
+      customerId: customerId || null,
+      date,
+      dueDate: dueDate || null,
+      subject,
+      weddingPlannerName,
+      customerAddress,
+      lineItems: reindexedLineItems,
+      subtotal: calcSubtotal.toFixed(2),
+      discountPercent: discountPercent.toFixed(2),
+      discountAmount: calcDiscountAmount.toFixed(2),
+      serviceChargePercent: serviceChargePercent.toFixed(2),
+      serviceChargeAmount: calcServiceChargeAmount.toFixed(2),
+      taxTotal: '0',
+      total: calcTotal.toFixed(2),
+      totalInWords: `Indian Rupee ${numberToWords(Math.round(calcTotal))} Only`,
+      balanceDue: calcBalanceDue.toFixed(2),
+      notes,
+      terms,
+      status: newStatus,
+    });
+  };
+
+  if (isEditMode) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex justify-between items-center">
+              <DialogTitle>Edit Invoice - {invoice.number}</DialogTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <Label>Customer</Label>
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c: Customer) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Invoice Date</Label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Due Date</Label>
+                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="sent">Sent</SelectItem>
+                    <SelectItem value="partial">Partially Paid</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Wedding Planner Name</Label>
+                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <Label>Customer Address</Label>
+              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <Label>Subject</Label>
+              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <Label>Line Items</Label>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
+                    + Section Header
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
+                    + Item
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="p-2 text-left w-12">Sl No</th>
+                      <th className="p-2 text-left">Item & Description</th>
+                      <th className="p-2 text-right w-20">Qty</th>
+                      <th className="p-2 text-right w-24">Rate</th>
+                      <th className="p-2 text-right w-28">Amount</th>
+                      <th className="p-2 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item, index) => (
+                      <tr key={index} className={cn("border-t", item.isHeading && "bg-muted/30")}>
+                        <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                        <td className="p-2" colSpan={item.isHeading ? 4 : 1}>
+                          <Textarea
+                            value={item.name}
+                            onChange={e => updateLineItem(index, 'name', e.target.value)}
+                            className={cn("min-h-[40px]", item.isHeading && "font-bold")}
+                            rows={1}
+                          />
+                        </td>
+                        {!item.isHeading && (
+                          <>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.quantity}
+                                onChange={e => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="text-right"
+                              />
+                            </td>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.rate}
+                                onChange={e => updateLineItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                                className="text-right"
+                              />
+                            </td>
+                            <td className="p-2 text-right font-medium">
+                              {formatIndianCurrency(item.total)}
+                            </td>
+                          </>
+                        )}
+                        <td className="p-2">
+                          <Button variant="ghost" size="sm" onClick={() => removeLineItem(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <div className="w-80 space-y-2">
+                <div className="flex justify-between">
+                  <span>Sub Total</span>
+                  <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    Discount
+                    <Input
+                      type="number"
+                      value={discountPercent}
+                      onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                      className="w-16 h-6 text-right"
+                    />
+                    %
+                  </span>
+                  <span>- {formatIndianCurrency(discountAmount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="flex items-center gap-2">
+                    Service Charge
+                    <Input
+                      type="number"
+                      value={serviceChargePercent}
+                      onChange={e => setServiceChargePercent(parseFloat(e.target.value) || 0)}
+                      className="w-16 h-6 text-right"
+                    />
+                    %
+                  </span>
+                  <span>{formatIndianCurrency(serviceChargeAmount)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span>{formatIndianCurrency(total)}</span>
+                </div>
+                <div className="flex justify-between text-destructive font-bold">
+                  <span>Balance Due</span>
+                  <span>{formatIndianCurrency(balanceDue > 0 ? balanceDue : 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+            </div>
+
+            <div>
+              <Label>Terms & Conditions</Label>
+              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={6} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        {/* Toolbar */}
+        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+          <div className="flex items-center gap-2">
+            <Badge variant={invoice.status === 'paid' ? 'default' : parseFloat(invoice.balanceDue) > 0 ? 'destructive' : 'secondary'}>
+              {invoice.status}
+            </Badge>
+            <span className="font-medium">{invoice.number}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
+              <Edit className="h-4 w-4 mr-2" /> Edit
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 print:p-0">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-start gap-4">
+              <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
+              <div>
+                <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
+                </p>
+                <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
+                <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-3xl font-bold text-primary">Invoice</h2>
+            </div>
+          </div>
+
+          {/* Invoice Details */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <p className="text-sm text-muted-foreground">Invoice No</p>
+              <p className="font-medium">: {invoice.number}</p>
+              <p className="text-sm text-muted-foreground mt-2">Invoice Date</p>
+              <p className="font-medium">: {format(new Date(invoice.date), 'dd/MM/yyyy')}</p>
+              {invoice.dueDate && (
+                <>
+                  <p className="text-sm text-muted-foreground mt-2">Due Date</p>
+                  <p className="font-medium">: {format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</p>
+                </>
+              )}
+              {invoice.weddingPlannerName && (
+                <>
+                  <p className="text-sm text-muted-foreground mt-2">Wedding Planner</p>
+                  <p className="font-medium">: {invoice.weddingPlannerName}</p>
+                </>
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Bill To</p>
+              <p className="font-medium">{customer?.name || '—'}</p>
+              <p className="text-sm whitespace-pre-line">{invoice.customerAddress || customer?.billingAddress || ''}</p>
+            </div>
+          </div>
+
+          {invoice.subject && (
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground">Subject:</p>
+              <p className="font-medium">{invoice.subject}</p>
+            </div>
+          )}
+
+          {/* Line Items */}
+          <table className="w-full text-sm border-collapse mb-6">
+            <thead>
+              <tr className="border-y">
+                <th className="p-2 text-left w-12">Sl No</th>
+                <th className="p-2 text-left">Item & Description</th>
+                <th className="p-2 text-right w-16">Qty</th>
+                <th className="p-2 text-right w-24">Rate</th>
+                <th className="p-2 text-right w-28">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(invoice.lineItems || []).map((item: LineItem, index: number) => (
+                <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
+                  <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                  <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
+                  {!item.isHeading && (
+                    <>
+                      <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
+                      <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
+                      <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="flex">
+            <div className="flex-1">
+              <p className="font-medium">Total In Words</p>
+              <p className="text-sm italic">{invoice.totalInWords}</p>
+              
+              {invoice.notes && (
+                <div className="mt-4">
+                  <p className="font-medium">Notes</p>
+                  <p className="text-sm">{invoice.notes}</p>
+                </div>
+              )}
+
+              {invoice.terms && (
+                <div className="mt-4">
+                  <p className="font-medium">Terms & Conditions</p>
+                  <p className="text-sm whitespace-pre-line">{invoice.terms}</p>
+                </div>
+              )}
+            </div>
+            <div className="w-64 text-right">
+              <div className="flex justify-between py-1">
+                <span>Sub Total</span>
+                <span>{formatIndianCurrency(parseFloat(invoice.subtotal))}</span>
+              </div>
+              {parseFloat(invoice.discountAmount || '0') > 0 && (
+                <div className="flex justify-between py-1">
+                  <span>Discount ({invoice.discountPercent}%)</span>
+                  <span>- {formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
+                </div>
+              )}
+              {parseFloat(invoice.serviceChargeAmount || '0') > 0 && (
+                <div className="flex justify-between py-1">
+                  <span>Service Charge ({invoice.serviceChargePercent}%)</span>
+                  <span>{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 border-t font-bold text-lg">
+                <span>Total</span>
+                <span>₹{parseFloat(invoice.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between py-2 border-t font-bold text-destructive">
+                <span>Balance Due</span>
+                <span>₹{parseFloat(invoice.balanceDue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Signature */}
+          <div className="mt-8 text-right">
+            <p className="text-sm text-muted-foreground">Authorized Signature</p>
+            {invoice.signature && (
+              <img src={invoice.signature} alt="Signature" className="h-16 ml-auto" />
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
