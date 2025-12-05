@@ -477,6 +477,46 @@ export default function OakBook() {
         </ScrollArea>
       </div>
 
+      {/* Mobile Sub-Navigation - Shows when in Sales or Purchases sections */}
+      {["customers", "quotes", "invoices", "payments-received"].includes(activeSection) && (
+        <div className="md:hidden fixed top-[4rem] left-0 right-0 bg-white border-b z-40 px-2 py-1">
+          <ScrollArea className="w-full">
+            <div className="flex gap-1 w-max">
+              {salesItems.map((item) => (
+                <Button
+                  key={item.id}
+                  variant={activeSection === item.id ? "secondary" : "ghost"}
+                  size="sm"
+                  className="whitespace-nowrap text-xs"
+                  onClick={() => setActiveSection(item.id)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+      {["vendors", "expenses", "vendor-payments"].includes(activeSection) && (
+        <div className="md:hidden fixed top-[4rem] left-0 right-0 bg-white border-b z-40 px-2 py-1">
+          <ScrollArea className="w-full">
+            <div className="flex gap-1 w-max">
+              {purchaseItems.map((item) => (
+                <Button
+                  key={item.id}
+                  variant={activeSection === item.id ? "secondary" : "ghost"}
+                  size="sm"
+                  className="whitespace-nowrap text-xs"
+                  onClick={() => setActiveSection(item.id)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
       {/* Mobile Navigation */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 p-2">
         <div className="flex justify-around">
@@ -496,7 +536,7 @@ export default function OakBook() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+      <div className={`flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6 ${["customers", "quotes", "invoices", "payments-received", "vendors", "expenses", "vendor-payments"].includes(activeSection) ? "pt-14 md:pt-4" : ""}`}>
         {activeSection === "home" && (
           <HomeSection 
             estimates={estimates} 
@@ -1105,7 +1145,7 @@ function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, que
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Quote</DialogTitle>
         </DialogHeader>
@@ -1171,20 +1211,20 @@ function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, que
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
               <Label>Line Items</Label>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
-                  + Add Section Header
+                <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs sm:text-sm">
+                  + Section
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
-                  + Add Item
+                <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs sm:text-sm">
+                  + Item
                 </Button>
               </div>
             </div>
             
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="border rounded-lg overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="p-2 text-left w-12">Sl No</th>
@@ -1253,13 +1293,13 @@ function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, que
           </div>
 
           <div className="flex justify-end">
-            <div className="w-80 space-y-2">
+            <div className="w-full sm:w-80 space-y-2">
               <div className="flex justify-between">
                 <span>Sub Total</span>
                 <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span className="flex items-center gap-2 text-sm">
                   Discount
                   <Input
                     type="number"
@@ -1271,8 +1311,8 @@ function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, que
                 </span>
                 <span>- {formatIndianCurrency(discountAmount)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                <span className="flex items-center gap-2 text-sm">
                   Service Charge
                   <Input
                     type="number"
@@ -1441,7 +1481,7 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
   if (isEditMode) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <DialogTitle>Edit Quote - {estimate.number}</DialogTitle>
@@ -1509,20 +1549,20 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
                 <Label>Line Items</Label>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
-                    + Section Header
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs sm:text-sm">
+                    + Section
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs sm:text-sm">
                     + Item
                   </Button>
                 </div>
               </div>
               
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="p-2 text-left w-12">Sl No</th>
@@ -1581,13 +1621,13 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             </div>
 
             <div className="flex justify-end">
-              <div className="w-80 space-y-2">
+              <div className="w-full sm:w-80 space-y-2">
                 <div className="flex justify-between">
                   <span>Sub Total</span>
                   <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span className="flex items-center gap-2 text-sm">
                     Discount
                     <Input
                       type="number"
@@ -1599,8 +1639,8 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
                   </span>
                   <span>- {formatIndianCurrency(discountAmount)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span className="flex items-center gap-2 text-sm">
                     Service Charge
                     <Input
                       type="number"
@@ -1690,7 +1730,7 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Toolbar */}
         <div className="flex justify-between items-center mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
@@ -2112,7 +2152,7 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   if (isEditMode) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <DialogTitle>Edit Invoice - {invoice.number}</DialogTitle>
@@ -2185,20 +2225,20 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
                 <Label>Line Items</Label>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
-                    + Section Header
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs sm:text-sm">
+                    + Section
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs sm:text-sm">
                     + Item
                   </Button>
                 </div>
               </div>
               
-              <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="p-2 text-left w-12">Sl No</th>
@@ -2257,13 +2297,13 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             </div>
 
             <div className="flex justify-end">
-              <div className="w-80 space-y-2">
+              <div className="w-full sm:w-80 space-y-2">
                 <div className="flex justify-between">
                   <span>Sub Total</span>
                   <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span className="flex items-center gap-2 text-sm">
                     Discount
                     <Input
                       type="number"
@@ -2275,8 +2315,8 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
                   </span>
                   <span>- {formatIndianCurrency(discountAmount)}</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
+                  <span className="flex items-center gap-2 text-sm">
                     Service Charge
                     <Input
                       type="number"
@@ -2370,7 +2410,7 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Toolbar */}
         <div className="flex justify-between items-center mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
@@ -2768,7 +2808,7 @@ function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Toolbar */}
         <div className="flex justify-between items-center mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
