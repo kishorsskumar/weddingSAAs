@@ -16,6 +16,7 @@ import OakBook from "@/pages/oak-book";
 import HR from "@/pages/hr";
 import Admin from "@/pages/admin";
 import CustomerPortal from "@/pages/customer-portal";
+import PrintDocument from "@/pages/print-document";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -80,6 +81,9 @@ function App() {
           <Switch>
             <Route path="/portal/:token">
               <CustomerPortal />
+            </Route>
+            <Route path="/print/:type/:id">
+              <PrintDocument />
             </Route>
             <Route>
               <AppRoutes />

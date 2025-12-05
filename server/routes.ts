@@ -1059,6 +1059,58 @@ export async function registerRoutes(
     }
   });
 
+  // PDF Generation endpoint
+  app.get('/api/pdf/:type/:id', async (req, res) => {
+    try {
+      const { type, id } = req.params;
+      
+      if (!['quote', 'invoice', 'receipt'].includes(type)) {
+        return res.status(400).json({ error: 'Invalid document type' });
+      }
+
+      const puppeteer = await import('puppeteer');
+      const browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
+
+      try {
+        const page = await browser.newPage();
+        
+        const baseUrl = `http://localhost:5000`;
+        const printUrl = `${baseUrl}/print/${type}/${id}`;
+        
+        await page.goto(printUrl, { 
+          waitUntil: 'networkidle0',
+          timeout: 30000,
+        });
+
+        await page.waitForFunction(() => (window as any).printReady === true, { timeout: 15000 });
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const pdf = await page.pdf({
+          format: 'A4',
+          printBackground: true,
+          margin: {
+            top: '10mm',
+            bottom: '10mm',
+            left: '10mm',
+            right: '10mm',
+          },
+        });
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}-${id}.pdf"`);
+        res.send(pdf);
+      } finally {
+        await browser.close();
+      }
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      res.status(500).json({ error: 'Failed to generate PDF' });
+    }
+  });
+
   // Customer Portal - Public endpoints (no auth required)
   app.get('/api/portal/:token', async (req, res) => {
     try {

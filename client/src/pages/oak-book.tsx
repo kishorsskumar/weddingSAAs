@@ -1642,7 +1642,17 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
     try {
-      await generatePDF(`quote-preview-${estimate.id}`, `Quote-${estimate.number}.pdf`);
+      const response = await fetch(`/api/pdf/quote/${estimate.id}`);
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Quote-${estimate.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
@@ -2312,7 +2322,17 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
     try {
-      await generatePDF(`invoice-preview-${invoice.id}`, `Invoice-${invoice.number}.pdf`);
+      const response = await fetch(`/api/pdf/invoice/${invoice.id}`);
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice-${invoice.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
@@ -2700,7 +2720,17 @@ function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoi
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
     try {
-      await generatePDF(`receipt-preview-${payment.id}`, `Receipt-${payment.number}.pdf`);
+      const response = await fetch(`/api/pdf/receipt/${payment.id}`);
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Receipt-${payment.number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
       toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
