@@ -19,6 +19,7 @@ import {
   companySettings,
   documentSequences,
   estimateTemplates,
+  portalLinks,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -59,6 +60,8 @@ import {
   type InsertDocumentSequence,
   type EstimateTemplate,
   type InsertEstimateTemplate,
+  type PortalLink,
+  type InsertPortalLink,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -203,6 +206,14 @@ export interface IStorage {
   createEstimateTemplate(template: InsertEstimateTemplate): Promise<EstimateTemplate>;
   updateEstimateTemplate(id: string, template: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined>;
   deleteEstimateTemplate(id: string): Promise<void>;
+
+  // Customer Portal - Portal Links
+  createPortalLink(link: InsertPortalLink): Promise<PortalLink>;
+  getPortalLinkByToken(token: string): Promise<PortalLink | undefined>;
+  getPortalLinksForDocument(documentType: string, documentId: string): Promise<PortalLink[]>;
+  updatePortalLinkViewCount(id: string): Promise<void>;
+  deactivatePortalLink(id: string): Promise<void>;
+  getAllPortalLinks(): Promise<PortalLink[]>;
 
   // Oak Book - Clone/Convert Operations
   cloneEstimate(id: string): Promise<Estimate>;
@@ -941,6 +952,50 @@ export class DatabaseStorage implements IStorage {
       .where(eq(estimates.id, estimateId));
 
     return invoice;
+  }
+
+  // Customer Portal - Portal Links
+  async createPortalLink(insertLink: InsertPortalLink): Promise<PortalLink> {
+    const [link] = await db.insert(portalLinks).values(insertLink).returning();
+    return link;
+  }
+
+  async getPortalLinkByToken(token: string): Promise<PortalLink | undefined> {
+    const [link] = await db.select().from(portalLinks).where(
+      and(
+        eq(portalLinks.token, token),
+        eq(portalLinks.isActive, true)
+      )
+    );
+    return link || undefined;
+  }
+
+  async getPortalLinksForDocument(documentType: string, documentId: string): Promise<PortalLink[]> {
+    return await db.select().from(portalLinks).where(
+      and(
+        eq(portalLinks.documentType, documentType),
+        eq(portalLinks.documentId, documentId)
+      )
+    );
+  }
+
+  async updatePortalLinkViewCount(id: string): Promise<void> {
+    await db.update(portalLinks)
+      .set({ 
+        viewCount: sql`${portalLinks.viewCount} + 1`,
+        lastViewedAt: new Date()
+      })
+      .where(eq(portalLinks.id, id));
+  }
+
+  async deactivatePortalLink(id: string): Promise<void> {
+    await db.update(portalLinks)
+      .set({ isActive: false })
+      .where(eq(portalLinks.id, id));
+  }
+
+  async getAllPortalLinks(): Promise<PortalLink[]> {
+    return await db.select().from(portalLinks).orderBy(desc(portalLinks.createdAt));
   }
 }
 

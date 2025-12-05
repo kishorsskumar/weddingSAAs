@@ -296,6 +296,21 @@ export const estimateTemplates = pgTable("estimate_templates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Oak Customer Portal - Shareable Links
+export const portalLinks = pgTable("portal_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  token: varchar("token").notNull().unique(), // Unique shareable token
+  customerId: varchar("customer_id").references(() => customers.id),
+  documentType: text("document_type").notNull(), // 'estimate' | 'invoice' | 'payment_receipt'
+  documentId: varchar("document_id").notNull(), // ID of the estimate, invoice, or payment
+  expiresAt: timestamp("expires_at"), // Optional expiry date
+  isActive: boolean("is_active").notNull().default(true),
+  viewCount: integer("view_count").notNull().default(0),
+  lastViewedAt: timestamp("last_viewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: varchar("created_by").references(() => users.id),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   permissions: many(userPermissions),
@@ -348,6 +363,7 @@ export const insertDocumentSequenceSchema = createInsertSchema(documentSequences
 export const insertEstimateTemplateSchema = createInsertSchema(estimateTemplates).omit({ id: true, createdAt: true }).extend({
   lineItems: z.array(lineItemSchema).optional().default([]),
 });
+export const insertPortalLinkSchema = createInsertSchema(portalLinks).omit({ id: true, createdAt: true, viewCount: true, lastViewedAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -410,3 +426,6 @@ export type InsertDocumentSequence = z.infer<typeof insertDocumentSequenceSchema
 
 export type EstimateTemplate = typeof estimateTemplates.$inferSelect;
 export type InsertEstimateTemplate = z.infer<typeof insertEstimateTemplateSchema>;
+
+export type PortalLink = typeof portalLinks.$inferSelect;
+export type InsertPortalLink = z.infer<typeof insertPortalLinkSchema>;
