@@ -1372,6 +1372,9 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
   const [notes, setNotes] = useState(estimate.notes || '');
   const [terms, setTerms] = useState(estimate.terms || DEFAULT_TERMS);
   const [status, setStatus] = useState(estimate.status);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const customer = customers.find((c: Customer) => c.id === customerId);
 
@@ -1674,10 +1677,6 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
       </Dialog>
     );
   }
-
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -2033,6 +2032,9 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   const [notes, setNotes] = useState(invoice.notes || '');
   const [terms, setTerms] = useState(invoice.terms || DEFAULT_TERMS);
   const [status, setStatus] = useState(invoice.status);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const customer = customers.find((c: Customer) => c.id === customerId);
 
@@ -2355,10 +2357,6 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
       </Dialog>
     );
   }
-
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
