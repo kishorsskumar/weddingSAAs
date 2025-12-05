@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, DollarSign, Users, TrendingUp } from "lucide-react";
@@ -6,8 +7,9 @@ import type { Event } from "@/lib/types";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const { data: allEvents = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
     queryFn: async () => {
       const res = await fetch('/api/events');
@@ -15,6 +17,13 @@ export default function Dashboard() {
       return res.json();
     },
   });
+
+  const events = useMemo(() => {
+    if (isAdmin) return allEvents;
+    return allEvents.filter(e => 
+      e.planner?.toLowerCase() === user?.name?.toLowerCase()
+    );
+  }, [allEvents, isAdmin, user?.name]);
 
   const totalSales = events.reduce((acc, curr) => acc + parseFloat(curr.salesValue || '0'), 0);
   const upcomingEvents = events.filter((e) => new Date(e.date) > new Date()).length;
