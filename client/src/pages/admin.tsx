@@ -23,6 +23,17 @@ const ALL_PAGES = [
   { id: "admin", label: "Admin" },
 ];
 
+const ROLE_LABELS: Record<string, string> = {
+  wedding_planner: "Wedding Planner",
+  accountant: "Accountant",
+  employee: "Employee",
+  manager: "Manager",
+  admin: "Admin",
+  superadmin: "Super Admin",
+};
+
+const getRoleLabel = (role: string) => ROLE_LABELS[role] || role;
+
 export default function Admin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -109,6 +120,8 @@ export default function Admin() {
         <div className="space-y-2">
           <Label>Role</Label>
           <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" {...register("role")}>
+            <option value="wedding_planner">Wedding Planner</option>
+            <option value="accountant">Accountant</option>
             <option value="employee">Employee</option>
             <option value="manager">Manager</option>
             <option value="admin">Admin</option>
@@ -164,7 +177,7 @@ export default function Admin() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="capitalize text-xs hidden sm:inline-flex">{user.role}</Badge>
+                    <Badge variant="outline" className="text-xs hidden sm:inline-flex">{getRoleLabel(user.role)}</Badge>
                     {expandedUser === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </div>
                 </div>
@@ -172,7 +185,7 @@ export default function Admin() {
                 {expandedUser === user.id && (
                   <div className="p-3 sm:p-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="capitalize">{user.role}</Badge>
+                      <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
                       <Button 
                         variant="ghost" 
                         size="sm"

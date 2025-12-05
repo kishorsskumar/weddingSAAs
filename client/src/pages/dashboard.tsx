@@ -8,6 +8,7 @@ import type { Event } from "@/lib/types";
 export default function Dashboard() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isWeddingPlanner = user?.role === 'wedding_planner' || user?.role === 'employee';
 
   const { data: allEvents = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -20,10 +21,13 @@ export default function Dashboard() {
 
   const events = useMemo(() => {
     if (isAdmin) return allEvents;
-    return allEvents.filter(e => 
-      e.planner?.toLowerCase() === user?.name?.toLowerCase()
-    );
-  }, [allEvents, isAdmin, user?.name]);
+    if (isWeddingPlanner) {
+      return allEvents.filter(e => 
+        e.planner?.toLowerCase() === user?.name?.toLowerCase()
+      );
+    }
+    return allEvents;
+  }, [allEvents, isAdmin, isWeddingPlanner, user?.name]);
 
   const totalSales = events.reduce((acc, curr) => acc + parseFloat(curr.salesValue || '0'), 0);
   const upcomingEvents = events.filter((e) => new Date(e.date) > new Date()).length;
