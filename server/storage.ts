@@ -20,6 +20,8 @@ import {
   documentSequences,
   estimateTemplates,
   portalLinks,
+  payrollRuns,
+  payrollItems,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -62,6 +64,10 @@ import {
   type InsertEstimateTemplate,
   type PortalLink,
   type InsertPortalLink,
+  type PayrollRun,
+  type InsertPayrollRun,
+  type PayrollItem,
+  type InsertPayrollItem,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -218,6 +224,19 @@ export interface IStorage {
   // Oak Book - Clone/Convert Operations
   cloneEstimate(id: string): Promise<Estimate>;
   convertEstimateToInvoice(estimateId: string): Promise<Invoice>;
+
+  // Payroll
+  getAllPayrollRuns(): Promise<PayrollRun[]>;
+  getPayrollRun(id: string): Promise<PayrollRun | undefined>;
+  getPayrollRunByMonthYear(month: number, year: number): Promise<PayrollRun | undefined>;
+  createPayrollRun(run: InsertPayrollRun): Promise<PayrollRun>;
+  updatePayrollRun(id: string, run: Partial<InsertPayrollRun>): Promise<PayrollRun | undefined>;
+  deletePayrollRun(id: string): Promise<void>;
+  getPayrollItemsByRunId(runId: string): Promise<PayrollItem[]>;
+  createPayrollItem(item: InsertPayrollItem): Promise<PayrollItem>;
+  updatePayrollItem(id: string, item: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
+  deletePayrollItem(id: string): Promise<void>;
+  markPayrollAsPaid(runId: string, payDate: string, bankId?: string): Promise<PayrollRun>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -996,6 +1015,103 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPortalLinks(): Promise<PortalLink[]> {
     return await db.select().from(portalLinks).orderBy(desc(portalLinks.createdAt));
+  }
+
+  // Payroll
+  async getAllPayrollRuns(): Promise<PayrollRun[]> {
+    return await db.select().from(payrollRuns).orderBy(desc(payrollRuns.createdAt));
+  }
+
+  async getPayrollRun(id: string): Promise<PayrollRun | undefined> {
+    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, id));
+    return run || undefined;
+  }
+
+  async getPayrollRunByMonthYear(month: number, year: number): Promise<PayrollRun | undefined> {
+    const [run] = await db.select().from(payrollRuns).where(
+      and(
+        eq(payrollRuns.month, month),
+        eq(payrollRuns.year, year)
+      )
+    );
+    return run || undefined;
+  }
+
+  async createPayrollRun(run: InsertPayrollRun): Promise<PayrollRun> {
+    const [created] = await db.insert(payrollRuns).values(run).returning();
+    return created;
+  }
+
+  async updatePayrollRun(id: string, run: Partial<InsertPayrollRun>): Promise<PayrollRun | undefined> {
+    const [updated] = await db.update(payrollRuns).set(run).where(eq(payrollRuns.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deletePayrollRun(id: string): Promise<void> {
+    await db.delete(payrollRuns).where(eq(payrollRuns.id, id));
+  }
+
+  async getPayrollItemsByRunId(runId: string): Promise<PayrollItem[]> {
+    return await db.select().from(payrollItems).where(eq(payrollItems.payrollRunId, runId));
+  }
+
+  async createPayrollItem(item: InsertPayrollItem): Promise<PayrollItem> {
+    const [created] = await db.insert(payrollItems).values(item).returning();
+    return created;
+  }
+
+  async updatePayrollItem(id: string, item: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined> {
+    const [updated] = await db.update(payrollItems).set(item).where(eq(payrollItems.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deletePayrollItem(id: string): Promise<void> {
+    await db.delete(payrollItems).where(eq(payrollItems.id, id));
+  }
+
+  async markPayrollAsPaid(runId: string, payDate: string, bankId?: string): Promise<PayrollRun> {
+    const run = await this.getPayrollRun(runId);
+    if (!run) {
+      throw new Error('Payroll run not found');
+    }
+    if (run.status === 'paid') {
+      throw new Error('Payroll already marked as paid');
+    }
+
+    const items = await this.getPayrollItemsByRunId(runId);
+    const totalAmount = items.reduce((sum, item) => sum + parseFloat(item.netPay), 0);
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                        'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthName = monthNames[run.month - 1];
+
+    const [daybookEntry] = await db.insert(daybookEntries).values({
+      date: payDate,
+      description: `Payroll for ${monthName} ${run.year}`,
+      type: 'expense',
+      amount: totalAmount.toFixed(2),
+      category: 'Salary',
+      bankId: bankId || null,
+    }).returning();
+
+    if (bankId) {
+      await db.update(banks)
+        .set({ balance: sql`${banks.balance} - ${totalAmount}` })
+        .where(eq(banks.id, bankId));
+    }
+
+    const [updated] = await db.update(payrollRuns)
+      .set({
+        status: 'paid',
+        payDate: payDate,
+        bankId: bankId || null,
+        totalAmount: totalAmount.toFixed(2),
+        daybookEntryId: daybookEntry.id,
+      })
+      .where(eq(payrollRuns.id, runId))
+      .returning();
+
+    return updated;
   }
 }
 
