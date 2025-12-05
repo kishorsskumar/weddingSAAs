@@ -22,6 +22,14 @@ import {
   portalLinks,
   payrollRuns,
   payrollItems,
+  salesPipelines,
+  salesStages,
+  salesContacts,
+  salesCompanies,
+  salesDeals,
+  salesActivities,
+  salesTargets,
+  salesAutomations,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -68,6 +76,22 @@ import {
   type InsertPayrollRun,
   type PayrollItem,
   type InsertPayrollItem,
+  type SalesPipeline,
+  type InsertSalesPipeline,
+  type SalesStage,
+  type InsertSalesStage,
+  type SalesContact,
+  type InsertSalesContact,
+  type SalesCompany,
+  type InsertSalesCompany,
+  type SalesDeal,
+  type InsertSalesDeal,
+  type SalesActivity,
+  type InsertSalesActivity,
+  type SalesTarget,
+  type InsertSalesTarget,
+  type SalesAutomation,
+  type InsertSalesAutomation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -237,6 +261,68 @@ export interface IStorage {
   updatePayrollItem(id: string, item: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
   deletePayrollItem(id: string): Promise<void>;
   markPayrollAsPaid(runId: string, payDate: string, bankId?: string): Promise<PayrollRun>;
+
+  // Oak Sales - Pipelines
+  getAllSalesPipelines(): Promise<SalesPipeline[]>;
+  getSalesPipeline(id: string): Promise<SalesPipeline | undefined>;
+  createSalesPipeline(pipeline: InsertSalesPipeline): Promise<SalesPipeline>;
+  updateSalesPipeline(id: string, pipeline: Partial<InsertSalesPipeline>): Promise<SalesPipeline | undefined>;
+  deleteSalesPipeline(id: string): Promise<void>;
+
+  // Oak Sales - Stages
+  getAllSalesStages(): Promise<SalesStage[]>;
+  getSalesStagesByPipelineId(pipelineId: string): Promise<SalesStage[]>;
+  getSalesStage(id: string): Promise<SalesStage | undefined>;
+  createSalesStage(stage: InsertSalesStage): Promise<SalesStage>;
+  updateSalesStage(id: string, stage: Partial<InsertSalesStage>): Promise<SalesStage | undefined>;
+  deleteSalesStage(id: string): Promise<void>;
+
+  // Oak Sales - Contacts
+  getAllSalesContacts(): Promise<SalesContact[]>;
+  getSalesContact(id: string): Promise<SalesContact | undefined>;
+  createSalesContact(contact: InsertSalesContact): Promise<SalesContact>;
+  updateSalesContact(id: string, contact: Partial<InsertSalesContact>): Promise<SalesContact | undefined>;
+  deleteSalesContact(id: string): Promise<void>;
+
+  // Oak Sales - Companies
+  getAllSalesCompanies(): Promise<SalesCompany[]>;
+  getSalesCompany(id: string): Promise<SalesCompany | undefined>;
+  createSalesCompany(company: InsertSalesCompany): Promise<SalesCompany>;
+  updateSalesCompany(id: string, company: Partial<InsertSalesCompany>): Promise<SalesCompany | undefined>;
+  deleteSalesCompany(id: string): Promise<void>;
+
+  // Oak Sales - Deals
+  getAllSalesDeals(): Promise<SalesDeal[]>;
+  getSalesDealsByPipelineId(pipelineId: string): Promise<SalesDeal[]>;
+  getSalesDealsByOwnerId(ownerId: string): Promise<SalesDeal[]>;
+  getSalesDeal(id: string): Promise<SalesDeal | undefined>;
+  createSalesDeal(deal: InsertSalesDeal): Promise<SalesDeal>;
+  updateSalesDeal(id: string, deal: Partial<InsertSalesDeal>): Promise<SalesDeal | undefined>;
+  deleteSalesDeal(id: string): Promise<void>;
+
+  // Oak Sales - Activities
+  getAllSalesActivities(): Promise<SalesActivity[]>;
+  getSalesActivitiesByDealId(dealId: string): Promise<SalesActivity[]>;
+  getSalesActivitiesByOwnerId(ownerId: string): Promise<SalesActivity[]>;
+  getSalesActivity(id: string): Promise<SalesActivity | undefined>;
+  createSalesActivity(activity: InsertSalesActivity): Promise<SalesActivity>;
+  updateSalesActivity(id: string, activity: Partial<InsertSalesActivity>): Promise<SalesActivity | undefined>;
+  deleteSalesActivity(id: string): Promise<void>;
+
+  // Oak Sales - Targets
+  getAllSalesTargets(): Promise<SalesTarget[]>;
+  getSalesTargetsByUserId(userId: string): Promise<SalesTarget[]>;
+  getSalesTarget(id: string): Promise<SalesTarget | undefined>;
+  createSalesTarget(target: InsertSalesTarget): Promise<SalesTarget>;
+  updateSalesTarget(id: string, target: Partial<InsertSalesTarget>): Promise<SalesTarget | undefined>;
+  deleteSalesTarget(id: string): Promise<void>;
+
+  // Oak Sales - Automations
+  getAllSalesAutomations(): Promise<SalesAutomation[]>;
+  getSalesAutomation(id: string): Promise<SalesAutomation | undefined>;
+  createSalesAutomation(automation: InsertSalesAutomation): Promise<SalesAutomation>;
+  updateSalesAutomation(id: string, automation: Partial<InsertSalesAutomation>): Promise<SalesAutomation | undefined>;
+  deleteSalesAutomation(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1112,6 +1198,222 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updated;
+  }
+
+  // Oak Sales - Pipelines
+  async getAllSalesPipelines(): Promise<SalesPipeline[]> {
+    return await db.select().from(salesPipelines);
+  }
+
+  async getSalesPipeline(id: string): Promise<SalesPipeline | undefined> {
+    const [pipeline] = await db.select().from(salesPipelines).where(eq(salesPipelines.id, id));
+    return pipeline || undefined;
+  }
+
+  async createSalesPipeline(pipeline: InsertSalesPipeline): Promise<SalesPipeline> {
+    const [created] = await db.insert(salesPipelines).values(pipeline).returning();
+    return created;
+  }
+
+  async updateSalesPipeline(id: string, pipeline: Partial<InsertSalesPipeline>): Promise<SalesPipeline | undefined> {
+    const [updated] = await db.update(salesPipelines).set(pipeline).where(eq(salesPipelines.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesPipeline(id: string): Promise<void> {
+    await db.delete(salesPipelines).where(eq(salesPipelines.id, id));
+  }
+
+  // Oak Sales - Stages
+  async getAllSalesStages(): Promise<SalesStage[]> {
+    return await db.select().from(salesStages);
+  }
+
+  async getSalesStagesByPipelineId(pipelineId: string): Promise<SalesStage[]> {
+    return await db.select().from(salesStages).where(eq(salesStages.pipelineId, pipelineId));
+  }
+
+  async getSalesStage(id: string): Promise<SalesStage | undefined> {
+    const [stage] = await db.select().from(salesStages).where(eq(salesStages.id, id));
+    return stage || undefined;
+  }
+
+  async createSalesStage(stage: InsertSalesStage): Promise<SalesStage> {
+    const [created] = await db.insert(salesStages).values(stage).returning();
+    return created;
+  }
+
+  async updateSalesStage(id: string, stage: Partial<InsertSalesStage>): Promise<SalesStage | undefined> {
+    const [updated] = await db.update(salesStages).set(stage).where(eq(salesStages.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesStage(id: string): Promise<void> {
+    await db.delete(salesStages).where(eq(salesStages.id, id));
+  }
+
+  // Oak Sales - Contacts
+  async getAllSalesContacts(): Promise<SalesContact[]> {
+    return await db.select().from(salesContacts);
+  }
+
+  async getSalesContact(id: string): Promise<SalesContact | undefined> {
+    const [contact] = await db.select().from(salesContacts).where(eq(salesContacts.id, id));
+    return contact || undefined;
+  }
+
+  async createSalesContact(contact: InsertSalesContact): Promise<SalesContact> {
+    const [created] = await db.insert(salesContacts).values(contact).returning();
+    return created;
+  }
+
+  async updateSalesContact(id: string, contact: Partial<InsertSalesContact>): Promise<SalesContact | undefined> {
+    const [updated] = await db.update(salesContacts).set(contact).where(eq(salesContacts.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesContact(id: string): Promise<void> {
+    await db.delete(salesContacts).where(eq(salesContacts.id, id));
+  }
+
+  // Oak Sales - Companies
+  async getAllSalesCompanies(): Promise<SalesCompany[]> {
+    return await db.select().from(salesCompanies);
+  }
+
+  async getSalesCompany(id: string): Promise<SalesCompany | undefined> {
+    const [company] = await db.select().from(salesCompanies).where(eq(salesCompanies.id, id));
+    return company || undefined;
+  }
+
+  async createSalesCompany(company: InsertSalesCompany): Promise<SalesCompany> {
+    const [created] = await db.insert(salesCompanies).values(company).returning();
+    return created;
+  }
+
+  async updateSalesCompany(id: string, company: Partial<InsertSalesCompany>): Promise<SalesCompany | undefined> {
+    const [updated] = await db.update(salesCompanies).set(company).where(eq(salesCompanies.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesCompany(id: string): Promise<void> {
+    await db.delete(salesCompanies).where(eq(salesCompanies.id, id));
+  }
+
+  // Oak Sales - Deals
+  async getAllSalesDeals(): Promise<SalesDeal[]> {
+    return await db.select().from(salesDeals);
+  }
+
+  async getSalesDealsByPipelineId(pipelineId: string): Promise<SalesDeal[]> {
+    return await db.select().from(salesDeals).where(eq(salesDeals.pipelineId, pipelineId));
+  }
+
+  async getSalesDealsByOwnerId(ownerId: string): Promise<SalesDeal[]> {
+    return await db.select().from(salesDeals).where(eq(salesDeals.ownerId, ownerId));
+  }
+
+  async getSalesDeal(id: string): Promise<SalesDeal | undefined> {
+    const [deal] = await db.select().from(salesDeals).where(eq(salesDeals.id, id));
+    return deal || undefined;
+  }
+
+  async createSalesDeal(deal: InsertSalesDeal): Promise<SalesDeal> {
+    const [created] = await db.insert(salesDeals).values(deal).returning();
+    return created;
+  }
+
+  async updateSalesDeal(id: string, deal: Partial<InsertSalesDeal>): Promise<SalesDeal | undefined> {
+    const [updated] = await db.update(salesDeals).set(deal).where(eq(salesDeals.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesDeal(id: string): Promise<void> {
+    await db.delete(salesDeals).where(eq(salesDeals.id, id));
+  }
+
+  // Oak Sales - Activities
+  async getAllSalesActivities(): Promise<SalesActivity[]> {
+    return await db.select().from(salesActivities);
+  }
+
+  async getSalesActivitiesByDealId(dealId: string): Promise<SalesActivity[]> {
+    return await db.select().from(salesActivities).where(eq(salesActivities.dealId, dealId));
+  }
+
+  async getSalesActivitiesByOwnerId(ownerId: string): Promise<SalesActivity[]> {
+    return await db.select().from(salesActivities).where(eq(salesActivities.ownerId, ownerId));
+  }
+
+  async getSalesActivity(id: string): Promise<SalesActivity | undefined> {
+    const [activity] = await db.select().from(salesActivities).where(eq(salesActivities.id, id));
+    return activity || undefined;
+  }
+
+  async createSalesActivity(activity: InsertSalesActivity): Promise<SalesActivity> {
+    const [created] = await db.insert(salesActivities).values(activity).returning();
+    return created;
+  }
+
+  async updateSalesActivity(id: string, activity: Partial<InsertSalesActivity>): Promise<SalesActivity | undefined> {
+    const [updated] = await db.update(salesActivities).set(activity).where(eq(salesActivities.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesActivity(id: string): Promise<void> {
+    await db.delete(salesActivities).where(eq(salesActivities.id, id));
+  }
+
+  // Oak Sales - Targets
+  async getAllSalesTargets(): Promise<SalesTarget[]> {
+    return await db.select().from(salesTargets);
+  }
+
+  async getSalesTargetsByUserId(userId: string): Promise<SalesTarget[]> {
+    return await db.select().from(salesTargets).where(eq(salesTargets.userId, userId));
+  }
+
+  async getSalesTarget(id: string): Promise<SalesTarget | undefined> {
+    const [target] = await db.select().from(salesTargets).where(eq(salesTargets.id, id));
+    return target || undefined;
+  }
+
+  async createSalesTarget(target: InsertSalesTarget): Promise<SalesTarget> {
+    const [created] = await db.insert(salesTargets).values(target).returning();
+    return created;
+  }
+
+  async updateSalesTarget(id: string, target: Partial<InsertSalesTarget>): Promise<SalesTarget | undefined> {
+    const [updated] = await db.update(salesTargets).set(target).where(eq(salesTargets.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesTarget(id: string): Promise<void> {
+    await db.delete(salesTargets).where(eq(salesTargets.id, id));
+  }
+
+  // Oak Sales - Automations
+  async getAllSalesAutomations(): Promise<SalesAutomation[]> {
+    return await db.select().from(salesAutomations);
+  }
+
+  async getSalesAutomation(id: string): Promise<SalesAutomation | undefined> {
+    const [automation] = await db.select().from(salesAutomations).where(eq(salesAutomations.id, id));
+    return automation || undefined;
+  }
+
+  async createSalesAutomation(automation: InsertSalesAutomation): Promise<SalesAutomation> {
+    const [created] = await db.insert(salesAutomations).values(automation).returning();
+    return created;
+  }
+
+  async updateSalesAutomation(id: string, automation: Partial<InsertSalesAutomation>): Promise<SalesAutomation | undefined> {
+    const [updated] = await db.update(salesAutomations).set(automation).where(eq(salesAutomations.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalesAutomation(id: string): Promise<void> {
+    await db.delete(salesAutomations).where(eq(salesAutomations.id, id));
   }
 }
 
