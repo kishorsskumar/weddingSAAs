@@ -275,35 +275,69 @@ function formatIndianCurrency(amount: number): string {
 }
 
 async function generatePDF(elementId: string, filename: string): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
   const element = document.getElementById(elementId);
   if (!element) {
-    throw new Error('Element not found');
+    console.error('PDF generation failed: Element not found with ID:', elementId);
+    throw new Error('Element not found: ' + elementId);
   }
   
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-  });
+  console.log('Generating PDF for element:', elementId, 'Element found:', element);
   
-  const imgData = canvas.toDataURL('image/png');
-  const pdf = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
-  
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const pdfHeight = pdf.internal.pageSize.getHeight();
-  const imgWidth = canvas.width;
-  const imgHeight = canvas.height;
-  const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-  const imgX = (pdfWidth - imgWidth * ratio) / 2;
-  const imgY = 10;
-  
-  pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-  pdf.save(filename);
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: true,
+      backgroundColor: '#ffffff',
+      allowTaint: true,
+      foreignObjectRendering: false,
+    });
+    
+    console.log('Canvas created:', canvas.width, 'x', canvas.height);
+    
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = canvas.width;
+    const imgHeight = canvas.height;
+    
+    const contentHeight = (imgHeight * pdfWidth) / imgWidth;
+    
+    if (contentHeight <= pdfHeight - 20) {
+      const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 20) / imgHeight);
+      const imgX = (pdfWidth - imgWidth * ratio) / 2;
+      pdf.addImage(imgData, 'PNG', imgX, 10, imgWidth * ratio, imgHeight * ratio);
+    } else {
+      const scaledWidth = pdfWidth - 20;
+      const scaledHeight = (imgHeight * scaledWidth) / imgWidth;
+      let heightLeft = scaledHeight;
+      let position = 10;
+      let pageNum = 0;
+      
+      while (heightLeft > 0) {
+        if (pageNum > 0) {
+          pdf.addPage();
+        }
+        pdf.addImage(imgData, 'PNG', 10, position - (pageNum * (pdfHeight - 20)), scaledWidth, scaledHeight);
+        heightLeft -= (pdfHeight - 20);
+        pageNum++;
+      }
+    }
+    
+    pdf.save(filename);
+    console.log('PDF saved successfully:', filename);
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    throw error;
+  }
 }
 
 export default function OakBook() {
@@ -1609,8 +1643,10 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
     setIsDownloading(true);
     try {
       await generatePDF(`quote-preview-${estimate.id}`, `Quote-${estimate.number}.pdf`);
+      toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
+      toast({ title: 'Failed to download PDF', description: String(error), variant: 'destructive' });
     } finally {
       setIsDownloading(false);
     }
@@ -2277,8 +2313,10 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
     setIsDownloading(true);
     try {
       await generatePDF(`invoice-preview-${invoice.id}`, `Invoice-${invoice.number}.pdf`);
+      toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
+      toast({ title: 'Failed to download PDF', description: String(error), variant: 'destructive' });
     } finally {
       setIsDownloading(false);
     }
@@ -2663,8 +2701,10 @@ function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoi
     setIsDownloading(true);
     try {
       await generatePDF(`receipt-preview-${payment.id}`, `Receipt-${payment.number}.pdf`);
+      toast({ title: 'PDF downloaded successfully!' });
     } catch (error) {
       console.error('Failed to generate PDF:', error);
+      toast({ title: 'Failed to download PDF', description: String(error), variant: 'destructive' });
     } finally {
       setIsDownloading(false);
     }
