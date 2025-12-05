@@ -120,19 +120,23 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
              <div className="space-y-3 sm:space-y-4">
-              {events.slice(0, 3).map((e) => (
+              {events
+                .filter(e => new Date(e.date) >= new Date(new Date().toDateString()))
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .slice(0, 3)
+                .map((e) => (
                 <div key={e.id} className="flex items-center justify-between p-2 sm:p-3 bg-muted/30 rounded-lg gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{e.title}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(e.date).toLocaleDateString()}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(e.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
                   <div className="text-[10px] sm:text-xs font-medium px-2 py-1 rounded bg-primary/10 text-primary capitalize flex-shrink-0">
                     {e.type}
                   </div>
                 </div>
               ))}
-              {events.length === 0 && (
-                <p className="text-center py-4 text-muted-foreground text-sm">No events scheduled</p>
+              {events.filter(e => new Date(e.date) >= new Date(new Date().toDateString())).length === 0 && (
+                <p className="text-center py-4 text-muted-foreground text-sm">No upcoming events</p>
               )}
             </div>
           </CardContent>
