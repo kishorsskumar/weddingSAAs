@@ -365,6 +365,37 @@ export const insertEstimateTemplateSchema = createInsertSchema(estimateTemplates
 });
 export const insertPortalLinkSchema = createInsertSchema(portalLinks).omit({ id: true, createdAt: true, viewCount: true, lastViewedAt: true });
 
+// Payroll Tables
+export const payrollRuns = pgTable("payroll_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  month: integer("month").notNull(), // 1-12
+  year: integer("year").notNull(),
+  status: text("status").notNull().default('draft'), // 'draft' | 'paid'
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull().default('0'),
+  payDate: date("pay_date"),
+  bankId: varchar("bank_id").references(() => banks.id),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const payrollItems = pgTable("payroll_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  payrollRunId: varchar("payroll_run_id").notNull().references(() => payrollRuns.id, { onDelete: 'cascade' }),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id),
+  employeeName: text("employee_name").notNull(), // Snapshot of name at time of payroll
+  monthlySalary: decimal("monthly_salary", { precision: 10, scale: 2 }).notNull(), // Snapshot of salary
+  daysWorked: integer("days_worked").notNull().default(30),
+  dailyRate: decimal("daily_rate", { precision: 10, scale: 2 }).notNull(),
+  grossPay: decimal("gross_pay", { precision: 10, scale: 2 }).notNull(),
+  deductions: decimal("deductions", { precision: 10, scale: 2 }).default('0'),
+  netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPayrollRunSchema = createInsertSchema(payrollRuns).omit({ id: true, createdAt: true, daybookEntryId: true });
+export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({ id: true, createdAt: true });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -429,3 +460,9 @@ export type InsertEstimateTemplate = z.infer<typeof insertEstimateTemplateSchema
 
 export type PortalLink = typeof portalLinks.$inferSelect;
 export type InsertPortalLink = z.infer<typeof insertPortalLinkSchema>;
+
+export type PayrollRun = typeof payrollRuns.$inferSelect;
+export type InsertPayrollRun = z.infer<typeof insertPayrollRunSchema>;
+
+export type PayrollItem = typeof payrollItems.$inferSelect;
+export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
