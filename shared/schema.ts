@@ -396,6 +396,136 @@ export const payrollItems = pgTable("payroll_items", {
 export const insertPayrollRunSchema = createInsertSchema(payrollRuns).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({ id: true, createdAt: true });
 
+// Oak Sales CRM
+
+// Sales Pipelines (e.g., "Bookings FY26-27", "Wedding Planning")
+export const salesPipelines = pgTable("sales_pipelines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Pipeline Stages (e.g., "Lead", "Proposal", "Negotiation", "Closed Won", "Closed Lost")
+export const salesStages = pgTable("sales_stages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pipelineId: varchar("pipeline_id").notNull().references(() => salesPipelines.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  order: integer("order").notNull(),
+  color: text("color").default('#6B7280'),
+  probability: integer("probability").default(0), // Win probability percentage
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Contacts
+export const salesContacts = pgTable("sales_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  mobile: text("mobile"),
+  companyId: varchar("company_id"),
+  title: text("title"),
+  source: text("source"), // "Website", "Referral", "Social Media", etc.
+  notes: text("notes"),
+  ownerId: varchar("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// CRM Companies/Accounts
+export const salesCompanies = pgTable("sales_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  industry: text("industry"),
+  website: text("website"),
+  phone: text("phone"),
+  email: text("email"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  country: text("country"),
+  notes: text("notes"),
+  ownerId: varchar("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Deals/Opportunities
+export const salesDeals = pgTable("sales_deals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  pipelineId: varchar("pipeline_id").notNull().references(() => salesPipelines.id),
+  stageId: varchar("stage_id").notNull().references(() => salesStages.id),
+  value: decimal("value", { precision: 12, scale: 2 }).default('0'),
+  currency: text("currency").default('INR'),
+  contactId: varchar("contact_id").references(() => salesContacts.id),
+  companyId: varchar("company_id").references(() => salesCompanies.id),
+  ownerId: varchar("owner_id").references(() => users.id),
+  expectedCloseDate: date("expected_close_date"),
+  actualCloseDate: date("actual_close_date"),
+  status: text("status").default('open'), // 'open', 'won', 'lost'
+  probability: integer("probability"),
+  source: text("source"),
+  notes: text("notes"),
+  eventType: text("event_type"), // 'wedding', 'corporate', 'birthday', 'other'
+  eventDate: date("event_date"),
+  venue: text("venue"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Activities (Tasks, Calls, Events/Meetings)
+export const salesActivities = pgTable("sales_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(), // 'task', 'call', 'meeting'
+  subject: text("subject").notNull(),
+  description: text("description"),
+  dueDate: date("due_date"),
+  dueTime: text("due_time"),
+  status: text("status").default('pending'), // 'pending', 'completed', 'cancelled'
+  priority: text("priority").default('medium'), // 'low', 'medium', 'high'
+  dealId: varchar("deal_id").references(() => salesDeals.id, { onDelete: 'cascade' }),
+  contactId: varchar("contact_id").references(() => salesContacts.id),
+  companyId: varchar("company_id").references(() => salesCompanies.id),
+  ownerId: varchar("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Sales Targets for Wedding Planners
+export const salesTargets = pgTable("sales_targets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  fiscalYear: text("fiscal_year").notNull(), // e.g., "FY2025-26"
+  month: text("month"), // Optional: for monthly targets
+  targetAmount: decimal("target_amount", { precision: 12, scale: 2 }).notNull(),
+  targetDeals: integer("target_deals"), // Number of deals target
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Sales Automations
+export const salesAutomations = pgTable("sales_automations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: text("trigger_type").notNull(), // 'deal_created', 'stage_changed', 'deal_won', 'deal_lost'
+  triggerConditions: jsonb("trigger_conditions"),
+  actionType: text("action_type").notNull(), // 'create_task', 'send_notification', 'update_field'
+  actionConfig: jsonb("action_config"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schemas for Oak Sales
+export const insertSalesPipelineSchema = createInsertSchema(salesPipelines).omit({ id: true, createdAt: true });
+export const insertSalesStageSchema = createInsertSchema(salesStages).omit({ id: true, createdAt: true });
+export const insertSalesContactSchema = createInsertSchema(salesContacts).omit({ id: true, createdAt: true });
+export const insertSalesCompanySchema = createInsertSchema(salesCompanies).omit({ id: true, createdAt: true });
+export const insertSalesDealSchema = createInsertSchema(salesDeals).omit({ id: true, createdAt: true });
+export const insertSalesActivitySchema = createInsertSchema(salesActivities).omit({ id: true, createdAt: true });
+export const insertSalesTargetSchema = createInsertSchema(salesTargets).omit({ id: true, createdAt: true });
+export const insertSalesAutomationSchema = createInsertSchema(salesAutomations).omit({ id: true, createdAt: true });
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -466,3 +596,28 @@ export type InsertPayrollRun = z.infer<typeof insertPayrollRunSchema>;
 
 export type PayrollItem = typeof payrollItems.$inferSelect;
 export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
+
+// Oak Sales Types
+export type SalesPipeline = typeof salesPipelines.$inferSelect;
+export type InsertSalesPipeline = z.infer<typeof insertSalesPipelineSchema>;
+
+export type SalesStage = typeof salesStages.$inferSelect;
+export type InsertSalesStage = z.infer<typeof insertSalesStageSchema>;
+
+export type SalesContact = typeof salesContacts.$inferSelect;
+export type InsertSalesContact = z.infer<typeof insertSalesContactSchema>;
+
+export type SalesCompany = typeof salesCompanies.$inferSelect;
+export type InsertSalesCompany = z.infer<typeof insertSalesCompanySchema>;
+
+export type SalesDeal = typeof salesDeals.$inferSelect;
+export type InsertSalesDeal = z.infer<typeof insertSalesDealSchema>;
+
+export type SalesActivity = typeof salesActivities.$inferSelect;
+export type InsertSalesActivity = z.infer<typeof insertSalesActivitySchema>;
+
+export type SalesTarget = typeof salesTargets.$inferSelect;
+export type InsertSalesTarget = z.infer<typeof insertSalesTargetSchema>;
+
+export type SalesAutomation = typeof salesAutomations.$inferSelect;
+export type InsertSalesAutomation = z.infer<typeof insertSalesAutomationSchema>;
