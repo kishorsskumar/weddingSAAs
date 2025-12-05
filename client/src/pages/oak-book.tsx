@@ -1732,7 +1732,7 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Toolbar */}
-        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
             <Badge variant={estimate.status === 'accepted' ? 'default' : estimate.status === 'converted' ? 'secondary' : 'outline'}>
               {estimate.status}
@@ -1740,23 +1740,23 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             <span className="font-medium">{estimate.number}</span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
+            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)} className="text-xs sm:text-sm">
+              <Edit className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Edit</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
-              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              {isDownloading ? 'Generating...' : 'Download PDF'}
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading} className="text-xs sm:text-sm">
+              {isDownloading ? <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" /> : <Download className="h-4 w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">{isDownloading ? 'Generating...' : 'PDF'}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing}>
-              {isSharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
-              {isSharing ? 'Creating...' : 'Share'}
+            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing} className="text-xs sm:text-sm">
+              {isSharing ? <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" /> : <Share2 className="h-4 w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">{isSharing ? 'Creating...' : 'Share'}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={onClone}>
-              <Copy className="h-4 w-4 mr-2" /> Clone
+            <Button variant="outline" size="sm" onClick={onClone} className="text-xs sm:text-sm">
+              <Copy className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Clone</span>
             </Button>
             {estimate.status !== 'converted' && (
-              <Button variant="outline" size="sm" onClick={onConvert}>
-                <ArrowRight className="h-4 w-4 mr-2" /> Convert to Invoice
+              <Button variant="outline" size="sm" onClick={onConvert} className="text-xs sm:text-sm">
+                <ArrowRight className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Invoice</span>
               </Button>
             )}
           </div>
@@ -1771,103 +1771,104 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
           </div>
         )}
 
-        <div id={`quote-preview-${estimate.id}`} className="bg-white p-6 print:p-0">
+        <div id={`quote-preview-${estimate.id}`} className="bg-white p-2 sm:p-6 print:p-0 overflow-x-auto">
           {/* Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-start gap-4">
-              <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
-              <div>
-                <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <img src={logo} alt="Oakstreet Events" className="h-10 sm:h-16 w-auto bg-primary p-1 sm:p-2 rounded" />
+              <div className="text-xs sm:text-sm">
+                <h1 className="text-base sm:text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+                <p className="text-muted-foreground whitespace-pre-line hidden sm:block">
                   {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
                 </p>
-                <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
-                <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
-                <p className="text-sm">{companySettings?.website || 'www.oakstreetevents.com'}</p>
+                <p>{companySettings?.phone || '7902373354'}</p>
+                <p className="hidden sm:block">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
               </div>
             </div>
-            <div className="text-right">
-              <h2 className="text-3xl font-bold text-primary">Quote</h2>
+            <div className="text-left sm:text-right">
+              <h2 className="text-xl sm:text-3xl font-bold text-primary">Quote</h2>
             </div>
           </div>
 
           {/* Quote Details */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-xs sm:text-sm">
             <div>
-              <p className="text-sm text-muted-foreground">Estimate No</p>
+              <p className="text-muted-foreground">Estimate No</p>
               <p className="font-medium">: {estimate.number}</p>
-              <p className="text-sm text-muted-foreground mt-2">Quote Date</p>
+              <p className="text-muted-foreground mt-2">Quote Date</p>
               <p className="font-medium">: {format(new Date(estimate.date), 'dd/MM/yyyy')}</p>
               {estimate.weddingPlannerName && (
                 <>
-                  <p className="text-sm text-muted-foreground mt-2">Wedding Planner</p>
+                  <p className="text-muted-foreground mt-2">Wedding Planner</p>
                   <p className="font-medium">: {estimate.weddingPlannerName}</p>
                 </>
               )}
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Bill To</p>
+              <p className="text-muted-foreground">Bill To</p>
               <p className="font-medium">{customer?.name || '—'}</p>
-              <p className="text-sm whitespace-pre-line">{estimate.customerAddress || customer?.billingAddress || ''}</p>
+              <p className="whitespace-pre-line">{estimate.customerAddress || customer?.billingAddress || ''}</p>
             </div>
           </div>
 
           {estimate.subject && (
-            <div className="mb-6">
-              <p className="text-sm text-muted-foreground">Subject:</p>
+            <div className="mb-6 text-xs sm:text-sm">
+              <p className="text-muted-foreground">Subject:</p>
               <p className="font-medium">{estimate.subject}</p>
             </div>
           )}
 
           {/* Line Items */}
-          <table className="w-full text-sm border-collapse mb-6">
-            <thead>
-              <tr className="border-y">
-                <th className="p-2 text-left w-12">Sl No</th>
-                <th className="p-2 text-left">Item & Description</th>
-                <th className="p-2 text-right w-16">Qty</th>
-                <th className="p-2 text-right w-24">Rate</th>
-                <th className="p-2 text-right w-28">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(estimate.lineItems || []).map((item: LineItem, index: number) => (
-                <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
-                  <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
-                  <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
-                  {!item.isHeading && (
-                    <>
-                      <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
-                      <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
-                      <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
-                    </>
-                  )}
+          <div className="overflow-x-auto mb-6">
+            <table className="w-full text-xs sm:text-sm border-collapse min-w-[400px]">
+              <thead>
+                <tr className="border-y">
+                  <th className="p-2 text-left w-12">Sl No</th>
+                  <th className="p-2 text-left">Item & Description</th>
+                  <th className="p-2 text-right w-16">Qty</th>
+                  <th className="p-2 text-right w-24">Rate</th>
+                  <th className="p-2 text-right w-28">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(estimate.lineItems || []).map((item: LineItem, index: number) => (
+                  <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
+                    <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                    <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
+                    {!item.isHeading && (
+                      <>
+                        <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
+                        <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
+                        <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Totals */}
-          <div className="flex">
+          <div className="flex flex-col-reverse sm:flex-row gap-4 text-xs sm:text-sm">
             <div className="flex-1">
               <p className="font-medium">Total In Words</p>
-              <p className="text-sm italic">{estimate.totalInWords}</p>
+              <p className="italic">{estimate.totalInWords}</p>
               
               {estimate.notes && (
                 <div className="mt-4">
                   <p className="font-medium">Notes</p>
-                  <p className="text-sm">{estimate.notes}</p>
+                  <p>{estimate.notes}</p>
                 </div>
               )}
 
               {estimate.terms && (
                 <div className="mt-4">
                   <p className="font-medium">Terms & Conditions</p>
-                  <p className="text-sm whitespace-pre-line">{estimate.terms}</p>
+                  <p className="whitespace-pre-line">{estimate.terms}</p>
                 </div>
               )}
             </div>
-            <div className="w-64 text-right">
+            <div className="w-full sm:w-64 text-right">
               <div className="flex justify-between py-1">
                 <span>Sub Total</span>
                 <span>{formatIndianCurrency(parseFloat(estimate.subtotal))}</span>
@@ -1884,7 +1885,7 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
                   <span>{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
                 </div>
               )}
-              <div className="flex justify-between py-2 border-t font-bold text-lg">
+              <div className="flex justify-between py-2 border-t font-bold text-base sm:text-lg">
                 <span>Total</span>
                 <span>₹{parseFloat(estimate.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
@@ -2412,7 +2413,7 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Toolbar */}
-        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 pb-4 border-b">
           <div className="flex items-center gap-2">
             <Badge variant={invoice.status === 'paid' ? 'default' : parseFloat(invoice.balanceDue) > 0 ? 'destructive' : 'secondary'}>
               {invoice.status}
@@ -2420,16 +2421,16 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             <span className="font-medium">{invoice.number}</span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
-              <Edit className="h-4 w-4 mr-2" /> Edit
+            <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)} className="text-xs sm:text-sm">
+              <Edit className="h-4 w-4 sm:mr-2" /> <span className="hidden sm:inline">Edit</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
-              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-              {isDownloading ? 'Generating...' : 'Download PDF'}
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading} className="text-xs sm:text-sm">
+              {isDownloading ? <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" /> : <Download className="h-4 w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">{isDownloading ? 'Generating...' : 'PDF'}</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing}>
-              {isSharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
-              {isSharing ? 'Creating...' : 'Share'}
+            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing} className="text-xs sm:text-sm">
+              {isSharing ? <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" /> : <Share2 className="h-4 w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">{isSharing ? 'Creating...' : 'Share'}</span>
             </Button>
           </div>
         </div>
@@ -2443,108 +2444,110 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
           </div>
         )}
 
-        <div id={`invoice-preview-${invoice.id}`} className="bg-white p-6 print:p-0">
+        <div id={`invoice-preview-${invoice.id}`} className="bg-white p-2 sm:p-6 print:p-0 overflow-x-auto">
           {/* Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-start gap-4">
-              <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
-              <div>
-                <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <img src={logo} alt="Oakstreet Events" className="h-10 sm:h-16 w-auto bg-primary p-1 sm:p-2 rounded" />
+              <div className="text-xs sm:text-sm">
+                <h1 className="text-base sm:text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+                <p className="text-muted-foreground whitespace-pre-line hidden sm:block">
                   {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
                 </p>
-                <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
-                <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
+                <p>{companySettings?.phone || '7902373354'}</p>
+                <p className="hidden sm:block">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
               </div>
             </div>
-            <div className="text-right">
-              <h2 className="text-3xl font-bold text-primary">Invoice</h2>
+            <div className="text-left sm:text-right">
+              <h2 className="text-xl sm:text-3xl font-bold text-primary">Invoice</h2>
             </div>
           </div>
 
           {/* Invoice Details */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-xs sm:text-sm">
             <div>
-              <p className="text-sm text-muted-foreground">Invoice No</p>
+              <p className="text-muted-foreground">Invoice No</p>
               <p className="font-medium">: {invoice.number}</p>
-              <p className="text-sm text-muted-foreground mt-2">Invoice Date</p>
+              <p className="text-muted-foreground mt-2">Invoice Date</p>
               <p className="font-medium">: {format(new Date(invoice.date), 'dd/MM/yyyy')}</p>
               {invoice.dueDate && (
                 <>
-                  <p className="text-sm text-muted-foreground mt-2">Due Date</p>
+                  <p className="text-muted-foreground mt-2">Due Date</p>
                   <p className="font-medium">: {format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</p>
                 </>
               )}
               {invoice.weddingPlannerName && (
                 <>
-                  <p className="text-sm text-muted-foreground mt-2">Wedding Planner</p>
+                  <p className="text-muted-foreground mt-2">Wedding Planner</p>
                   <p className="font-medium">: {invoice.weddingPlannerName}</p>
                 </>
               )}
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Bill To</p>
+              <p className="text-muted-foreground">Bill To</p>
               <p className="font-medium">{customer?.name || '—'}</p>
-              <p className="text-sm whitespace-pre-line">{invoice.customerAddress || customer?.billingAddress || ''}</p>
+              <p className="whitespace-pre-line">{invoice.customerAddress || customer?.billingAddress || ''}</p>
             </div>
           </div>
 
           {invoice.subject && (
-            <div className="mb-6">
-              <p className="text-sm text-muted-foreground">Subject:</p>
+            <div className="mb-6 text-xs sm:text-sm">
+              <p className="text-muted-foreground">Subject:</p>
               <p className="font-medium">{invoice.subject}</p>
             </div>
           )}
 
           {/* Line Items */}
-          <table className="w-full text-sm border-collapse mb-6">
-            <thead>
-              <tr className="border-y">
-                <th className="p-2 text-left w-12">Sl No</th>
-                <th className="p-2 text-left">Item & Description</th>
-                <th className="p-2 text-right w-16">Qty</th>
-                <th className="p-2 text-right w-24">Rate</th>
-                <th className="p-2 text-right w-28">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(invoice.lineItems || []).map((item: LineItem, index: number) => (
-                <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
-                  <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
-                  <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
-                  {!item.isHeading && (
-                    <>
-                      <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
-                      <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
-                      <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
-                    </>
-                  )}
+          <div className="overflow-x-auto mb-6">
+            <table className="w-full text-xs sm:text-sm border-collapse min-w-[400px]">
+              <thead>
+                <tr className="border-y">
+                  <th className="p-2 text-left w-12">Sl No</th>
+                  <th className="p-2 text-left">Item & Description</th>
+                  <th className="p-2 text-right w-16">Qty</th>
+                  <th className="p-2 text-right w-24">Rate</th>
+                  <th className="p-2 text-right w-28">Amount</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(invoice.lineItems || []).map((item: LineItem, index: number) => (
+                  <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
+                    <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                    <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
+                    {!item.isHeading && (
+                      <>
+                        <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
+                        <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
+                        <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {/* Totals */}
-          <div className="flex">
+          <div className="flex flex-col-reverse sm:flex-row gap-4 text-xs sm:text-sm">
             <div className="flex-1">
               <p className="font-medium">Total In Words</p>
-              <p className="text-sm italic">{invoice.totalInWords}</p>
+              <p className="italic">{invoice.totalInWords}</p>
               
               {invoice.notes && (
                 <div className="mt-4">
                   <p className="font-medium">Notes</p>
-                  <p className="text-sm">{invoice.notes}</p>
+                  <p>{invoice.notes}</p>
                 </div>
               )}
 
               {invoice.terms && (
                 <div className="mt-4">
                   <p className="font-medium">Terms & Conditions</p>
-                  <p className="text-sm whitespace-pre-line">{invoice.terms}</p>
+                  <p className="whitespace-pre-line">{invoice.terms}</p>
                 </div>
               )}
             </div>
-            <div className="w-64 text-right">
+            <div className="w-full sm:w-64 text-right">
               <div className="flex justify-between py-1">
                 <span>Sub Total</span>
                 <span>{formatIndianCurrency(parseFloat(invoice.subtotal))}</span>
@@ -2561,11 +2564,11 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
                   <span>{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
                 </div>
               )}
-              <div className="flex justify-between py-2 border-t font-bold text-lg">
+              <div className="flex justify-between py-2 border-t font-bold text-base sm:text-lg">
                 <span>Total</span>
                 <span>₹{parseFloat(invoice.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between py-2 border-t font-bold text-destructive">
+              <div className="flex justify-between py-2 border-t font-bold text-destructive text-base sm:text-lg">
                 <span>Balance Due</span>
                 <span>₹{parseFloat(invoice.balanceDue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
@@ -2574,9 +2577,9 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
 
           {/* Signature */}
           <div className="mt-8 text-right">
-            <p className="text-sm text-muted-foreground">Authorized Signature</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">Authorized Signature</p>
             {invoice.signature && (
-              <img src={invoice.signature} alt="Signature" className="h-16 ml-auto" />
+              <img src={invoice.signature} alt="Signature" className="h-12 sm:h-16 ml-auto" />
             )}
           </div>
         </div>
