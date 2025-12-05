@@ -752,11 +752,11 @@ function CustomersSection({ customers, queryClient, toast }: any) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Customers</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Customers</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-customer"><Plus className="h-4 w-4 mr-2" /> New Customer</Button>
+            <Button data-testid="button-add-customer" size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> New Customer</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -892,9 +892,9 @@ function QuotesSection({ estimates, customers, companySettings, queryClient, toa
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Quotes</h1>
-        <Button onClick={() => setIsCreateOpen(true)} data-testid="button-add-quote">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Quotes</h1>
+        <Button onClick={() => setIsCreateOpen(true)} data-testid="button-add-quote" size="sm" className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-2" /> New Quote
         </Button>
       </div>
@@ -1935,8 +1935,8 @@ function InvoicesSection({ invoices, customers, banks, queryClient, toast, compa
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Invoices</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Invoices</h1>
       </div>
 
       <Card>
@@ -2620,11 +2620,11 @@ function PaymentsReceivedSection({ payments, customers, invoices, banks, queryCl
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Payments Received</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Payments Received</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
+            <Button size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -2965,11 +2965,11 @@ function VendorsSection({ vendors, queryClient, toast }: any) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Vendors</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Vendors</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> New Vendor</Button>
+            <Button size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> New Vendor</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -3080,11 +3080,11 @@ function ExpensesSection({ expenses, vendors, banks, queryClient, toast }: any) 
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Expenses</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Expenses</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Record Expense</Button>
+            <Button size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> Record Expense</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -3223,11 +3223,11 @@ function VendorPaymentsSection({ payments, vendors, expenses, banks, queryClient
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Vendor Payments</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+        <h1 className="text-xl sm:text-2xl font-bold">Vendor Payments</h1>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
+            <Button size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
