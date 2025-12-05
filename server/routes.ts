@@ -1248,9 +1248,40 @@ export async function registerRoutes(
       if (run.status === 'paid') {
         return res.status(400).json({ error: 'Cannot modify paid payroll' });
       }
-      const updated = await storage.updatePayrollRun(req.params.id, req.body);
+      
+      const { items, ...runUpdates } = req.body;
+      
+      if (items && Array.isArray(items)) {
+        const existingItems = await storage.getPayrollItemsByRunId(req.params.id);
+        let newTotal = 0;
+        
+        for (const itemUpdate of items) {
+          const item = existingItems.find(i => i.id === itemUpdate.id);
+          if (item) {
+            const dailyRate = parseFloat(item.monthlySalary) / 30;
+            const daysWorked = itemUpdate.daysWorked ?? item.daysWorked;
+            const grossPay = dailyRate * daysWorked;
+            const deductions = parseFloat(item.deductions || '0');
+            const netPay = grossPay - deductions;
+            
+            await storage.updatePayrollItem(itemUpdate.id, {
+              daysWorked,
+              dailyRate: dailyRate.toFixed(2),
+              grossPay: grossPay.toFixed(2),
+              netPay: netPay.toFixed(2),
+            });
+            newTotal += netPay;
+          }
+        }
+        await storage.updatePayrollRun(req.params.id, { totalAmount: newTotal.toFixed(2) });
+      } else if (Object.keys(runUpdates).length > 0) {
+        await storage.updatePayrollRun(req.params.id, runUpdates);
+      }
+      
+      const updated = await storage.getPayrollRun(req.params.id);
       res.json(updated);
     } catch (error) {
+      console.error('Error updating payroll run:', error);
       res.status(400).json({ error: 'Failed to update payroll run' });
     }
   });

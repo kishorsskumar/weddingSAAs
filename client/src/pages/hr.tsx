@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import * as XLSX from "xlsx";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
@@ -618,8 +617,10 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
     updatePayrollMutation.mutate({ runId: selectedRun.id, items });
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
     if (!selectedRun || payrollItems.length === 0) return;
+
+    const XLSX = await import('xlsx');
 
     const data = payrollItems.map(item => ({
       'Employee Name': item.employeeName,
