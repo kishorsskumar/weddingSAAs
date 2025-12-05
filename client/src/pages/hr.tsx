@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import * as XLSX from "xlsx";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
@@ -431,6 +432,8 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
   const [employeeDays, setEmployeeDays] = useState<Record<string, number>>({});
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedBankId, setSelectedBankId] = useState<string>('');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editedDays, setEditedDays] = useState<Record<string, number>>({});
 
   const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
     queryKey: ['/api/payroll-runs'],
@@ -536,6 +539,30 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
     },
   });
 
+  const updatePayrollMutation = useMutation({
+    mutationFn: async ({ runId, items }: { runId: string; items: { id: string; daysWorked: number }[] }) => {
+      const res = await fetch(`/api/payroll-runs/${runId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update payroll');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+      setIsEditMode(false);
+      setEditedDays({});
+      toast({ title: 'Payroll updated successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                       'July', 'August', 'September', 'October', 'November', 'December'];
   
@@ -567,6 +594,70 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
   };
 
   const previewTotal = calculatePayrollPreview().reduce((sum, emp) => sum + emp.grossPay, 0);
+
+  const startEditMode = () => {
+    const daysMap: Record<string, number> = {};
+    payrollItems.forEach(item => {
+      daysMap[item.id] = item.daysWorked;
+    });
+    setEditedDays(daysMap);
+    setIsEditMode(true);
+  };
+
+  const cancelEditMode = () => {
+    setIsEditMode(false);
+    setEditedDays({});
+  };
+
+  const savePayrollChanges = () => {
+    if (!selectedRun) return;
+    const items = payrollItems.map(item => ({
+      id: item.id,
+      daysWorked: editedDays[item.id] ?? item.daysWorked,
+    }));
+    updatePayrollMutation.mutate({ runId: selectedRun.id, items });
+  };
+
+  const downloadExcel = () => {
+    if (!selectedRun || payrollItems.length === 0) return;
+
+    const data = payrollItems.map(item => ({
+      'Employee Name': item.employeeName,
+      'Monthly Salary': Number(item.monthlySalary),
+      'Days Worked': item.daysWorked,
+      'Daily Rate': Number(item.dailyRate),
+      'Gross Pay': Number(item.grossPay),
+      'Deductions': Number(item.deductions),
+      'Net Pay': Number(item.netPay),
+    }));
+
+    data.push({
+      'Employee Name': 'TOTAL',
+      'Monthly Salary': payrollItems.reduce((sum, i) => sum + Number(i.monthlySalary), 0),
+      'Days Worked': 0,
+      'Daily Rate': 0,
+      'Gross Pay': payrollItems.reduce((sum, i) => sum + Number(i.grossPay), 0),
+      'Deductions': payrollItems.reduce((sum, i) => sum + Number(i.deductions), 0),
+      'Net Pay': Number(selectedRun.totalAmount),
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Payroll');
+
+    ws['!cols'] = [
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+    ];
+
+    XLSX.writeFile(wb, `Payroll_${monthNames[selectedRun.month - 1]}_${selectedRun.year}.xlsx`);
+    toast({ title: 'Excel downloaded successfully' });
+  };
 
   return (
     <div className="space-y-4">
@@ -625,34 +716,73 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
                     ₹{Number(selectedRun.totalAmount).toLocaleString()}
                   </span>
                 </div>
-                <div className="flex gap-2">
-                  {selectedRun.status === 'draft' && isAdmin && (
+                <div className="flex flex-wrap gap-2">
+                  {isEditMode ? (
                     <>
                       <Button 
                         size="sm" 
-                        onClick={() => openPayDialog(selectedRun.id)}
-                        data-testid="button-mark-paid"
+                        onClick={savePayrollChanges}
+                        disabled={updatePayrollMutation.isPending}
+                        data-testid="button-save-payroll"
                       >
-                        <DollarSign className="h-4 w-4 mr-1" /> Mark as Paid
+                        <Save className="h-4 w-4 mr-1" /> {updatePayrollMutation.isPending ? 'Saving...' : 'Save'}
                       </Button>
                       <Button 
                         size="sm" 
-                        variant="destructive"
-                        onClick={() => {
-                          if (confirm('Delete this payroll run?')) {
-                            deletePayrollMutation.mutate(selectedRun.id);
-                          }
-                        }}
-                        data-testid="button-delete-payroll"
+                        variant="outline"
+                        onClick={cancelEditMode}
+                        data-testid="button-cancel-edit"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4 mr-1" /> Cancel
                       </Button>
                     </>
-                  )}
-                  {selectedRun.status === 'paid' && selectedRun.payDate && (
-                    <span className="text-xs text-muted-foreground">
-                      Paid on {format(parseISO(selectedRun.payDate), 'dd/MM/yyyy')}
-                    </span>
+                  ) : (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={downloadExcel}
+                        data-testid="button-download-excel"
+                      >
+                        <Download className="h-4 w-4 mr-1" /> Excel
+                      </Button>
+                      {selectedRun.status === 'draft' && isAdmin && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={startEditMode}
+                            data-testid="button-edit-payroll"
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={() => openPayDialog(selectedRun.id)}
+                            data-testid="button-mark-paid"
+                          >
+                            <DollarSign className="h-4 w-4 mr-1" /> Mark as Paid
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => {
+                              if (confirm('Delete this payroll run?')) {
+                                deletePayrollMutation.mutate(selectedRun.id);
+                              }
+                            }}
+                            data-testid="button-delete-payroll"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      {selectedRun.status === 'paid' && selectedRun.payDate && (
+                        <span className="text-xs text-muted-foreground">
+                          Paid on {format(parseISO(selectedRun.payDate), 'dd/MM/yyyy')}
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -670,25 +800,55 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {payrollItems.map(item => (
-                        <TableRow key={item.id}>
-                          <TableCell className="text-xs sm:text-sm font-medium">{item.employeeName}</TableCell>
-                          <TableCell className="text-right font-mono text-xs sm:text-sm">
-                            ₹{Number(item.monthlySalary).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-xs sm:text-sm">{item.daysWorked}</TableCell>
-                          <TableCell className="text-right font-mono text-xs sm:text-sm">
-                            ₹{Number(item.dailyRate).toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-xs sm:text-sm font-bold">
-                            ₹{Number(item.netPay).toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {payrollItems.map(item => {
+                        const daysWorked = isEditMode ? (editedDays[item.id] ?? item.daysWorked) : item.daysWorked;
+                        const dailyRate = Number(item.monthlySalary) / 30;
+                        const calculatedPay = isEditMode ? dailyRate * daysWorked : Number(item.netPay);
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell className="text-xs sm:text-sm font-medium">{item.employeeName}</TableCell>
+                            <TableCell className="text-right font-mono text-xs sm:text-sm">
+                              ₹{Number(item.monthlySalary).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right text-xs sm:text-sm">
+                              {isEditMode ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="31"
+                                  value={editedDays[item.id] ?? item.daysWorked}
+                                  onChange={e => setEditedDays(prev => ({
+                                    ...prev,
+                                    [item.id]: Math.min(31, Math.max(0, Number(e.target.value)))
+                                  }))}
+                                  className="w-16 text-center text-xs sm:text-sm ml-auto"
+                                  data-testid={`input-edit-days-${item.id}`}
+                                />
+                              ) : (
+                                daysWorked
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs sm:text-sm">
+                              ₹{dailyRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs sm:text-sm font-bold">
+                              ₹{calculatedPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                       <TableRow className="bg-muted/50 font-bold">
                         <TableCell colSpan={4} className="text-xs sm:text-sm">Total Payroll</TableCell>
                         <TableCell className="text-right text-primary font-mono text-xs sm:text-sm">
-                          ₹{Number(selectedRun.totalAmount).toLocaleString()}
+                          {isEditMode ? (
+                            `₹${payrollItems.reduce((sum, item) => {
+                              const days = editedDays[item.id] ?? item.daysWorked;
+                              const dailyRate = Number(item.monthlySalary) / 30;
+                              return sum + (dailyRate * days);
+                            }, 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                          ) : (
+                            `₹${Number(selectedRun.totalAmount).toLocaleString()}`
+                          )}
                         </TableCell>
                       </TableRow>
                     </TableBody>
