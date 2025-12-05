@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,9 +34,13 @@ import {
   Edit,
   Eye,
   Calendar,
-  Download
+  Download,
+  Share2,
+  Loader2
 } from "lucide-react";
 import logo from "@assets/oakstreet_white_1764858814551.png";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 type Customer = {
   id: string;
@@ -270,6 +274,38 @@ function formatIndianCurrency(amount: number): string {
   }).format(amount);
 }
 
+async function generatePDF(elementId: string, filename: string): Promise<void> {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    throw new Error('Element not found');
+  }
+  
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    backgroundColor: '#ffffff',
+  });
+  
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+  
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = canvas.width;
+  const imgHeight = canvas.height;
+  const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+  const imgX = (pdfWidth - imgWidth * ratio) / 2;
+  const imgY = 10;
+  
+  pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
+  pdf.save(filename);
+}
+
 export default function OakBook() {
   const [activeSection, setActiveSection] = useState("home");
   const [salesExpanded, setSalesExpanded] = useState(true);
@@ -464,6 +500,7 @@ export default function OakBook() {
             customers={customers}
             invoices={invoices}
             banks={banks}
+            companySettings={companySettings}
             queryClient={queryClient} 
             toast={toast} 
           />
@@ -1564,6 +1601,19 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
     );
   }
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      await generatePDF(`quote-preview-${estimate.id}`, `Quote-${estimate.number}.pdf`);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1575,9 +1625,13 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             </Badge>
             <span className="font-medium">{estimate.number}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
               <Edit className="h-4 w-4 mr-2" /> Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
+              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {isDownloading ? 'Generating...' : 'Download PDF'}
             </Button>
             <Button variant="outline" size="sm" onClick={onClone}>
               <Copy className="h-4 w-4 mr-2" /> Clone
@@ -1590,7 +1644,7 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
           </div>
         </div>
 
-        <div className="bg-white p-6 print:p-0">
+        <div id={`quote-preview-${estimate.id}`} className="bg-white p-6 print:p-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-start gap-4">
@@ -2174,6 +2228,19 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
     );
   }
 
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      await generatePDF(`invoice-preview-${invoice.id}`, `Invoice-${invoice.number}.pdf`);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -2189,10 +2256,14 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
               <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
+              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {isDownloading ? 'Generating...' : 'Download PDF'}
+            </Button>
           </div>
         </div>
 
-        <div className="bg-white p-6 print:p-0">
+        <div id={`invoice-preview-${invoice.id}`} className="bg-white p-6 print:p-0">
           {/* Header */}
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-start gap-4">
@@ -2334,8 +2405,10 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   );
 }
 
-function PaymentsReceivedSection({ payments, customers, invoices, banks, queryClient, toast }: any) {
+function PaymentsReceivedSection({ payments, customers, invoices, banks, queryClient, toast, companySettings }: any) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<CustomerPayment | null>(null);
   const [formData, setFormData] = useState({
     customerId: '', invoiceId: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'),
     paymentMode: 'bank_transfer', bankId: '', reference: '', notes: ''
@@ -2460,7 +2533,7 @@ function PaymentsReceivedSection({ payments, customers, invoices, banks, queryCl
               </thead>
               <tbody>
                 {payments.map((payment: CustomerPayment) => (
-                  <tr key={payment.id} className="border-t">
+                  <tr key={payment.id} className="border-t hover:bg-muted/30 cursor-pointer" onClick={() => { setSelectedPayment(payment); setIsViewOpen(true); }}>
                     <td className="p-3 font-medium">{payment.number}</td>
                     <td className="p-3">
                       {payment.customerId ? customers.find((c: Customer) => c.id === payment.customerId)?.name : '—'}
@@ -2482,7 +2555,140 @@ function PaymentsReceivedSection({ payments, customers, invoices, banks, queryCl
           </div>
         </CardContent>
       </Card>
+
+      {selectedPayment && (
+        <ViewPaymentReceiptDialog
+          open={isViewOpen}
+          onOpenChange={setIsViewOpen}
+          payment={selectedPayment}
+          customer={customers.find((c: Customer) => c.id === selectedPayment.customerId)}
+          invoice={invoices.find((i: Invoice) => i.id === selectedPayment.invoiceId)}
+          bank={banks.find((b: Bank) => b.id === selectedPayment.bankId)}
+          companySettings={companySettings}
+        />
+      )}
     </div>
+  );
+}
+
+function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoice, bank, companySettings }: any) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+    try {
+      await generatePDF(`receipt-preview-${payment.id}`, `Receipt-${payment.number}.pdf`);
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        {/* Toolbar */}
+        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+          <div className="flex items-center gap-2">
+            <Badge variant="default">Payment Receipt</Badge>
+            <span className="font-medium">{payment.number}</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
+              {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {isDownloading ? 'Generating...' : 'Download PDF'}
+            </Button>
+          </div>
+        </div>
+
+        <div id={`receipt-preview-${payment.id}`} className="bg-white p-6">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-start gap-4">
+              <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
+              <div>
+                <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
+                </p>
+                <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-3xl font-bold text-green-600">Payment Receipt</h2>
+            </div>
+          </div>
+
+          {/* Receipt Details */}
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Receipt No</p>
+                <p className="font-medium">{payment.number}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="font-medium">{format(new Date(payment.date), 'dd/MM/yyyy')}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Payment Mode</p>
+                <p className="font-medium capitalize">{payment.paymentMode.replace('_', ' ')}</p>
+              </div>
+              {payment.reference && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Reference</p>
+                  <p className="font-medium">{payment.reference}</p>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm text-muted-foreground">Received From</p>
+                <p className="font-medium">{customer?.name || '—'}</p>
+              </div>
+              {invoice && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Against Invoice</p>
+                  <p className="font-medium">{invoice.number}</p>
+                </div>
+              )}
+              {bank && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Deposited To</p>
+                  <p className="font-medium">{bank.name}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-6 text-center">
+            <p className="text-sm text-muted-foreground mb-2">Amount Received</p>
+            <p className="text-4xl font-bold text-green-600">{formatIndianCurrency(parseFloat(payment.amount))}</p>
+            <p className="text-sm mt-2 italic">Indian Rupee {numberToWords(Math.round(parseFloat(payment.amount)))} Only</p>
+          </div>
+
+          {payment.notes && (
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground">Notes</p>
+              <p className="text-sm">{payment.notes}</p>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="flex justify-between items-end mt-8">
+            <div>
+              <p className="text-sm text-muted-foreground">Thank you for your payment!</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-muted-foreground">Authorized Signature</p>
+              <div className="h-16 w-32 border-b border-gray-300 mt-8"></div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
