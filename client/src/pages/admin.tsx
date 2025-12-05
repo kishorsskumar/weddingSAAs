@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/context/auth-context";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard" },
@@ -36,8 +38,13 @@ const getRoleLabel = (role: string) => ROLE_LABELS[role] || role;
 
 export default function Admin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editRole, setEditRole] = useState<string>('');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isSuperAdmin = currentUser?.role === 'superadmin';
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['/api/users'],
@@ -89,6 +96,35 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
     },
   });
+
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) throw new Error('Failed to update user');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+    },
+  });
+
+  const openEditDialog = (user: User) => {
+    setEditingUser(user);
+    setEditRole(user.role);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = () => {
+    if (editingUser && editRole) {
+      updateUserMutation.mutate({ userId: editingUser.id, role: editRole });
+    }
+  };
 
   const togglePermission = (userId: string, pageId: string, currentPages: string[]) => {
     const newPages = currentPages.includes(pageId)
@@ -186,15 +222,27 @@ export default function Admin() {
                   <div className="p-3 sm:p-4 border-t space-y-3">
                     <div className="flex items-center justify-between">
                       <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        disabled={user.role === 'admin' || user.role === 'superadmin'}
-                        onClick={() => deleteMutation.mutate(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" /> Delete
-                      </Button>
+                      <div className="flex gap-2">
+                        {isSuperAdmin && user.role !== 'superadmin' && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => openEditDialog(user)}
+                            data-testid={`button-edit-user-${user.id}`}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" /> Edit
+                          </Button>
+                        )}
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          disabled={user.role === 'admin' || user.role === 'superadmin'}
+                          onClick={() => deleteMutation.mutate(user.id)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="space-y-2">
@@ -226,6 +274,49 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+          </DialogHeader>
+          {editingUser && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={editingUser.name} disabled className="bg-muted" />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input value={editingUser.email} disabled className="bg-muted" />
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger data-testid="select-edit-role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wedding_planner">Wedding Planner</SelectItem>
+                    <SelectItem value="accountant">Accountant</SelectItem>
+                    <SelectItem value="employee">Employee</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                className="w-full" 
+                onClick={handleUpdateUser}
+                disabled={updateUserMutation.isPending}
+                data-testid="button-save-user"
+              >
+                {updateUserMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
