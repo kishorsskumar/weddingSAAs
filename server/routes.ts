@@ -889,5 +889,134 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Oak Book - Company Settings
+  app.get('/api/company-settings', async (req, res) => {
+    const settings = await storage.getCompanySettings();
+    res.json(settings);
+  });
+
+  app.patch('/api/company-settings', async (req, res) => {
+    try {
+      const settings = await storage.updateCompanySettings(req.body);
+      res.json(settings);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update company settings' });
+    }
+  });
+
+  // Oak Book - Document Sequences
+  app.get('/api/document-sequences', async (req, res) => {
+    const sequences = await storage.getAllDocumentSequences();
+    res.json(sequences);
+  });
+
+  app.get('/api/document-sequences/:type/next', async (req, res) => {
+    try {
+      const number = await storage.getNextDocumentNumber(req.params.type);
+      res.json({ number });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to get next document number' });
+    }
+  });
+
+  app.patch('/api/document-sequences/:type', async (req, res) => {
+    try {
+      const sequence = await storage.updateDocumentSequence(req.params.type, req.body);
+      res.json(sequence);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update document sequence' });
+    }
+  });
+
+  // Oak Book - Estimate Templates
+  app.get('/api/estimate-templates', async (req, res) => {
+    const templates = await storage.getAllEstimateTemplates();
+    res.json(templates);
+  });
+
+  app.get('/api/estimate-templates/:id', async (req, res) => {
+    const template = await storage.getEstimateTemplate(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  });
+
+  app.post('/api/estimate-templates', async (req, res) => {
+    try {
+      const template = await storage.createEstimateTemplate(req.body);
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create template' });
+    }
+  });
+
+  app.patch('/api/estimate-templates/:id', async (req, res) => {
+    try {
+      const template = await storage.updateEstimateTemplate(req.params.id, req.body);
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update template' });
+    }
+  });
+
+  app.delete('/api/estimate-templates/:id', async (req, res) => {
+    await storage.deleteEstimateTemplate(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Clone Estimate
+  app.post('/api/estimates/:id/clone', async (req, res) => {
+    try {
+      const cloned = await storage.cloneEstimate(req.params.id);
+      res.json(cloned);
+    } catch (error) {
+      console.error('Clone estimate error:', error);
+      res.status(400).json({ error: 'Failed to clone estimate' });
+    }
+  });
+
+  // Oak Book - Convert Estimate to Invoice (improved version using storage method)
+  app.post('/api/estimates/:id/convert-to-invoice', async (req, res) => {
+    try {
+      const invoice = await storage.convertEstimateToInvoice(req.params.id);
+      res.json(invoice);
+    } catch (error) {
+      console.error('Convert estimate error:', error);
+      res.status(400).json({ error: 'Failed to convert estimate to invoice' });
+    }
+  });
+
+  // Oak Book - Register Event from Invoice/Payment
+  app.post('/api/register-event-from-payment', async (req, res) => {
+    try {
+      const { customerId, invoiceId, eventTitle, eventDate, eventTime, eventType, venue, weddingPlannerName, salesValue, advancePayment } = req.body;
+      
+      const customer = customerId ? await storage.getCustomer(customerId) : null;
+      
+      const event = await storage.createEvent({
+        title: eventTitle,
+        date: eventDate,
+        time: eventTime || null,
+        type: eventType || 'wedding',
+        planner: weddingPlannerName || '',
+        customer: customer?.name || '',
+        venue: venue || '',
+        salesValue: salesValue || '0',
+        paymentReceived: advancePayment || '0',
+        cost: '0',
+      });
+
+      if (invoiceId) {
+        await storage.updateInvoice(invoiceId, { eventId: event.id });
+      }
+
+      res.json(event);
+    } catch (error) {
+      console.error('Register event error:', error);
+      res.status(400).json({ error: 'Failed to register event' });
+    }
+  });
+
   return httpServer;
 }

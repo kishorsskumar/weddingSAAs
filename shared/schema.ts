@@ -131,14 +131,16 @@ export const vendors = pgTable("vendors", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Line item type for estimates and invoices
+// Enhanced line item type for estimates and invoices (supports section headings)
 export const lineItemSchema = z.object({
+  slNo: z.number().optional(),
   name: z.string(),
   description: z.string().optional(),
   quantity: z.number(),
   rate: z.number(),
   taxRate: z.number().optional().default(0),
   total: z.number(),
+  isHeading: z.boolean().optional().default(false), // For section headers like "DAY 1: MEHANDI"
 });
 
 export type LineItem = z.infer<typeof lineItemSchema>;
@@ -146,18 +148,32 @@ export type LineItem = z.infer<typeof lineItemSchema>;
 // Oak Book - Estimates
 export const estimates = pgTable("estimates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  number: text("number").notNull().unique(), // EST-001
+  number: text("number").notNull().unique(), // QT-000968 or EST-001
   customerId: varchar("customer_id").references(() => customers.id),
   eventId: varchar("event_id").references(() => events.id),
   date: date("date").notNull(),
   dueDate: date("due_date"),
   status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'accepted' | 'declined' | 'converted'
+  // Enhanced fields
+  subject: text("subject"), // Event description like "Welcome party, Sangeet & Wedding on 14&15th Dec 2025"
+  weddingPlannerName: text("wedding_planner_name"), // Wedding planner name on top
+  customerAddress: text("customer_address"), // Full billing address block
+  // Line items with section headings support
   lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default('0'),
+  // Discount
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).default('0'),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).default('0'),
+  // Service charge with percentage
+  serviceChargePercent: decimal("service_charge_percent", { precision: 5, scale: 2 }).default('0'),
+  serviceChargeAmount: decimal("service_charge_amount", { precision: 12, scale: 2 }).default('0'),
   taxTotal: decimal("tax_total", { precision: 12, scale: 2 }).notNull().default('0'),
   total: decimal("total", { precision: 12, scale: 2 }).notNull().default('0'),
+  totalInWords: text("total_in_words"), // "Indian Rupee Nine Lakh Four Thousand..."
   notes: text("notes"),
   terms: text("terms"),
+  thankYouMessage: text("thank_you_message"), // Thank you message
+  signature: text("signature"), // Signature image URL or base64
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -171,13 +187,24 @@ export const invoices = pgTable("invoices", {
   date: date("date").notNull(),
   dueDate: date("due_date"),
   status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
+  // Enhanced fields (same as estimates)
+  subject: text("subject"),
+  weddingPlannerName: text("wedding_planner_name"),
+  customerAddress: text("customer_address"),
   lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default('0'),
+  discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).default('0'),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).default('0'),
+  serviceChargePercent: decimal("service_charge_percent", { precision: 5, scale: 2 }).default('0'),
+  serviceChargeAmount: decimal("service_charge_amount", { precision: 12, scale: 2 }).default('0'),
   taxTotal: decimal("tax_total", { precision: 12, scale: 2 }).notNull().default('0'),
   total: decimal("total", { precision: 12, scale: 2 }).notNull().default('0'),
+  totalInWords: text("total_in_words"),
   balanceDue: decimal("balance_due", { precision: 12, scale: 2 }).notNull().default('0'),
   notes: text("notes"),
   terms: text("terms"),
+  thankYouMessage: text("thank_you_message"),
+  signature: text("signature"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -233,6 +260,42 @@ export const vendorPayments = pgTable("vendor_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Oak Book - Company Settings (for estimate/invoice header)
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull().default('Oakstreet Events'),
+  address: text("address").default('2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'),
+  phone: text("phone").default('7902373354'),
+  email: text("email").default('oakstreetevents18@gmail.com'),
+  website: text("website").default('www.oakstreetevents.com'),
+  logo: text("logo"), // URL or base64
+  gstNumber: text("gst_number"),
+  defaultTerms: text("default_terms"),
+  defaultThankYouMessage: text("default_thank_you_message").default('Looking forward for your business.'),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Oak Book - Document Number Sequences (for auto-numbering)
+export const documentSequences = pgTable("document_sequences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  documentType: text("document_type").notNull().unique(), // 'estimate' | 'invoice' | 'receipt' | 'expense' | 'vendor_payment'
+  prefix: text("prefix").notNull(), // 'QT-', 'INV-', 'REC-', etc.
+  nextNumber: integer("next_number").notNull().default(1),
+  paddingLength: integer("padding_length").notNull().default(6), // For QT-000001
+});
+
+// Oak Book - Estimate Templates (for sample templates)
+export const estimateTemplates = pgTable("estimate_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
+  terms: text("terms"),
+  thankYouMessage: text("thank_you_message"),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   permissions: many(userPermissions),
@@ -280,6 +343,11 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertCustomerPaymentSchema = createInsertSchema(customerPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertVendorPaymentSchema = createInsertSchema(vendorPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true, updatedAt: true });
+export const insertDocumentSequenceSchema = createInsertSchema(documentSequences).omit({ id: true });
+export const insertEstimateTemplateSchema = createInsertSchema(estimateTemplates).omit({ id: true, createdAt: true }).extend({
+  lineItems: z.array(lineItemSchema).optional().default([]),
+});
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -333,3 +401,12 @@ export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 
 export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type InsertVendorPayment = z.infer<typeof insertVendorPaymentSchema>;
+
+export type CompanySettings = typeof companySettings.$inferSelect;
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+
+export type DocumentSequence = typeof documentSequences.$inferSelect;
+export type InsertDocumentSequence = z.infer<typeof insertDocumentSequenceSchema>;
+
+export type EstimateTemplate = typeof estimateTemplates.$inferSelect;
+export type InsertEstimateTemplate = z.infer<typeof insertEstimateTemplateSchema>;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { 
   Plus, 
   FileText, 
@@ -20,10 +22,21 @@ import {
   Building2, 
   ShoppingCart,
   Trash2,
+  Copy,
   ArrowRight,
   IndianRupee,
-  X
+  X,
+  Home,
+  Package,
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  Edit,
+  Eye,
+  Calendar,
+  Download
 } from "lucide-react";
+import logo from "@assets/oakstreet_white_1764858814551.png";
 
 type Customer = {
   id: string;
@@ -45,12 +58,14 @@ type Vendor = {
 };
 
 type LineItem = {
+  slNo?: number;
   name: string;
   description?: string;
   quantity: number;
   rate: number;
   taxRate?: number;
   total: number;
+  isHeading?: boolean;
 };
 
 type Estimate = {
@@ -61,12 +76,22 @@ type Estimate = {
   date: string;
   dueDate: string | null;
   status: string;
+  subject: string | null;
+  weddingPlannerName: string | null;
+  customerAddress: string | null;
   lineItems: LineItem[];
   subtotal: string;
+  discountPercent: string | null;
+  discountAmount: string | null;
+  serviceChargePercent: string | null;
+  serviceChargeAmount: string | null;
   taxTotal: string;
   total: string;
+  totalInWords: string | null;
   notes: string | null;
   terms: string | null;
+  thankYouMessage: string | null;
+  signature: string | null;
 };
 
 type Invoice = {
@@ -78,13 +103,23 @@ type Invoice = {
   date: string;
   dueDate: string | null;
   status: string;
+  subject: string | null;
+  weddingPlannerName: string | null;
+  customerAddress: string | null;
   lineItems: LineItem[];
   subtotal: string;
+  discountPercent: string | null;
+  discountAmount: string | null;
+  serviceChargePercent: string | null;
+  serviceChargeAmount: string | null;
   taxTotal: string;
   total: string;
+  totalInWords: string | null;
   balanceDue: string;
   notes: string | null;
   terms: string | null;
+  thankYouMessage: string | null;
+  signature: string | null;
 };
 
 type CustomerPayment = {
@@ -143,20 +178,23 @@ type Bank = {
   balance: string;
 };
 
+type CompanySettings = {
+  id: string;
+  companyName: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  logo: string | null;
+  gstNumber: string | null;
+  defaultTerms: string | null;
+  defaultThankYouMessage: string | null;
+};
+
 const EXPENSE_CATEGORIES = [
-  "Catering",
-  "Decoration",
-  "Photography",
-  "Videography",
-  "Venue",
-  "Entertainment",
-  "Travel",
-  "Accommodation",
-  "Printing",
-  "Flowers",
-  "Rentals",
-  "Staff",
-  "Other"
+  "Catering", "Decoration", "Photography", "Videography", "Venue",
+  "Entertainment", "Travel", "Accommodation", "Printing", "Flowers",
+  "Rentals", "Staff", "Other"
 ];
 
 const PAYMENT_MODES = [
@@ -167,966 +205,837 @@ const PAYMENT_MODES = [
   { value: "card", label: "Card" },
 ];
 
+const DEFAULT_TERMS = `1. Any other additional facilities & Services to support the event will be charged at actual
+2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.
+3. The venue is to be made available 1 day prior to the setup.
+4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client
+5. Any Damage that occurred to our materials by participants will be charged at the actual.
+6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.
+7. All items mentioned above are on a rental basis for this event only
+8. 18% GST will be extra.
+9. Public Performance License (PPL), Entertainment License may come additional at actual
+10. Genset fuel rates will be at actual.
+11. KSEB or electrical charges may come additional at actual.`;
+
+function numberToWords(num: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+    'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  if (num === 0) return 'Zero';
+  if (num < 0) return 'Negative ' + numberToWords(-num);
+
+  let words = '';
+
+  if (Math.floor(num / 10000000) > 0) {
+    words += numberToWords(Math.floor(num / 10000000)) + ' Crore ';
+    num %= 10000000;
+  }
+
+  if (Math.floor(num / 100000) > 0) {
+    words += numberToWords(Math.floor(num / 100000)) + ' Lakh ';
+    num %= 100000;
+  }
+
+  if (Math.floor(num / 1000) > 0) {
+    words += numberToWords(Math.floor(num / 1000)) + ' Thousand ';
+    num %= 1000;
+  }
+
+  if (Math.floor(num / 100) > 0) {
+    words += numberToWords(Math.floor(num / 100)) + ' Hundred ';
+    num %= 100;
+  }
+
+  if (num > 0) {
+    if (num < 20) {
+      words += ones[num];
+    } else {
+      words += tens[Math.floor(num / 10)];
+      if (num % 10 > 0) {
+        words += ' ' + ones[num % 10];
+      }
+    }
+  }
+
+  return words.trim();
+}
+
+function formatIndianCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
 export default function OakBook() {
-  const [activeTab, setActiveTab] = useState("sales");
-  const [salesSubTab, setSalesSubTab] = useState("estimates");
-  const [purchaseSubTab, setPurchaseSubTab] = useState("vendors");
+  const [activeSection, setActiveSection] = useState("home");
+  const [salesExpanded, setSalesExpanded] = useState(true);
+  const [purchasesExpanded, setPurchasesExpanded] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/customers"],
-  });
+  const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/customers"] });
+  const { data: vendors = [] } = useQuery<Vendor[]>({ queryKey: ["/api/vendors"] });
+  const { data: estimates = [] } = useQuery<Estimate[]>({ queryKey: ["/api/estimates"] });
+  const { data: invoices = [] } = useQuery<Invoice[]>({ queryKey: ["/api/invoices"] });
+  const { data: customerPayments = [] } = useQuery<CustomerPayment[]>({ queryKey: ["/api/customer-payments"] });
+  const { data: expenses = [] } = useQuery<Expense[]>({ queryKey: ["/api/expenses"] });
+  const { data: vendorPayments = [] } = useQuery<VendorPayment[]>({ queryKey: ["/api/vendor-payments"] });
+  const { data: events = [] } = useQuery<Event[]>({ queryKey: ["/api/events"] });
+  const { data: banks = [] } = useQuery<Bank[]>({ queryKey: ["/api/banks"] });
+  const { data: companySettings } = useQuery<CompanySettings>({ queryKey: ["/api/company-settings"] });
 
-  const { data: vendors = [] } = useQuery<Vendor[]>({
-    queryKey: ["/api/vendors"],
-  });
+  const getCustomerName = (id: string | null) => customers.find(c => c.id === id)?.name || "—";
+  const getVendorName = (id: string | null) => vendors.find(v => v.id === id)?.name || "—";
 
-  const { data: estimates = [] } = useQuery<Estimate[]>({
-    queryKey: ["/api/estimates"],
-  });
+  const menuItems = [
+    { id: "home", label: "Home", icon: Home },
+    { id: "items", label: "Items", icon: Package },
+  ];
 
-  const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
-  });
+  const salesItems = [
+    { id: "customers", label: "Customers" },
+    { id: "quotes", label: "Quotes" },
+    { id: "invoices", label: "Invoices" },
+    { id: "payments-received", label: "Payments Received" },
+  ];
 
-  const { data: customerPayments = [] } = useQuery<CustomerPayment[]>({
-    queryKey: ["/api/customer-payments"],
-  });
-
-  const { data: expenses = [] } = useQuery<Expense[]>({
-    queryKey: ["/api/expenses"],
-  });
-
-  const { data: vendorPayments = [] } = useQuery<VendorPayment[]>({
-    queryKey: ["/api/vendor-payments"],
-  });
-
-  const { data: events = [] } = useQuery<Event[]>({
-    queryKey: ["/api/events"],
-  });
-
-  const { data: banks = [] } = useQuery<Bank[]>({
-    queryKey: ["/api/banks"],
-  });
-
-  const getCustomerName = (id: string | null) => {
-    if (!id) return "—";
-    const customer = customers.find(c => c.id === id);
-    return customer?.name || "—";
-  };
-
-  const getVendorName = (id: string | null) => {
-    if (!id) return "—";
-    const vendor = vendors.find(v => v.id === id);
-    return vendor?.name || "—";
-  };
-
-  const getEventTitle = (id: string | null) => {
-    if (!id) return "—";
-    const event = events.find(e => e.id === id);
-    return event?.title || "—";
-  };
-
-  const getBankName = (id: string | null) => {
-    if (!id) return "—";
-    const bank = banks.find(b => b.id === id);
-    return bank?.name || "—";
-  };
-
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: "bg-gray-100 text-gray-800",
-      sent: "bg-blue-100 text-blue-800",
-      accepted: "bg-green-100 text-green-800",
-      declined: "bg-red-100 text-red-800",
-      converted: "bg-purple-100 text-purple-800",
-      partial: "bg-yellow-100 text-yellow-800",
-      paid: "bg-green-100 text-green-800",
-      overdue: "bg-red-100 text-red-800",
-      recorded: "bg-gray-100 text-gray-800",
-    };
-    return <Badge className={colors[status] || "bg-gray-100"}>{status}</Badge>;
-  };
+  const purchaseItems = [
+    { id: "vendors", label: "Vendors" },
+    { id: "expenses", label: "Expenses" },
+    { id: "vendor-payments", label: "Vendor Payments" },
+  ];
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Oak Book</h1>
+    <div className="flex h-[calc(100vh-4rem)] -m-4 sm:-m-6">
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-50 border-r flex-shrink-0 hidden md:block">
+        <div className="p-4 border-b">
+          <h2 className="font-semibold text-lg text-primary">Oak Book</h2>
+          <p className="text-xs text-muted-foreground">Accounting & Invoicing</p>
+        </div>
+        <ScrollArea className="h-[calc(100%-5rem)]">
+          <div className="p-2 space-y-1">
+            {menuItems.map((item) => (
+              <Button
+                key={item.id}
+                variant={activeSection === item.id ? "secondary" : "ghost"}
+                className="w-full justify-start gap-2"
+                onClick={() => setActiveSection(item.id)}
+                data-testid={`nav-${item.id}`}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </Button>
+            ))}
+
+            {/* Sales Section */}
+            <div>
+              <Button
+                variant="ghost"
+                className="w-full justify-between"
+                onClick={() => setSalesExpanded(!salesExpanded)}
+              >
+                <span className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4" />
+                  Sales
+                </span>
+                {salesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+              {salesExpanded && (
+                <div className="ml-6 space-y-1">
+                  {salesItems.map((item) => (
+                    <Button
+                      key={item.id}
+                      variant={activeSection === item.id ? "secondary" : "ghost"}
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setActiveSection(item.id)}
+                      data-testid={`nav-${item.id}`}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Purchases Section */}
+            <div>
+              <Button
+                variant="ghost"
+                className="w-full justify-between"
+                onClick={() => setPurchasesExpanded(!purchasesExpanded)}
+              >
+                <span className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4" />
+                  Purchases
+                </span>
+                {purchasesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+              {purchasesExpanded && (
+                <div className="ml-6 space-y-1">
+                  {purchaseItems.map((item) => (
+                    <Button
+                      key={item.id}
+                      variant={activeSection === item.id ? "secondary" : "ghost"}
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => setActiveSection(item.id)}
+                      data-testid={`nav-${item.id}`}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Separator className="my-2" />
+            <Button
+              variant={activeSection === "settings" ? "secondary" : "ghost"}
+              className="w-full justify-start gap-2"
+              onClick={() => setActiveSection("settings")}
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </Button>
+          </div>
+        </ScrollArea>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="sales" className="gap-2">
-            <Receipt className="h-4 w-4" />
-            Sales
-          </TabsTrigger>
-          <TabsTrigger value="purchases" className="gap-2">
+      {/* Mobile Navigation */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 p-2">
+        <div className="flex justify-around">
+          <Button variant={activeSection === "home" ? "secondary" : "ghost"} size="sm" onClick={() => setActiveSection("home")}>
+            <Home className="h-4 w-4" />
+          </Button>
+          <Button variant={["customers", "quotes", "invoices", "payments-received"].includes(activeSection) ? "secondary" : "ghost"} size="sm" onClick={() => setActiveSection("quotes")}>
             <ShoppingCart className="h-4 w-4" />
-            Purchases
-          </TabsTrigger>
-        </TabsList>
+          </Button>
+          <Button variant={["vendors", "expenses", "vendor-payments"].includes(activeSection) ? "secondary" : "ghost"} size="sm" onClick={() => setActiveSection("expenses")}>
+            <Receipt className="h-4 w-4" />
+          </Button>
+          <Button variant={activeSection === "settings" ? "secondary" : "ghost"} size="sm" onClick={() => setActiveSection("settings")}>
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
 
-        <TabsContent value="sales" className="mt-4">
-          <SalesSection 
-            subTab={salesSubTab}
-            setSubTab={setSalesSubTab}
-            customers={customers}
-            estimates={estimates}
-            invoices={invoices}
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        {activeSection === "home" && (
+          <HomeSection 
+            estimates={estimates} 
+            invoices={invoices} 
             customerPayments={customerPayments}
-            events={events}
-            banks={banks}
-            getCustomerName={getCustomerName}
-            getEventTitle={getEventTitle}
-            getBankName={getBankName}
-            formatCurrency={formatCurrency}
-            getStatusBadge={getStatusBadge}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
-
-        <TabsContent value="purchases" className="mt-4">
-          <PurchaseSection
-            subTab={purchaseSubTab}
-            setSubTab={setPurchaseSubTab}
-            vendors={vendors}
             expenses={expenses}
-            vendorPayments={vendorPayments}
-            events={events}
-            banks={banks}
-            getVendorName={getVendorName}
-            getEventTitle={getEventTitle}
-            getBankName={getBankName}
-            formatCurrency={formatCurrency}
-            getStatusBadge={getStatusBadge}
-            queryClient={queryClient}
-            toast={toast}
+            customers={customers}
           />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-function SalesSection({ 
-  subTab, 
-  setSubTab, 
-  customers, 
-  estimates, 
-  invoices, 
-  customerPayments,
-  events,
-  banks,
-  getCustomerName,
-  getEventTitle,
-  getBankName,
-  formatCurrency,
-  getStatusBadge,
-  queryClient,
-  toast,
-}: any) {
-  const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
-  const [estimateDialogOpen, setEstimateDialogOpen] = useState(false);
-  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-
-  return (
-    <div className="space-y-4">
-      <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="flex flex-wrap gap-1">
-          <TabsTrigger value="customers" className="gap-1 text-xs sm:text-sm">
-            <Users className="h-3 w-3 sm:h-4 sm:w-4" />
-            Customers
-          </TabsTrigger>
-          <TabsTrigger value="estimates" className="gap-1 text-xs sm:text-sm">
-            <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-            Estimates
-          </TabsTrigger>
-          <TabsTrigger value="invoices" className="gap-1 text-xs sm:text-sm">
-            <Receipt className="h-3 w-3 sm:h-4 sm:w-4" />
-            Invoices
-          </TabsTrigger>
-          <TabsTrigger value="receipts" className="gap-1 text-xs sm:text-sm">
-            <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-            Receipts
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="customers" className="mt-4">
-          <CustomersTab 
+        )}
+        {activeSection === "customers" && (
+          <CustomersSection customers={customers} queryClient={queryClient} toast={toast} />
+        )}
+        {activeSection === "quotes" && (
+          <QuotesSection 
+            estimates={estimates} 
             customers={customers} 
-            dialogOpen={customerDialogOpen}
-            setDialogOpen={setCustomerDialogOpen}
-            queryClient={queryClient}
-            toast={toast}
+            companySettings={companySettings}
+            queryClient={queryClient} 
+            toast={toast} 
           />
-        </TabsContent>
-
-        <TabsContent value="estimates" className="mt-4">
-          <EstimatesTab
-            estimates={estimates}
+        )}
+        {activeSection === "invoices" && (
+          <InvoicesSection 
+            invoices={invoices} 
             customers={customers}
-            events={events}
-            dialogOpen={estimateDialogOpen}
-            setDialogOpen={setEstimateDialogOpen}
-            getCustomerName={getCustomerName}
-            getEventTitle={getEventTitle}
-            formatCurrency={formatCurrency}
-            getStatusBadge={getStatusBadge}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
-
-        <TabsContent value="invoices" className="mt-4">
-          <InvoicesTab
-            invoices={invoices}
-            customers={customers}
-            events={events}
-            dialogOpen={invoiceDialogOpen}
-            setDialogOpen={setInvoiceDialogOpen}
-            getCustomerName={getCustomerName}
-            getEventTitle={getEventTitle}
-            formatCurrency={formatCurrency}
-            getStatusBadge={getStatusBadge}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
-
-        <TabsContent value="receipts" className="mt-4">
-          <ReceiptsTab
-            payments={customerPayments}
-            customers={customers}
-            invoices={invoices}
-            events={events}
             banks={banks}
-            dialogOpen={paymentDialogOpen}
-            setDialogOpen={setPaymentDialogOpen}
-            getCustomerName={getCustomerName}
-            getEventTitle={getEventTitle}
-            getBankName={getBankName}
-            formatCurrency={formatCurrency}
-            queryClient={queryClient}
-            toast={toast}
+            queryClient={queryClient} 
+            toast={toast} 
           />
-        </TabsContent>
-      </Tabs>
+        )}
+        {activeSection === "payments-received" && (
+          <PaymentsReceivedSection 
+            payments={customerPayments} 
+            customers={customers}
+            invoices={invoices}
+            banks={banks}
+            queryClient={queryClient} 
+            toast={toast} 
+          />
+        )}
+        {activeSection === "vendors" && (
+          <VendorsSection vendors={vendors} queryClient={queryClient} toast={toast} />
+        )}
+        {activeSection === "expenses" && (
+          <ExpensesSection 
+            expenses={expenses} 
+            vendors={vendors}
+            banks={banks}
+            queryClient={queryClient} 
+            toast={toast} 
+          />
+        )}
+        {activeSection === "vendor-payments" && (
+          <VendorPaymentsSection 
+            payments={vendorPayments} 
+            vendors={vendors}
+            expenses={expenses}
+            banks={banks}
+            queryClient={queryClient} 
+            toast={toast} 
+          />
+        )}
+        {activeSection === "settings" && (
+          <SettingsSection companySettings={companySettings} queryClient={queryClient} toast={toast} />
+        )}
+      </div>
     </div>
   );
 }
 
-function PurchaseSection({
-  subTab,
-  setSubTab,
-  vendors,
-  expenses,
-  vendorPayments,
-  events,
-  banks,
-  getVendorName,
-  getEventTitle,
-  getBankName,
-  formatCurrency,
-  getStatusBadge,
-  queryClient,
-  toast,
-}: any) {
-  const [vendorDialogOpen, setVendorDialogOpen] = useState(false);
-  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+function HomeSection({ estimates, invoices, customerPayments, expenses, customers }: any) {
+  const totalEstimates = estimates.length;
+  const totalInvoices = invoices.length;
+  const totalPaymentsReceived = customerPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount || '0'), 0);
+  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + parseFloat(e.total || '0'), 0);
+  const pendingInvoices = invoices.filter((i: any) => parseFloat(i.balanceDue || '0') > 0).length;
 
   return (
-    <div className="space-y-4">
-      <Tabs value={subTab} onValueChange={setSubTab}>
-        <TabsList className="flex flex-wrap gap-1">
-          <TabsTrigger value="vendors" className="gap-1 text-xs sm:text-sm">
-            <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-            Vendors
-          </TabsTrigger>
-          <TabsTrigger value="expenses" className="gap-1 text-xs sm:text-sm">
-            <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4" />
-            Expenses
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="gap-1 text-xs sm:text-sm">
-            <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-            Vendor Payments
-          </TabsTrigger>
-        </TabsList>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-primary">Welcome to Oak Book</h1>
+        <p className="text-muted-foreground">Your accounting and invoicing dashboard</p>
+      </div>
 
-        <TabsContent value="vendors" className="mt-4">
-          <VendorsTab
-            vendors={vendors}
-            dialogOpen={vendorDialogOpen}
-            setDialogOpen={setVendorDialogOpen}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Quotes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalEstimates}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalInvoices}</div>
+            <p className="text-xs text-muted-foreground">{pendingInvoices} pending</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Payments Received</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{formatIndianCurrency(totalPaymentsReceived)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{formatIndianCurrency(totalExpenses)}</div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <TabsContent value="expenses" className="mt-4">
-          <ExpensesTab
-            expenses={expenses}
-            vendors={vendors}
-            events={events}
-            banks={banks}
-            dialogOpen={expenseDialogOpen}
-            setDialogOpen={setExpenseDialogOpen}
-            getVendorName={getVendorName}
-            getEventTitle={getEventTitle}
-            getBankName={getBankName}
-            formatCurrency={formatCurrency}
-            getStatusBadge={getStatusBadge}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Recent Quotes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {estimates.slice(0, 5).map((est: Estimate) => (
+              <div key={est.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                <div>
+                  <p className="font-medium">{est.number}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {est.customerId ? customers.find((c: Customer) => c.id === est.customerId)?.name : 'No customer'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{formatIndianCurrency(parseFloat(est.total))}</p>
+                  <Badge variant={est.status === 'accepted' ? 'default' : 'secondary'}>{est.status}</Badge>
+                </div>
+              </div>
+            ))}
+            {estimates.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">No quotes yet</p>
+            )}
+          </CardContent>
+        </Card>
 
-        <TabsContent value="payments" className="mt-4">
-          <VendorPaymentsTab
-            payments={vendorPayments}
-            vendors={vendors}
-            expenses={expenses}
-            events={events}
-            banks={banks}
-            dialogOpen={paymentDialogOpen}
-            setDialogOpen={setPaymentDialogOpen}
-            getVendorName={getVendorName}
-            getEventTitle={getEventTitle}
-            getBankName={getBankName}
-            formatCurrency={formatCurrency}
-            queryClient={queryClient}
-            toast={toast}
-          />
-        </TabsContent>
-      </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Recent Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {invoices.slice(0, 5).map((inv: Invoice) => (
+              <div key={inv.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                <div>
+                  <p className="font-medium">{inv.number}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {inv.customerId ? customers.find((c: Customer) => c.id === inv.customerId)?.name : 'No customer'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-medium">{formatIndianCurrency(parseFloat(inv.total))}</p>
+                  <Badge variant={inv.status === 'paid' ? 'default' : 'secondary'}>{inv.status}</Badge>
+                </div>
+              </div>
+            ))}
+            {invoices.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">No invoices yet</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
 
-function CustomersTab({ customers, dialogOpen, setDialogOpen, queryClient, toast }: any) {
+function CustomersSection({ customers, queryClient, toast }: any) {
+  const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    gstNumber: "",
-    billingAddress: "",
+    name: '', email: '', phone: '', gstNumber: '', billingAddress: ''
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create customer");
+      if (!res.ok) throw new Error('Failed to create customer');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      setDialogOpen(false);
-      setFormData({ name: "", email: "", phone: "", gstNumber: "", billingAddress: "" });
-      toast({ title: "Customer created successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers'] });
+      setIsOpen(false);
+      setFormData({ name: '', email: '', phone: '', gstNumber: '', billingAddress: '' });
+      toast({ title: 'Customer created successfully' });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete customer");
+      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete customer');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-      toast({ title: "Customer deleted" });
+      queryClient.invalidateQueries({ queryKey: ['/api/customers'] });
+      toast({ title: 'Customer deleted' });
     },
   });
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Customers</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Customers</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Add Customer
-            </Button>
+            <Button data-testid="button-add-customer"><Plus className="h-4 w-4 mr-2" /> New Customer</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Customer</DialogTitle>
             </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
-              <div className="space-y-2">
+            <div className="space-y-4">
+              <div>
                 <Label>Name *</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
+                <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} data-testid="input-customer-name" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
               </div>
-              <div className="space-y-2">
+              <div>
+                <Label>Phone</Label>
+                <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              </div>
+              <div>
                 <Label>GST Number</Label>
-                <Input value={formData.gstNumber} onChange={(e) => setFormData({...formData, gstNumber: e.target.value})} />
+                <Input value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
               </div>
-              <div className="space-y-2">
+              <div>
                 <Label>Billing Address</Label>
-                <Textarea value={formData.billingAddress} onChange={(e) => setFormData({...formData, billingAddress: e.target.value})} />
+                <Textarea value={formData.billingAddress} onChange={e => setFormData({...formData, billingAddress: e.target.value})} />
               </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create Customer"}
+              <Button onClick={() => createMutation.mutate(formData)} disabled={!formData.name || createMutation.isPending} className="w-full">
+                {createMutation.isPending ? 'Creating...' : 'Create Customer'}
               </Button>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
-      </CardHeader>
-      <CardContent>
-        {customers.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No customers yet. Add your first customer.</p>
-        ) : (
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Name</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Email</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Phone</th>
-                  <th className="text-left py-2 px-2 hidden md:table-cell">GST</th>
-                  <th className="py-2 px-2 w-10"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Name</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Email</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Phone</th>
+                  <th className="text-right p-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {customers.map((customer: Customer) => (
-                  <tr key={customer.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{customer.name}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{customer.email || "—"}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{customer.phone || "—"}</td>
-                    <td className="py-2 px-2 hidden md:table-cell">{customer.gstNumber || "—"}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(customer.id)}>
+                  <tr key={customer.id} className="border-t" data-testid={`row-customer-${customer.id}`}>
+                    <td className="p-3">
+                      <div className="font-medium">{customer.name}</div>
+                      <div className="text-sm text-muted-foreground md:hidden">{customer.email}</div>
+                    </td>
+                    <td className="p-3 hidden md:table-cell">{customer.email || '—'}</td>
+                    <td className="p-3 hidden md:table-cell">{customer.phone || '—'}</td>
+                    <td className="p-3 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(customer.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </td>
                   </tr>
                 ))}
+                {customers.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                      No customers yet. Click "New Customer" to add one.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function VendorsTab({ vendors, dialogOpen, setDialogOpen, queryClient, toast }: any) {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    gstNumber: "",
-    category: "",
-    billingAddress: "",
-  });
+function QuotesSection({ estimates, customers, companySettings, queryClient, toast }: any) {
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null);
 
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await fetch("/api/vendors", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to create vendor");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      setDialogOpen(false);
-      setFormData({ name: "", email: "", phone: "", gstNumber: "", category: "", billingAddress: "" });
-      toast({ title: "Vendor created successfully" });
-    },
-  });
-
-  const deleteMutation = useMutation({
+  const cloneMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/vendors/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete vendor");
+      const res = await fetch(`/api/estimates/${id}/clone`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to clone');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendors"] });
-      toast({ title: "Vendor deleted" });
-    },
-  });
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Vendors</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Add Vendor
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Vendor</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(formData); }} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name *</Label>
-                <Input value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>GST Number</Label>
-                  <Input value={formData.gstNumber} onChange={(e) => setFormData({...formData, gstNumber: e.target.value})} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Billing Address</Label>
-                <Textarea value={formData.billingAddress} onChange={(e) => setFormData({...formData, billingAddress: e.target.value})} />
-              </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create Vendor"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        {vendors.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No vendors yet. Add your first vendor.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Name</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Category</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Phone</th>
-                  <th className="text-left py-2 px-2 hidden md:table-cell">GST</th>
-                  <th className="py-2 px-2 w-10"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendors.map((vendor: Vendor) => (
-                  <tr key={vendor.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{vendor.name}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{vendor.category || "—"}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{vendor.phone || "—"}</td>
-                    <td className="py-2 px-2 hidden md:table-cell">{vendor.gstNumber || "—"}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(vendor.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function EstimatesTab({ estimates, customers, events, dialogOpen, setDialogOpen, getCustomerName, getEventTitle, formatCurrency, getStatusBadge, queryClient, toast }: any) {
-  const [formData, setFormData] = useState({
-    customerId: "",
-    eventId: "",
-    date: new Date().toISOString().split('T')[0],
-    dueDate: "",
-    notes: "",
-    terms: "",
-  });
-  const [lineItems, setLineItems] = useState<LineItem[]>([{ name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
-
-  const addLineItem = () => {
-    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
-  };
-
-  const removeLineItem = (index: number) => {
-    setLineItems(lineItems.filter((_, i) => i !== index));
-  };
-
-  const updateLineItem = (index: number, field: string, value: any) => {
-    const updated = [...lineItems];
-    (updated[index] as any)[field] = value;
-    const item = updated[index];
-    item.total = item.quantity * item.rate * (1 + (item.taxRate || 0) / 100);
-    setLineItems(updated);
-  };
-
-  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-  const taxTotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.rate * (item.taxRate || 0) / 100), 0);
-  const total = subtotal + taxTotal;
-
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const numRes = await fetch("/api/estimates/next-number");
-      const { number } = await numRes.json();
-      const res = await fetch("/api/estimates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, number }),
-      });
-      if (!res.ok) throw new Error("Failed to create estimate");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      setDialogOpen(false);
-      setFormData({ customerId: "", eventId: "", date: new Date().toISOString().split('T')[0], dueDate: "", notes: "", terms: "" });
-      setLineItems([{ name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
-      toast({ title: "Estimate created successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/estimates'] });
+      toast({ title: 'Quote cloned successfully' });
     },
   });
 
   const convertMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/estimates/${id}/convert`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to convert estimate");
+      const res = await fetch(`/api/estimates/${id}/convert-to-invoice`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to convert');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Estimate converted to Invoice" });
+      queryClient.invalidateQueries({ queryKey: ['/api/estimates'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      toast({ title: 'Quote converted to invoice successfully' });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/estimates/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete estimate");
+      const res = await fetch(`/api/estimates/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
-      toast({ title: "Estimate deleted" });
+      queryClient.invalidateQueries({ queryKey: ['/api/estimates'] });
+      toast({ title: 'Quote deleted' });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const validItems = lineItems.filter(item => item.name && item.rate > 0);
-    createMutation.mutate({
-      ...formData,
-      customerId: formData.customerId || null,
-      eventId: formData.eventId || null,
-      lineItems: validItems,
-      subtotal: subtotal.toString(),
-      taxTotal: taxTotal.toString(),
-      total: total.toString(),
-    });
-  };
-
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Estimates</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> New Estimate
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create Estimate</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Customer</Label>
-                  <Select value={formData.customerId} onValueChange={(v) => setFormData({...formData, customerId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c: Customer) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Event</Label>
-                  <Select value={formData.eventId} onValueChange={(v) => setFormData({...formData, eventId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select event" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {events.map((e: Event) => (
-                        <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date *</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valid Until</Label>
-                  <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} />
-                </div>
-              </div>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Quotes</h1>
+        <Button onClick={() => setIsCreateOpen(true)} data-testid="button-add-quote">
+          <Plus className="h-4 w-4 mr-2" /> New Quote
+        </Button>
+      </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Line Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  {lineItems.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                      <Input 
-                        className="col-span-4" 
-                        placeholder="Item name" 
-                        value={item.name} 
-                        onChange={(e) => updateLineItem(index, 'name', e.target.value)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Qty" 
-                        value={item.quantity} 
-                        onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Rate" 
-                        value={item.rate} 
-                        onChange={(e) => updateLineItem(index, 'rate', parseFloat(e.target.value) || 0)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Tax %" 
-                        value={item.taxRate || 0} 
-                        onChange={(e) => updateLineItem(index, 'taxRate', parseFloat(e.target.value) || 0)} 
-                      />
-                      <div className="col-span-1 text-right text-sm font-medium">
-                        {formatCurrency(item.total)}
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" className="col-span-1 h-8 w-8" onClick={() => removeLineItem(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="border-t pt-4 space-y-1 text-right">
-                <p className="text-sm">Subtotal: {formatCurrency(subtotal)}</p>
-                <p className="text-sm">Tax: {formatCurrency(taxTotal)}</p>
-                <p className="text-lg font-bold">Total: {formatCurrency(total)}</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create Estimate"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        {estimates.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No estimates yet. Create your first estimate.</p>
-        ) : (
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Number</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Customer</th>
-                  <th className="text-left py-2 px-2 hidden md:table-cell">Event</th>
-                  <th className="text-left py-2 px-2">Date</th>
-                  <th className="text-right py-2 px-2">Total</th>
-                  <th className="text-center py-2 px-2">Status</th>
-                  <th className="py-2 px-2 w-20"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Quote #</th>
+                  <th className="text-left p-3 font-medium">Customer</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Date</th>
+                  <th className="text-right p-3 font-medium">Amount</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-right p-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {estimates.map((estimate: Estimate) => (
-                  <tr key={estimate.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{estimate.number}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{getCustomerName(estimate.customerId)}</td>
-                    <td className="py-2 px-2 hidden md:table-cell text-xs">{getEventTitle(estimate.eventId)}</td>
-                    <td className="py-2 px-2">{format(new Date(estimate.date), "dd/MM/yy")}</td>
-                    <td className="py-2 px-2 text-right font-medium">{formatCurrency(estimate.total)}</td>
-                    <td className="py-2 px-2 text-center">{getStatusBadge(estimate.status)}</td>
-                    <td className="py-2 px-2">
-                      <div className="flex gap-1">
+                  <tr key={estimate.id} className="border-t" data-testid={`row-quote-${estimate.id}`}>
+                    <td className="p-3 font-medium">{estimate.number}</td>
+                    <td className="p-3">
+                      {estimate.customerId ? customers.find((c: Customer) => c.id === estimate.customerId)?.name : '—'}
+                    </td>
+                    <td className="p-3 hidden md:table-cell">{format(new Date(estimate.date), 'dd/MM/yyyy')}</td>
+                    <td className="p-3 text-right font-medium">{formatIndianCurrency(parseFloat(estimate.total))}</td>
+                    <td className="p-3 text-center">
+                      <Badge variant={estimate.status === 'accepted' ? 'default' : estimate.status === 'converted' ? 'secondary' : 'outline'}>
+                        {estimate.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => { setSelectedEstimate(estimate); setIsViewOpen(true); }}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => cloneMutation.mutate(estimate.id)}>
+                          <Copy className="h-4 w-4" />
+                        </Button>
                         {estimate.status !== 'converted' && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => convertMutation.mutate(estimate.id)} title="Convert to Invoice">
-                            <ArrowRight className="h-4 w-4 text-primary" />
+                          <Button variant="ghost" size="sm" onClick={() => convertMutation.mutate(estimate.id)}>
+                            <ArrowRight className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(estimate.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(estimate.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {estimates.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      No quotes yet. Click "New Quote" to create one.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <CreateQuoteDialog 
+        open={isCreateOpen} 
+        onOpenChange={setIsCreateOpen}
+        customers={customers}
+        companySettings={companySettings}
+        queryClient={queryClient}
+        toast={toast}
+      />
+
+      {selectedEstimate && (
+        <ViewQuoteDialog
+          open={isViewOpen}
+          onOpenChange={setIsViewOpen}
+          estimate={selectedEstimate}
+          customer={customers.find((c: Customer) => c.id === selectedEstimate.customerId)}
+          companySettings={companySettings}
+        />
+      )}
+    </div>
   );
 }
 
-function InvoicesTab({ invoices, customers, events, dialogOpen, setDialogOpen, getCustomerName, getEventTitle, formatCurrency, getStatusBadge, queryClient, toast }: any) {
-  const [formData, setFormData] = useState({
-    customerId: "",
-    eventId: "",
-    date: new Date().toISOString().split('T')[0],
-    dueDate: "",
-    notes: "",
-    terms: "",
-  });
-  const [lineItems, setLineItems] = useState<LineItem[]>([{ name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
+function CreateQuoteDialog({ open, onOpenChange, customers, companySettings, queryClient, toast }: any) {
+  const [customerId, setCustomerId] = useState('');
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [subject, setSubject] = useState('');
+  const [weddingPlannerName, setWeddingPlannerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [discountPercent, setDiscountPercent] = useState(0);
+  const [serviceChargePercent, setServiceChargePercent] = useState(12.5);
+  const [notes, setNotes] = useState('Looking forward for your business.');
+  const [terms, setTerms] = useState(DEFAULT_TERMS);
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
 
-  const addLineItem = () => {
-    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
+  const addLineItem = (isHeading: boolean = false) => {
+    setLineItems([...lineItems, {
+      slNo: isHeading ? undefined : lineItems.filter(i => !i.isHeading).length + 1,
+      name: '',
+      description: '',
+      quantity: isHeading ? 0 : 1,
+      rate: 0,
+      total: 0,
+      isHeading,
+    }]);
+  };
+
+  const updateLineItem = (index: number, field: string, value: any) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      updated[index].total = updated[index].quantity * updated[index].rate;
+    }
+    setLineItems(updated);
   };
 
   const removeLineItem = (index: number) => {
     setLineItems(lineItems.filter((_, i) => i !== index));
   };
 
-  const updateLineItem = (index: number, field: string, value: any) => {
-    const updated = [...lineItems];
-    (updated[index] as any)[field] = value;
-    const item = updated[index];
-    item.total = item.quantity * item.rate * (1 + (item.taxRate || 0) / 100);
-    setLineItems(updated);
-  };
+  const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + item.total, 0);
+  const discountAmount = subtotal * (discountPercent / 100);
+  const afterDiscount = subtotal - discountAmount;
+  const serviceChargeAmount = afterDiscount * (serviceChargePercent / 100);
+  const total = afterDiscount + serviceChargeAmount;
 
-  const subtotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-  const taxTotal = lineItems.reduce((sum, item) => sum + (item.quantity * item.rate * (item.taxRate || 0) / 100), 0);
-  const total = subtotal + taxTotal;
+  const createCustomerMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error('Failed to create customer');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/customers'] });
+      setCustomerId(data.id);
+      setIsAddingCustomer(false);
+      setNewCustomerName('');
+      toast({ title: 'Customer created' });
+    },
+  });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const numRes = await fetch("/api/invoices/next-number");
-      const { number } = await numRes.json();
-      const res = await fetch("/api/invoices", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const numberRes = await fetch('/api/document-sequences/estimate/next');
+      const { number } = await numberRes.json();
+      
+      const res = await fetch('/api/estimates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, number }),
       });
-      if (!res.ok) throw new Error("Failed to create invoice");
+      if (!res.ok) throw new Error('Failed to create quote');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      setDialogOpen(false);
-      setFormData({ customerId: "", eventId: "", date: new Date().toISOString().split('T')[0], dueDate: "", notes: "", terms: "" });
-      setLineItems([{ name: "", quantity: 1, rate: 0, taxRate: 0, total: 0 }]);
-      toast({ title: "Invoice created successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/estimates'] });
+      onOpenChange(false);
+      resetForm();
+      toast({ title: 'Quote created successfully' });
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete invoice");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      toast({ title: "Invoice deleted" });
-    },
-  });
+  const resetForm = () => {
+    setCustomerId('');
+    setDate(format(new Date(), 'yyyy-MM-dd'));
+    setSubject('');
+    setWeddingPlannerName('');
+    setCustomerAddress('');
+    setLineItems([]);
+    setDiscountPercent(0);
+    setServiceChargePercent(12.5);
+    setNotes('Looking forward for your business.');
+    setTerms(DEFAULT_TERMS);
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const validItems = lineItems.filter(item => item.name && item.rate > 0);
+  const handleSubmit = () => {
     createMutation.mutate({
-      ...formData,
-      customerId: formData.customerId || null,
-      eventId: formData.eventId || null,
-      lineItems: validItems,
-      subtotal: subtotal.toString(),
-      taxTotal: taxTotal.toString(),
-      total: total.toString(),
+      customerId: customerId || null,
+      date,
+      subject,
+      weddingPlannerName,
+      customerAddress,
+      lineItems,
+      subtotal: subtotal.toFixed(2),
+      discountPercent: discountPercent.toFixed(2),
+      discountAmount: discountAmount.toFixed(2),
+      serviceChargePercent: serviceChargePercent.toFixed(2),
+      serviceChargeAmount: serviceChargeAmount.toFixed(2),
+      taxTotal: '0',
+      total: total.toFixed(2),
+      totalInWords: `Indian Rupee ${numberToWords(Math.round(total))} Only`,
+      notes,
+      terms,
+      thankYouMessage: notes,
+      status: 'draft',
     });
   };
 
+  const loadTemplate = () => {
+    setSubject('Welcome party, Sangeet & Wedding on 14&15th Dec 2025 at Backwater Ripples');
+    setLineItems([
+      { slNo: undefined, name: 'DAY 1: 13th Dec 2025 - MEHANDI', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 1, name: 'Mehandi artist for bride on 13th Dec\n*Plastic wraps\n*Transportation charge: 1000/-', description: '', quantity: 1, rate: 5000, total: 5000, isHeading: false },
+      { slNo: 2, name: 'Mehandi artist for mom on 13th Dec\n*Mehandi for 3 people', description: '', quantity: 1, rate: 1500, total: 1500, isHeading: false },
+      { slNo: 3, name: 'Coordinator to book Cab at Airport\n*With placard', description: '', quantity: 1, rate: 2000, total: 2000, isHeading: false },
+      { slNo: undefined, name: 'GENERAL DECOR', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 4, name: 'Flower and props hanging on trees with artificial mariegold & rajasthani umbrellas\n*From 13th Dec onwards', description: '', quantity: 1, rate: 7950, total: 7950, isHeading: false },
+      { slNo: undefined, name: 'DAY 2: 14th Dec - WELCOME PARTY DECOR', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 5, name: 'Welcome board with artificial white flowers\n*Same board for wedding', description: '', quantity: 1, rate: 4500, total: 4500, isHeading: false },
+      { slNo: 6, name: 'Entrance arch with green & orange cloth draping on pillars', description: '', quantity: 1, rate: 7500, total: 7500, isHeading: false },
+      { slNo: undefined, name: 'MINI STATIONS', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 7, name: 'Chat & tea cart', description: '', quantity: 2, rate: 3500, total: 7000, isHeading: false },
+      { slNo: 8, name: 'Mehandi artists for guests (3 artists for 2 hours)\nTime: 03.30 PM to 05.30 PM', description: '', quantity: 6, rate: 1500, total: 9000, isHeading: false },
+      { slNo: undefined, name: 'SEATING & FURNITURES FOR MEHANDI', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 9, name: 'Tiffany chairs', description: '', quantity: 30, rate: 85, total: 2550, isHeading: false },
+      { slNo: 10, name: 'Bench with cushion and bolsters', description: '', quantity: 8, rate: 1550, total: 12400, isHeading: false },
+      { slNo: undefined, name: 'SANGEET DECOR', description: '', quantity: 0, rate: 0, total: 0, isHeading: true },
+      { slNo: 11, name: 'Board for letters to guest', description: '', quantity: 1, rate: 8200, total: 8200, isHeading: false },
+      { slNo: 12, name: 'Entrance arch', description: '', quantity: 1, rate: 14500, total: 14500, isHeading: false },
+      { slNo: 13, name: 'Sangeet dance floor print - 24x16ft', description: '', quantity: 1, rate: 9600, total: 9600, isHeading: false },
+    ]);
+    setServiceChargePercent(12.5);
+    toast({ title: 'Template loaded' });
+  };
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Invoices</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> New Invoice
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Quote</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={loadTemplate}>
+              Load Sample Template
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create Invoice</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Customer</Label>
-                  <Select value={formData.customerId} onValueChange={(v) => setFormData({...formData, customerId: v})}>
-                    <SelectTrigger>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Customer</Label>
+              {isAddingCustomer ? (
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Customer name" 
+                    value={newCustomerName} 
+                    onChange={e => setNewCustomerName(e.target.value)} 
+                  />
+                  <Button size="sm" onClick={() => createCustomerMutation.mutate(newCustomerName)}>Add</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsAddingCustomer(false)}>Cancel</Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select value={customerId} onValueChange={setCustomerId}>
+                    <SelectTrigger className="flex-1">
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1135,745 +1044,1051 @@ function InvoicesTab({ invoices, customers, events, dialogOpen, setDialogOpen, g
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Event</Label>
-                  <Select value={formData.eventId} onValueChange={(v) => setFormData({...formData, eventId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select event" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {events.map((e: Event) => (
-                        <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Invoice Date *</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Due Date</Label>
-                  <Input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Line Items</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
+                  <Button size="sm" variant="outline" onClick={() => setIsAddingCustomer(true)}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="space-y-2">
+              )}
+            </div>
+            <div>
+              <Label>Quote Date</Label>
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Wedding Planner Name</Label>
+              <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} placeholder="Wedding planner name" />
+            </div>
+            <div>
+              <Label>Customer Address</Label>
+              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="Billing address" rows={2} />
+            </div>
+          </div>
+
+          <div>
+            <Label>Subject (Event Description)</Label>
+            <Textarea value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g., Welcome party, Sangeet & Wedding on 14&15th Dec 2025 at Backwater Ripples" rows={2} />
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <Label>Line Items</Label>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => addLineItem(true)}>
+                  + Add Section Header
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => addLineItem(false)}>
+                  + Add Item
+                </Button>
+              </div>
+            </div>
+            
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="p-2 text-left w-12">Sl No</th>
+                    <th className="p-2 text-left">Item & Description</th>
+                    <th className="p-2 text-right w-20">Qty</th>
+                    <th className="p-2 text-right w-24">Rate</th>
+                    <th className="p-2 text-right w-28">Amount</th>
+                    <th className="p-2 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
                   {lineItems.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                      <Input 
-                        className="col-span-4" 
-                        placeholder="Item name" 
-                        value={item.name} 
-                        onChange={(e) => updateLineItem(index, 'name', e.target.value)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Qty" 
-                        value={item.quantity} 
-                        onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Rate" 
-                        value={item.rate} 
-                        onChange={(e) => updateLineItem(index, 'rate', parseFloat(e.target.value) || 0)} 
-                      />
-                      <Input 
-                        className="col-span-2" 
-                        type="number" 
-                        placeholder="Tax %" 
-                        value={item.taxRate || 0} 
-                        onChange={(e) => updateLineItem(index, 'taxRate', parseFloat(e.target.value) || 0)} 
-                      />
-                      <div className="col-span-1 text-right text-sm font-medium">
-                        {formatCurrency(item.total)}
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" className="col-span-1 h-8 w-8" onClick={() => removeLineItem(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <tr key={index} className={cn("border-t", item.isHeading && "bg-muted/30")}>
+                      <td className="p-2">
+                        {item.isHeading ? '' : item.slNo}
+                      </td>
+                      <td className="p-2" colSpan={item.isHeading ? 4 : 1}>
+                        <Textarea
+                          value={item.name}
+                          onChange={e => updateLineItem(index, 'name', e.target.value)}
+                          className={cn("min-h-[40px]", item.isHeading && "font-bold bg-transparent border-none")}
+                          placeholder={item.isHeading ? "Section heading..." : "Item description..."}
+                          rows={1}
+                        />
+                      </td>
+                      {!item.isHeading && (
+                        <>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={e => updateLineItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                              className="text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              value={item.rate}
+                              onChange={e => updateLineItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                              className="text-right"
+                            />
+                          </td>
+                          <td className="p-2 text-right font-medium">
+                            {formatIndianCurrency(item.total)}
+                          </td>
+                        </>
+                      )}
+                      <td className="p-2">
+                        <Button variant="ghost" size="sm" onClick={() => removeLineItem(index)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
                   ))}
+                  {lineItems.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        Add section headers and line items above
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <div className="w-80 space-y-2">
+              <div className="flex justify-between">
+                <span>Sub Total</span>
+                <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-2">
+                  Discount
+                  <Input
+                    type="number"
+                    value={discountPercent}
+                    onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                    className="w-16 h-6 text-right"
+                  />
+                  %
+                </span>
+                <span>- {formatIndianCurrency(discountAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="flex items-center gap-2">
+                  Service Charge
+                  <Input
+                    type="number"
+                    value={serviceChargePercent}
+                    onChange={e => setServiceChargePercent(parseFloat(e.target.value) || 0)}
+                    className="w-16 h-6 text-right"
+                  />
+                  %
+                </span>
+                <span>{formatIndianCurrency(serviceChargeAmount)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-lg font-bold">
+                <span>Total</span>
+                <span>{formatIndianCurrency(total)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label>Total in Words</Label>
+            <p className="text-sm font-medium mt-1">Indian Rupee {numberToWords(Math.round(total))} Only</p>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+          </div>
+
+          <div>
+            <Label>Terms & Conditions</Label>
+            <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={6} />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Creating...' : 'Create Quote'}
+            </Button>
+          </DialogFooter>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ViewQuoteDialog({ open, onOpenChange, estimate, customer, companySettings }: any) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-white p-6 print:p-0">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-6">
+            <div className="flex items-start gap-4">
+              <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
+              <div>
+                <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+                <p className="text-sm text-muted-foreground whitespace-pre-line">
+                  {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
+                </p>
+                <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
+                <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
+                <p className="text-sm">{companySettings?.website || 'www.oakstreetevents.com'}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <h2 className="text-3xl font-bold text-primary">Quote</h2>
+            </div>
+          </div>
+
+          {/* Quote Details */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <p className="text-sm text-muted-foreground">Estimate No</p>
+              <p className="font-medium">: {estimate.number}</p>
+              <p className="text-sm text-muted-foreground mt-2">Quote Date</p>
+              <p className="font-medium">: {format(new Date(estimate.date), 'dd/MM/yyyy')}</p>
+              {estimate.weddingPlannerName && (
+                <>
+                  <p className="text-sm text-muted-foreground mt-2">Wedding Planner</p>
+                  <p className="font-medium">: {estimate.weddingPlannerName}</p>
+                </>
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Bill To</p>
+              <p className="font-medium">{customer?.name || '—'}</p>
+              <p className="text-sm whitespace-pre-line">{estimate.customerAddress || customer?.billingAddress || ''}</p>
+            </div>
+          </div>
+
+          {estimate.subject && (
+            <div className="mb-6">
+              <p className="text-sm text-muted-foreground">Subject:</p>
+              <p className="font-medium">{estimate.subject}</p>
+            </div>
+          )}
+
+          {/* Line Items */}
+          <table className="w-full text-sm border-collapse mb-6">
+            <thead>
+              <tr className="border-y">
+                <th className="p-2 text-left w-12">Sl No</th>
+                <th className="p-2 text-left">Item & Description</th>
+                <th className="p-2 text-right w-16">Qty</th>
+                <th className="p-2 text-right w-24">Rate</th>
+                <th className="p-2 text-right w-28">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(estimate.lineItems || []).map((item: LineItem, index: number) => (
+                <tr key={index} className={cn("border-b", item.isHeading && "bg-muted/30 font-bold")}>
+                  <td className="p-2">{item.isHeading ? '' : item.slNo}</td>
+                  <td className="p-2 whitespace-pre-line" colSpan={item.isHeading ? 4 : 1}>{item.name}</td>
+                  {!item.isHeading && (
+                    <>
+                      <td className="p-2 text-right">{item.quantity.toFixed(2)}</td>
+                      <td className="p-2 text-right">{formatIndianCurrency(item.rate)}</td>
+                      <td className="p-2 text-right">{formatIndianCurrency(item.total)}</td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div className="flex">
+            <div className="flex-1">
+              <p className="font-medium">Total In Words</p>
+              <p className="text-sm italic">{estimate.totalInWords}</p>
+              
+              {estimate.notes && (
+                <div className="mt-4">
+                  <p className="font-medium">Notes</p>
+                  <p className="text-sm">{estimate.notes}</p>
                 </div>
-              </div>
+              )}
 
-              <div className="border-t pt-4 space-y-1 text-right">
-                <p className="text-sm">Subtotal: {formatCurrency(subtotal)}</p>
-                <p className="text-sm">Tax: {formatCurrency(taxTotal)}</p>
-                <p className="text-lg font-bold">Total: {formatCurrency(total)}</p>
+              {estimate.terms && (
+                <div className="mt-4">
+                  <p className="font-medium">Terms & Conditions</p>
+                  <p className="text-sm whitespace-pre-line">{estimate.terms}</p>
+                </div>
+              )}
+            </div>
+            <div className="w-64 text-right">
+              <div className="flex justify-between py-1">
+                <span>Sub Total</span>
+                <span>{formatIndianCurrency(parseFloat(estimate.subtotal))}</span>
               </div>
-
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} />
+              {parseFloat(estimate.discountAmount || '0') > 0 && (
+                <div className="flex justify-between py-1">
+                  <span>Discount ({estimate.discountPercent}%)</span>
+                  <span>- {formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
+                </div>
+              )}
+              {parseFloat(estimate.serviceChargeAmount || '0') > 0 && (
+                <div className="flex justify-between py-1">
+                  <span>Service Charge ({estimate.serviceChargePercent}%)</span>
+                  <span>{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 border-t font-bold text-lg">
+                <span>Total</span>
+                <span>₹{parseFloat(estimate.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
+            </div>
+          </div>
 
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Creating..." : "Create Invoice"}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </CardHeader>
-      <CardContent>
-        {invoices.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No invoices yet. Create your first invoice.</p>
-        ) : (
+          {/* Signature */}
+          <div className="mt-8 text-right">
+            <p className="text-sm text-muted-foreground">Authorized Signature</p>
+            {estimate.signature && (
+              <img src={estimate.signature} alt="Signature" className="h-16 ml-auto" />
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function InvoicesSection({ invoices, customers, banks, queryClient, toast }: any) {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      toast({ title: 'Invoice deleted' });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Invoices</h1>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Number</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Customer</th>
-                  <th className="text-left py-2 px-2">Date</th>
-                  <th className="text-right py-2 px-2">Total</th>
-                  <th className="text-right py-2 px-2 hidden sm:table-cell">Balance</th>
-                  <th className="text-center py-2 px-2">Status</th>
-                  <th className="py-2 px-2 w-10"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Invoice #</th>
+                  <th className="text-left p-3 font-medium">Customer</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Date</th>
+                  <th className="text-right p-3 font-medium">Amount</th>
+                  <th className="text-right p-3 font-medium">Balance</th>
+                  <th className="text-center p-3 font-medium">Status</th>
+                  <th className="text-right p-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((invoice: Invoice) => (
-                  <tr key={invoice.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{invoice.number}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{getCustomerName(invoice.customerId)}</td>
-                    <td className="py-2 px-2">{format(new Date(invoice.date), "dd/MM/yy")}</td>
-                    <td className="py-2 px-2 text-right font-medium">{formatCurrency(invoice.total)}</td>
-                    <td className="py-2 px-2 text-right hidden sm:table-cell text-orange-600">{formatCurrency(invoice.balanceDue)}</td>
-                    <td className="py-2 px-2 text-center">{getStatusBadge(invoice.status)}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(invoice.id)}>
+                  <tr key={invoice.id} className="border-t">
+                    <td className="p-3 font-medium">{invoice.number}</td>
+                    <td className="p-3">
+                      {invoice.customerId ? customers.find((c: Customer) => c.id === invoice.customerId)?.name : '—'}
+                    </td>
+                    <td className="p-3 hidden md:table-cell">{format(new Date(invoice.date), 'dd/MM/yyyy')}</td>
+                    <td className="p-3 text-right">{formatIndianCurrency(parseFloat(invoice.total))}</td>
+                    <td className="p-3 text-right font-medium">{formatIndianCurrency(parseFloat(invoice.balanceDue))}</td>
+                    <td className="p-3 text-center">
+                      <Badge variant={invoice.status === 'paid' ? 'default' : parseFloat(invoice.balanceDue) > 0 ? 'destructive' : 'secondary'}>
+                        {invoice.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(invoice.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </td>
                   </tr>
                 ))}
+                {invoices.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                      No invoices yet. Convert a quote to create an invoice.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function ReceiptsTab({ payments, customers, invoices, events, banks, dialogOpen, setDialogOpen, getCustomerName, getEventTitle, getBankName, formatCurrency, queryClient, toast }: any) {
+function PaymentsReceivedSection({ payments, customers, invoices, banks, queryClient, toast }: any) {
+  const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
-    customerId: "",
-    invoiceId: "",
-    eventId: "",
-    amount: "",
-    date: new Date().toISOString().split('T')[0],
-    paymentMode: "bank_transfer",
-    bankId: "",
-    reference: "",
-    notes: "",
+    customerId: '', invoiceId: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'),
+    paymentMode: 'bank_transfer', bankId: '', reference: '', notes: ''
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const numRes = await fetch("/api/customer-payments/next-number");
-      const { number } = await numRes.json();
-      const res = await fetch("/api/customer-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const numberRes = await fetch('/api/document-sequences/receipt/next');
+      const { number } = await numberRes.json();
+      
+      const res = await fetch('/api/customer-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, number }),
       });
-      if (!res.ok) throw new Error("Failed to record payment");
+      if (!res.ok) throw new Error('Failed to create payment');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      setDialogOpen(false);
-      setFormData({ customerId: "", invoiceId: "", eventId: "", amount: "", date: new Date().toISOString().split('T')[0], paymentMode: "bank_transfer", bankId: "", reference: "", notes: "" });
-      toast({ title: "Payment recorded successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/customer-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-entries'] });
+      setIsOpen(false);
+      toast({ title: 'Payment recorded successfully' });
     },
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/customer-payments/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete payment");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      toast({ title: "Payment deleted" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({
-      ...formData,
-      customerId: formData.customerId || null,
-      invoiceId: formData.invoiceId || null,
-      eventId: formData.eventId || null,
-      bankId: formData.bankId || null,
-    });
-  };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Payment Receipts</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Payments Received</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Record Payment
-            </Button>
+            <Button><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record Customer Payment</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label>Customer</Label>
+                <Select value={formData.customerId} onValueChange={v => setFormData({...formData, customerId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c: Customer) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Invoice (Optional)</Label>
+                <Select value={formData.invoiceId} onValueChange={v => setFormData({...formData, invoiceId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select invoice" /></SelectTrigger>
+                  <SelectContent>
+                    {invoices.filter((i: Invoice) => parseFloat(i.balanceDue) > 0).map((i: Invoice) => (
+                      <SelectItem key={i.id} value={i.id}>{i.number} - {formatIndianCurrency(parseFloat(i.balanceDue))}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Customer</Label>
-                  <Select value={formData.customerId} onValueChange={(v) => setFormData({...formData, customerId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c: Customer) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <Label>Amount</Label>
+                  <Input type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Invoice</Label>
-                  <Select value={formData.invoiceId} onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select invoice" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {invoices.filter((inv: Invoice) => inv.status !== 'paid').map((inv: Invoice) => (
-                        <SelectItem key={inv.id} value={inv.id}>{inv.number} ({formatCurrency(inv.balanceDue)} due)</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <Label>Date</Label>
+                  <Input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Amount *</Label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type="number" className="pl-9" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Date *</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label>Payment Mode</Label>
-                  <Select value={formData.paymentMode} onValueChange={(v) => setFormData({...formData, paymentMode: v})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={formData.paymentMode} onValueChange={v => setFormData({...formData, paymentMode: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_MODES.map(mode => (
-                        <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>
+                      {PAYMENT_MODES.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Deposit To</Label>
-                  <Select value={formData.bankId} onValueChange={(v) => setFormData({...formData, bankId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select bank" />
-                    </SelectTrigger>
+                <div>
+                  <Label>Bank Account</Label>
+                  <Select value={formData.bankId} onValueChange={v => setFormData({...formData, bankId: v})}>
+                    <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
                     <SelectContent>
-                      {banks.map((bank: Bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                      {banks.map((b: Bank) => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div>
                 <Label>Reference</Label>
-                <Input value={formData.reference} onChange={(e) => setFormData({...formData, reference: e.target.value})} placeholder="Transaction ID, Cheque No, etc." />
+                <Input value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} />
               </div>
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} />
-              </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Recording..." : "Record Payment"}
+              <Button onClick={() => createMutation.mutate(formData)} disabled={!formData.amount || createMutation.isPending} className="w-full">
+                {createMutation.isPending ? 'Recording...' : 'Record Payment'}
               </Button>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
-      </CardHeader>
-      <CardContent>
-        {payments.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No payments recorded yet.</p>
-        ) : (
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Receipt #</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Customer</th>
-                  <th className="text-left py-2 px-2">Date</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Mode</th>
-                  <th className="text-right py-2 px-2">Amount</th>
-                  <th className="py-2 px-2 w-10"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Receipt #</th>
+                  <th className="text-left p-3 font-medium">Customer</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Date</th>
+                  <th className="text-right p-3 font-medium">Amount</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Mode</th>
                 </tr>
               </thead>
               <tbody>
                 {payments.map((payment: CustomerPayment) => (
-                  <tr key={payment.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{payment.number}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{getCustomerName(payment.customerId)}</td>
-                    <td className="py-2 px-2">{format(new Date(payment.date), "dd/MM/yy")}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell capitalize">{payment.paymentMode.replace('_', ' ')}</td>
-                    <td className="py-2 px-2 text-right font-medium text-green-600">{formatCurrency(payment.amount)}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(payment.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                  <tr key={payment.id} className="border-t">
+                    <td className="p-3 font-medium">{payment.number}</td>
+                    <td className="p-3">
+                      {payment.customerId ? customers.find((c: Customer) => c.id === payment.customerId)?.name : '—'}
                     </td>
+                    <td className="p-3 hidden md:table-cell">{format(new Date(payment.date), 'dd/MM/yyyy')}</td>
+                    <td className="p-3 text-right font-medium text-green-600">{formatIndianCurrency(parseFloat(payment.amount))}</td>
+                    <td className="p-3 hidden md:table-cell capitalize">{payment.paymentMode.replace('_', ' ')}</td>
                   </tr>
                 ))}
+                {payments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No payments recorded yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function ExpensesTab({ expenses, vendors, events, banks, dialogOpen, setDialogOpen, getVendorName, getEventTitle, getBankName, formatCurrency, getStatusBadge, queryClient, toast }: any) {
+function VendorsSection({ vendors, queryClient, toast }: any) {
+  const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
-    vendorId: "",
-    eventId: "",
-    category: "",
-    description: "",
-    amount: "",
-    taxAmount: "0",
-    date: new Date().toISOString().split('T')[0],
-    bankId: "",
+    name: '', email: '', phone: '', gstNumber: '', category: '', billingAddress: ''
   });
-
-  const total = (parseFloat(formData.amount) || 0) + (parseFloat(formData.taxAmount) || 0);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const numRes = await fetch("/api/expenses/next-number");
-      const { number } = await numRes.json();
-      const res = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, number }),
+      const res = await fetch('/api/vendors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to record expense");
+      if (!res.ok) throw new Error('Failed to create vendor');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      setDialogOpen(false);
-      setFormData({ vendorId: "", eventId: "", category: "", description: "", amount: "", taxAmount: "0", date: new Date().toISOString().split('T')[0], bankId: "" });
-      toast({ title: "Expense recorded successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      setIsOpen(false);
+      setFormData({ name: '', email: '', phone: '', gstNumber: '', category: '', billingAddress: '' });
+      toast({ title: 'Vendor created successfully' });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete expense");
+      const res = await fetch(`/api/vendors/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete vendor');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      toast({ title: "Expense deleted" });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      toast({ title: 'Vendor deleted' });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({
-      ...formData,
-      vendorId: formData.vendorId || null,
-      eventId: formData.eventId || null,
-      bankId: formData.bankId || null,
-      total: total.toString(),
-    });
-  };
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Vendors</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button><Plus className="h-4 w-4 mr-2" /> New Vendor</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Vendor</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Name *</Label>
+                <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              </div>
+              <div>
+                <Label>Category</Label>
+                <Select value={formData.category} onValueChange={v => setFormData({...formData, category: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map(c => (
+                      <SelectItem key={c} value={c.toLowerCase()}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+              </div>
+              <Button onClick={() => createMutation.mutate(formData)} disabled={!formData.name || createMutation.isPending} className="w-full">
+                {createMutation.isPending ? 'Creating...' : 'Create Vendor'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Name</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Category</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Phone</th>
+                  <th className="text-right p-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendors.map((vendor: Vendor) => (
+                  <tr key={vendor.id} className="border-t">
+                    <td className="p-3 font-medium">{vendor.name}</td>
+                    <td className="p-3 hidden md:table-cell capitalize">{vendor.category || '—'}</td>
+                    <td className="p-3 hidden md:table-cell">{vendor.phone || '—'}</td>
+                    <td className="p-3 text-right">
+                      <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(vendor.id)}>
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {vendors.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                      No vendors yet. Click "New Vendor" to add one.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ExpensesSection({ expenses, vendors, banks, queryClient, toast }: any) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    vendorId: '', category: '', description: '', amount: '', taxAmount: '0',
+    date: format(new Date(), 'yyyy-MM-dd'), bankId: ''
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const numberRes = await fetch('/api/document-sequences/expense/next');
+      const { number } = await numberRes.json();
+      
+      const total = parseFloat(data.amount) + parseFloat(data.taxAmount || '0');
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, number, total: total.toString() }),
+      });
+      if (!res.ok) throw new Error('Failed to create expense');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-entries'] });
+      setIsOpen(false);
+      toast({ title: 'Expense recorded successfully' });
+    },
+  });
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Expenses</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Expenses</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Add Expense
-            </Button>
+            <Button><Plus className="h-4 w-4 mr-2" /> Record Expense</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record Expense</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  <Select value={formData.vendorId} onValueChange={(v) => setFormData({...formData, vendorId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vendors.map((v: Vendor) => (
-                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Event</Label>
-                  <Select value={formData.eventId} onValueChange={(v) => setFormData({...formData, eventId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select event" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {events.map((e: Event) => (
-                        <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select value={formData.category} onValueChange={(v) => setFormData({...formData, category: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPENSE_CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Date *</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Description *</Label>
-                <Input value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Amount *</Label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type="number" className="pl-9" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tax</Label>
-                  <Input type="number" value={formData.taxAmount} onChange={(e) => setFormData({...formData, taxAmount: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Total</Label>
-                  <div className="h-10 flex items-center px-3 bg-muted rounded-md font-medium">{formatCurrency(total)}</div>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Paid From (Bank)</Label>
-                <Select value={formData.bankId} onValueChange={(v) => setFormData({...formData, bankId: v})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select bank (optional)" />
-                  </SelectTrigger>
+            <div className="space-y-4">
+              <div>
+                <Label>Vendor</Label>
+                <Select value={formData.vendorId} onValueChange={v => setFormData({...formData, vendorId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
                   <SelectContent>
-                    {banks.map((bank: Bank) => (
-                      <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                    {vendors.map((v: Vendor) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">If bank selected, expense will be marked as paid</p>
               </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Recording..." : "Record Expense"}
+              <div>
+                <Label>Category</Label>
+                <Select value={formData.category} onValueChange={v => setFormData({...formData, category: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map(c => (
+                      <SelectItem key={c} value={c.toLowerCase()}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Amount</Label>
+                  <Input type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
+                </div>
+                <div>
+                  <Label>Date</Label>
+                  <Input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <Label>Pay From Bank</Label>
+                <Select value={formData.bankId} onValueChange={v => setFormData({...formData, bankId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
+                  <SelectContent>
+                    {banks.map((b: Bank) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={() => createMutation.mutate(formData)} disabled={!formData.amount || !formData.category || !formData.description || createMutation.isPending} className="w-full">
+                {createMutation.isPending ? 'Recording...' : 'Record Expense'}
               </Button>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
-      </CardHeader>
-      <CardContent>
-        {expenses.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No expenses recorded yet.</p>
-        ) : (
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Number</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Vendor</th>
-                  <th className="text-left py-2 px-2">Category</th>
-                  <th className="text-left py-2 px-2">Date</th>
-                  <th className="text-right py-2 px-2">Total</th>
-                  <th className="text-center py-2 px-2 hidden sm:table-cell">Status</th>
-                  <th className="py-2 px-2 w-10"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Expense #</th>
+                  <th className="text-left p-3 font-medium">Description</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Vendor</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Date</th>
+                  <th className="text-right p-3 font-medium">Amount</th>
+                  <th className="text-center p-3 font-medium">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {expenses.map((expense: Expense) => (
-                  <tr key={expense.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{expense.number}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{getVendorName(expense.vendorId)}</td>
-                    <td className="py-2 px-2">{expense.category}</td>
-                    <td className="py-2 px-2">{format(new Date(expense.date), "dd/MM/yy")}</td>
-                    <td className="py-2 px-2 text-right font-medium text-red-600">{formatCurrency(expense.total)}</td>
-                    <td className="py-2 px-2 text-center hidden sm:table-cell">{getStatusBadge(expense.status)}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(expense.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                  <tr key={expense.id} className="border-t">
+                    <td className="p-3 font-medium">{expense.number}</td>
+                    <td className="p-3">{expense.description}</td>
+                    <td className="p-3 hidden md:table-cell">
+                      {expense.vendorId ? vendors.find((v: Vendor) => v.id === expense.vendorId)?.name : '—'}
+                    </td>
+                    <td className="p-3 hidden md:table-cell">{format(new Date(expense.date), 'dd/MM/yyyy')}</td>
+                    <td className="p-3 text-right font-medium text-red-600">{formatIndianCurrency(parseFloat(expense.total))}</td>
+                    <td className="p-3 text-center">
+                      <Badge variant={expense.status === 'paid' ? 'default' : 'secondary'}>{expense.status}</Badge>
                     </td>
                   </tr>
                 ))}
+                {expenses.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                      No expenses recorded yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function VendorPaymentsTab({ payments, vendors, expenses, events, banks, dialogOpen, setDialogOpen, getVendorName, getEventTitle, getBankName, formatCurrency, queryClient, toast }: any) {
+function VendorPaymentsSection({ payments, vendors, expenses, banks, queryClient, toast }: any) {
+  const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({
-    vendorId: "",
-    expenseId: "",
-    eventId: "",
-    amount: "",
-    date: new Date().toISOString().split('T')[0],
-    paymentMode: "bank_transfer",
-    bankId: "",
-    reference: "",
-    notes: "",
+    vendorId: '', expenseId: '', amount: '', date: format(new Date(), 'yyyy-MM-dd'),
+    paymentMode: 'bank_transfer', bankId: '', reference: '', notes: ''
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
-      const numRes = await fetch("/api/vendor-payments/next-number");
-      const { number } = await numRes.json();
-      const res = await fetch("/api/vendor-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const numberRes = await fetch('/api/document-sequences/vendor_payment/next');
+      const { number } = await numberRes.json();
+      
+      const res = await fetch('/api/vendor-payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, number }),
       });
-      if (!res.ok) throw new Error("Failed to record vendor payment");
+      if (!res.ok) throw new Error('Failed to create payment');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      setDialogOpen(false);
-      setFormData({ vendorId: "", expenseId: "", eventId: "", amount: "", date: new Date().toISOString().split('T')[0], paymentMode: "bank_transfer", bankId: "", reference: "", notes: "" });
-      toast({ title: "Vendor payment recorded successfully" });
+      queryClient.invalidateQueries({ queryKey: ['/api/vendor-payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-entries'] });
+      setIsOpen(false);
+      toast({ title: 'Vendor payment recorded successfully' });
     },
   });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/vendor-payments/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete vendor payment");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vendor-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
-      toast({ title: "Vendor payment deleted" });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    createMutation.mutate({
-      ...formData,
-      vendorId: formData.vendorId || null,
-      expenseId: formData.expenseId || null,
-      eventId: formData.eventId || null,
-      bankId: formData.bankId || null,
-    });
-  };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg">Vendor Payments</CardTitle>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Vendor Payments</h1>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" /> Make Payment
-            </Button>
+            <Button><Plus className="h-4 w-4 mr-2" /> Record Payment</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record Vendor Payment</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label>Vendor</Label>
+                <Select value={formData.vendorId} onValueChange={v => setFormData({...formData, vendorId: v})}>
+                  <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+                  <SelectContent>
+                    {vendors.map((v: Vendor) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Vendor</Label>
-                  <Select value={formData.vendorId} onValueChange={(v) => setFormData({...formData, vendorId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vendor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vendors.map((v: Vendor) => (
-                        <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <Label>Amount</Label>
+                  <Input type="number" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Against Expense</Label>
-                  <Select value={formData.expenseId} onValueChange={(v) => setFormData({...formData, expenseId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select expense" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {expenses.filter((exp: Expense) => exp.status === 'recorded').map((exp: Expense) => (
-                        <SelectItem key={exp.id} value={exp.id}>{exp.number} - {exp.description} ({formatCurrency(exp.total)})</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div>
+                  <Label>Date</Label>
+                  <Input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Amount *</Label>
-                  <div className="relative">
-                    <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type="number" className="pl-9" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} required />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Date *</Label>
-                  <Input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label>Payment Mode</Label>
-                  <Select value={formData.paymentMode} onValueChange={(v) => setFormData({...formData, paymentMode: v})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={formData.paymentMode} onValueChange={v => setFormData({...formData, paymentMode: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_MODES.map(mode => (
-                        <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>
+                      {PAYMENT_MODES.map(m => (
+                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Paid From</Label>
-                  <Select value={formData.bankId} onValueChange={(v) => setFormData({...formData, bankId: v})}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select bank" />
-                    </SelectTrigger>
+                <div>
+                  <Label>Bank Account</Label>
+                  <Select value={formData.bankId} onValueChange={v => setFormData({...formData, bankId: v})}>
+                    <SelectTrigger><SelectValue placeholder="Select bank" /></SelectTrigger>
                     <SelectContent>
-                      {banks.map((bank: Bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                      {banks.map((b: Bank) => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div>
                 <Label>Reference</Label>
-                <Input value={formData.reference} onChange={(e) => setFormData({...formData, reference: e.target.value})} placeholder="Transaction ID, Cheque No, etc." />
+                <Input value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} />
               </div>
-              <div className="space-y-2">
-                <Label>Notes</Label>
-                <Textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} />
-              </div>
-              <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Recording..." : "Record Payment"}
+              <Button onClick={() => createMutation.mutate(formData)} disabled={!formData.amount || createMutation.isPending} className="w-full">
+                {createMutation.isPending ? 'Recording...' : 'Record Payment'}
               </Button>
-            </form>
+            </div>
           </DialogContent>
         </Dialog>
-      </CardHeader>
-      <CardContent>
-        {payments.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">No vendor payments recorded yet.</p>
-        ) : (
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 px-2">Payment #</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Vendor</th>
-                  <th className="text-left py-2 px-2">Date</th>
-                  <th className="text-left py-2 px-2 hidden sm:table-cell">Mode</th>
-                  <th className="text-right py-2 px-2">Amount</th>
-                  <th className="py-2 px-2 w-10"></th>
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-3 font-medium">Payment #</th>
+                  <th className="text-left p-3 font-medium">Vendor</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Date</th>
+                  <th className="text-right p-3 font-medium">Amount</th>
+                  <th className="text-left p-3 font-medium hidden md:table-cell">Mode</th>
                 </tr>
               </thead>
               <tbody>
                 {payments.map((payment: VendorPayment) => (
-                  <tr key={payment.id} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-2 font-medium">{payment.number}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell">{getVendorName(payment.vendorId)}</td>
-                    <td className="py-2 px-2">{format(new Date(payment.date), "dd/MM/yy")}</td>
-                    <td className="py-2 px-2 hidden sm:table-cell capitalize">{payment.paymentMode.replace('_', ' ')}</td>
-                    <td className="py-2 px-2 text-right font-medium text-red-600">{formatCurrency(payment.amount)}</td>
-                    <td className="py-2 px-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => deleteMutation.mutate(payment.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                  <tr key={payment.id} className="border-t">
+                    <td className="p-3 font-medium">{payment.number}</td>
+                    <td className="p-3">
+                      {payment.vendorId ? vendors.find((v: Vendor) => v.id === payment.vendorId)?.name : '—'}
                     </td>
+                    <td className="p-3 hidden md:table-cell">{format(new Date(payment.date), 'dd/MM/yyyy')}</td>
+                    <td className="p-3 text-right font-medium text-red-600">{formatIndianCurrency(parseFloat(payment.amount))}</td>
+                    <td className="p-3 hidden md:table-cell capitalize">{payment.paymentMode.replace('_', ' ')}</td>
                   </tr>
                 ))}
+                {payments.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                      No vendor payments recorded yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SettingsSection({ companySettings, queryClient, toast }: any) {
+  const [formData, setFormData] = useState({
+    companyName: companySettings?.companyName || 'Oakstreet Events',
+    address: companySettings?.address || '',
+    phone: companySettings?.phone || '',
+    email: companySettings?.email || '',
+    website: companySettings?.website || '',
+    gstNumber: companySettings?.gstNumber || '',
+    defaultTerms: companySettings?.defaultTerms || DEFAULT_TERMS,
+    defaultThankYouMessage: companySettings?.defaultThankYouMessage || 'Looking forward for your business.',
+  });
+
+  useEffect(() => {
+    if (companySettings) {
+      setFormData({
+        companyName: companySettings.companyName || 'Oakstreet Events',
+        address: companySettings.address || '',
+        phone: companySettings.phone || '',
+        email: companySettings.email || '',
+        website: companySettings.website || '',
+        gstNumber: companySettings.gstNumber || '',
+        defaultTerms: companySettings.defaultTerms || DEFAULT_TERMS,
+        defaultThankYouMessage: companySettings.defaultThankYouMessage || 'Looking forward for your business.',
+      });
+    }
+  }, [companySettings]);
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/company-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update settings');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings'] });
+      toast({ title: 'Settings updated successfully' });
+    },
+  });
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <h1 className="text-2xl font-bold">Company Settings</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Company Information</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Company Name</Label>
+            <Input value={formData.companyName} onChange={e => setFormData({...formData, companyName: e.target.value})} />
+          </div>
+          <div>
+            <Label>Address</Label>
+            <Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} rows={3} />
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Phone</Label>
+              <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+            </div>
+            <div>
+              <Label>Email</Label>
+              <Input value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label>Website</Label>
+              <Input value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} />
+            </div>
+            <div>
+              <Label>GST Number</Label>
+              <Input value={formData.gstNumber} onChange={e => setFormData({...formData, gstNumber: e.target.value})} />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Default Templates</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Default Thank You Message</Label>
+            <Textarea value={formData.defaultThankYouMessage} onChange={e => setFormData({...formData, defaultThankYouMessage: e.target.value})} rows={2} />
+          </div>
+          <div>
+            <Label>Default Terms & Conditions</Label>
+            <Textarea value={formData.defaultTerms} onChange={e => setFormData({...formData, defaultTerms: e.target.value})} rows={8} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Button onClick={() => updateMutation.mutate(formData)} disabled={updateMutation.isPending}>
+        {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+      </Button>
+    </div>
   );
 }

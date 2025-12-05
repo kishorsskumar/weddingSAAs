@@ -16,6 +16,9 @@ import {
   customerPayments,
   expenses,
   vendorPayments,
+  companySettings,
+  documentSequences,
+  estimateTemplates,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -50,6 +53,12 @@ import {
   type InsertExpense,
   type VendorPayment,
   type InsertVendorPayment,
+  type CompanySettings,
+  type InsertCompanySettings,
+  type DocumentSequence,
+  type InsertDocumentSequence,
+  type EstimateTemplate,
+  type InsertEstimateTemplate,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -178,6 +187,26 @@ export interface IStorage {
   createVendorPaymentWithDaybook(payment: InsertVendorPayment, vendorName: string): Promise<VendorPayment>;
   deleteVendorPayment(id: string): Promise<void>;
   getNextVendorPaymentNumber(): Promise<string>;
+
+  // Oak Book - Company Settings
+  getCompanySettings(): Promise<CompanySettings | undefined>;
+  updateCompanySettings(settings: Partial<InsertCompanySettings>): Promise<CompanySettings>;
+
+  // Oak Book - Document Sequences
+  getNextDocumentNumber(documentType: string): Promise<string>;
+  getAllDocumentSequences(): Promise<DocumentSequence[]>;
+  updateDocumentSequence(documentType: string, updates: Partial<InsertDocumentSequence>): Promise<DocumentSequence | undefined>;
+
+  // Oak Book - Estimate Templates
+  getAllEstimateTemplates(): Promise<EstimateTemplate[]>;
+  getEstimateTemplate(id: string): Promise<EstimateTemplate | undefined>;
+  createEstimateTemplate(template: InsertEstimateTemplate): Promise<EstimateTemplate>;
+  updateEstimateTemplate(id: string, template: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined>;
+  deleteEstimateTemplate(id: string): Promise<void>;
+
+  // Oak Book - Clone/Convert Operations
+  cloneEstimate(id: string): Promise<Estimate>;
+  convertEstimateToInvoice(estimateId: string): Promise<Invoice>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -751,6 +780,167 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(vendorPayments);
     const count = Number(result?.count || 0) + 1;
     return `VPY-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Company Settings
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings).limit(1);
+    if (!settings) {
+      const [newSettings] = await db.insert(companySettings).values({}).returning();
+      return newSettings;
+    }
+    return settings;
+  }
+
+  async updateCompanySettings(updateData: Partial<InsertCompanySettings>): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings();
+    if (existing) {
+      const [updated] = await db.update(companySettings)
+        .set({ ...updateData, updatedAt: new Date() })
+        .where(eq(companySettings.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [newSettings] = await db.insert(companySettings).values(updateData).returning();
+    return newSettings;
+  }
+
+  // Oak Book - Document Sequences
+  async getNextDocumentNumber(documentType: string): Promise<string> {
+    const [sequence] = await db.select().from(documentSequences)
+      .where(eq(documentSequences.documentType, documentType));
+    
+    if (!sequence) {
+      throw new Error(`Document sequence not found for type: ${documentType}`);
+    }
+
+    const number = `${sequence.prefix}${String(sequence.nextNumber).padStart(sequence.paddingLength, '0')}`;
+    
+    await db.update(documentSequences)
+      .set({ nextNumber: sequence.nextNumber + 1 })
+      .where(eq(documentSequences.documentType, documentType));
+    
+    return number;
+  }
+
+  async getAllDocumentSequences(): Promise<DocumentSequence[]> {
+    return await db.select().from(documentSequences);
+  }
+
+  async updateDocumentSequence(documentType: string, updateData: Partial<InsertDocumentSequence>): Promise<DocumentSequence | undefined> {
+    const [updated] = await db.update(documentSequences)
+      .set(updateData)
+      .where(eq(documentSequences.documentType, documentType))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Oak Book - Estimate Templates
+  async getAllEstimateTemplates(): Promise<EstimateTemplate[]> {
+    return await db.select().from(estimateTemplates).orderBy(desc(estimateTemplates.createdAt));
+  }
+
+  async getEstimateTemplate(id: string): Promise<EstimateTemplate | undefined> {
+    const [template] = await db.select().from(estimateTemplates).where(eq(estimateTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createEstimateTemplate(insertTemplate: InsertEstimateTemplate): Promise<EstimateTemplate> {
+    const [template] = await db.insert(estimateTemplates).values(insertTemplate).returning();
+    return template;
+  }
+
+  async updateEstimateTemplate(id: string, updateData: Partial<InsertEstimateTemplate>): Promise<EstimateTemplate | undefined> {
+    const [template] = await db.update(estimateTemplates)
+      .set(updateData)
+      .where(eq(estimateTemplates.id, id))
+      .returning();
+    return template || undefined;
+  }
+
+  async deleteEstimateTemplate(id: string): Promise<void> {
+    await db.delete(estimateTemplates).where(eq(estimateTemplates.id, id));
+  }
+
+  // Oak Book - Clone/Convert Operations
+  async cloneEstimate(id: string): Promise<Estimate> {
+    const original = await this.getEstimate(id);
+    if (!original) {
+      throw new Error('Estimate not found');
+    }
+
+    const newNumber = await this.getNextDocumentNumber('estimate');
+    const today = new Date().toISOString().split('T')[0];
+
+    const [cloned] = await db.insert(estimates).values({
+      number: newNumber,
+      customerId: original.customerId,
+      eventId: original.eventId,
+      date: today,
+      dueDate: original.dueDate,
+      status: 'draft',
+      subject: original.subject,
+      weddingPlannerName: original.weddingPlannerName,
+      customerAddress: original.customerAddress,
+      lineItems: original.lineItems,
+      subtotal: original.subtotal,
+      discountPercent: original.discountPercent,
+      discountAmount: original.discountAmount,
+      serviceChargePercent: original.serviceChargePercent,
+      serviceChargeAmount: original.serviceChargeAmount,
+      taxTotal: original.taxTotal,
+      total: original.total,
+      totalInWords: original.totalInWords,
+      notes: original.notes,
+      terms: original.terms,
+      thankYouMessage: original.thankYouMessage,
+      signature: original.signature,
+    }).returning();
+
+    return cloned;
+  }
+
+  async convertEstimateToInvoice(estimateId: string): Promise<Invoice> {
+    const estimate = await this.getEstimate(estimateId);
+    if (!estimate) {
+      throw new Error('Estimate not found');
+    }
+
+    const invoiceNumber = await this.getNextDocumentNumber('invoice');
+    const today = new Date().toISOString().split('T')[0];
+
+    const [invoice] = await db.insert(invoices).values({
+      number: invoiceNumber,
+      customerId: estimate.customerId,
+      eventId: estimate.eventId,
+      estimateId: estimate.id,
+      date: today,
+      dueDate: estimate.dueDate,
+      status: 'draft',
+      subject: estimate.subject,
+      weddingPlannerName: estimate.weddingPlannerName,
+      customerAddress: estimate.customerAddress,
+      lineItems: estimate.lineItems,
+      subtotal: estimate.subtotal,
+      discountPercent: estimate.discountPercent,
+      discountAmount: estimate.discountAmount,
+      serviceChargePercent: estimate.serviceChargePercent,
+      serviceChargeAmount: estimate.serviceChargeAmount,
+      taxTotal: estimate.taxTotal,
+      total: estimate.total,
+      totalInWords: estimate.totalInWords,
+      balanceDue: estimate.total,
+      notes: estimate.notes,
+      terms: estimate.terms,
+      thankYouMessage: estimate.thankYouMessage,
+      signature: estimate.signature,
+    }).returning();
+
+    await db.update(estimates)
+      .set({ status: 'converted' })
+      .where(eq(estimates.id, estimateId));
+
+    return invoice;
   }
 }
 
