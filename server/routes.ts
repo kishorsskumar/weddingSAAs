@@ -1161,5 +1161,160 @@ export async function registerRoutes(
     }
   });
 
+  // Payroll Routes
+  app.get('/api/payroll-runs', async (req, res) => {
+    try {
+      const runs = await storage.getAllPayrollRuns();
+      res.json(runs);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch payroll runs' });
+    }
+  });
+
+  app.get('/api/payroll-runs/:id', async (req, res) => {
+    try {
+      const run = await storage.getPayrollRun(req.params.id);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+      res.json(run);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch payroll run' });
+    }
+  });
+
+  app.get('/api/payroll-runs/:id/items', async (req, res) => {
+    try {
+      const items = await storage.getPayrollItemsByRunId(req.params.id);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch payroll items' });
+    }
+  });
+
+  app.post('/api/payroll-runs', async (req, res) => {
+    try {
+      const { month, year, employees } = req.body;
+      
+      const existing = await storage.getPayrollRunByMonthYear(month, year);
+      if (existing) {
+        return res.status(400).json({ error: 'Payroll run already exists for this month' });
+      }
+
+      const run = await storage.createPayrollRun({
+        month,
+        year,
+        status: 'draft',
+        totalAmount: '0',
+      });
+
+      let totalAmount = 0;
+      for (const emp of employees) {
+        const dailyRate = parseFloat(emp.salary) / 30;
+        const grossPay = dailyRate * emp.daysWorked;
+        const deductions = parseFloat(emp.deductions || '0');
+        const netPay = grossPay - deductions;
+        totalAmount += netPay;
+
+        await storage.createPayrollItem({
+          payrollRunId: run.id,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          monthlySalary: emp.salary.toString(),
+          daysWorked: emp.daysWorked,
+          dailyRate: dailyRate.toFixed(2),
+          grossPay: grossPay.toFixed(2),
+          deductions: deductions.toFixed(2),
+          netPay: netPay.toFixed(2),
+        });
+      }
+
+      await storage.updatePayrollRun(run.id, { totalAmount: totalAmount.toFixed(2) });
+      
+      const updatedRun = await storage.getPayrollRun(run.id);
+      res.json(updatedRun);
+    } catch (error) {
+      console.error('Create payroll run error:', error);
+      res.status(400).json({ error: 'Failed to create payroll run' });
+    }
+  });
+
+  app.patch('/api/payroll-runs/:id', async (req, res) => {
+    try {
+      const run = await storage.getPayrollRun(req.params.id);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+      if (run.status === 'paid') {
+        return res.status(400).json({ error: 'Cannot modify paid payroll' });
+      }
+      const updated = await storage.updatePayrollRun(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update payroll run' });
+    }
+  });
+
+  app.patch('/api/payroll-items/:id', async (req, res) => {
+    try {
+      const { daysWorked, deductions } = req.body;
+      const item = await storage.updatePayrollItem(req.params.id, {});
+      
+      if (!item) {
+        return res.status(404).json({ error: 'Payroll item not found' });
+      }
+
+      const dailyRate = parseFloat(item.monthlySalary) / 30;
+      const grossPay = dailyRate * (daysWorked ?? item.daysWorked);
+      const deductionAmount = parseFloat(deductions ?? item.deductions ?? '0');
+      const netPay = grossPay - deductionAmount;
+
+      const updated = await storage.updatePayrollItem(req.params.id, {
+        daysWorked: daysWorked ?? item.daysWorked,
+        deductions: deductionAmount.toFixed(2),
+        grossPay: grossPay.toFixed(2),
+        netPay: netPay.toFixed(2),
+      });
+
+      const allItems = await storage.getPayrollItemsByRunId(item.payrollRunId);
+      const totalAmount = allItems.reduce((sum, i) => sum + parseFloat(i.netPay), 0);
+      await storage.updatePayrollRun(item.payrollRunId, { totalAmount: totalAmount.toFixed(2) });
+
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update payroll item' });
+    }
+  });
+
+  app.post('/api/payroll-runs/:id/pay', async (req, res) => {
+    try {
+      const { payDate, bankId } = req.body;
+      if (!payDate) {
+        return res.status(400).json({ error: 'Pay date is required' });
+      }
+      const run = await storage.markPayrollAsPaid(req.params.id, payDate, bankId);
+      res.json(run);
+    } catch (error: any) {
+      console.error('Mark payroll paid error:', error);
+      res.status(400).json({ error: error.message || 'Failed to mark payroll as paid' });
+    }
+  });
+
+  app.delete('/api/payroll-runs/:id', async (req, res) => {
+    try {
+      const run = await storage.getPayrollRun(req.params.id);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+      if (run.status === 'paid') {
+        return res.status(400).json({ error: 'Cannot delete paid payroll' });
+      }
+      await storage.deletePayrollRun(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete payroll run' });
+    }
+  });
+
   return httpServer;
 }
