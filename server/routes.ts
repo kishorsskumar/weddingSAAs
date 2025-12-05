@@ -1018,5 +1018,96 @@ export async function registerRoutes(
     }
   });
 
+  // Customer Portal - Portal Links (Admin endpoints)
+  app.post('/api/portal-links', async (req, res) => {
+    try {
+      const { documentType, documentId, customerId, expiresAt } = req.body;
+      const token = crypto.randomUUID().replace(/-/g, '');
+      
+      const link = await storage.createPortalLink({
+        token,
+        documentType,
+        documentId,
+        customerId: customerId || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isActive: true,
+        createdBy: (req.session as any)?.userId || null,
+      });
+      
+      res.json(link);
+    } catch (error) {
+      console.error('Create portal link error:', error);
+      res.status(400).json({ error: 'Failed to create portal link' });
+    }
+  });
+
+  app.get('/api/portal-links', async (req, res) => {
+    try {
+      const links = await storage.getAllPortalLinks();
+      res.json(links);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch portal links' });
+    }
+  });
+
+  app.delete('/api/portal-links/:id', async (req, res) => {
+    try {
+      await storage.deactivatePortalLink(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to deactivate link' });
+    }
+  });
+
+  // Customer Portal - Public endpoints (no auth required)
+  app.get('/api/portal/:token', async (req, res) => {
+    try {
+      const link = await storage.getPortalLinkByToken(req.params.token);
+      
+      if (!link) {
+        return res.status(404).json({ error: 'Link not found or expired' });
+      }
+
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ error: 'This link has expired' });
+      }
+
+      await storage.updatePortalLinkViewCount(link.id);
+
+      let document = null;
+      let customer = null;
+
+      if (link.documentType === 'estimate') {
+        document = await storage.getEstimate(link.documentId);
+      } else if (link.documentType === 'invoice') {
+        document = await storage.getInvoice(link.documentId);
+      } else if (link.documentType === 'payment_receipt') {
+        document = await storage.getCustomerPayment(link.documentId);
+      }
+
+      if (!document) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      if (link.customerId) {
+        customer = await storage.getCustomer(link.customerId);
+      } else if ('customerId' in document && document.customerId) {
+        customer = await storage.getCustomer(document.customerId);
+      }
+
+      const companySettings = await storage.getCompanySettings();
+
+      res.json({
+        link,
+        document,
+        customer,
+        companySettings,
+      });
+    } catch (error) {
+      console.error('Portal access error:', error);
+      res.status(500).json({ error: 'Failed to access portal' });
+    }
+  });
+
   return httpServer;
 }
