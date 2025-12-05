@@ -15,6 +15,7 @@ import Daybook from "@/pages/daybook";
 import OakBook from "@/pages/oak-book";
 import HR from "@/pages/hr";
 import Admin from "@/pages/admin";
+import CustomerPortal from "@/pages/customer-portal";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -76,7 +77,14 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <AppRoutes />
+          <Switch>
+            <Route path="/portal/:token">
+              <CustomerPortal />
+            </Route>
+            <Route>
+              <AppRoutes />
+            </Route>
+          </Switch>
           <Toaster />
         </AuthProvider>
       </TooltipProvider>
