@@ -1484,23 +1484,23 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
   if (isEditMode) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <div className="flex justify-between items-center">
-              <DialogTitle>Edit Quote - {estimate.number}</DialogTitle>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <DialogTitle className="text-base sm:text-lg">Edit Quote - {estimate.number}</DialogTitle>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)}>
+                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)} className="text-xs sm:text-sm">
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="text-xs sm:text-sm">
+                  {updateMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <Label>Customer</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
@@ -1520,11 +1520,11 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <Label>Status</Label>
+                <Label className="text-xs sm:text-sm">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1536,36 +1536,36 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
                 </Select>
               </div>
               <div>
-                <Label>Wedding Planner Name</Label>
-                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} />
+                <Label className="text-xs sm:text-sm">Wedding Planner</Label>
+                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} className="text-xs sm:text-sm" />
               </div>
             </div>
 
             <div>
-              <Label>Customer Address</Label>
-              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Customer Address</Label>
+              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
-              <Label>Subject (Event Description)</Label>
-              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Subject (Event Description)</Label>
+              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
-                <Label>Line Items</Label>
+                <Label className="text-xs sm:text-sm">Line Items</Label>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs sm:text-sm">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs h-7 px-2">
                     + Section
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs sm:text-sm">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs h-7 px-2">
                     + Item
                   </Button>
                 </div>
               </div>
               
-              <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm min-w-[500px]">
+              <div className="border rounded-lg overflow-x-auto w-full">
+                <table className="w-full text-xs sm:text-sm min-w-[450px]">
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="p-2 text-left w-12">Sl No</th>
@@ -1623,40 +1623,40 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <div className="w-full sm:w-80 space-y-2">
+            <div className="w-full">
+              <div className="w-full sm:w-80 sm:ml-auto space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between">
                   <span>Sub Total</span>
                   <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                  <span className="flex items-center gap-2 text-sm">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="flex items-center gap-1">
                     Discount
                     <Input
                       type="number"
                       value={discountPercent}
                       onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)}
-                      className="w-16 h-6 text-right"
+                      className="w-12 h-6 text-right text-xs"
                     />
                     %
                   </span>
                   <span>- {formatIndianCurrency(discountAmount)}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                  <span className="flex items-center gap-2 text-sm">
-                    Service Charge
+                <div className="flex justify-between items-center gap-2">
+                  <span className="flex items-center gap-1">
+                    Service
                     <Input
                       type="number"
                       value={serviceChargePercent}
                       onChange={e => setServiceChargePercent(parseFloat(e.target.value) || 0)}
-                      className="w-16 h-6 text-right"
+                      className="w-12 h-6 text-right text-xs"
                     />
                     %
                   </span>
                   <span>{formatIndianCurrency(serviceChargeAmount)}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-sm sm:text-lg font-bold">
                   <span>Total</span>
                   <span>{formatIndianCurrency(total)}</span>
                 </div>
@@ -1664,13 +1664,13 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             </div>
 
             <div>
-              <Label>Notes</Label>
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Notes</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
-              <Label>Terms & Conditions</Label>
-              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={6} />
+              <Label className="text-xs sm:text-sm">Terms & Conditions</Label>
+              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={4} className="text-xs sm:text-sm" />
             </div>
           </div>
         </DialogContent>
@@ -2155,27 +2155,27 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   if (isEditMode) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <div className="flex justify-between items-center">
-              <DialogTitle>Edit Invoice - {invoice.number}</DialogTitle>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+              <DialogTitle className="text-base sm:text-lg">Edit Invoice - {invoice.number}</DialogTitle>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)}>
+                <Button variant="outline" size="sm" onClick={() => setIsEditMode(false)} className="text-xs sm:text-sm">
                   Cancel
                 </Button>
-                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+                <Button size="sm" onClick={handleSave} disabled={updateMutation.isPending} className="text-xs sm:text-sm">
+                  {updateMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="space-y-6">
-            <div className="grid md:grid-cols-3 gap-4">
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <div>
-                <Label>Customer</Label>
+                <Label className="text-xs sm:text-sm">Customer</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs sm:text-sm">
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2186,20 +2186,20 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
                 </Select>
               </div>
               <div>
-                <Label>Invoice Date</Label>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                <Label className="text-xs sm:text-sm">Invoice Date</Label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-xs sm:text-sm" />
               </div>
               <div>
-                <Label>Due Date</Label>
-                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                <Label className="text-xs sm:text-sm">Due Date</Label>
+                <Input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="text-xs sm:text-sm" />
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <Label>Status</Label>
+                <Label className="text-xs sm:text-sm">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2212,36 +2212,36 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
                 </Select>
               </div>
               <div>
-                <Label>Wedding Planner Name</Label>
-                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} />
+                <Label className="text-xs sm:text-sm">Wedding Planner</Label>
+                <Input value={weddingPlannerName} onChange={e => setWeddingPlannerName(e.target.value)} className="text-xs sm:text-sm" />
               </div>
             </div>
 
             <div>
-              <Label>Customer Address</Label>
-              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Customer Address</Label>
+              <Textarea value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
-              <Label>Subject</Label>
-              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Subject</Label>
+              <Textarea value={subject} onChange={e => setSubject(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
-                <Label>Line Items</Label>
+                <Label className="text-xs sm:text-sm">Line Items</Label>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs sm:text-sm">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(true)} className="text-xs h-7 px-2">
                     + Section
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs sm:text-sm">
+                  <Button size="sm" variant="outline" onClick={() => addLineItem(false)} className="text-xs h-7 px-2">
                     + Item
                   </Button>
                 </div>
               </div>
               
-              <div className="border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm min-w-[500px]">
+              <div className="border rounded-lg overflow-x-auto w-full">
+                <table className="w-full text-xs sm:text-sm min-w-[450px]">
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="p-2 text-left w-12">Sl No</th>
@@ -2299,44 +2299,44 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <div className="w-full sm:w-80 space-y-2">
+            <div className="w-full">
+              <div className="w-full sm:w-80 sm:ml-auto space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between">
                   <span>Sub Total</span>
                   <span className="font-medium">{formatIndianCurrency(subtotal)}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                  <span className="flex items-center gap-2 text-sm">
+                <div className="flex justify-between items-center gap-2">
+                  <span className="flex items-center gap-1">
                     Discount
                     <Input
                       type="number"
                       value={discountPercent}
                       onChange={e => setDiscountPercent(parseFloat(e.target.value) || 0)}
-                      className="w-16 h-6 text-right"
+                      className="w-12 h-6 text-right text-xs"
                     />
                     %
                   </span>
                   <span>- {formatIndianCurrency(discountAmount)}</span>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                  <span className="flex items-center gap-2 text-sm">
-                    Service Charge
+                <div className="flex justify-between items-center gap-2">
+                  <span className="flex items-center gap-1">
+                    Service
                     <Input
                       type="number"
                       value={serviceChargePercent}
                       onChange={e => setServiceChargePercent(parseFloat(e.target.value) || 0)}
-                      className="w-16 h-6 text-right"
+                      className="w-12 h-6 text-right text-xs"
                     />
                     %
                   </span>
                   <span>{formatIndianCurrency(serviceChargeAmount)}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between text-sm sm:text-lg font-bold">
                   <span>Total</span>
                   <span>{formatIndianCurrency(total)}</span>
                 </div>
-                <div className="flex justify-between text-destructive font-bold">
+                <div className="flex justify-between text-destructive font-bold text-sm sm:text-base">
                   <span>Balance Due</span>
                   <span>{formatIndianCurrency(balanceDue > 0 ? balanceDue : 0)}</span>
                 </div>
@@ -2344,13 +2344,13 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             </div>
 
             <div>
-              <Label>Notes</Label>
-              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+              <Label className="text-xs sm:text-sm">Notes</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="text-xs sm:text-sm" />
             </div>
 
             <div>
-              <Label>Terms & Conditions</Label>
-              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={6} />
+              <Label className="text-xs sm:text-sm">Terms & Conditions</Label>
+              <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={4} className="text-xs sm:text-sm" />
             </div>
           </div>
         </DialogContent>
