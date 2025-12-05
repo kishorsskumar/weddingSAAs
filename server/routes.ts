@@ -1361,5 +1361,315 @@ export async function registerRoutes(
     }
   });
 
+  // Oak Sales - Pipelines
+  app.get('/api/sales/pipelines', async (req, res) => {
+    const pipelines = await storage.getAllSalesPipelines();
+    res.json(pipelines);
+  });
+
+  app.get('/api/sales/pipelines/:id', async (req, res) => {
+    const pipeline = await storage.getSalesPipeline(req.params.id);
+    if (!pipeline) return res.status(404).json({ error: 'Pipeline not found' });
+    res.json(pipeline);
+  });
+
+  app.post('/api/sales/pipelines', async (req, res) => {
+    try {
+      const pipeline = await storage.createSalesPipeline(req.body);
+      res.json(pipeline);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create pipeline' });
+    }
+  });
+
+  app.patch('/api/sales/pipelines/:id', async (req, res) => {
+    try {
+      const pipeline = await storage.updateSalesPipeline(req.params.id, req.body);
+      res.json(pipeline);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update pipeline' });
+    }
+  });
+
+  app.delete('/api/sales/pipelines/:id', async (req, res) => {
+    await storage.deleteSalesPipeline(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Stages
+  app.get('/api/sales/stages', async (req, res) => {
+    const { pipelineId } = req.query;
+    if (pipelineId) {
+      const stages = await storage.getSalesStagesByPipelineId(pipelineId as string);
+      res.json(stages);
+    } else {
+      const stages = await storage.getAllSalesStages();
+      res.json(stages);
+    }
+  });
+
+  app.get('/api/sales/stages/:id', async (req, res) => {
+    const stage = await storage.getSalesStage(req.params.id);
+    if (!stage) return res.status(404).json({ error: 'Stage not found' });
+    res.json(stage);
+  });
+
+  app.post('/api/sales/stages', async (req, res) => {
+    try {
+      const stage = await storage.createSalesStage(req.body);
+      res.json(stage);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create stage' });
+    }
+  });
+
+  app.patch('/api/sales/stages/:id', async (req, res) => {
+    try {
+      const stage = await storage.updateSalesStage(req.params.id, req.body);
+      res.json(stage);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update stage' });
+    }
+  });
+
+  app.delete('/api/sales/stages/:id', async (req, res) => {
+    await storage.deleteSalesStage(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Contacts
+  app.get('/api/sales/contacts', async (req, res) => {
+    const contacts = await storage.getAllSalesContacts();
+    res.json(contacts);
+  });
+
+  app.get('/api/sales/contacts/:id', async (req, res) => {
+    const contact = await storage.getSalesContact(req.params.id);
+    if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    res.json(contact);
+  });
+
+  app.post('/api/sales/contacts', async (req, res) => {
+    try {
+      const contact = await storage.createSalesContact(req.body);
+      res.json(contact);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create contact' });
+    }
+  });
+
+  app.patch('/api/sales/contacts/:id', async (req, res) => {
+    try {
+      const contact = await storage.updateSalesContact(req.params.id, req.body);
+      res.json(contact);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update contact' });
+    }
+  });
+
+  app.delete('/api/sales/contacts/:id', async (req, res) => {
+    await storage.deleteSalesContact(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Companies
+  app.get('/api/sales/companies', async (req, res) => {
+    const companies = await storage.getAllSalesCompanies();
+    res.json(companies);
+  });
+
+  app.get('/api/sales/companies/:id', async (req, res) => {
+    const company = await storage.getSalesCompany(req.params.id);
+    if (!company) return res.status(404).json({ error: 'Company not found' });
+    res.json(company);
+  });
+
+  app.post('/api/sales/companies', async (req, res) => {
+    try {
+      const company = await storage.createSalesCompany(req.body);
+      res.json(company);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create company' });
+    }
+  });
+
+  app.patch('/api/sales/companies/:id', async (req, res) => {
+    try {
+      const company = await storage.updateSalesCompany(req.params.id, req.body);
+      res.json(company);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update company' });
+    }
+  });
+
+  app.delete('/api/sales/companies/:id', async (req, res) => {
+    await storage.deleteSalesCompany(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Deals
+  app.get('/api/sales/deals', async (req, res) => {
+    const { pipelineId, ownerId } = req.query;
+    if (pipelineId) {
+      const deals = await storage.getSalesDealsByPipelineId(pipelineId as string);
+      res.json(deals);
+    } else if (ownerId) {
+      const deals = await storage.getSalesDealsByOwnerId(ownerId as string);
+      res.json(deals);
+    } else {
+      const deals = await storage.getAllSalesDeals();
+      res.json(deals);
+    }
+  });
+
+  app.get('/api/sales/deals/:id', async (req, res) => {
+    const deal = await storage.getSalesDeal(req.params.id);
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+    res.json(deal);
+  });
+
+  app.post('/api/sales/deals', async (req, res) => {
+    try {
+      const deal = await storage.createSalesDeal(req.body);
+      res.json(deal);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create deal' });
+    }
+  });
+
+  app.patch('/api/sales/deals/:id', async (req, res) => {
+    try {
+      const deal = await storage.updateSalesDeal(req.params.id, req.body);
+      res.json(deal);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update deal' });
+    }
+  });
+
+  app.delete('/api/sales/deals/:id', async (req, res) => {
+    await storage.deleteSalesDeal(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Activities
+  app.get('/api/sales/activities', async (req, res) => {
+    const { dealId, ownerId } = req.query;
+    if (dealId) {
+      const activities = await storage.getSalesActivitiesByDealId(dealId as string);
+      res.json(activities);
+    } else if (ownerId) {
+      const activities = await storage.getSalesActivitiesByOwnerId(ownerId as string);
+      res.json(activities);
+    } else {
+      const activities = await storage.getAllSalesActivities();
+      res.json(activities);
+    }
+  });
+
+  app.get('/api/sales/activities/:id', async (req, res) => {
+    const activity = await storage.getSalesActivity(req.params.id);
+    if (!activity) return res.status(404).json({ error: 'Activity not found' });
+    res.json(activity);
+  });
+
+  app.post('/api/sales/activities', async (req, res) => {
+    try {
+      const activity = await storage.createSalesActivity(req.body);
+      res.json(activity);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create activity' });
+    }
+  });
+
+  app.patch('/api/sales/activities/:id', async (req, res) => {
+    try {
+      const activity = await storage.updateSalesActivity(req.params.id, req.body);
+      res.json(activity);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update activity' });
+    }
+  });
+
+  app.delete('/api/sales/activities/:id', async (req, res) => {
+    await storage.deleteSalesActivity(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Targets
+  app.get('/api/sales/targets', async (req, res) => {
+    const { userId } = req.query;
+    if (userId) {
+      const targets = await storage.getSalesTargetsByUserId(userId as string);
+      res.json(targets);
+    } else {
+      const targets = await storage.getAllSalesTargets();
+      res.json(targets);
+    }
+  });
+
+  app.get('/api/sales/targets/:id', async (req, res) => {
+    const target = await storage.getSalesTarget(req.params.id);
+    if (!target) return res.status(404).json({ error: 'Target not found' });
+    res.json(target);
+  });
+
+  app.post('/api/sales/targets', async (req, res) => {
+    try {
+      const target = await storage.createSalesTarget(req.body);
+      res.json(target);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create target' });
+    }
+  });
+
+  app.patch('/api/sales/targets/:id', async (req, res) => {
+    try {
+      const target = await storage.updateSalesTarget(req.params.id, req.body);
+      res.json(target);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update target' });
+    }
+  });
+
+  app.delete('/api/sales/targets/:id', async (req, res) => {
+    await storage.deleteSalesTarget(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Sales - Automations
+  app.get('/api/sales/automations', async (req, res) => {
+    const automations = await storage.getAllSalesAutomations();
+    res.json(automations);
+  });
+
+  app.get('/api/sales/automations/:id', async (req, res) => {
+    const automation = await storage.getSalesAutomation(req.params.id);
+    if (!automation) return res.status(404).json({ error: 'Automation not found' });
+    res.json(automation);
+  });
+
+  app.post('/api/sales/automations', async (req, res) => {
+    try {
+      const automation = await storage.createSalesAutomation(req.body);
+      res.json(automation);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create automation' });
+    }
+  });
+
+  app.patch('/api/sales/automations/:id', async (req, res) => {
+    try {
+      const automation = await storage.updateSalesAutomation(req.params.id, req.body);
+      res.json(automation);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update automation' });
+    }
+  });
+
+  app.delete('/api/sales/automations/:id', async (req, res) => {
+    await storage.deleteSalesAutomation(req.params.id);
+    res.json({ success: true });
+  });
+
   return httpServer;
 }
