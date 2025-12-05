@@ -1602,6 +1602,8 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
   }
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -1611,6 +1613,32 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
       console.error('Failed to generate PDF:', error);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleShareToPortal = async () => {
+    setIsSharing(true);
+    try {
+      const res = await fetch('/api/portal-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'estimate',
+          documentId: estimate.id,
+          customerId: estimate.customerId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      const link = await res.json();
+      const portalUrl = `${window.location.origin}/portal/${link.token}`;
+      setShareLink(portalUrl);
+      await navigator.clipboard.writeText(portalUrl);
+      toast({ title: 'Link copied to clipboard!', description: 'Share this link with your customer.' });
+    } catch (error) {
+      console.error('Failed to share:', error);
+      toast({ title: 'Failed to create share link', variant: 'destructive' });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -1633,6 +1661,10 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
               {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               {isDownloading ? 'Generating...' : 'Download PDF'}
             </Button>
+            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing}>
+              {isSharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
+              {isSharing ? 'Creating...' : 'Share'}
+            </Button>
             <Button variant="outline" size="sm" onClick={onClone}>
               <Copy className="h-4 w-4 mr-2" /> Clone
             </Button>
@@ -1643,6 +1675,15 @@ function ViewEditQuoteDialog({ open, onOpenChange, estimate, customers, companyS
             )}
           </div>
         </div>
+        
+        {shareLink && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between gap-2">
+            <div className="flex-1 text-sm truncate">{shareLink}</div>
+            <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(shareLink); toast({ title: 'Copied!' }); }}>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         <div id={`quote-preview-${estimate.id}`} className="bg-white p-6 print:p-0">
           {/* Header */}
@@ -2229,6 +2270,8 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
   }
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -2238,6 +2281,32 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
       console.error('Failed to generate PDF:', error);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleShareToPortal = async () => {
+    setIsSharing(true);
+    try {
+      const res = await fetch('/api/portal-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'invoice',
+          documentId: invoice.id,
+          customerId: invoice.customerId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      const link = await res.json();
+      const portalUrl = `${window.location.origin}/portal/${link.token}`;
+      setShareLink(portalUrl);
+      await navigator.clipboard.writeText(portalUrl);
+      toast({ title: 'Link copied to clipboard!', description: 'Share this link with your customer.' });
+    } catch (error) {
+      console.error('Failed to share:', error);
+      toast({ title: 'Failed to create share link', variant: 'destructive' });
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -2252,7 +2321,7 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
             </Badge>
             <span className="font-medium">{invoice.number}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={() => setIsEditMode(true)}>
               <Edit className="h-4 w-4 mr-2" /> Edit
             </Button>
@@ -2260,8 +2329,21 @@ function ViewEditInvoiceDialog({ open, onOpenChange, invoice, customers, company
               {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               {isDownloading ? 'Generating...' : 'Download PDF'}
             </Button>
+            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing}>
+              {isSharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
+              {isSharing ? 'Creating...' : 'Share'}
+            </Button>
           </div>
         </div>
+
+        {shareLink && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between gap-2">
+            <div className="flex-1 text-sm truncate">{shareLink}</div>
+            <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(shareLink); toast({ title: 'Copied!' }); }}>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         <div id={`invoice-preview-${invoice.id}`} className="bg-white p-6 print:p-0">
           {/* Header */}
@@ -2573,6 +2655,9 @@ function PaymentsReceivedSection({ payments, customers, invoices, banks, queryCl
 
 function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoice, bank, companySettings }: any) {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -2585,6 +2670,32 @@ function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoi
     }
   };
 
+  const handleShareToPortal = async () => {
+    setIsSharing(true);
+    try {
+      const res = await fetch('/api/portal-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentType: 'payment_receipt',
+          documentId: payment.id,
+          customerId: payment.customerId,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create share link');
+      const link = await res.json();
+      const portalUrl = `${window.location.origin}/portal/${link.token}`;
+      setShareLink(portalUrl);
+      await navigator.clipboard.writeText(portalUrl);
+      toast({ title: 'Link copied to clipboard!', description: 'Share this link with your customer.' });
+    } catch (error) {
+      console.error('Failed to share:', error);
+      toast({ title: 'Failed to create share link', variant: 'destructive' });
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -2594,13 +2705,26 @@ function ViewPaymentReceiptDialog({ open, onOpenChange, payment, customer, invoi
             <Badge variant="default">Payment Receipt</Badge>
             <span className="font-medium">{payment.number}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isDownloading}>
               {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               {isDownloading ? 'Generating...' : 'Download PDF'}
             </Button>
+            <Button variant="outline" size="sm" onClick={handleShareToPortal} disabled={isSharing}>
+              {isSharing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Share2 className="h-4 w-4 mr-2" />}
+              {isSharing ? 'Creating...' : 'Share'}
+            </Button>
           </div>
         </div>
+
+        {shareLink && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between gap-2">
+            <div className="flex-1 text-sm truncate">{shareLink}</div>
+            <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(shareLink); toast({ title: 'Copied!' }); }}>
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         <div id={`receipt-preview-${payment.id}`} className="bg-white p-6">
           {/* Header */}
