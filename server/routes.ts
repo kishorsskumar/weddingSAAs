@@ -904,6 +904,85 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Oak Book - Items
+  app.get('/api/items', async (req, res) => {
+    const itemsList = await storage.getAllItems();
+    res.json(itemsList);
+  });
+
+  app.get('/api/items/:id', async (req, res) => {
+    const item = await storage.getItem(req.params.id);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.post('/api/items', async (req, res) => {
+    try {
+      const item = await storage.createItem(req.body);
+      res.json(item);
+    } catch (error) {
+      console.error('Item error:', error);
+      res.status(400).json({ error: 'Invalid item data' });
+    }
+  });
+
+  app.patch('/api/items/:id', async (req, res) => {
+    const item = await storage.updateItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/items/:id', async (req, res) => {
+    await storage.deleteItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Oak Book - Bills
+  app.get('/api/bills', async (req, res) => {
+    const billsList = await storage.getAllBills();
+    res.json(billsList);
+  });
+
+  app.get('/api/bills/next-number', async (req, res) => {
+    const number = await storage.getNextBillNumber();
+    res.json({ number });
+  });
+
+  app.get('/api/bills/:id', async (req, res) => {
+    const bill = await storage.getBill(req.params.id);
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+    res.json(bill);
+  });
+
+  app.post('/api/bills', async (req, res) => {
+    try {
+      const bill = await storage.createBill(req.body);
+      res.json(bill);
+    } catch (error) {
+      console.error('Bill error:', error);
+      res.status(400).json({ error: 'Invalid bill data' });
+    }
+  });
+
+  app.patch('/api/bills/:id', async (req, res) => {
+    const bill = await storage.updateBill(req.params.id, req.body);
+    if (!bill) {
+      return res.status(404).json({ error: 'Bill not found' });
+    }
+    res.json(bill);
+  });
+
+  app.delete('/api/bills/:id', async (req, res) => {
+    await storage.deleteBill(req.params.id);
+    res.json({ success: true });
+  });
+
   // Oak Book - Company Settings
   app.get('/api/company-settings', async (req, res) => {
     const settings = await storage.getCompanySettings();

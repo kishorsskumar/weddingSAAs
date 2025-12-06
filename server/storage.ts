@@ -16,6 +16,8 @@ import {
   customerPayments,
   expenses,
   vendorPayments,
+  items,
+  bills,
   companySettings,
   documentSequences,
   estimateTemplates,
@@ -64,6 +66,10 @@ import {
   type InsertExpense,
   type VendorPayment,
   type InsertVendorPayment,
+  type Item,
+  type InsertItem,
+  type Bill,
+  type InsertBill,
   type CompanySettings,
   type InsertCompanySettings,
   type DocumentSequence,
@@ -220,6 +226,21 @@ export interface IStorage {
   createVendorPaymentWithDaybook(payment: InsertVendorPayment, vendorName: string): Promise<VendorPayment>;
   deleteVendorPayment(id: string): Promise<void>;
   getNextVendorPaymentNumber(): Promise<string>;
+
+  // Oak Book - Items
+  getAllItems(): Promise<Item[]>;
+  getItem(id: string): Promise<Item | undefined>;
+  createItem(item: InsertItem): Promise<Item>;
+  updateItem(id: string, item: Partial<InsertItem>): Promise<Item | undefined>;
+  deleteItem(id: string): Promise<void>;
+
+  // Oak Book - Bills
+  getAllBills(): Promise<Bill[]>;
+  getBill(id: string): Promise<Bill | undefined>;
+  createBill(bill: InsertBill): Promise<Bill>;
+  updateBill(id: string, bill: Partial<InsertBill>): Promise<Bill | undefined>;
+  deleteBill(id: string): Promise<void>;
+  getNextBillNumber(): Promise<string>;
 
   // Oak Book - Company Settings
   getCompanySettings(): Promise<CompanySettings | undefined>;
@@ -896,6 +917,61 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(vendorPayments);
     const count = Number(result?.count || 0) + 1;
     return `VPY-${String(count).padStart(4, '0')}`;
+  }
+
+  // Oak Book - Items
+  async getAllItems(): Promise<Item[]> {
+    return db.select().from(items).orderBy(desc(items.createdAt));
+  }
+
+  async getItem(id: string): Promise<Item | undefined> {
+    const [item] = await db.select().from(items).where(eq(items.id, id));
+    return item;
+  }
+
+  async createItem(item: InsertItem): Promise<Item> {
+    const [created] = await db.insert(items).values(item).returning();
+    return created;
+  }
+
+  async updateItem(id: string, itemData: Partial<InsertItem>): Promise<Item | undefined> {
+    const [updated] = await db.update(items).set(itemData).where(eq(items.id, id)).returning();
+    return updated;
+  }
+
+  async deleteItem(id: string): Promise<void> {
+    await db.delete(items).where(eq(items.id, id));
+  }
+
+  // Oak Book - Bills
+  async getAllBills(): Promise<Bill[]> {
+    return db.select().from(bills).orderBy(desc(bills.createdAt));
+  }
+
+  async getBill(id: string): Promise<Bill | undefined> {
+    const [bill] = await db.select().from(bills).where(eq(bills.id, id));
+    return bill;
+  }
+
+  async createBill(bill: InsertBill): Promise<Bill> {
+    const number = await this.getNextBillNumber();
+    const [created] = await db.insert(bills).values({ ...bill, number }).returning();
+    return created;
+  }
+
+  async updateBill(id: string, billData: Partial<InsertBill>): Promise<Bill | undefined> {
+    const [updated] = await db.update(bills).set(billData).where(eq(bills.id, id)).returning();
+    return updated;
+  }
+
+  async deleteBill(id: string): Promise<void> {
+    await db.delete(bills).where(eq(bills.id, id));
+  }
+
+  async getNextBillNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(bills);
+    const count = Number(result?.count || 0) + 1;
+    return `BILL-${String(count).padStart(4, '0')}`;
   }
 
   // Oak Book - Company Settings

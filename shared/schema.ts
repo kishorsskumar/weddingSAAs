@@ -260,6 +260,42 @@ export const vendorPayments = pgTable("vendor_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Oak Book - Items/Products (reusable products/services)
+export const items = pgTable("items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type").notNull().default('service'), // 'service' | 'product'
+  rate: decimal("rate", { precision: 12, scale: 2 }).notNull().default('0'),
+  unit: text("unit").default('Nos'), // 'Nos', 'Hours', 'Days', etc.
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default('0'),
+  hsnCode: text("hsn_code"), // HSN/SAC code for GST
+  sku: text("sku"), // Stock Keeping Unit
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Oak Book - Bills (from vendors)
+export const bills = pgTable("bills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  number: text("number").notNull().unique(), // BILL-001
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorBillNumber: text("vendor_bill_number"), // Vendor's bill/invoice number
+  eventId: varchar("event_id").references(() => events.id),
+  date: date("date").notNull(),
+  dueDate: date("due_date"),
+  status: text("status").notNull().default('pending'), // 'pending' | 'partially_paid' | 'paid' | 'overdue'
+  lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull().default('0'),
+  taxTotal: decimal("tax_total", { precision: 12, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull().default('0'),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).notNull().default('0'),
+  balanceDue: decimal("balance_due", { precision: 12, scale: 2 }).notNull().default('0'),
+  notes: text("notes"),
+  attachmentUrl: text("attachment_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Oak Book - Company Settings (for estimate/invoice header)
 export const companySettings = pgTable("company_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -358,6 +394,10 @@ export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true,
 export const insertCustomerPaymentSchema = createInsertSchema(customerPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertVendorPaymentSchema = createInsertSchema(vendorPayments).omit({ id: true, createdAt: true, daybookEntryId: true });
+export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true });
+export const insertBillSchema = createInsertSchema(bills).omit({ id: true, createdAt: true }).extend({
+  lineItems: z.array(lineItemSchema).optional().default([]),
+});
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true, updatedAt: true });
 export const insertDocumentSequenceSchema = createInsertSchema(documentSequences).omit({ id: true });
 export const insertEstimateTemplateSchema = createInsertSchema(estimateTemplates).omit({ id: true, createdAt: true }).extend({
@@ -578,6 +618,12 @@ export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 
 export type VendorPayment = typeof vendorPayments.$inferSelect;
 export type InsertVendorPayment = z.infer<typeof insertVendorPaymentSchema>;
+
+export type Item = typeof items.$inferSelect;
+export type InsertItem = z.infer<typeof insertItemSchema>;
+
+export type Bill = typeof bills.$inferSelect;
+export type InsertBill = z.infer<typeof insertBillSchema>;
 
 export type CompanySettings = typeof companySettings.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
