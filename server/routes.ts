@@ -51,6 +51,29 @@ export async function registerRoutes(
     })
   );
 
+  // Health check endpoint for debugging
+  app.get('/api/health', async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const roles = await storage.getAllRoles();
+      res.json({
+        status: 'ok',
+        database: 'connected',
+        userCount: users.length,
+        roleCount: roles.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error('[/api/health] Database error:', error?.message);
+      res.status(500).json({
+        status: 'error',
+        database: 'error',
+        error: error?.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
   // All available pages for admin/superadmin
   const ALL_PAGES = [
     'dashboard',
