@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -190,10 +192,14 @@ type Bank = {
 export default function OakBook() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState("dashboard");
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales", "purchases"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -505,6 +511,20 @@ export default function OakBook() {
     setPreviewModalOpen(true);
   };
 
+  const handleSelectDocument = (type: "quote" | "invoice", id: string) => {
+    setSelectedDocType(type);
+    setSelectedDocId(id);
+    if (isMobile) {
+      setMobilePreviewOpen(true);
+    }
+  };
+
+  const clearSelectedDocument = () => {
+    setSelectedDocType(null);
+    setSelectedDocId(null);
+    setMobilePreviewOpen(false);
+  };
+
   const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string) => {
     try {
       toast({ title: "Generating PDF..." });
@@ -558,6 +578,7 @@ export default function OakBook() {
   const handleNavClick = (sectionId: string) => {
     setActiveSection(sectionId);
     setMobileMenuOpen(false);
+    clearSelectedDocument();
   };
 
   const totalIncome = useMemo(() => {
@@ -1186,8 +1207,8 @@ export default function OakBook() {
   };
 
   const renderEstimates = () => (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Estimates</h1>
         <Button onClick={() => { setEditingEstimate(null); setEstimateModalOpen(true); }} data-testid="btn-add-estimate">
           <Plus className="h-4 w-4 mr-2" />
@@ -1195,76 +1216,138 @@ export default function OakBook() {
         </Button>
       </div>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-4 font-medium text-muted-foreground">Number</th>
-                <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Date</th>
-                <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Customer</th>
-                <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {estimates.map((estimate) => {
-                const customer = customers.find((c) => c.id === estimate.customerId);
-                return (
-                  <tr key={estimate.id} className="border-b hover:bg-muted/50">
-                    <td className="p-4 font-medium">{estimate.number}</td>
-                    <td className="p-4 text-muted-foreground hidden sm:table-cell">
-                      {format(new Date(estimate.date), "dd MMM yyyy")}
-                    </td>
-                    <td className="p-4 hidden md:table-cell">{customer?.name || "-"}</td>
-                    <td className="p-4 text-right font-medium">
-                      ₹{parseFloat(estimate.total).toLocaleString("en-IN")}
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={estimate.status === "accepted" ? "default" : "secondary"}>
-                        {estimate.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handlePreview("quote", estimate.id)} title="Preview">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingEstimate(estimate); setEstimateModalOpen(true); }} title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleCloneEstimate(estimate)} title="Clone">
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("quote", estimate.id)} title="Download PDF">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteEstimate.mutate(estimate.id)} title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+        {/* List Panel */}
+        <div className={cn(
+          "flex-shrink-0 overflow-auto",
+          selectedDocType === "quote" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
+        )}>
+          <Card className="h-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
                   </tr>
-                );
-              })}
-              {estimates.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                    No estimates found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {estimates.map((estimate) => {
+                    const customer = customers.find((c) => c.id === estimate.customerId);
+                    const isSelected = selectedDocType === "quote" && selectedDocId === estimate.id;
+                    return (
+                      <tr 
+                        key={estimate.id} 
+                        className={cn(
+                          "border-b cursor-pointer transition-colors",
+                          isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+                        )}
+                        onClick={() => handleSelectDocument("quote", estimate.id)}
+                      >
+                        <td className="p-3 font-medium text-sm">{estimate.number}</td>
+                        <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
+                          {format(new Date(estimate.date), "dd MMM")}
+                        </td>
+                        <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
+                        <td className="p-3 text-right font-medium text-sm">
+                          ₹{parseFloat(estimate.total).toLocaleString("en-IN")}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant={estimate.status === "accepted" ? "default" : "secondary"} className="text-xs">
+                            {estimate.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingEstimate(estimate); setEstimateModalOpen(true); }} title="Edit">
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneEstimate(estimate); }} title="Clone">
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDownloadPdf("quote", estimate.id); }} title="Download PDF">
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(estimate.id); }} title="Delete">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {estimates.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No estimates found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
-      </Card>
+
+        {/* Preview Panel - Desktop */}
+        {selectedDocType === "quote" && selectedDocId && !isMobile && (
+          <div className="hidden lg:flex flex-1 flex-col min-h-0">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+                <span className="font-medium text-sm">Preview</span>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf("quote", selectedDocId)}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelectedDocument}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <iframe
+                  src={`/print/quote/${selectedDocId}`}
+                  className="w-full h-full border-0"
+                  title="Document Preview"
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Preview Sheet */}
+      <Sheet open={mobilePreviewOpen && selectedDocType === "quote"} onOpenChange={(open) => !open && clearSelectedDocument()}>
+        <SheetContent side="bottom" className="h-[90vh] p-0">
+          <SheetHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Estimate Preview</SheetTitle>
+              <Button variant="outline" size="sm" onClick={() => selectedDocId && handleDownloadPdf("quote", selectedDocId)}>
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+            </div>
+          </SheetHeader>
+          {selectedDocId && (
+            <iframe
+              src={`/print/quote/${selectedDocId}`}
+              className="w-full h-[calc(100%-60px)] border-0"
+              title="Document Preview"
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 
   const renderInvoices = () => (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Invoices</h1>
         <Button onClick={() => { setEditingInvoice(null); setInvoiceModalOpen(true); }} data-testid="btn-add-invoice">
           <Plus className="h-4 w-4 mr-2" />
@@ -1272,74 +1355,132 @@ export default function OakBook() {
         </Button>
       </div>
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-4 font-medium text-muted-foreground">Number</th>
-                <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Date</th>
-                <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Customer</th>
-                <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
-                <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Balance</th>
-                <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
-                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice) => {
-                const customer = customers.find((c) => c.id === invoice.customerId);
-                return (
-                  <tr key={invoice.id} className="border-b hover:bg-muted/50">
-                    <td className="p-4 font-medium">{invoice.number}</td>
-                    <td className="p-4 text-muted-foreground hidden sm:table-cell">
-                      {format(new Date(invoice.date), "dd MMM yyyy")}
-                    </td>
-                    <td className="p-4 hidden md:table-cell">{customer?.name || "-"}</td>
-                    <td className="p-4 text-right font-medium">
-                      ₹{parseFloat(invoice.total).toLocaleString("en-IN")}
-                    </td>
-                    <td className="p-4 text-right text-muted-foreground hidden lg:table-cell">
-                      ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN")}
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={invoice.status === "paid" ? "default" : "secondary"}>
-                        {invoice.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handlePreview("invoice", invoice.id)} title="Preview">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingInvoice(invoice); setInvoiceModalOpen(true); }} title="Edit">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleCloneInvoice(invoice)} title="Clone">
-                          <FileText className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("invoice", invoice.id)} title="Download PDF">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => deleteInvoice.mutate(invoice.id)} title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
+        {/* List Panel */}
+        <div className={cn(
+          "flex-shrink-0 overflow-auto",
+          selectedDocType === "invoice" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
+        )}>
+          <Card className="h-full">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
                   </tr>
-                );
-              })}
-              {invoices.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
-                    No invoices found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {invoices.map((invoice) => {
+                    const customer = customers.find((c) => c.id === invoice.customerId);
+                    const isSelected = selectedDocType === "invoice" && selectedDocId === invoice.id;
+                    return (
+                      <tr 
+                        key={invoice.id} 
+                        className={cn(
+                          "border-b cursor-pointer transition-colors",
+                          isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+                        )}
+                        onClick={() => handleSelectDocument("invoice", invoice.id)}
+                      >
+                        <td className="p-3 font-medium text-sm">{invoice.number}</td>
+                        <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
+                          {format(new Date(invoice.date), "dd MMM")}
+                        </td>
+                        <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
+                        <td className="p-3 text-right font-medium text-sm">
+                          ₹{parseFloat(invoice.total).toLocaleString("en-IN")}
+                        </td>
+                        <td className="p-3">
+                          <Badge variant={invoice.status === "paid" ? "default" : "secondary"} className="text-xs">
+                            {invoice.status}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingInvoice(invoice); setInvoiceModalOpen(true); }} title="Edit">
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneInvoice(invoice); }} title="Clone">
+                              <FileText className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDownloadPdf("invoice", invoice.id); }} title="Download PDF">
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteInvoice.mutate(invoice.id); }} title="Delete">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                        No invoices found
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
-      </Card>
+
+        {/* Preview Panel - Desktop */}
+        {selectedDocType === "invoice" && selectedDocId && !isMobile && (
+          <div className="hidden lg:flex flex-1 flex-col min-h-0">
+            <Card className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+                <span className="font-medium text-sm">Preview</span>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf("invoice", selectedDocId)}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelectedDocument}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto">
+                <iframe
+                  src={`/print/invoice/${selectedDocId}`}
+                  className="w-full h-full border-0"
+                  title="Document Preview"
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Preview Sheet */}
+      <Sheet open={mobilePreviewOpen && selectedDocType === "invoice"} onOpenChange={(open) => !open && clearSelectedDocument()}>
+        <SheetContent side="bottom" className="h-[90vh] p-0">
+          <SheetHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <SheetTitle>Invoice Preview</SheetTitle>
+              <Button variant="outline" size="sm" onClick={() => selectedDocId && handleDownloadPdf("invoice", selectedDocId)}>
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+            </div>
+          </SheetHeader>
+          {selectedDocId && (
+            <iframe
+              src={`/print/invoice/${selectedDocId}`}
+              className="w-full h-[calc(100%-60px)] border-0"
+              title="Document Preview"
+            />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 
