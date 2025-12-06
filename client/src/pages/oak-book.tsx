@@ -2070,39 +2070,63 @@ export default function OakBook() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="md:hidden flex items-center justify-between p-3 border-b bg-card">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          data-testid="btn-mobile-menu"
-          className="flex items-center gap-2"
-        >
-          <Menu className="h-4 w-4" />
-          <span>Menu</span>
-        </Button>
-        <span className="text-sm font-medium text-muted-foreground capitalize">
-          {activeSection.replace("-", " ")}
-        </span>
-      </div>
-
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
-          <div className="fixed inset-y-0 left-0 w-72 bg-background shadow-lg border-r" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b">
-              <span className="font-semibold">Oak Book</span>
-              <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            {renderSidebar()}
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Top Navigation Bar */}
+      <div className="flex items-center gap-2 p-3 border-b bg-card overflow-x-auto">
+        <a href="/dashboard" className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors mr-2">
+          <ChevronRight className="h-4 w-4 rotate-180" />
+          <span className="text-sm whitespace-nowrap">Back</span>
+        </a>
+        <div className="h-6 w-px bg-border" />
+        <ScrollArea className="flex-1">
+          <div className="flex items-center gap-1">
+            {SIDEBAR_SECTIONS.map((section) => (
+              section.children ? (
+                <div key={section.id} className="relative group">
+                  <Button
+                    variant={expandedMenus.includes(section.id) || section.children.some(c => c.id === activeSection) ? "secondary" : "ghost"}
+                    size="sm"
+                    className="text-xs whitespace-nowrap"
+                    onClick={() => toggleMenu(section.id)}
+                  >
+                    <section.icon className="h-3 w-3 mr-1" />
+                    {section.label}
+                    <ChevronDown className={cn("h-3 w-3 ml-1 transition-transform", expandedMenus.includes(section.id) && "rotate-180")} />
+                  </Button>
+                  {expandedMenus.includes(section.id) && (
+                    <div className="absolute top-full left-0 mt-1 bg-card border rounded-md shadow-lg z-50 min-w-[150px]">
+                      {section.children.map((child) => (
+                        <Button
+                          key={child.id}
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "w-full justify-start text-xs rounded-none",
+                            activeSection === child.id && "bg-accent"
+                          )}
+                          onClick={() => { handleNavClick(child.id); toggleMenu(section.id); }}
+                        >
+                          {child.label}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Button
+                  key={section.id}
+                  variant={activeSection === section.id ? "secondary" : "ghost"}
+                  size="sm"
+                  className="text-xs whitespace-nowrap"
+                  onClick={() => handleNavClick(section.id)}
+                >
+                  <section.icon className="h-3 w-3 mr-1" />
+                  {section.label}
+                </Button>
+              )
+            ))}
           </div>
-        </div>
-      )}
-
-      <div className="hidden md:block w-64 border-r flex-shrink-0 bg-card">
-        {renderSidebar()}
+        </ScrollArea>
       </div>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
