@@ -551,9 +551,74 @@ export async function registerRoutes(
 
   app.patch('/api/daybook/:id', async (req, res) => {
     try {
-      const entry = await storage.updateDaybookEntry(req.params.id, req.body);
+      const oldEntry = await storage.getDaybookEntry(req.params.id);
+      if (!oldEntry) {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      
+      const updateData = req.body;
+      const newAmount = updateData.amount ? parseFloat(updateData.amount) : parseFloat(oldEntry.amount);
+      const oldAmount = parseFloat(oldEntry.amount);
+      const newBankId = updateData.bankId !== undefined ? updateData.bankId : oldEntry.bankId;
+      const newEventId = updateData.eventId !== undefined ? updateData.eventId : oldEntry.eventId;
+      const newType = updateData.type || oldEntry.type;
+      
+      // Handle bank balance reconciliation
+      // First, reverse the old bank adjustment
+      if (oldEntry.bankId) {
+        const oldBank = await storage.getBank(oldEntry.bankId);
+        if (oldBank) {
+          const reverseAdjustment = oldEntry.type === 'income'
+            ? parseFloat(oldBank.balance) - oldAmount
+            : parseFloat(oldBank.balance) + oldAmount;
+          await storage.updateBank(oldBank.id, { balance: reverseAdjustment.toString() });
+        }
+      }
+      
+      // Then apply the new bank adjustment
+      if (newBankId) {
+        const newBank = await storage.getBank(newBankId);
+        if (newBank) {
+          const newAdjustment = newType === 'income'
+            ? parseFloat(newBank.balance) + newAmount
+            : parseFloat(newBank.balance) - newAmount;
+          await storage.updateBank(newBank.id, { balance: newAdjustment.toString() });
+        }
+      }
+      
+      // Handle event sync reconciliation
+      // First, reverse the old event adjustment
+      if (oldEntry.eventId) {
+        const oldEvent = await storage.getEvent(oldEntry.eventId);
+        if (oldEvent) {
+          if (oldEntry.type === 'income') {
+            const newPaymentReceived = Math.max(0, parseFloat(oldEvent.paymentReceived) - oldAmount);
+            await storage.updateEvent(oldEntry.eventId, { paymentReceived: newPaymentReceived.toFixed(2) });
+          } else {
+            const newCost = Math.max(0, parseFloat(oldEvent.cost) - oldAmount);
+            await storage.updateEvent(oldEntry.eventId, { cost: newCost.toFixed(2) });
+          }
+        }
+      }
+      
+      // Then apply the new event adjustment
+      if (newEventId) {
+        const newEvent = await storage.getEvent(newEventId);
+        if (newEvent) {
+          if (newType === 'income') {
+            const newPaymentReceived = parseFloat(newEvent.paymentReceived) + newAmount;
+            await storage.updateEvent(newEventId, { paymentReceived: newPaymentReceived.toFixed(2) });
+          } else {
+            const newCost = parseFloat(newEvent.cost) + newAmount;
+            await storage.updateEvent(newEventId, { cost: newCost.toFixed(2) });
+          }
+        }
+      }
+      
+      const entry = await storage.updateDaybookEntry(req.params.id, updateData);
       res.json(entry);
     } catch (error) {
+      console.error('Failed to update daybook entry:', error);
       res.status(400).json({ error: 'Failed to update entry' });
     }
   });
