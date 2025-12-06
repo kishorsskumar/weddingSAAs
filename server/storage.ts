@@ -34,6 +34,18 @@ import {
   salesActivities,
   salesTargets,
   salesAutomations,
+  inventoryItems,
+  inventoryTransactions,
+  eventInventorySessions,
+  eventInventoryItems,
+  rentalRecords,
+  rentalItems,
+  inventoryTemplates,
+  inventoryTemplateItems,
+  purchaseOrders,
+  purchaseOrderItems,
+  productionPlans,
+  productionTasks,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -104,6 +116,30 @@ import {
   type InsertSalesTarget,
   type SalesAutomation,
   type InsertSalesAutomation,
+  type InventoryItem,
+  type InsertInventoryItem,
+  type InventoryTransaction,
+  type InsertInventoryTransaction,
+  type EventInventorySession,
+  type InsertEventInventorySession,
+  type EventInventoryItem,
+  type InsertEventInventoryItem,
+  type RentalRecord,
+  type InsertRentalRecord,
+  type RentalItem,
+  type InsertRentalItem,
+  type InventoryTemplate,
+  type InsertInventoryTemplate,
+  type InventoryTemplateItem,
+  type InsertInventoryTemplateItem,
+  type PurchaseOrder,
+  type InsertPurchaseOrder,
+  type PurchaseOrderItem,
+  type InsertPurchaseOrderItem,
+  type ProductionPlan,
+  type InsertProductionPlan,
+  type ProductionTask,
+  type InsertProductionTask,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -366,6 +402,84 @@ export interface IStorage {
   createSalesAutomation(automation: InsertSalesAutomation): Promise<SalesAutomation>;
   updateSalesAutomation(id: string, automation: Partial<InsertSalesAutomation>): Promise<SalesAutomation | undefined>;
   deleteSalesAutomation(id: string): Promise<void>;
+
+  // Oak Inventory - Inventory Items
+  getAllInventoryItems(): Promise<InventoryItem[]>;
+  getInventoryItem(id: string): Promise<InventoryItem | undefined>;
+  createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
+  updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem | undefined>;
+  deleteInventoryItem(id: string): Promise<void>;
+
+  // Oak Inventory - Inventory Transactions
+  getInventoryTransactionsByItemId(itemId: string): Promise<InventoryTransaction[]>;
+  createInventoryTransaction(tx: InsertInventoryTransaction): Promise<InventoryTransaction>;
+
+  // Oak Inventory - Event Inventory Sessions
+  getAllEventInventorySessions(): Promise<EventInventorySession[]>;
+  getEventInventorySessionsByEventId(eventId: string): Promise<EventInventorySession[]>;
+  getEventInventorySession(id: string): Promise<EventInventorySession | undefined>;
+  createEventInventorySession(session: InsertEventInventorySession): Promise<EventInventorySession>;
+  updateEventInventorySession(id: string, session: Partial<InsertEventInventorySession>): Promise<EventInventorySession | undefined>;
+  deleteEventInventorySession(id: string): Promise<void>;
+
+  // Oak Inventory - Event Inventory Items
+  getEventInventoryItemsBySessionId(sessionId: string): Promise<EventInventoryItem[]>;
+  createEventInventoryItem(item: InsertEventInventoryItem): Promise<EventInventoryItem>;
+  updateEventInventoryItem(id: string, item: Partial<InsertEventInventoryItem>): Promise<EventInventoryItem | undefined>;
+  deleteEventInventoryItem(id: string): Promise<void>;
+
+  // Oak Inventory - Rental Records
+  getAllRentalRecords(): Promise<RentalRecord[]>;
+  getRentalRecord(id: string): Promise<RentalRecord | undefined>;
+  getRentalRecordsByEventId(eventId: string): Promise<RentalRecord[]>;
+  createRentalRecord(record: InsertRentalRecord): Promise<RentalRecord>;
+  updateRentalRecord(id: string, record: Partial<InsertRentalRecord>): Promise<RentalRecord | undefined>;
+  deleteRentalRecord(id: string): Promise<void>;
+
+  // Oak Inventory - Rental Items
+  getRentalItemsByRentalId(rentalId: string): Promise<RentalItem[]>;
+  createRentalItem(item: InsertRentalItem): Promise<RentalItem>;
+  updateRentalItem(id: string, item: Partial<InsertRentalItem>): Promise<RentalItem | undefined>;
+  deleteRentalItem(id: string): Promise<void>;
+
+  // Oak Inventory - Inventory Templates
+  getAllInventoryTemplates(): Promise<InventoryTemplate[]>;
+  getInventoryTemplate(id: string): Promise<InventoryTemplate | undefined>;
+  createInventoryTemplate(template: InsertInventoryTemplate): Promise<InventoryTemplate>;
+  updateInventoryTemplate(id: string, template: Partial<InsertInventoryTemplate>): Promise<InventoryTemplate | undefined>;
+  deleteInventoryTemplate(id: string): Promise<void>;
+
+  // Oak Inventory - Inventory Template Items
+  getInventoryTemplateItemsByTemplateId(templateId: string): Promise<InventoryTemplateItem[]>;
+  createInventoryTemplateItem(item: InsertInventoryTemplateItem): Promise<InventoryTemplateItem>;
+  deleteInventoryTemplateItem(id: string): Promise<void>;
+
+  // Oak Inventory - Purchase Orders
+  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
+  createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: string, po: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined>;
+  deletePurchaseOrder(id: string): Promise<void>;
+  getNextPurchaseOrderNumber(): Promise<string>;
+
+  // Oak Inventory - Purchase Order Items
+  getPurchaseOrderItemsByPOId(poId: string): Promise<PurchaseOrderItem[]>;
+  createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem>;
+  deletePurchaseOrderItem(id: string): Promise<void>;
+
+  // Oak Inventory - Production Plans
+  getAllProductionPlans(): Promise<ProductionPlan[]>;
+  getProductionPlan(id: string): Promise<ProductionPlan | undefined>;
+  getProductionPlansByEventId(eventId: string): Promise<ProductionPlan[]>;
+  createProductionPlan(plan: InsertProductionPlan): Promise<ProductionPlan>;
+  updateProductionPlan(id: string, plan: Partial<InsertProductionPlan>): Promise<ProductionPlan | undefined>;
+  deleteProductionPlan(id: string): Promise<void>;
+
+  // Oak Inventory - Production Tasks
+  getProductionTasksByPlanId(planId: string): Promise<ProductionTask[]>;
+  createProductionTask(task: InsertProductionTask): Promise<ProductionTask>;
+  updateProductionTask(id: string, task: Partial<InsertProductionTask>): Promise<ProductionTask | undefined>;
+  deleteProductionTask(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1595,6 +1709,304 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSalesAutomation(id: string): Promise<void> {
     await db.delete(salesAutomations).where(eq(salesAutomations.id, id));
+  }
+
+  // Oak Inventory - Inventory Items
+  async getAllInventoryItems(): Promise<InventoryItem[]> {
+    return await db.select().from(inventoryItems).orderBy(desc(inventoryItems.createdAt));
+  }
+
+  async getInventoryItem(id: string): Promise<InventoryItem | undefined> {
+    const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id));
+    return item || undefined;
+  }
+
+  async createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem> {
+    const [created] = await db.insert(inventoryItems).values(item).returning();
+    return created;
+  }
+
+  async updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem | undefined> {
+    const [updated] = await db.update(inventoryItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(inventoryItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteInventoryItem(id: string): Promise<void> {
+    await db.delete(inventoryItems).where(eq(inventoryItems.id, id));
+  }
+
+  // Oak Inventory - Inventory Transactions
+  async getInventoryTransactionsByItemId(itemId: string): Promise<InventoryTransaction[]> {
+    return await db.select().from(inventoryTransactions)
+      .where(eq(inventoryTransactions.itemId, itemId))
+      .orderBy(desc(inventoryTransactions.createdAt));
+  }
+
+  async createInventoryTransaction(tx: InsertInventoryTransaction): Promise<InventoryTransaction> {
+    const [created] = await db.insert(inventoryTransactions).values(tx).returning();
+    return created;
+  }
+
+  // Oak Inventory - Event Inventory Sessions
+  async getAllEventInventorySessions(): Promise<EventInventorySession[]> {
+    return await db.select().from(eventInventorySessions).orderBy(desc(eventInventorySessions.createdAt));
+  }
+
+  async getEventInventorySessionsByEventId(eventId: string): Promise<EventInventorySession[]> {
+    return await db.select().from(eventInventorySessions)
+      .where(eq(eventInventorySessions.eventId, eventId))
+      .orderBy(desc(eventInventorySessions.createdAt));
+  }
+
+  async getEventInventorySession(id: string): Promise<EventInventorySession | undefined> {
+    const [session] = await db.select().from(eventInventorySessions).where(eq(eventInventorySessions.id, id));
+    return session || undefined;
+  }
+
+  async createEventInventorySession(session: InsertEventInventorySession): Promise<EventInventorySession> {
+    const [created] = await db.insert(eventInventorySessions).values(session).returning();
+    return created;
+  }
+
+  async updateEventInventorySession(id: string, session: Partial<InsertEventInventorySession>): Promise<EventInventorySession | undefined> {
+    const [updated] = await db.update(eventInventorySessions)
+      .set(session)
+      .where(eq(eventInventorySessions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEventInventorySession(id: string): Promise<void> {
+    await db.delete(eventInventorySessions).where(eq(eventInventorySessions.id, id));
+  }
+
+  // Oak Inventory - Event Inventory Items
+  async getEventInventoryItemsBySessionId(sessionId: string): Promise<EventInventoryItem[]> {
+    return await db.select().from(eventInventoryItems)
+      .where(eq(eventInventoryItems.sessionId, sessionId));
+  }
+
+  async createEventInventoryItem(item: InsertEventInventoryItem): Promise<EventInventoryItem> {
+    const [created] = await db.insert(eventInventoryItems).values(item).returning();
+    return created;
+  }
+
+  async updateEventInventoryItem(id: string, item: Partial<InsertEventInventoryItem>): Promise<EventInventoryItem | undefined> {
+    const [updated] = await db.update(eventInventoryItems)
+      .set(item)
+      .where(eq(eventInventoryItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEventInventoryItem(id: string): Promise<void> {
+    await db.delete(eventInventoryItems).where(eq(eventInventoryItems.id, id));
+  }
+
+  // Oak Inventory - Rental Records
+  async getAllRentalRecords(): Promise<RentalRecord[]> {
+    return await db.select().from(rentalRecords).orderBy(desc(rentalRecords.createdAt));
+  }
+
+  async getRentalRecord(id: string): Promise<RentalRecord | undefined> {
+    const [record] = await db.select().from(rentalRecords).where(eq(rentalRecords.id, id));
+    return record || undefined;
+  }
+
+  async getRentalRecordsByEventId(eventId: string): Promise<RentalRecord[]> {
+    return await db.select().from(rentalRecords)
+      .where(eq(rentalRecords.eventId, eventId))
+      .orderBy(desc(rentalRecords.createdAt));
+  }
+
+  async createRentalRecord(record: InsertRentalRecord): Promise<RentalRecord> {
+    const [created] = await db.insert(rentalRecords).values(record).returning();
+    return created;
+  }
+
+  async updateRentalRecord(id: string, record: Partial<InsertRentalRecord>): Promise<RentalRecord | undefined> {
+    const [updated] = await db.update(rentalRecords)
+      .set(record)
+      .where(eq(rentalRecords.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRentalRecord(id: string): Promise<void> {
+    await db.delete(rentalRecords).where(eq(rentalRecords.id, id));
+  }
+
+  // Oak Inventory - Rental Items
+  async getRentalItemsByRentalId(rentalId: string): Promise<RentalItem[]> {
+    return await db.select().from(rentalItems)
+      .where(eq(rentalItems.rentalId, rentalId));
+  }
+
+  async createRentalItem(item: InsertRentalItem): Promise<RentalItem> {
+    const [created] = await db.insert(rentalItems).values(item).returning();
+    return created;
+  }
+
+  async updateRentalItem(id: string, item: Partial<InsertRentalItem>): Promise<RentalItem | undefined> {
+    const [updated] = await db.update(rentalItems)
+      .set(item)
+      .where(eq(rentalItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteRentalItem(id: string): Promise<void> {
+    await db.delete(rentalItems).where(eq(rentalItems.id, id));
+  }
+
+  // Oak Inventory - Inventory Templates
+  async getAllInventoryTemplates(): Promise<InventoryTemplate[]> {
+    return await db.select().from(inventoryTemplates).orderBy(desc(inventoryTemplates.createdAt));
+  }
+
+  async getInventoryTemplate(id: string): Promise<InventoryTemplate | undefined> {
+    const [template] = await db.select().from(inventoryTemplates).where(eq(inventoryTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createInventoryTemplate(template: InsertInventoryTemplate): Promise<InventoryTemplate> {
+    const [created] = await db.insert(inventoryTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateInventoryTemplate(id: string, template: Partial<InsertInventoryTemplate>): Promise<InventoryTemplate | undefined> {
+    const [updated] = await db.update(inventoryTemplates)
+      .set(template)
+      .where(eq(inventoryTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteInventoryTemplate(id: string): Promise<void> {
+    await db.delete(inventoryTemplates).where(eq(inventoryTemplates.id, id));
+  }
+
+  // Oak Inventory - Inventory Template Items
+  async getInventoryTemplateItemsByTemplateId(templateId: string): Promise<InventoryTemplateItem[]> {
+    return await db.select().from(inventoryTemplateItems)
+      .where(eq(inventoryTemplateItems.templateId, templateId));
+  }
+
+  async createInventoryTemplateItem(item: InsertInventoryTemplateItem): Promise<InventoryTemplateItem> {
+    const [created] = await db.insert(inventoryTemplateItems).values(item).returning();
+    return created;
+  }
+
+  async deleteInventoryTemplateItem(id: string): Promise<void> {
+    await db.delete(inventoryTemplateItems).where(eq(inventoryTemplateItems.id, id));
+  }
+
+  // Oak Inventory - Purchase Orders
+  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  }
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id));
+    return po || undefined;
+  }
+
+  async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const [created] = await db.insert(purchaseOrders).values(po).returning();
+    return created;
+  }
+
+  async updatePurchaseOrder(id: string, po: Partial<InsertPurchaseOrder>): Promise<PurchaseOrder | undefined> {
+    const [updated] = await db.update(purchaseOrders)
+      .set(po)
+      .where(eq(purchaseOrders.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePurchaseOrder(id: string): Promise<void> {
+    await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+  }
+
+  async getNextPurchaseOrderNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders);
+    const count = Number(result?.count || 0) + 1;
+    return `PO-${String(count).padStart(6, '0')}`;
+  }
+
+  // Oak Inventory - Purchase Order Items
+  async getPurchaseOrderItemsByPOId(poId: string): Promise<PurchaseOrderItem[]> {
+    return await db.select().from(purchaseOrderItems)
+      .where(eq(purchaseOrderItems.poId, poId));
+  }
+
+  async createPurchaseOrderItem(item: InsertPurchaseOrderItem): Promise<PurchaseOrderItem> {
+    const [created] = await db.insert(purchaseOrderItems).values(item).returning();
+    return created;
+  }
+
+  async deletePurchaseOrderItem(id: string): Promise<void> {
+    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.id, id));
+  }
+
+  // Oak Inventory - Production Plans
+  async getAllProductionPlans(): Promise<ProductionPlan[]> {
+    return await db.select().from(productionPlans).orderBy(desc(productionPlans.createdAt));
+  }
+
+  async getProductionPlan(id: string): Promise<ProductionPlan | undefined> {
+    const [plan] = await db.select().from(productionPlans).where(eq(productionPlans.id, id));
+    return plan || undefined;
+  }
+
+  async getProductionPlansByEventId(eventId: string): Promise<ProductionPlan[]> {
+    return await db.select().from(productionPlans)
+      .where(eq(productionPlans.eventId, eventId))
+      .orderBy(desc(productionPlans.createdAt));
+  }
+
+  async createProductionPlan(plan: InsertProductionPlan): Promise<ProductionPlan> {
+    const [created] = await db.insert(productionPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateProductionPlan(id: string, plan: Partial<InsertProductionPlan>): Promise<ProductionPlan | undefined> {
+    const [updated] = await db.update(productionPlans)
+      .set(plan)
+      .where(eq(productionPlans.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProductionPlan(id: string): Promise<void> {
+    await db.delete(productionPlans).where(eq(productionPlans.id, id));
+  }
+
+  // Oak Inventory - Production Tasks
+  async getProductionTasksByPlanId(planId: string): Promise<ProductionTask[]> {
+    return await db.select().from(productionTasks)
+      .where(eq(productionTasks.planId, planId))
+      .orderBy(productionTasks.sortOrder);
+  }
+
+  async createProductionTask(task: InsertProductionTask): Promise<ProductionTask> {
+    const [created] = await db.insert(productionTasks).values(task).returning();
+    return created;
+  }
+
+  async updateProductionTask(id: string, task: Partial<InsertProductionTask>): Promise<ProductionTask | undefined> {
+    const [updated] = await db.update(productionTasks)
+      .set(task)
+      .where(eq(productionTasks.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProductionTask(id: string): Promise<void> {
+    await db.delete(productionTasks).where(eq(productionTasks.id, id));
   }
 }
 
