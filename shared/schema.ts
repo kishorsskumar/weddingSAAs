@@ -704,3 +704,215 @@ export type InsertSalesTarget = z.infer<typeof insertSalesTargetSchema>;
 
 export type SalesAutomation = typeof salesAutomations.$inferSelect;
 export type InsertSalesAutomation = z.infer<typeof insertSalesAutomationSchema>;
+
+// =====================
+// OAK INVENTORY TABLES
+// =====================
+
+// Inventory Items - Full inventory with photos, descriptions, costing
+export const inventoryItems = pgTable("inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  sku: text("sku").unique(),
+  unitCost: decimal("unit_cost", { precision: 12, scale: 2 }).notNull().default('0'),
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").default(0),
+  location: text("location"),
+  photos: text("photos").array(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+
+// Inventory Transactions - Detailed entry logs for stock movements
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").notNull().references(() => inventoryItems.id, { onDelete: 'cascade' }),
+  type: text("type").notNull(), // 'in' | 'out' | 'adjustment' | 'damage' | 'return'
+  quantity: integer("quantity").notNull(),
+  previousStock: integer("previous_stock").notNull(),
+  newStock: integer("new_stock").notNull(),
+  eventId: varchar("event_id").references(() => events.id),
+  notes: text("notes"),
+  performedBy: varchar("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({ id: true, createdAt: true });
+export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+
+// Event Inventory Sessions - Track material outflow & inflow per event
+export const eventInventorySessions = pgTable("event_inventory_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  status: text("status").notNull().default('draft'), // 'draft' | 'issued' | 'partial_return' | 'completed'
+  issuedAt: timestamp("issued_at"),
+  returnedAt: timestamp("returned_at"),
+  issuedBy: varchar("issued_by").references(() => users.id),
+  receivedBy: varchar("received_by").references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventInventorySessionSchema = createInsertSchema(eventInventorySessions).omit({ id: true, createdAt: true });
+export type InsertEventInventorySession = z.infer<typeof insertEventInventorySessionSchema>;
+export type EventInventorySession = typeof eventInventorySessions.$inferSelect;
+
+// Event Inventory Items - Items within a session
+export const eventInventoryItems = pgTable("event_inventory_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => eventInventorySessions.id, { onDelete: 'cascade' }),
+  itemId: varchar("item_id").notNull().references(() => inventoryItems.id),
+  quantityIssued: integer("quantity_issued").notNull().default(0),
+  quantityReturned: integer("quantity_returned").notNull().default(0),
+  quantityDamaged: integer("quantity_damaged").notNull().default(0),
+  quantityLost: integer("quantity_lost").notNull().default(0),
+  damageNotes: text("damage_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventInventoryItemSchema = createInsertSchema(eventInventoryItems).omit({ id: true, createdAt: true });
+export type InsertEventInventoryItem = z.infer<typeof insertEventInventoryItemSchema>;
+export type EventInventoryItem = typeof eventInventoryItems.$inferSelect;
+
+// Rental Records - Items from external rental shops
+export const rentalRecords = pgTable("rental_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  eventId: varchar("event_id").references(() => events.id),
+  rentalDate: date("rental_date").notNull(),
+  expectedReturnDate: date("expected_return_date"),
+  actualReturnDate: date("actual_return_date"),
+  status: text("status").notNull().default('active'), // 'active' | 'returned' | 'partial' | 'overdue'
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }).default('0'),
+  depositPaid: decimal("deposit_paid", { precision: 12, scale: 2 }).default('0'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRentalRecordSchema = createInsertSchema(rentalRecords).omit({ id: true, createdAt: true });
+export type InsertRentalRecord = z.infer<typeof insertRentalRecordSchema>;
+export type RentalRecord = typeof rentalRecords.$inferSelect;
+
+// Rental Items - Individual items in a rental
+export const rentalItems = pgTable("rental_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  rentalId: varchar("rental_id").notNull().references(() => rentalRecords.id, { onDelete: 'cascade' }),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  quantityReturned: integer("quantity_returned").notNull().default(0),
+  unitRate: decimal("unit_rate", { precision: 12, scale: 2 }).default('0'),
+  photos: text("photos").array(),
+  condition: text("condition"),
+  returnCondition: text("return_condition"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRentalItemSchema = createInsertSchema(rentalItems).omit({ id: true, createdAt: true });
+export type InsertRentalItem = z.infer<typeof insertRentalItemSchema>;
+export type RentalItem = typeof rentalItems.$inferSelect;
+
+// Inventory Templates - Pre-defined bundles for event types
+export const inventoryTemplates = pgTable("inventory_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  eventType: text("event_type").notNull(), // e.g., 'Hindu Wedding Stage Décor'
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInventoryTemplateSchema = createInsertSchema(inventoryTemplates).omit({ id: true, createdAt: true });
+export type InsertInventoryTemplate = z.infer<typeof insertInventoryTemplateSchema>;
+export type InventoryTemplate = typeof inventoryTemplates.$inferSelect;
+
+// Inventory Template Items - Items in a template bundle
+export const inventoryTemplateItems = pgTable("inventory_template_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => inventoryTemplates.id, { onDelete: 'cascade' }),
+  itemId: varchar("item_id").references(() => inventoryItems.id),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInventoryTemplateItemSchema = createInsertSchema(inventoryTemplateItems).omit({ id: true, createdAt: true });
+export type InsertInventoryTemplateItem = z.infer<typeof insertInventoryTemplateItemSchema>;
+export type InventoryTemplateItem = typeof inventoryTemplateItems.$inferSelect;
+
+// Purchase Orders - Orders to vendors
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: text("po_number").notNull().unique(),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  eventId: varchar("event_id").references(() => events.id),
+  status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'confirmed' | 'received' | 'cancelled'
+  orderDate: date("order_date").notNull(),
+  expectedDelivery: date("expected_delivery"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).default('0'),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, createdAt: true });
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+
+// Purchase Order Items
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poId: varchar("po_id").notNull().references(() => purchaseOrders.id, { onDelete: 'cascade' }),
+  itemId: varchar("item_id").references(() => inventoryItems.id),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).default('0'),
+  totalPrice: decimal("total_price", { precision: 12, scale: 2 }).default('0'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true });
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+
+// Production Plans - Event production schedule
+export const productionPlans = pgTable("production_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id),
+  name: text("name").notNull(),
+  status: text("status").notNull().default('draft'), // 'draft' | 'active' | 'completed'
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProductionPlanSchema = createInsertSchema(productionPlans).omit({ id: true, createdAt: true });
+export type InsertProductionPlan = z.infer<typeof insertProductionPlanSchema>;
+export type ProductionPlan = typeof productionPlans.$inferSelect;
+
+// Production Tasks - Individual tasks in a production plan
+export const productionTasks = pgTable("production_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => productionPlans.id, { onDelete: 'cascade' }),
+  activity: text("activity").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  responsiblePersonId: varchar("responsible_person_id").references(() => users.id),
+  responsiblePersonName: text("responsible_person_name"),
+  status: text("status").notNull().default('pending'), // 'pending' | 'in_progress' | 'completed'
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProductionTaskSchema = createInsertSchema(productionTasks).omit({ id: true, createdAt: true });
+export type InsertProductionTask = z.infer<typeof insertProductionTaskSchema>;
+export type ProductionTask = typeof productionTasks.$inferSelect;
