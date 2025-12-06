@@ -369,6 +369,10 @@ export default function Admin() {
             <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
               {usersLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+              ) : usersError ? (
+                <div className="text-center py-8 text-destructive text-sm">
+                  Error loading users: {(usersError as Error).message}
+                </div>
               ) : (
                 <div className="space-y-3">
                   {users.map((user) => (

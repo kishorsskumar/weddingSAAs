@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
+import bcrypt from "bcryptjs";
 
 const DEFAULT_ROLES = [
   { name: 'superadmin', label: 'Super Admin', description: 'Full system access with role management', isSystem: true },
@@ -24,6 +25,27 @@ async function ensureDefaultRoles() {
     }
   } catch (error) {
     console.error('Error seeding default roles:', error);
+  }
+}
+
+async function ensureDefaultSuperAdmin() {
+  try {
+    const users = await storage.getAllUsers();
+    const hasSuperAdmin = users.some((u: { role: string }) => u.role === 'superadmin');
+    
+    if (!hasSuperAdmin) {
+      const hashedPassword = await bcrypt.hash('OakAdmin2024!', 10);
+      await storage.createUser({
+        name: 'Super Admin',
+        email: 'admin@oakstreetevent.com',
+        password: hashedPassword,
+        role: 'superadmin',
+      });
+      console.log('Created default Super Admin user (admin@oakstreetevent.com)');
+      console.log('IMPORTANT: Please change the default password immediately after first login!');
+    }
+  } catch (error) {
+    console.error('Error seeding default super admin:', error);
   }
 }
 
@@ -94,8 +116,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed default roles on startup
+  // Seed default roles and superadmin on startup
   await ensureDefaultRoles();
+  await ensureDefaultSuperAdmin();
   
   await registerRoutes(httpServer, app);
 
