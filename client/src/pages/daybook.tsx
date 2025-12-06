@@ -16,6 +16,7 @@ import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Daybook() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -33,8 +34,10 @@ export default function Daybook() {
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdmin = user?.role === 'superadmin';
+  const canEditEntries = isAdmin || user?.role === 'manager' || user?.role === 'wedding_planner' || user?.role === 'accountant';
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -176,6 +179,10 @@ export default function Daybook() {
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
       setEditingEntry(null);
       setIsEditDialogOpen(false);
+      toast({
+        title: "Entry Updated",
+        description: "Your changes have been saved successfully.",
+      });
     },
   });
 
@@ -1170,13 +1177,13 @@ export default function Daybook() {
                           <TableHead className="text-xs">Description</TableHead>
                           <TableHead className="text-xs">Bank</TableHead>
                           <TableHead className="text-right text-xs">Amount</TableHead>
-                          {isAdmin && <TableHead className="w-8"></TableHead>}
+                          {canEditEntries && <TableHead className="w-8"></TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {incomeEntries.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No income entries for this day</TableCell>
+                            <TableCell colSpan={canEditEntries ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No income entries for this day</TableCell>
                           </TableRow>
                         ) : (
                           incomeEntries.map((entry) => (
@@ -1189,7 +1196,7 @@ export default function Daybook() {
                               <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-green-600">
                                 +₹{Number(entry.amount).toLocaleString()}
                               </TableCell>
-                              {isAdmin && (
+                              {canEditEntries && (
                                 <TableCell>
                                   <div className="flex items-center gap-1">
                                     <Button 
@@ -1204,17 +1211,19 @@ export default function Daybook() {
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      className="h-7 w-7 text-destructive hover:text-destructive"
-                                      onClick={() => {
-                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                      }}
-                                      data-testid={`button-delete-income-${entry.id}`}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
+                                    {isAdmin && (
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                        }}
+                                        data-testid={`button-delete-income-${entry.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               )}
@@ -1258,13 +1267,13 @@ export default function Daybook() {
                           <TableHead className="text-xs">Description</TableHead>
                           <TableHead className="text-xs">Bank</TableHead>
                           <TableHead className="text-right text-xs">Amount</TableHead>
-                          {isAdmin && <TableHead className="w-8"></TableHead>}
+                          {canEditEntries && <TableHead className="w-8"></TableHead>}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {expenseEntries.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={isAdmin ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No expense entries for this day</TableCell>
+                            <TableCell colSpan={canEditEntries ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No expense entries for this day</TableCell>
                           </TableRow>
                         ) : (
                           expenseEntries.map((entry) => (
@@ -1277,7 +1286,7 @@ export default function Daybook() {
                               <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-red-600">
                                 -₹{Number(entry.amount).toLocaleString()}
                               </TableCell>
-                              {isAdmin && (
+                              {canEditEntries && (
                                 <TableCell>
                                   <div className="flex items-center gap-1">
                                     <Button 
@@ -1292,17 +1301,19 @@ export default function Daybook() {
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </Button>
-                                    <Button 
-                                      size="icon" 
-                                      variant="ghost" 
-                                      className="h-7 w-7 text-destructive hover:text-destructive"
-                                      onClick={() => {
-                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                      }}
-                                      data-testid={`button-delete-expense-${entry.id}`}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
+                                    {isAdmin && (
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                        }}
+                                        data-testid={`button-delete-expense-${entry.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </TableCell>
                               )}
