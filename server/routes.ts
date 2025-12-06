@@ -160,21 +160,28 @@ export async function registerRoutes(
 
   // Users
   app.get('/api/users', async (req, res) => {
-    const auth = await verifyAdminAccess(req, res);
-    if (!auth) return;
+    try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
 
-    const users = await storage.getAllUsers();
-    const usersWithPermissions = await Promise.all(
-      users.map(async (user) => {
-        const permissions = await storage.getUserPermissions(user.id);
-        return {
-          ...user,
-          password: undefined,
-          allowedPages: permissions.map(p => p.pageId),
-        };
-      })
-    );
-    res.json(usersWithPermissions);
+      const users = await storage.getAllUsers();
+      console.log(`[/api/users] Found ${users.length} users`);
+      
+      const usersWithPermissions = await Promise.all(
+        users.map(async (user) => {
+          const permissions = await storage.getUserPermissions(user.id);
+          return {
+            ...user,
+            password: undefined,
+            allowedPages: permissions.map(p => p.pageId),
+          };
+        })
+      );
+      res.json(usersWithPermissions);
+    } catch (error) {
+      console.error('[/api/users] Error:', error);
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
   });
 
   app.post('/api/users', async (req, res) => {
