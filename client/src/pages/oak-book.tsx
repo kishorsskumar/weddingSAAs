@@ -196,9 +196,23 @@ export default function OakBook() {
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [estimateModalOpen, setEstimateModalOpen] = useState(false);
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [billModalOpen, setBillModalOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [previewType, setPreviewType] = useState<"invoice" | "quote" | "receipt" | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
+  const [editingPayment, setEditingPayment] = useState<CustomerPayment | null>(null);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
