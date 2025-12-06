@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertUserSchema,
+  insertRoleSchema,
   insertEventSchema,
   insertMeetingSchema,
   insertEmployeeSchema,
@@ -138,15 +139,37 @@ export async function registerRoutes(
     });
   });
 
+  // Helper function to verify admin/superadmin access
+  const verifyAdminAccess = async (req: any, res: any): Promise<{ user: any } | null> => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return null;
+    }
+    const user = await storage.getUser(userId);
+    if (!user) {
+      res.status(401).json({ error: 'Session expired' });
+      return null;
+    }
+    if (user.role !== 'admin' && user.role !== 'superadmin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return null;
+    }
+    return { user };
+  };
+
   // Users
   app.get('/api/users', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+
     const users = await storage.getAllUsers();
     const usersWithPermissions = await Promise.all(
       users.map(async (user) => {
         const permissions = await storage.getUserPermissions(user.id);
         return {
           ...user,
-          password: undefined, // Don't send passwords
+          password: undefined,
           allowedPages: permissions.map(p => p.pageId),
         };
       })
@@ -156,11 +179,19 @@ export async function registerRoutes(
 
   app.post('/api/users', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+
       const data = insertUserSchema.parse(req.body);
+      
+      // Prevent non-superadmin from creating superadmin users
+      if (data.role === 'superadmin' && auth.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can create Super Admin users' });
+      }
+
       const hashedPassword = await bcrypt.hash(data.password, 10);
       const user = await storage.createUser({ ...data, password: hashedPassword });
       
-      // Set default permissions
       await storage.setUserPermissions(user.id, ['dashboard']);
       
       res.json({ ...user, password: undefined });
@@ -171,7 +202,17 @@ export async function registerRoutes(
 
   app.patch('/api/users/:id/permissions', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+
       const { id } = req.params;
+      const targetUser = await storage.getUser(id);
+      
+      // Prevent modifying superadmin permissions if not superadmin
+      if (targetUser?.role === 'superadmin' && auth.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Cannot modify Super Admin permissions' });
+      }
+
       const { pageIds } = req.body;
       await storage.setUserPermissions(id, pageIds);
       res.json({ success: true });
@@ -182,8 +223,29 @@ export async function registerRoutes(
 
   app.patch('/api/users/:id', async (req, res) => {
     try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser || currentUser.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can change user roles' });
+      }
+
       const { id } = req.params;
+      const targetUser = await storage.getUser(id);
+      
+      // Prevent modifying superadmin users
+      if (targetUser?.role === 'superadmin') {
+        return res.status(403).json({ error: 'Cannot modify Super Admin users' });
+      }
+
       const { role } = req.body;
+      // Prevent promoting to superadmin
+      if (role === 'superadmin') {
+        return res.status(403).json({ error: 'Cannot promote users to Super Admin' });
+      }
+
       const updated = await storage.updateUser(id, { role });
       if (!updated) {
         return res.status(404).json({ error: 'User not found' });
@@ -195,8 +257,99 @@ export async function registerRoutes(
   });
 
   app.delete('/api/users/:id', async (req, res) => {
-    await storage.deleteUser(req.params.id);
-    res.json({ success: true });
+    try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+
+      const targetUser = await storage.getUser(req.params.id);
+      
+      // Prevent deleting superadmin users
+      if (targetUser?.role === 'superadmin') {
+        return res.status(403).json({ error: 'Cannot delete Super Admin users' });
+      }
+      // Prevent deleting admin users if not superadmin
+      if (targetUser?.role === 'admin' && auth.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can delete Admin users' });
+      }
+
+      await storage.deleteUser(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete user' });
+    }
+  });
+
+  // Roles
+  app.get('/api/roles', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const roles = await storage.getAllRoles();
+    res.json(roles);
+  });
+
+  app.post('/api/roles', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can create roles' });
+      }
+      const data = insertRoleSchema.parse(req.body);
+      const role = await storage.createRole(data);
+      res.json(role);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid role data' });
+    }
+  });
+
+  app.patch('/api/roles/:id', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can update roles' });
+      }
+      const { label, description } = req.body;
+      const role = await storage.updateRole(req.params.id, { label, description });
+      if (!role) {
+        return res.status(404).json({ error: 'Role not found' });
+      }
+      res.json(role);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update role' });
+    }
+  });
+
+  app.delete('/api/roles/:id', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only Super Admin can delete roles' });
+      }
+      const role = await storage.getRole(req.params.id);
+      if (!role) {
+        return res.status(404).json({ error: 'Role not found' });
+      }
+      if (role.isSystem) {
+        return res.status(400).json({ error: 'Cannot delete system roles' });
+      }
+      await storage.deleteRole(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete role' });
+    }
   });
 
   // Events

@@ -1,6 +1,7 @@
 import { 
   users, 
   userPermissions,
+  roles,
   events, 
   meetings, 
   employees, 
@@ -36,6 +37,8 @@ import {
   type InsertUser,
   type UserPermission,
   type InsertUserPermission,
+  type Role,
+  type InsertRole,
   type Event,
   type InsertEvent,
   type Meeting,
@@ -114,6 +117,14 @@ export interface IStorage {
   // User Permissions
   getUserPermissions(userId: string): Promise<UserPermission[]>;
   setUserPermissions(userId: string, pageIds: string[]): Promise<void>;
+  
+  // Roles
+  getAllRoles(): Promise<Role[]>;
+  getRole(id: string): Promise<Role | undefined>;
+  getRoleByName(name: string): Promise<Role | undefined>;
+  createRole(role: InsertRole): Promise<Role>;
+  updateRole(id: string, role: Partial<InsertRole>): Promise<Role | undefined>;
+  deleteRole(id: string): Promise<void>;
   
   // Events
   getAllEvents(): Promise<Event[]>;
@@ -388,6 +399,35 @@ export class DatabaseStorage implements IStorage {
         pageIds.map(pageId => ({ userId, pageId }))
       );
     }
+  }
+
+  // Roles
+  async getAllRoles(): Promise<Role[]> {
+    return await db.select().from(roles).orderBy(roles.name);
+  }
+
+  async getRole(id: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.id, id));
+    return role || undefined;
+  }
+
+  async getRoleByName(name: string): Promise<Role | undefined> {
+    const [role] = await db.select().from(roles).where(eq(roles.name, name));
+    return role || undefined;
+  }
+
+  async createRole(insertRole: InsertRole): Promise<Role> {
+    const [role] = await db.insert(roles).values(insertRole).returning();
+    return role;
+  }
+
+  async updateRole(id: string, updateData: Partial<InsertRole>): Promise<Role | undefined> {
+    const [role] = await db.update(roles).set(updateData).where(eq(roles.id, id)).returning();
+    return role || undefined;
+  }
+
+  async deleteRole(id: string): Promise<void> {
+    await db.delete(roles).where(eq(roles.id, id));
   }
 
   // Events

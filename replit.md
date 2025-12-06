@@ -63,8 +63,12 @@ Preferred communication style: Simple, everyday language.
 - Session-based authentication using express-session
 - PostgreSQL session store (connect-pg-simple) for persistent sessions
 - bcrypt for password hashing
-- Role-based access control (admin, manager, employee)
+- Role-based access control with dynamic roles stored in database
+- System roles: superadmin, admin, manager, employee, wedding_planner, accountant
+- Super admin can create custom roles through Admin panel
 - Page-level permissions stored in database and checked on each request
+- API endpoints protected with authentication and authorization checks
+- verifyAdminAccess helper function for admin/superadmin route protection
 
 **Build & Deployment Strategy**
 - Separate client and server builds
@@ -82,8 +86,9 @@ Preferred communication style: Simple, everyday language.
 - Connection pooling with node-postgres (pg)
 
 **Database Schema Design**
-- Users table with role-based access (admin, manager, employee)
+- Users table with role-based access (admin, manager, employee, etc.)
 - User permissions table for granular page access control
+- Roles table for dynamic role management (system and custom roles)
 - Events table with financial tracking (sales, payments, costs)
 - Meetings table for team scheduling
 - Employees table for HR management

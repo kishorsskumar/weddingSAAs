@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp, Pencil } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
@@ -21,25 +22,27 @@ const ALL_PAGES = [
   { id: "event-milestones", label: "Event Milestones" },
   { id: "daybook", label: "Daybook" },
   { id: "oak-book", label: "Oak Book" },
+  { id: "oak-sales", label: "Oak Sales" },
   { id: "hr", label: "HR" },
   { id: "admin", label: "Admin" },
 ];
 
-const ROLE_LABELS: Record<string, string> = {
-  wedding_planner: "Wedding Planner",
-  accountant: "Accountant",
-  employee: "Employee",
-  manager: "Manager",
-  admin: "Admin",
-  superadmin: "Super Admin",
+type Role = {
+  id: string;
+  name: string;
+  label: string;
+  description: string | null;
+  isSystem: boolean;
+  createdAt: string | null;
 };
-
-const getRoleLabel = (role: string) => ROLE_LABELS[role] || role;
 
 export default function Admin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
+  const [isEditRoleDialogOpen, setIsEditRoleDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editRole, setEditRole] = useState<string>('');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -54,6 +57,20 @@ export default function Admin() {
       return res.json();
     },
   });
+
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ['/api/roles'],
+    queryFn: async () => {
+      const res = await fetch('/api/roles');
+      if (!res.ok) throw new Error('Failed to fetch roles');
+      return res.json();
+    },
+  });
+
+  const getRoleLabel = (roleName: string) => {
+    const role = roles.find(r => r.name === roleName);
+    return role?.label || roleName;
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; email: string; password: string; role: string }) => {
@@ -114,10 +131,62 @@ export default function Admin() {
     },
   });
 
+  const createRoleMutation = useMutation({
+    mutationFn: async (data: { name: string; label: string; description: string }) => {
+      const res = await fetch('/api/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create role');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/roles'] });
+      setIsRoleDialogOpen(false);
+    },
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; label: string; description: string }) => {
+      const res = await fetch(`/api/roles/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update role');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/roles'] });
+      setIsEditRoleDialogOpen(false);
+      setEditingRole(null);
+    },
+  });
+
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/roles/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete role');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/roles'] });
+    },
+  });
+
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setEditRole(user.role);
     setIsEditDialogOpen(true);
+  };
+
+  const openEditRoleDialog = (role: Role) => {
+    setEditingRole(role);
+    setIsEditRoleDialogOpen(true);
   };
 
   const handleUpdateUser = () => {
@@ -134,7 +203,10 @@ export default function Admin() {
   };
 
   const AddUserForm = () => {
-    const { register, handleSubmit } = useForm();
+    const { register, handleSubmit, setValue, watch } = useForm({
+      defaultValues: { name: '', email: '', password: '', role: 'employee' }
+    });
+    const selectedRole = watch('role');
     const onSubmit = (data: any) => {
       createMutation.mutate(data);
     };
@@ -143,29 +215,88 @@ export default function Admin() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <Label>Name</Label>
-          <Input {...register("name")} required />
+          <Input {...register("name")} required data-testid="input-user-name" />
         </div>
         <div className="space-y-2">
           <Label>Email</Label>
-          <Input {...register("email")} type="email" required />
+          <Input {...register("email")} type="email" required data-testid="input-user-email" />
         </div>
         <div className="space-y-2">
           <Label>Password</Label>
-          <Input {...register("password")} type="password" required />
+          <Input {...register("password")} type="password" required data-testid="input-user-password" />
         </div>
         <div className="space-y-2">
           <Label>Role</Label>
-          <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" {...register("role")}>
-            <option value="wedding_planner">Wedding Planner</option>
-            <option value="accountant">Accountant</option>
-            <option value="employee">Employee</option>
-            <option value="manager">Manager</option>
-            <option value="admin">Admin</option>
-            <option value="superadmin">Super Admin</option>
-          </select>
+          <Select value={selectedRole} onValueChange={(val) => setValue('role', val)}>
+            <SelectTrigger data-testid="select-user-role">
+              <SelectValue placeholder="Select role" />
+            </SelectTrigger>
+            <SelectContent>
+              {roles.map(role => (
+                <SelectItem key={role.id} value={role.name}>
+                  {role.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
+        <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-create-user">
           {createMutation.isPending ? 'Creating...' : 'Create User'}
+        </Button>
+      </form>
+    );
+  };
+
+  const AddRoleForm = () => {
+    const { register, handleSubmit } = useForm();
+    const onSubmit = (data: any) => {
+      const name = data.label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      createRoleMutation.mutate({ ...data, name });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Role Name</Label>
+          <Input {...register("label")} required placeholder="e.g., Event Coordinator" data-testid="input-role-label" />
+          <p className="text-xs text-muted-foreground">This is the display name for the role</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <Input {...register("description")} placeholder="Brief description of the role" data-testid="input-role-description" />
+        </div>
+        <Button type="submit" className="w-full" disabled={createRoleMutation.isPending} data-testid="button-create-role">
+          {createRoleMutation.isPending ? 'Creating...' : 'Create Role'}
+        </Button>
+      </form>
+    );
+  };
+
+  const EditRoleForm = ({ role }: { role: Role }) => {
+    const { register, handleSubmit } = useForm({
+      defaultValues: { label: role.label, description: role.description || '' }
+    });
+    const onSubmit = (data: any) => {
+      updateRoleMutation.mutate({ id: role.id, ...data });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>System Name</Label>
+          <Input value={role.name} disabled className="bg-muted" />
+          <p className="text-xs text-muted-foreground">System name cannot be changed</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Display Name</Label>
+          <Input {...register("label")} required data-testid="input-edit-role-label" />
+        </div>
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <Input {...register("description")} data-testid="input-edit-role-description" />
+        </div>
+        <Button type="submit" className="w-full" disabled={updateRoleMutation.isPending} data-testid="button-save-role">
+          {updateRoleMutation.isPending ? 'Saving...' : 'Save Changes'}
         </Button>
       </form>
     );
@@ -178,102 +309,191 @@ export default function Admin() {
           <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Admin Panel</h1>
           <p className="text-sm text-muted-foreground">User Access & Configuration</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-user"><Shield className="h-4 w-4" /> New User</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-[95vw] sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
-            </DialogHeader>
-            <AddUserForm />
-          </DialogContent>
-        </Dialog>
       </div>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-lg">User Permissions</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-          <div className="space-y-3">
-            {users.map((user) => (
-              <div key={user.id} className="border rounded-lg overflow-hidden">
-                <div 
-                  className="flex items-center justify-between p-3 sm:p-4 bg-muted/30 cursor-pointer"
-                  onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs sm:text-sm font-medium text-primary">
-                      {user.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-medium text-sm sm:text-base truncate">{user.name}</div>
-                      <div className="text-xs text-muted-foreground truncate">{user.email}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs hidden sm:inline-flex">{getRoleLabel(user.role)}</Badge>
-                    {expandedUser === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  </div>
-                </div>
-                
-                {expandedUser === user.id && (
-                  <div className="p-3 sm:p-4 border-t space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
-                      <div className="flex gap-2">
-                        {isSuperAdmin && user.role !== 'superadmin' && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => openEditDialog(user)}
-                            data-testid={`button-edit-user-${user.id}`}
-                          >
-                            <Pencil className="h-4 w-4 mr-1" /> Edit
-                          </Button>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          disabled={user.role === 'admin' || user.role === 'superadmin'}
-                          onClick={() => deleteMutation.mutate(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" /> Delete
-                        </Button>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+          {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="users" className="mt-4">
+          <div className="flex justify-end mb-4">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-user">
+                  <Shield className="h-4 w-4" /> New User
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[95vw] sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create New User</DialogTitle>
+                </DialogHeader>
+                <AddUserForm />
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-lg">User Permissions</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="space-y-3">
+                {users.map((user) => (
+                  <div key={user.id} className="border rounded-lg overflow-hidden">
+                    <div 
+                      className="flex items-center justify-between p-3 sm:p-4 bg-muted/30 cursor-pointer"
+                      onClick={() => setExpandedUser(expandedUser === user.id ? null : user.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/10 flex items-center justify-center text-xs sm:text-sm font-medium text-primary">
+                          {user.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-sm sm:text-base truncate">{user.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs hidden sm:inline-flex">{getRoleLabel(user.role)}</Badge>
+                        {expandedUser === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <p className="text-xs text-muted-foreground font-medium">Page Permissions:</p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {ALL_PAGES.filter(p => p.id !== 'dashboard').map(page => (
-                          <label 
-                            key={page.id} 
-                            className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer p-2 rounded hover:bg-muted/50"
-                          >
-                            <Checkbox 
-                              checked={user.allowedPages?.includes(page.id)}
-                              onCheckedChange={() => togglePermission(user.id, page.id, user.allowedPages || [])}
+                    {expandedUser === user.id && (
+                      <div className="p-3 sm:p-4 border-t space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
+                          <div className="flex gap-2">
+                            {isSuperAdmin && user.role !== 'superadmin' && (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => openEditDialog(user)}
+                                data-testid={`button-edit-user-${user.id}`}
+                              >
+                                <Pencil className="h-4 w-4 mr-1" /> Edit
+                              </Button>
+                            )}
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               disabled={user.role === 'admin' || user.role === 'superadmin'}
-                              data-testid={`checkbox-${user.id}-${page.id}`}
-                            />
-                            <span className="truncate">{page.label}</span>
-                          </label>
-                        ))}
+                              onClick={() => deleteMutation.mutate(user.id)}
+                              data-testid={`button-delete-user-${user.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" /> Delete
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium">Page Permissions:</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {ALL_PAGES.filter(p => p.id !== 'dashboard').map(page => (
+                              <label 
+                                key={page.id} 
+                                className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer p-2 rounded hover:bg-muted/50"
+                              >
+                                <Checkbox 
+                                  checked={user.allowedPages?.includes(page.id)}
+                                  onCheckedChange={() => togglePermission(user.id, page.id, user.allowedPages || [])}
+                                  disabled={user.role === 'admin' || user.role === 'superadmin'}
+                                  data-testid={`checkbox-${user.id}-${page.id}`}
+                                />
+                                <span className="truncate">{page.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
+                ))}
+                {users.length === 0 && (
+                  <p className="text-center py-8 text-muted-foreground text-sm">No users found</p>
                 )}
               </div>
-            ))}
-            {users.length === 0 && (
-              <p className="text-center py-8 text-muted-foreground text-sm">No users found</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {isSuperAdmin && (
+          <TabsContent value="roles" className="mt-4">
+            <div className="flex justify-end mb-4">
+              <Dialog open={isRoleDialogOpen} onOpenChange={setIsRoleDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-role">
+                    <Plus className="h-4 w-4" /> New Role
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[95vw] sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create New Role</DialogTitle>
+                  </DialogHeader>
+                  <AddRoleForm />
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg">Manage Roles</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                <div className="space-y-3">
+                  {roles.map((role) => (
+                    <div key={role.id} className="border rounded-lg p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Tag className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            {role.label}
+                            {role.isSystem && (
+                              <Badge variant="secondary" className="text-xs">System</Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {role.description || `System name: ${role.name}`}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => openEditRoleDialog(role)}
+                          data-testid={`button-edit-role-${role.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        {!role.isSystem && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => deleteRoleMutation.mutate(role.id)}
+                            data-testid={`button-delete-role-${role.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {roles.length === 0 && (
+                    <p className="text-center py-8 text-muted-foreground text-sm">No roles found</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
@@ -297,11 +517,11 @@ export default function Admin() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="wedding_planner">Wedding Planner</SelectItem>
-                    <SelectItem value="accountant">Accountant</SelectItem>
-                    <SelectItem value="employee">Employee</SelectItem>
-                    <SelectItem value="manager">Manager</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    {roles.filter(r => r.name !== 'superadmin').map(role => (
+                      <SelectItem key={role.id} value={role.name}>
+                        {role.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -315,6 +535,15 @@ export default function Admin() {
               </Button>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditRoleDialogOpen} onOpenChange={setIsEditRoleDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Role</DialogTitle>
+          </DialogHeader>
+          {editingRole && <EditRoleForm role={editingRole} />}
         </DialogContent>
       </Dialog>
     </div>

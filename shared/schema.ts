@@ -20,6 +20,19 @@ export const userPermissions = pgTable("user_permissions", {
   pageId: text("page_id").notNull(), // e.g., 'dashboard', 'event-calendar', etc.
 });
 
+export const roles = pgTable("roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  label: text("label").notNull(),
+  description: text("description"),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, createdAt: true });
+export type InsertRole = z.infer<typeof insertRoleSchema>;
+export type Role = typeof roles.$inferSelect;
+
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
