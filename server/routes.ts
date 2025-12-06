@@ -56,11 +56,22 @@ export async function registerRoutes(
     try {
       const users = await storage.getAllUsers();
       const roles = await storage.getAllRoles();
+      
+      // Also check session
+      const sessionUserId = (req.session as any)?.userId;
+      let sessionUser = null;
+      if (sessionUserId) {
+        sessionUser = await storage.getUser(sessionUserId);
+      }
+      
       res.json({
         status: 'ok',
         database: 'connected',
         userCount: users.length,
         roleCount: roles.length,
+        sessionUserId: sessionUserId || null,
+        sessionUserEmail: sessionUser?.email || null,
+        sessionUserRole: sessionUser?.role || null,
         timestamp: new Date().toISOString(),
       });
     } catch (error: any) {
