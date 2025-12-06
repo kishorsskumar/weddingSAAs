@@ -146,9 +146,13 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to create entry');
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      toast({
+        title: "Entry Added",
+        description: `Your ${data.type} entry has been saved successfully.`,
+      });
     },
   });
 
