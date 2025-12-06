@@ -17,8 +17,7 @@ import { useAuth } from "@/context/auth-context";
 
 export default function Daybook() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isIncomeDialogOpen, setIsIncomeDialogOpen] = useState(false);
-  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -112,8 +111,6 @@ export default function Daybook() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
-      setIsIncomeDialogOpen(false);
-      setIsExpenseDialogOpen(false);
     },
   });
 
@@ -200,51 +197,150 @@ export default function Daybook() {
     },
   });
 
-  const AddEntryForm = ({ type }: { type: "income" | "expense" }) => {
-    const { register, handleSubmit, setValue, watch } = useForm<Partial<DaybookEntry>>();
-    const selectedBankId = watch("bankId");
+  const incomeCategories = ['Sales', 'Payment Received', 'Advance', 'Refund', 'Interest', 'Commission', 'Other Income'];
+  const expenseCategories = ['Rent', 'Utilities', 'Salary', 'Office Supplies', 'Travel', 'Food', 'Marketing', 'Maintenance', 'Vendor Payment', 'Tax', 'Other Expense'];
+
+  const AddTransactionForm = ({ onClose }: { onClose: () => void }) => {
+    const { register, handleSubmit, setValue, watch, reset } = useForm<any>({
+      defaultValues: {
+        type: 'expense',
+        date: formattedDate,
+      }
+    });
+    const selectedType = watch("type") || 'expense';
+    const selectedDate = watch("date") || formattedDate;
     
     const onSubmit = (data: any) => {
       createMutation.mutate({
         ...data,
-        type,
-        date: formattedDate,
+        date: data.date || formattedDate,
+      }, {
+        onSuccess: () => {
+          reset({
+            type: selectedType,
+            date: selectedDate,
+            amount: '',
+            bankId: undefined,
+            category: '',
+            eventName: '',
+            vendorName: '',
+            description: '',
+          });
+        }
       });
     };
 
+    const categories = selectedType === 'income' ? incomeCategories : expenseCategories;
+
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-2">
-          <Label>Description</Label>
-          <Input {...register("description")} required placeholder={type === "income" ? "e.g. Payment received" : "e.g. Office rent"} />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Amount</Label>
-            <Input type="number" step="0.01" {...register("amount")} required placeholder="0.00" />
+            <Label>Type</Label>
+            <Select defaultValue="expense" onValueChange={(v) => setValue("type", v)}>
+              <SelectTrigger data-testid="select-transaction-type">
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="expense">Expense</SelectItem>
+                <SelectItem value="income">Income</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
-            <Label>Category</Label>
-            <Input {...register("category")} placeholder={type === "income" ? "e.g. Sales, Payment" : "e.g. Rent, Utilities"} />
+            <Label>Amount *</Label>
+            <Input 
+              type="number" 
+              step="0.01" 
+              {...register("amount")} 
+              required 
+              placeholder="0.00" 
+              data-testid="input-amount"
+            />
           </div>
         </div>
+        
         <div className="space-y-2">
-          <Label>Bank Account (Optional)</Label>
-          <Select onValueChange={(v) => setValue("bankId", v === "none" ? undefined : v)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select Bank" />
+          <Label>Date *</Label>
+          <Input 
+            type="date" 
+            {...register("date")} 
+            defaultValue={formattedDate}
+            required 
+            data-testid="input-date"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Bank *</Label>
+          <Select onValueChange={(v) => setValue("bankId", v)} required>
+            <SelectTrigger data-testid="select-bank">
+              <SelectValue placeholder="Select a bank..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No Bank</SelectItem>
               {banks.map((bank) => (
                 <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <Button type="submit" className="w-full" disabled={createMutation.isPending}>
-          {createMutation.isPending ? 'Adding...' : `Add ${type === "income" ? "Income" : "Expense"}`}
-        </Button>
+
+        <div className="space-y-2">
+          <Label>Category *</Label>
+          <Select onValueChange={(v) => setValue("category", v)} required>
+            <SelectTrigger data-testid="select-category">
+              <SelectValue placeholder="Select a category..." />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Event Name (Optional)</Label>
+            <Input 
+              {...register("eventName")} 
+              placeholder="e.g., Smith Wedding" 
+              data-testid="input-event-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Vendor Name (Optional)</Label>
+            <Input 
+              {...register("vendorName")} 
+              placeholder="e.g., ABC Catering" 
+              data-testid="input-vendor-name"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <textarea 
+            {...register("description")} 
+            className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-y"
+            placeholder="Add notes or details..."
+            data-testid="input-description"
+          />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            Close
+          </Button>
+          <Button type="submit" className="flex-1 bg-amber-600 hover:bg-amber-700" disabled={createMutation.isPending}>
+            <Plus className="h-4 w-4 mr-1" />
+            {createMutation.isPending ? 'Adding...' : 'Add Transaction'}
+          </Button>
+        </div>
+        
+        <p className="text-xs text-muted-foreground text-center">
+          The window will stay open for multiple entries.
+        </p>
       </form>
     );
   };
@@ -410,19 +506,14 @@ export default function Daybook() {
                   <TrendingUp className="h-5 w-5 text-green-600" />
                   <CardTitle className="font-serif text-lg text-green-700">Income</CardTitle>
                 </div>
-                <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1 h-8 bg-green-600 hover:bg-green-700" data-testid="button-add-income">
-                      <Plus className="h-3 w-3" /> Add
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add Income Entry</DialogTitle>
-                    </DialogHeader>
-                    <AddEntryForm type="income" />
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  size="sm" 
+                  className="gap-1 h-8 bg-green-600 hover:bg-green-700" 
+                  data-testid="button-add-income"
+                  onClick={() => setIsTransactionDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </Button>
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -489,19 +580,14 @@ export default function Daybook() {
                   <TrendingDown className="h-5 w-5 text-red-600" />
                   <CardTitle className="font-serif text-lg text-red-700">Expenses</CardTitle>
                 </div>
-                <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="gap-1 h-8 bg-red-600 hover:bg-red-700" data-testid="button-add-expense">
-                      <Plus className="h-3 w-3" /> Add
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Add Expense Entry</DialogTitle>
-                    </DialogHeader>
-                    <AddEntryForm type="expense" />
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  size="sm" 
+                  className="gap-1 h-8 bg-red-600 hover:bg-red-700" 
+                  data-testid="button-add-expense"
+                  onClick={() => setIsTransactionDialogOpen(true)}
+                >
+                  <Plus className="h-3 w-3" /> Add
+                </Button>
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -809,6 +895,15 @@ export default function Daybook() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-serif">Add New Transaction</DialogTitle>
+          </DialogHeader>
+          <AddTransactionForm onClose={() => setIsTransactionDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

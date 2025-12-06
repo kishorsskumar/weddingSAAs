@@ -38,11 +38,13 @@ export interface Employee {
 export interface DaybookEntry {
   id: string;
   date: string;
-  description: string;
+  description?: string | null;
   type: "income" | "expense";
   amount: string;
   category: string;
   bankId?: string | null;
+  eventName?: string | null;
+  vendorName?: string | null;
   createdAt?: string;
 }
 

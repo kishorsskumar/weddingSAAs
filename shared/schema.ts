@@ -73,11 +73,13 @@ export const employees = pgTable("employees", {
 export const daybookEntries = pgTable("daybook_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   date: date("date").notNull(),
-  description: text("description").notNull(),
+  description: text("description"),
   type: text("type").notNull(), // 'income' | 'expense'
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   category: text("category").notNull(),
   bankId: varchar("bank_id"),
+  eventName: text("event_name"),
+  vendorName: text("vendor_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
