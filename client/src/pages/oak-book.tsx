@@ -337,6 +337,201 @@ export default function OakBook() {
     },
   });
 
+  const createInvoice = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/invoices", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setInvoiceModalOpen(false);
+      setEditingInvoice(null);
+      toast({ title: "Invoice created successfully" });
+    },
+  });
+
+  const updateInvoice = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/invoices/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      setInvoiceModalOpen(false);
+      setEditingInvoice(null);
+      toast({ title: "Invoice updated successfully" });
+    },
+  });
+
+  const deleteInvoice = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/invoices/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      toast({ title: "Invoice deleted" });
+    },
+  });
+
+  const createEstimate = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/estimates", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      setEstimateModalOpen(false);
+      setEditingEstimate(null);
+      toast({ title: "Estimate created successfully" });
+    },
+  });
+
+  const updateEstimate = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/estimates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      setEstimateModalOpen(false);
+      setEditingEstimate(null);
+      toast({ title: "Estimate updated successfully" });
+    },
+  });
+
+  const deleteEstimate = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/estimates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estimates"] });
+      toast({ title: "Estimate deleted" });
+    },
+  });
+
+  const createExpense = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/expenses", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setExpenseModalOpen(false);
+      setEditingExpense(null);
+      toast({ title: "Expense recorded successfully" });
+    },
+  });
+
+  const updateExpense = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/expenses/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setExpenseModalOpen(false);
+      setEditingExpense(null);
+      toast({ title: "Expense updated successfully" });
+    },
+  });
+
+  const deleteExpense = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/expenses/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      toast({ title: "Expense deleted" });
+    },
+  });
+
+  const createBill = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/bills", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      setBillModalOpen(false);
+      setEditingBill(null);
+      toast({ title: "Bill created successfully" });
+    },
+  });
+
+  const updateBill = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/bills/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      setBillModalOpen(false);
+      setEditingBill(null);
+      toast({ title: "Bill updated successfully" });
+    },
+  });
+
+  const deleteBill = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/bills/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bills"] });
+      toast({ title: "Bill deleted" });
+    },
+  });
+
+  const createPayment = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/customer-payments", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
+      setPaymentModalOpen(false);
+      setEditingPayment(null);
+      toast({ title: "Payment recorded successfully" });
+    },
+  });
+
+  const updatePayment = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/customer-payments/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
+      setPaymentModalOpen(false);
+      setEditingPayment(null);
+      toast({ title: "Payment updated successfully" });
+    },
+  });
+
+  const deletePayment = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/customer-payments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
+      toast({ title: "Payment deleted" });
+    },
+  });
+
+  const handlePreview = (type: "invoice" | "quote" | "receipt", id: string) => {
+    setPreviewType(type);
+    setPreviewId(id);
+    setPreviewModalOpen(true);
+  };
+
+  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string) => {
+    try {
+      toast({ title: "Generating PDF..." });
+      const response = await fetch(`/api/pdf/${type}/${id}`);
+      if (!response.ok) throw new Error("PDF generation failed");
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${type}-${id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "PDF downloaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    }
+  };
+
+  const handleCloneInvoice = (invoice: Invoice) => {
+    const clonedData = {
+      ...invoice,
+      id: undefined,
+      number: `INV-${Date.now()}`,
+      date: format(new Date(), "yyyy-MM-dd"),
+      status: "draft",
+    };
+    setEditingInvoice(null);
+    createInvoice.mutate(clonedData);
+  };
+
+  const handleCloneEstimate = (estimate: Estimate) => {
+    const clonedData = {
+      ...estimate,
+      id: undefined,
+      number: `EST-${Date.now()}`,
+      date: format(new Date(), "yyyy-MM-dd"),
+      status: "draft",
+    };
+    setEditingEstimate(null);
+    createEstimate.mutate(clonedData);
+  };
+
   const toggleMenu = (menuId: string) => {
     setExpandedMenus((prev) =>
       prev.includes(menuId)
@@ -975,7 +1170,7 @@ export default function OakBook() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Estimates</h1>
-        <Button data-testid="btn-add-estimate">
+        <Button onClick={() => { setEditingEstimate(null); setEstimateModalOpen(true); }} data-testid="btn-add-estimate">
           <Plus className="h-4 w-4 mr-2" />
           New Estimate
         </Button>
@@ -1013,12 +1208,21 @@ export default function OakBook() {
                       </Badge>
                     </td>
                     <td className="p-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handlePreview("quote", estimate.id)} title="Preview">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingEstimate(estimate); setEstimateModalOpen(true); }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleCloneEstimate(estimate)} title="Clone">
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("quote", estimate.id)} title="Download PDF">
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteEstimate.mutate(estimate.id)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
@@ -1043,7 +1247,7 @@ export default function OakBook() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Invoices</h1>
-        <Button data-testid="btn-add-invoice">
+        <Button onClick={() => { setEditingInvoice(null); setInvoiceModalOpen(true); }} data-testid="btn-add-invoice">
           <Plus className="h-4 w-4 mr-2" />
           New Invoice
         </Button>
@@ -1085,12 +1289,21 @@ export default function OakBook() {
                       </Badge>
                     </td>
                     <td className="p-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handlePreview("invoice", invoice.id)} title="Preview">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingInvoice(invoice); setInvoiceModalOpen(true); }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleCloneInvoice(invoice)} title="Clone">
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("invoice", invoice.id)} title="Download PDF">
                           <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteInvoice.mutate(invoice.id)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
@@ -1115,7 +1328,7 @@ export default function OakBook() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Payments Received</h1>
-        <Button data-testid="btn-add-payment">
+        <Button onClick={() => { setEditingPayment(null); setPaymentModalOpen(true); }} data-testid="btn-add-payment">
           <Plus className="h-4 w-4 mr-2" />
           Record Payment
         </Button>
@@ -1131,6 +1344,7 @@ export default function OakBook() {
                 <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Customer</th>
                 <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
                 <th className="text-left p-4 font-medium text-muted-foreground hidden lg:table-cell">Mode</th>
+                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1149,12 +1363,28 @@ export default function OakBook() {
                     <td className="p-4 hidden lg:table-cell">
                       <Badge variant="outline">{payment.paymentMode}</Badge>
                     </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handlePreview("receipt", payment.id)} title="Preview">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingPayment(payment); setPaymentModalOpen(true); }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("receipt", payment.id)} title="Download PDF">
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deletePayment.mutate(payment.id)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
                     No payments recorded
                   </td>
                 </tr>
@@ -1170,7 +1400,7 @@ export default function OakBook() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Expenses</h1>
-        <Button data-testid="btn-add-expense">
+        <Button onClick={() => { setEditingExpense(null); setExpenseModalOpen(true); }} data-testid="btn-add-expense">
           <Plus className="h-4 w-4 mr-2" />
           Record Expense
         </Button>
@@ -1187,6 +1417,7 @@ export default function OakBook() {
                 <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Vendor</th>
                 <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
                 <th className="text-left p-4 font-medium text-muted-foreground hidden lg:table-cell">Status</th>
+                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1208,12 +1439,22 @@ export default function OakBook() {
                         {expense.status}
                       </Badge>
                     </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingExpense(expense); setExpenseModalOpen(true); }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteExpense.mutate(expense.id)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
               {expenses.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     No expenses recorded
                   </td>
                 </tr>
@@ -1229,7 +1470,7 @@ export default function OakBook() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Bills</h1>
-        <Button data-testid="btn-add-bill">
+        <Button onClick={() => { setEditingBill(null); setBillModalOpen(true); }} data-testid="btn-add-bill">
           <Plus className="h-4 w-4 mr-2" />
           Add Bill
         </Button>
@@ -1246,6 +1487,7 @@ export default function OakBook() {
                 <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
                 <th className="text-right p-4 font-medium text-muted-foreground hidden lg:table-cell">Balance</th>
                 <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1269,12 +1511,22 @@ export default function OakBook() {
                         {bill.status}
                       </Badge>
                     </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingBill(bill); setBillModalOpen(true); }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteBill.mutate(bill.id)} title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
               {billsList.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
                     No bills found
                   </td>
                 </tr>
@@ -1901,6 +2153,453 @@ export default function OakBook() {
       <CustomerModal />
       <VendorModal />
       <ItemModal />
+      
+      {/* Invoice Modal */}
+      <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          </DialogHeader>
+          <InvoiceForm 
+            invoice={editingInvoice}
+            customers={customers}
+            onSubmit={(data) => {
+              if (editingInvoice) {
+                updateInvoice.mutate({ id: editingInvoice.id, data });
+              } else {
+                createInvoice.mutate(data);
+              }
+            }}
+            onCancel={() => setInvoiceModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Estimate Modal */}
+      <Dialog open={estimateModalOpen} onOpenChange={setEstimateModalOpen}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingEstimate ? "Edit Estimate" : "New Estimate"}</DialogTitle>
+          </DialogHeader>
+          <EstimateForm 
+            estimate={editingEstimate}
+            customers={customers}
+            onSubmit={(data) => {
+              if (editingEstimate) {
+                updateEstimate.mutate({ id: editingEstimate.id, data });
+              } else {
+                createEstimate.mutate(data);
+              }
+            }}
+            onCancel={() => setEstimateModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingPayment ? "Edit Payment" : "Record Payment"}</DialogTitle>
+          </DialogHeader>
+          <PaymentForm 
+            payment={editingPayment}
+            customers={customers}
+            invoices={invoices}
+            onSubmit={(data) => {
+              if (editingPayment) {
+                updatePayment.mutate({ id: editingPayment.id, data });
+              } else {
+                createPayment.mutate(data);
+              }
+            }}
+            onCancel={() => setPaymentModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Expense Modal */}
+      <Dialog open={expenseModalOpen} onOpenChange={setExpenseModalOpen}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingExpense ? "Edit Expense" : "Record Expense"}</DialogTitle>
+          </DialogHeader>
+          <ExpenseForm 
+            expense={editingExpense}
+            vendors={vendors}
+            onSubmit={(data) => {
+              if (editingExpense) {
+                updateExpense.mutate({ id: editingExpense.id, data });
+              } else {
+                createExpense.mutate(data);
+              }
+            }}
+            onCancel={() => setExpenseModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Bill Modal */}
+      <Dialog open={billModalOpen} onOpenChange={setBillModalOpen}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingBill ? "Edit Bill" : "Add Bill"}</DialogTitle>
+          </DialogHeader>
+          <BillForm 
+            bill={editingBill}
+            vendors={vendors}
+            onSubmit={(data) => {
+              if (editingBill) {
+                updateBill.mutate({ id: editingBill.id, data });
+              } else {
+                createBill.mutate(data);
+              }
+            }}
+            onCancel={() => setBillModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Modal */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Document Preview</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => previewType && previewId && handleDownloadPdf(previewType, previewId)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          {previewType && previewId && (
+            <iframe 
+              src={`/print/${previewType}/${previewId}`}
+              className="w-full h-[70vh] border rounded"
+              title="Document Preview"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function InvoiceForm({ invoice, customers, onSubmit, onCancel }: { 
+  invoice: Invoice | null; 
+  customers: Customer[]; 
+  onSubmit: (data: any) => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    number: invoice?.number || `INV-${Date.now().toString().slice(-6)}`,
+    customerId: invoice?.customerId || "",
+    date: invoice?.date || format(new Date(), "yyyy-MM-dd"),
+    status: invoice?.status || "draft",
+    total: invoice?.total || "0",
+    balanceDue: invoice?.balanceDue || "0",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Invoice Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+        </div>
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Customer</Label>
+        <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+          <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+          <SelectContent>
+            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Total Amount (₹)</Label>
+          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value, balanceDue: e.target.value })} />
+        </div>
+        <div>
+          <Label>Status</Label>
+          <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSubmit(formData)}>{invoice ? "Update" : "Create"}</Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function EstimateForm({ estimate, customers, onSubmit, onCancel }: { 
+  estimate: Estimate | null; 
+  customers: Customer[]; 
+  onSubmit: (data: any) => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    number: estimate?.number || `EST-${Date.now().toString().slice(-6)}`,
+    customerId: estimate?.customerId || "",
+    date: estimate?.date || format(new Date(), "yyyy-MM-dd"),
+    status: estimate?.status || "draft",
+    total: estimate?.total || "0",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Estimate Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+        </div>
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Customer</Label>
+        <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+          <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+          <SelectContent>
+            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Total Amount (₹)</Label>
+          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value })} />
+        </div>
+        <div>
+          <Label>Status</Label>
+          <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="declined">Declined</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSubmit(formData)}>{estimate ? "Update" : "Create"}</Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function PaymentForm({ payment, customers, invoices, onSubmit, onCancel }: { 
+  payment: CustomerPayment | null; 
+  customers: Customer[]; 
+  invoices: Invoice[];
+  onSubmit: (data: any) => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    number: payment?.number || `REC-${Date.now().toString().slice(-6)}`,
+    customerId: payment?.customerId || "",
+    date: payment?.date || format(new Date(), "yyyy-MM-dd"),
+    amount: payment?.amount || "0",
+    paymentMode: payment?.paymentMode || "cash",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Receipt Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+        </div>
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Customer</Label>
+        <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+          <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+          <SelectContent>
+            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Amount (₹)</Label>
+          <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} />
+        </div>
+        <div>
+          <Label>Payment Mode</Label>
+          <Select value={formData.paymentMode} onValueChange={(v) => setFormData({ ...formData, paymentMode: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">Cash</SelectItem>
+              <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+              <SelectItem value="upi">UPI</SelectItem>
+              <SelectItem value="cheque">Cheque</SelectItem>
+              <SelectItem value="card">Card</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSubmit(formData)}>{payment ? "Update" : "Record"}</Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function ExpenseForm({ expense, vendors, onSubmit, onCancel }: { 
+  expense: Expense | null; 
+  vendors: Vendor[]; 
+  onSubmit: (data: any) => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    number: expense?.number || `EXP-${Date.now().toString().slice(-6)}`,
+    vendorId: expense?.vendorId || "",
+    date: expense?.date || format(new Date(), "yyyy-MM-dd"),
+    category: expense?.category || "",
+    description: expense?.description || "",
+    total: expense?.total || "0",
+    status: expense?.status || "pending",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Expense Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+        </div>
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Vendor</Label>
+        <Select value={formData.vendorId || ""} onValueChange={(v) => setFormData({ ...formData, vendorId: v })}>
+          <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+          <SelectContent>
+            {vendors.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Category</Label>
+          <Input value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} placeholder="e.g., Travel, Office" />
+        </div>
+        <div>
+          <Label>Amount (₹)</Label>
+          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Description</Label>
+        <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} />
+      </div>
+      <div>
+        <Label>Status</Label>
+        <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSubmit(formData)}>{expense ? "Update" : "Record"}</Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+function BillForm({ bill, vendors, onSubmit, onCancel }: { 
+  bill: Bill | null; 
+  vendors: Vendor[]; 
+  onSubmit: (data: any) => void; 
+  onCancel: () => void;
+}) {
+  const [formData, setFormData] = useState({
+    number: bill?.number || `BILL-${Date.now().toString().slice(-6)}`,
+    vendorId: bill?.vendorId || "",
+    date: bill?.date || format(new Date(), "yyyy-MM-dd"),
+    total: bill?.total || "0",
+    balanceDue: bill?.balanceDue || "0",
+    status: bill?.status || "pending",
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Bill Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+        </div>
+        <div>
+          <Label>Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
+        </div>
+      </div>
+      <div>
+        <Label>Vendor</Label>
+        <Select value={formData.vendorId || ""} onValueChange={(v) => setFormData({ ...formData, vendorId: v })}>
+          <SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger>
+          <SelectContent>
+            {vendors.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label>Total Amount (₹)</Label>
+          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value, balanceDue: e.target.value })} />
+        </div>
+        <div>
+          <Label>Status</Label>
+          <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={onCancel}>Cancel</Button>
+        <Button onClick={() => onSubmit(formData)}>{bill ? "Update" : "Create"}</Button>
+      </DialogFooter>
     </div>
   );
 }
