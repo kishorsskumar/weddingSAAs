@@ -739,21 +739,23 @@ export default function Daybook() {
   };
 
   const EditBankForm = ({ bank, onClose }: { bank: Bank; onClose: () => void }) => {
-    const { register, handleSubmit } = useForm<{ name: string; openingBalance: string }>({
+    const { register, handleSubmit } = useForm<{ name: string; openingBalance: string; currentBalance: string }>({
       defaultValues: { 
         name: bank.name, 
-        openingBalance: (bank as any).openingBalance || bank.balance 
+        openingBalance: (bank as any).openingBalance || bank.balance,
+        currentBalance: bank.balance
       }
     });
     
     const onSubmit = (data: any) => {
       const updateData: any = { name: data.name };
-      if (isSuperAdmin && data.openingBalance) {
-        const oldOpening = parseFloat((bank as any).openingBalance || bank.balance);
-        const newOpening = parseFloat(data.openingBalance);
-        const difference = newOpening - oldOpening;
-        updateData.openingBalance = data.openingBalance;
-        updateData.balance = (parseFloat(bank.balance) + difference).toFixed(2);
+      if (isSuperAdmin) {
+        if (data.openingBalance) {
+          updateData.openingBalance = data.openingBalance;
+        }
+        if (data.currentBalance) {
+          updateData.balance = data.currentBalance;
+        }
       }
       updateBankMutation.mutate({ id: bank.id, data: updateData });
     };
@@ -765,18 +767,27 @@ export default function Daybook() {
           <Input {...register("name")} required />
         </div>
         {isSuperAdmin && (
-          <div className="space-y-2">
-            <Label>Opening Balance</Label>
-            <Input type="number" step="0.01" {...register("openingBalance")} required />
-            <p className="text-xs text-muted-foreground">Only superadmin can edit opening balance</p>
+          <>
+            <div className="space-y-2">
+              <Label>Opening Balance</Label>
+              <Input type="number" step="0.01" {...register("openingBalance")} required />
+              <p className="text-xs text-muted-foreground">Initial balance when bank was added</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Current Balance</Label>
+              <Input type="number" step="0.01" {...register("currentBalance")} required data-testid="input-current-balance" />
+              <p className="text-xs text-muted-foreground text-amber-600">Warning: Editing current balance directly may cause discrepancies with transaction history</p>
+            </div>
+          </>
+        )}
+        {!isSuperAdmin && (
+          <div className="p-3 bg-muted rounded-md">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Current Balance</span>
+              <span className="font-mono font-bold">₹{Number(bank.balance).toLocaleString()}</span>
+            </div>
           </div>
         )}
-        <div className="p-3 bg-muted rounded-md">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Current Balance</span>
-            <span className="font-mono font-bold">₹{Number(bank.balance).toLocaleString()}</span>
-          </div>
-        </div>
         <Button type="submit" className="w-full" disabled={updateBankMutation.isPending}>
           {updateBankMutation.isPending ? 'Saving...' : 'Save Changes'}
         </Button>
