@@ -22,6 +22,16 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Redirect non-www to www in production
+app.use((req, res, next) => {
+  const host = req.hostname || req.headers.host || "";
+  // Only redirect in production and if not already www
+  if (process.env.NODE_ENV === "production" && host === "oakstreetevent.com") {
+    return res.redirect(301, `https://www.oakstreetevent.com${req.originalUrl}`);
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
