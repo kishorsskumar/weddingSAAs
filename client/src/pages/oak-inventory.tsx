@@ -63,7 +63,7 @@ import type {
 
 type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans';
 
-const ITEM_CATEGORIES = ["Décor", "Furniture", "Lighting", "Linens", "Props", "Florals", "Electronics", "Other"];
+const DEFAULT_CATEGORIES = ["Décor", "Furniture", "Lighting", "Linens", "Props", "Florals", "Electronics", "Other"];
 const EVENT_TYPES = ["Wedding Stage Décor", "Reception Setup", "Corporate Event", "Birthday Party", "Other"];
 const SESSION_STATUSES = ["draft", "issued", "partial_return", "completed"];
 const RENTAL_STATUSES = ["active", "returned", "partial", "overdue"];
@@ -307,11 +307,23 @@ function InventoryItemsSection({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState('');
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('oak-inventory-categories');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const allCategories = useMemo(() => {
+    const categoriesFromItems = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
+    const combined = Array.from(new Set([...DEFAULT_CATEGORIES, ...customCategories, ...categoriesFromItems]));
+    return combined.sort();
+  }, [items, customCategories]);
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    category: 'Décor',
+    category: 'Other',
     sku: '',
     unitCost: '',
     stockQuantity: '',
@@ -325,7 +337,7 @@ function InventoryItemsSection({
     setFormData({
       name: '',
       description: '',
-      category: 'Décor',
+      category: 'Other',
       sku: '',
       unitCost: '',
       stockQuantity: '',
@@ -337,11 +349,33 @@ function InventoryItemsSection({
     setEditingItem(null);
   };
 
+  const handleAddCategory = () => {
+    if (newCategory.trim() && !allCategories.includes(newCategory.trim())) {
+      const updated = [...customCategories, newCategory.trim()];
+      setCustomCategories(updated);
+      localStorage.setItem('oak-inventory-categories', JSON.stringify(updated));
+      toast({ title: `Category "${newCategory.trim()}" added` });
+      setNewCategory('');
+    }
+  };
+
+  const handleRemoveCategory = (cat: string) => {
+    if (DEFAULT_CATEGORIES.includes(cat)) {
+      toast({ title: 'Cannot remove default categories', variant: 'destructive' });
+      return;
+    }
+    const updated = customCategories.filter(c => c !== cat);
+    setCustomCategories(updated);
+    localStorage.setItem('oak-inventory-categories', JSON.stringify(updated));
+    toast({ title: `Category "${cat}" removed` });
+  };
+
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       const matchesSearch = !searchQuery || 
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.sku && item.sku.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (item.location && item.location.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
       return matchesSearch && matchesCategory;
@@ -412,11 +446,16 @@ function InventoryItemsSection({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
-      ...formData,
+      name: formData.name,
+      description: formData.description || null,
+      category: formData.category,
+      sku: formData.sku || `SKU-${Date.now()}`,
       unitCost: formData.unitCost || '0',
       stockQuantity: parseInt(formData.stockQuantity) || 0,
       minStockLevel: parseInt(formData.minStockLevel) || 0,
+      location: formData.location || null,
       photos: formData.photos ? formData.photos.split(',').map(p => p.trim()).filter(Boolean) : [],
+      isActive: formData.isActive,
     };
 
     if (editingItem) {
@@ -431,14 +470,14 @@ function InventoryItemsSection({
     setFormData({
       name: item.name,
       description: item.description || '',
-      category: item.category,
+      category: item.category || 'Other',
       sku: item.sku || '',
       unitCost: item.unitCost || '',
-      stockQuantity: String(item.stockQuantity),
+      stockQuantity: String(item.stockQuantity || 0),
       minStockLevel: String(item.minStockLevel || 0),
       location: item.location || '',
       photos: item.photos?.join(', ') || '',
-      isActive: item.isActive,
+      isActive: item.isActive !== false,
     });
     setIsModalOpen(true);
   };
@@ -526,11 +565,15 @@ function InventoryItemsSection({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {ITEM_CATEGORIES.map(cat => (
+                {allCategories.map(cat => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories">
+              <Plus className="w-4 h-4 mr-1" />
+              Categories
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -662,7 +705,7 @@ function InventoryItemsSection({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {ITEM_CATEGORIES.map(cat => (
+                    {allCategories.map(cat => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
                   </SelectContent>
@@ -771,6 +814,49 @@ function InventoryItemsSection({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Categories</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="New category name..."
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                data-testid="input-new-category"
+              />
+              <Button onClick={handleAddCategory} data-testid="button-add-category">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {allCategories.map((cat) => (
+                <div key={cat} className="flex items-center justify-between p-2 border rounded">
+                  <span>{cat}</span>
+                  {!DEFAULT_CATEGORIES.includes(cat) && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-red-500"
+                      onClick={() => handleRemoveCategory(cat)}
+                      data-testid={`button-remove-category-${cat}`}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setIsCategoryModalOpen(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
