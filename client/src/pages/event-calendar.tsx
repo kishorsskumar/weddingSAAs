@@ -78,8 +78,8 @@ export default function EventCalendar() {
 
   const getDayBackgroundStyle = (eventCount: number, isCurrentMonth: boolean): React.CSSProperties => {
     if (!isCurrentMonth) return {};
-    if (eventCount >= 3) return { backgroundColor: '#B22222' };
-    if (eventCount === 2) return { backgroundColor: '#FFD700' };
+    if (eventCount >= 3) return { backgroundColor: '#EAC4C4' };
+    if (eventCount === 2) return { backgroundColor: '#FFF5CC' };
     return {};
   };
 
@@ -195,8 +195,8 @@ export default function EventCalendar() {
       <div className="flex items-center gap-2 text-xs flex-wrap">
         <span className="text-muted-foreground">Legend:</span>
         <span className="px-2 py-1 rounded bg-green-100 border border-green-200 text-green-800">Booking</span>
-        <span className="px-2 py-1 rounded border border-yellow-600" style={{ backgroundColor: '#FFD700' }}>2 Events</span>
-        <span className="px-2 py-1 rounded border border-red-900 text-white" style={{ backgroundColor: '#B22222' }}>3+ Events</span>
+        <span className="px-2 py-1 rounded border border-yellow-400" style={{ backgroundColor: '#FFF5CC' }}>2 Events</span>
+        <span className="px-2 py-1 rounded border border-red-300" style={{ backgroundColor: '#EAC4C4' }}>3+ Events</span>
       </div>
 
       <Card className="flex-1 overflow-hidden flex flex-col shadow-md border-border/50">
