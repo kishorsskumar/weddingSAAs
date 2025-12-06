@@ -15,6 +15,7 @@ import Daybook from "@/pages/daybook";
 import OakBook from "@/pages/oak-book";
 import HR from "@/pages/hr";
 import Admin from "@/pages/admin";
+import OakSales from "@/pages/oak-sales";
 import CustomerPortal from "@/pages/customer-portal";
 import PrintDocument from "@/pages/print-document";
 import NotFound from "@/pages/not-found";
@@ -66,6 +67,9 @@ function AppRoutes() {
         </Route>
         <Route path="/admin">
            <PrivateRoute component={Admin} path="/admin" />
+        </Route>
+        <Route path="/oak-sales">
+           <PrivateRoute component={OakSales} path="/oak-sales" />
         </Route>
         <Route component={NotFound} />
       </Switch>

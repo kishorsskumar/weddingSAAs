@@ -13,7 +13,8 @@ import {
   Menu,
   Briefcase,
   CheckSquare,
-  Receipt
+  Receipt,
+  Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +29,7 @@ const ALL_PAGES = [
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
+  { id: "oak-sales", label: "Oak Sales", path: "/oak-sales" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
@@ -40,6 +42,7 @@ const ICONS: Record<string, any> = {
   "event-milestones": CheckSquare,
   daybook: BookOpen,
   "oak-book": Receipt,
+  "oak-sales": Target,
   hr: Briefcase,
   admin: Shield,
 };
