@@ -43,7 +43,8 @@ import {
   ArrowDownRight,
   Calendar,
   Menu,
-  X
+  X,
+  UserPlus
 } from "lucide-react";
 import {
   AreaChart,
@@ -2131,6 +2132,7 @@ export default function OakBook() {
               }
             }}
             onCancel={() => setInvoiceModalOpen(false)}
+            onCreateCustomer={() => { setEditingCustomer(null); setCustomerModalOpen(true); }}
           />
         </DialogContent>
       </Dialog>
@@ -2152,6 +2154,7 @@ export default function OakBook() {
               }
             }}
             onCancel={() => setEstimateModalOpen(false)}
+            onCreateCustomer={() => { setEditingCustomer(null); setCustomerModalOpen(true); }}
           />
         </DialogContent>
       </Dialog>
@@ -2260,11 +2263,12 @@ interface LineItem {
   slNo?: number;
 }
 
-function InvoiceForm({ invoice, customers, onSubmit, onCancel }: { 
+function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer }: { 
   invoice: Invoice | null; 
   customers: Customer[]; 
   onSubmit: (data: any) => void; 
   onCancel: () => void;
+  onCreateCustomer: () => void;
 }) {
   const [formData, setFormData] = useState({
     number: invoice?.number || `INV-${Date.now().toString().slice(-6)}`,
@@ -2280,6 +2284,7 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
     terms: (invoice as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
     thankYouMessage: (invoice as any)?.thankYouMessage || "Looking forward for your business.",
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [lineItems, setLineItems] = useState<LineItem[]>(
     (invoice as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
@@ -2318,6 +2323,12 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
   const totals = calculateTotals();
 
   const handleSubmit = () => {
+    if (!formData.weddingPlannerName.trim()) {
+      setValidationError("Wedding Planner Name is required");
+      return;
+    }
+    setValidationError(null);
+
     let slNo = 0;
     const numberedItems = lineItems.map(item => {
       if (item.isHeading) {
@@ -2341,6 +2352,9 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      {validationError && (
+        <div className="bg-destructive/10 text-destructive text-sm p-2 rounded-md">{validationError}</div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <Label className="text-xs">Invoice Number</Label>
@@ -2367,16 +2381,21 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Customer</Label>
-          <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
-            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select customer" /></SelectTrigger>
-            <SelectContent>
-              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-1">
+            <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+              <SelectTrigger className="h-8 text-sm flex-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" size="sm" onClick={onCreateCustomer} className="h-8 px-2" title="Create Customer">
+              <UserPlus className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         <div>
-          <Label className="text-xs">Wedding Planner Name</Label>
-          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Optional" className="h-8 text-sm" />
+          <Label className="text-xs">Wedding Planner Name <span className="text-destructive">*</span></Label>
+          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Required" className="h-8 text-sm" />
         </div>
       </div>
 
@@ -2537,11 +2556,12 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
   );
 }
 
-function EstimateForm({ estimate, customers, onSubmit, onCancel }: { 
+function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustomer }: { 
   estimate: Estimate | null; 
   customers: Customer[]; 
   onSubmit: (data: any) => void; 
   onCancel: () => void;
+  onCreateCustomer: () => void;
 }) {
   const [formData, setFormData] = useState({
     number: estimate?.number || `EST-${Date.now().toString().slice(-6)}`,
@@ -2557,6 +2577,7 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
     terms: (estimate as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
     thankYouMessage: (estimate as any)?.thankYouMessage || "Looking forward for your business.",
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [lineItems, setLineItems] = useState<LineItem[]>(
     (estimate as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
@@ -2595,6 +2616,12 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
   const totals = calculateTotals();
 
   const handleSubmit = () => {
+    if (!formData.weddingPlannerName.trim()) {
+      setValidationError("Wedding Planner Name is required");
+      return;
+    }
+    setValidationError(null);
+
     let slNo = 0;
     const numberedItems = lineItems.map(item => {
       if (item.isHeading) {
@@ -2617,6 +2644,9 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
 
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      {validationError && (
+        <div className="bg-destructive/10 text-destructive text-sm p-2 rounded-md">{validationError}</div>
+      )}
       {/* Basic Info */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
@@ -2645,16 +2675,21 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <Label className="text-xs">Customer</Label>
-          <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
-            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select customer" /></SelectTrigger>
-            <SelectContent>
-              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-1">
+            <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+              <SelectTrigger className="h-8 text-sm flex-1"><SelectValue placeholder="Select customer" /></SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button type="button" variant="outline" size="sm" onClick={onCreateCustomer} className="h-8 px-2" title="Create Customer">
+              <UserPlus className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
         <div>
-          <Label className="text-xs">Wedding Planner Name</Label>
-          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Optional" className="h-8 text-sm" />
+          <Label className="text-xs">Wedding Planner Name <span className="text-destructive">*</span></Label>
+          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Required" className="h-8 text-sm" />
         </div>
       </div>
 
