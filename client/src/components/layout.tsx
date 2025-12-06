@@ -47,6 +47,8 @@ const ICONS: Record<string, any> = {
   admin: Shield,
 };
 
+const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales"];
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
@@ -54,6 +56,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
+  const hasOwnSidebar = PAGES_WITH_OWN_SIDEBAR.includes(location);
   const navItems = ALL_PAGES.filter((page) => allowedPages.includes(page.id));
 
   const NavContent = () => (
@@ -116,6 +119,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+
+  if (hasOwnSidebar) {
+    return (
+      <div className="min-h-screen bg-background">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-background">

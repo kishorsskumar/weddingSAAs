@@ -140,6 +140,10 @@ export default function OakSales() {
       {/* Sidebar */}
       <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card border-r transition-all duration-300 flex flex-col`}>
         <div className="p-4 border-b">
+          <a href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3">
+            <LayoutDashboard className="w-4 h-4" />
+            {!sidebarCollapsed && <span className="text-sm font-medium">Dashboard</span>}
+          </a>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
               <Target className="w-5 h-5 text-white" />
