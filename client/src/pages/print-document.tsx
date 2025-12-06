@@ -72,10 +72,11 @@ function numberToWords(num: number): string {
 }
 
 function formatIndianCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
+  const formatted = new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+  return formatted;
 }
 
 export default function PrintDocument() {
@@ -175,153 +176,160 @@ export default function PrintDocument() {
   return <div className="p-8 text-center">Document not found</div>;
 }
 
-const printStyles = `
+const baseStyles = `
   @media print {
     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-    @page { size: A4; margin: 10mm; }
+    @page { size: A4; margin: 15mm 10mm; }
   }
-  * { box-sizing: border-box; }
-  .doc-container { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11px; color: #333; }
-  .header-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-  .header-table td { vertical-align: top; padding: 0; }
-  .company-logo { width: 80px; height: auto; }
-  .company-name { font-size: 22px; font-weight: bold; color: #333; margin-bottom: 4px; }
-  .company-address { font-size: 11px; color: #555; line-height: 1.4; }
-  .doc-type { font-size: 28px; font-weight: bold; text-align: right; }
-  .doc-type-estimate { color: #8B7355; }
-  .doc-type-invoice { color: #2563eb; }
-  .doc-type-receipt { color: #22c55e; }
-  .info-row { display: flex; border: 1px solid #ddd; margin-bottom: 0; }
-  .info-cell { flex: 1; padding: 8px 12px; border-right: 1px solid #ddd; }
-  .info-cell:last-child { border-right: none; }
-  .info-label { font-size: 10px; color: #666; margin-bottom: 2px; }
-  .info-value { font-weight: 500; }
-  .bill-ship-row { display: flex; border: 1px solid #ddd; border-top: none; }
-  .bill-to, .ship-to { flex: 1; padding: 10px 12px; }
-  .bill-to { border-right: 1px solid #ddd; }
-  .section-label { font-size: 10px; color: #666; font-weight: 600; margin-bottom: 4px; }
-  .customer-name { font-weight: bold; margin-bottom: 4px; }
-  .customer-address { font-size: 11px; line-height: 1.4; color: #444; }
-  .gstin-row { margin-top: 6px; font-size: 11px; }
-  .subject-row { border: 1px solid #ddd; border-top: none; padding: 10px 12px; }
-  .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; }
-  .items-table th { background-color: #8B7355; color: white; padding: 8px 6px; text-align: left; font-weight: 600; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
+  
+  .document { max-width: 800px; margin: 0 auto; padding: 20px; background: white; }
+  
+  /* Header */
+  .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .company-info { flex: 1; }
+  .company-logo { width: 60px; height: 60px; background: #2c5530; padding: 8px; border-radius: 4px; margin-bottom: 8px; }
+  .company-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .company-name { font-size: 22px; font-weight: bold; color: #2c5530; margin-bottom: 4px; }
+  .company-address { font-size: 11px; color: #444; line-height: 1.5; }
+  .doc-type-box { text-align: right; }
+  .doc-type { font-size: 28px; font-weight: bold; color: #2c5530; }
+  
+  /* Document Info */
+  .doc-info { margin-bottom: 15px; }
+  .doc-info-row { display: flex; margin-bottom: 3px; }
+  .doc-info-label { min-width: 120px; font-weight: 500; }
+  .doc-info-value { }
+  
+  /* Bill To */
+  .bill-to-section { margin-bottom: 15px; }
+  .bill-to-label { font-weight: bold; margin-bottom: 5px; color: #333; }
+  .bill-to-content { line-height: 1.5; }
+  .customer-name { font-weight: bold; }
+  
+  /* Subject */
+  .subject-section { margin-bottom: 15px; padding: 8px 0; border-top: 1px solid #ddd; border-bottom: 1px solid #ddd; }
+  .subject-label { font-weight: bold; margin-bottom: 3px; }
+  .subject-text { }
+  
+  /* Items Table */
+  .items-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px; }
+  .items-table th { background: #f5f5f5; padding: 8px 6px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
   .items-table th.text-right { text-align: right; }
   .items-table th.text-center { text-align: center; }
-  .items-table td { padding: 8px 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .items-table td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
   .items-table td.text-right { text-align: right; }
   .items-table td.text-center { text-align: center; }
-  .items-table .heading-row td { background-color: #f5f5f5; font-weight: bold; }
-  .items-table .gst-header { text-align: center; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 4px; margin-bottom: 4px; }
-  .items-table .gst-subheader { display: flex; justify-content: space-around; font-size: 9px; }
-  .totals-section { display: flex; justify-content: flex-end; margin: 10px 0; }
-  .totals-table { width: 280px; font-size: 11px; }
-  .totals-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; }
-  .totals-row.total { font-weight: bold; font-size: 13px; border-top: 2px solid #8B7355; border-bottom: none; padding-top: 8px; }
-  .amount-words { background-color: #f9f9f9; padding: 10px 12px; margin: 10px 0; border-radius: 4px; }
-  .amount-words-label { font-size: 10px; color: #666; margin-bottom: 2px; }
-  .bank-details { margin: 15px 0; padding: 12px; background-color: #f5f5f5; border-radius: 4px; }
-  .bank-title { font-weight: bold; margin-bottom: 8px; }
-  .bank-row { display: flex; margin-bottom: 4px; }
-  .bank-label { width: 120px; color: #666; }
-  .notes-section, .terms-section { margin: 10px 0; }
-  .section-title { font-weight: bold; margin-bottom: 4px; }
-  .section-content { color: #555; white-space: pre-line; }
-  .footer { margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; text-align: center; font-size: 11px; color: #666; }
-  .signature-section { margin-top: 40px; display: flex; justify-content: flex-end; }
-  .signature-box { text-align: center; width: 200px; }
-  .signature-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 5px; }
+  .items-table .heading-row td { background: #f9f9f9; font-weight: bold; padding: 8px 6px; }
+  .items-table .item-name { font-weight: 500; }
+  .items-table .item-desc { color: #666; font-size: 9px; white-space: pre-line; margin-top: 2px; }
+  .items-table .sl-no { width: 35px; text-align: center; }
+  .items-table .qty-col { width: 50px; text-align: right; }
+  .items-table .rate-col { width: 80px; text-align: right; }
+  .items-table .amount-col { width: 90px; text-align: right; }
+  
+  /* Totals */
+  .totals-section { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+  .totals-table { width: 280px; }
+  .totals-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
+  .totals-row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #2c5530; border-bottom: none; padding-top: 8px; margin-top: 5px; }
+  .totals-label { }
+  .totals-value { text-align: right; min-width: 100px; }
+  
+  /* Amount in Words */
+  .amount-words { margin-bottom: 15px; }
+  .amount-words-label { font-weight: bold; margin-bottom: 3px; }
+  .amount-words-text { font-style: italic; }
+  
+  /* Notes */
+  .notes-section { margin-bottom: 15px; }
+  .notes-label { font-weight: bold; margin-bottom: 5px; }
+  .notes-text { color: #555; }
+  
+  /* Terms */
+  .terms-section { margin-bottom: 20px; }
+  .terms-label { font-weight: bold; margin-bottom: 5px; }
+  .terms-list { list-style: none; padding: 0; }
+  .terms-list li { margin-bottom: 3px; color: #555; font-size: 10px; }
+  
+  /* Signature */
+  .signature-section { display: flex; justify-content: flex-end; margin-top: 30px; }
+  .signature-box { text-align: center; width: 180px; }
+  .signature-line { border-top: 1px solid #333; padding-top: 8px; margin-top: 50px; font-size: 11px; }
+  
+  /* Footer */
+  .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; font-size: 9px; color: #888; }
 `;
 
 function QuotePrint({ estimate, customer, companySettings }: any) {
   const lineItems: LineItem[] = estimate.lineItems || [];
-  const hasGst = lineItems.some(item => item.cgstPercent || item.sgstPercent || item.taxRate);
 
   return (
-    <div className="doc-container bg-white p-6 max-w-4xl mx-auto">
-      <style>{printStyles}</style>
+    <div className="document">
+      <style>{baseStyles}</style>
 
-      <table className="header-table">
-        <tbody>
-          <tr>
-            <td style={{ width: '70%' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <img src={logo} alt="Logo" className="company-logo" style={{ backgroundColor: '#8B7355', padding: '8px', borderRadius: '4px' }} />
-                <div>
-                  <div className="company-name">{companySettings?.companyName || 'Oakstreet Events'}</div>
-                  <div className="company-address">
-                    {(companySettings?.address || '2nd Floor, Above Devas Studio\nOpposite Deshabhimani Press, Kaloor\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                    {companySettings?.gstNumber && <div style={{ marginTop: '4px' }}>GSTIN {companySettings.gstNumber}</div>}
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td style={{ width: '30%', textAlign: 'right', verticalAlign: 'top' }}>
-              <div className="doc-type doc-type-estimate">ESTIMATE</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div className="info-row">
-        <div className="info-cell">
-          <div className="info-label">#</div>
-          <div className="info-value">{estimate.number}</div>
+      {/* Header */}
+      <div className="header">
+        <div className="company-info">
+          <div className="company-logo">
+            <img src={logo} alt="Logo" />
+          </div>
+          <div className="company-name">{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-address">
+            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              <div key={i}>{line}</div>
+            ))}
+            <div>{companySettings?.phone || '7902373354'}</div>
+            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+            <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+          </div>
         </div>
-        <div className="info-cell">
-          <div className="info-label">Estimate Date</div>
-          <div className="info-value">{format(new Date(estimate.date), 'dd/MM/yyyy')}</div>
-        </div>
-        <div className="info-cell">
-          <div className="info-label">Place Of Supply</div>
-          <div className="info-value">{companySettings?.placeOfSupply || 'Kerala (32)'}</div>
+        <div className="doc-type-box">
+          <div className="doc-type">Quote</div>
         </div>
       </div>
 
-      <div className="bill-ship-row">
-        <div className="bill-to">
-          <div className="section-label">Bill To</div>
+      {/* Document Info */}
+      <div className="doc-info">
+        <div className="doc-info-row">
+          <span className="doc-info-label">Estimate No</span>
+          <span>: {estimate.number}</span>
+        </div>
+        <div className="doc-info-row">
+          <span className="doc-info-label">Quote Date</span>
+          <span>: {format(new Date(estimate.date), 'dd/MM/yyyy')}</span>
+        </div>
+      </div>
+
+      {/* Bill To */}
+      <div className="bill-to-section">
+        <div className="bill-to-label">Bill To</div>
+        <div className="bill-to-content">
           <div className="customer-name">{customer?.name || '—'}</div>
-          <div className="customer-address">{estimate.customerAddress || customer?.address || ''}</div>
-          {customer?.gstNumber && <div className="gstin-row">GSTIN {customer.gstNumber}</div>}
-        </div>
-        <div className="ship-to">
-          <div className="section-label">Ship To</div>
-          <div className="customer-address">{estimate.shippingAddress || estimate.customerAddress || customer?.address || ''}</div>
-          {customer?.gstNumber && <div className="gstin-row">GSTIN {customer.gstNumber}</div>}
+          {(estimate.customerAddress || customer?.billingAddress || '').split('\n').map((line: string, i: number) => (
+            <div key={i}>{line}</div>
+          ))}
         </div>
       </div>
 
+      {/* Subject */}
       {estimate.subject && (
-        <div className="subject-row">
-          <div className="section-label">Subject :</div>
-          <div>{estimate.subject}</div>
+        <div className="subject-section">
+          <span className="subject-label">Subject : </span>
+          <span className="subject-text">{estimate.subject}</span>
         </div>
       )}
 
+      {/* Items Table */}
       <table className="items-table">
         <thead>
           <tr>
-            <th style={{ width: '30px' }}>#</th>
+            <th className="sl-no">Sl<br/>No</th>
             <th>Item & Description</th>
-            <th style={{ width: '70px' }}>HSN/SAC</th>
-            <th className="text-right" style={{ width: '50px' }}>Qty</th>
-            <th className="text-right" style={{ width: '80px' }}>Rate</th>
-            {hasGst && (
-              <>
-                <th className="text-center" style={{ width: '80px' }}>
-                  <div className="gst-header">CGST</div>
-                  <div className="gst-subheader"><span>%</span><span>Amt</span></div>
-                </th>
-                <th className="text-center" style={{ width: '80px' }}>
-                  <div className="gst-header">SGST</div>
-                  <div className="gst-subheader"><span>%</span><span>Amt</span></div>
-                </th>
-              </>
-            )}
-            <th className="text-right" style={{ width: '90px' }}>Amount</th>
+            <th className="qty-col">Qty</th>
+            <th className="rate-col">Rate</th>
+            <th className="amount-col">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -329,200 +337,177 @@ function QuotePrint({ estimate, customer, companySettings }: any) {
             if (item.isHeading) {
               return (
                 <tr key={index} className="heading-row">
-                  <td colSpan={hasGst ? 8 : 6}>{item.name}</td>
+                  <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
                 </tr>
               );
             }
-            const cgstPct = item.cgstPercent || (item.taxRate ? item.taxRate / 2 : 0);
-            const sgstPct = item.sgstPercent || (item.taxRate ? item.taxRate / 2 : 0);
-            const cgstAmt = item.cgstAmount || (item.total * cgstPct / 100);
-            const sgstAmt = item.sgstAmount || (item.total * sgstPct / 100);
             return (
               <tr key={index}>
-                <td>{item.slNo}</td>
+                <td className="sl-no">{item.slNo}</td>
                 <td>
-                  <div style={{ fontWeight: 500 }}>{item.name}</div>
-                  {item.description && <div style={{ color: '#666', fontSize: '10px' }}>{item.description}</div>}
+                  <div className="item-name">{item.name}</div>
+                  {item.description && <div className="item-desc">{item.description}</div>}
                 </td>
-                <td>{item.hsnCode || ''}</td>
-                <td className="text-right">{item.quantity.toFixed(2)}</td>
-                <td className="text-right">{formatIndianCurrency(item.rate)}</td>
-                {hasGst && (
-                  <>
-                    <td className="text-center">
-                      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                        <span>{cgstPct}%</span>
-                        <span>{formatIndianCurrency(cgstAmt)}</span>
-                      </div>
-                    </td>
-                    <td className="text-center">
-                      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                        <span>{sgstPct}%</span>
-                        <span>{formatIndianCurrency(sgstAmt)}</span>
-                      </div>
-                    </td>
-                  </>
-                )}
-                <td className="text-right">{formatIndianCurrency(item.total + (hasGst ? cgstAmt + sgstAmt : 0))}</td>
+                <td className="qty-col">{item.quantity.toFixed(2)}</td>
+                <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
+                <td className="amount-col">{formatIndianCurrency(item.total)}</td>
               </tr>
             );
           })}
         </tbody>
       </table>
 
+      {/* Totals */}
       <div className="totals-section">
         <div className="totals-table">
           <div className="totals-row">
-            <span>Sub Total</span>
-            <span>{formatIndianCurrency(parseFloat(estimate.subtotal || estimate.total))}</span>
+            <span className="totals-label">Sub Total</span>
+            <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.subtotal || estimate.total))}</span>
           </div>
           {parseFloat(estimate.discountPercent) > 0 && (
             <div className="totals-row" style={{ color: '#dc2626' }}>
-              <span>Discount ({estimate.discountPercent}%)</span>
-              <span>-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
+              <span className="totals-label">Discount ({estimate.discountPercent}%)</span>
+              <span className="totals-value">-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
             </div>
           )}
           {parseFloat(estimate.serviceChargePercent) > 0 && (
             <div className="totals-row">
-              <span>Service Charge ({estimate.serviceChargePercent}%)</span>
-              <span>{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
+              <span className="totals-label">Service Charge</span>
+              <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
             </div>
           )}
-          <div className="totals-row total">
-            <span>Total</span>
-            <span>₹{formatIndianCurrency(parseFloat(estimate.total))}</span>
+          <div className="totals-row total-row">
+            <span className="totals-label">Total</span>
+            <span className="totals-value">₹{formatIndianCurrency(parseFloat(estimate.total))}</span>
           </div>
         </div>
       </div>
 
+      {/* Amount in Words */}
       <div className="amount-words">
-        <div className="amount-words-label">Total In Words</div>
-        <div>{estimate.totalInWords || `Indian Rupee ${numberToWords(Math.round(parseFloat(estimate.total)))} Only`}</div>
+        <span className="amount-words-label">Total In Words</span>
+        <div className="amount-words-text">
+          {estimate.totalInWords || `Indian Rupee ${numberToWords(Math.round(parseFloat(estimate.total)))} Only`}
+        </div>
       </div>
 
+      {/* Notes */}
       {estimate.notes && (
         <div className="notes-section">
-          <div className="section-title">Notes</div>
-          <div className="section-content">{estimate.notes}</div>
+          <div className="notes-label">Notes</div>
+          <div className="notes-text">{estimate.notes}</div>
         </div>
       )}
 
+      {/* Terms & Conditions */}
       {estimate.terms && (
         <div className="terms-section">
-          <div className="section-title">Terms & Conditions</div>
-          <div className="section-content">{estimate.terms}</div>
+          <div className="terms-label">Terms & Conditions</div>
+          <ol className="terms-list">
+            {estimate.terms.split('\n').filter((t: string) => t.trim()).map((term: string, i: number) => {
+              const cleanTerm = term.replace(/^\d+\.\s*/, '');
+              return <li key={i}>{i + 1}. {cleanTerm}</li>;
+            })}
+          </ol>
         </div>
       )}
 
+      {/* Signature */}
       <div className="signature-section">
         <div className="signature-box">
-          <div>For {companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="signature-line">Authorized Signatory</div>
+          <div className="signature-line">Authorized Signature</div>
         </div>
       </div>
 
-      <div className="footer">
-        {estimate.thankYouMessage || companySettings?.defaultThankYouMessage || 'Looking forward for your business.'}
-      </div>
+      {/* Footer */}
+      <div className="footer">POWERED BY</div>
     </div>
   );
 }
 
 function InvoicePrint({ invoice, customer, companySettings }: any) {
   const lineItems: LineItem[] = invoice.lineItems || [];
-  const hasGst = lineItems.some(item => item.cgstPercent || item.sgstPercent || item.taxRate);
+
+  const invoiceStyles = baseStyles.replace(/#2c5530/g, '#1e40af');
 
   return (
-    <div className="doc-container bg-white p-6 max-w-4xl mx-auto">
-      <style>{printStyles.replace(/#8B7355/g, '#2563eb')}</style>
+    <div className="document">
+      <style>{invoiceStyles}</style>
 
-      <table className="header-table">
-        <tbody>
-          <tr>
-            <td style={{ width: '70%' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <img src={logo} alt="Logo" className="company-logo" style={{ backgroundColor: '#2563eb', padding: '8px', borderRadius: '4px' }} />
-                <div>
-                  <div className="company-name">{companySettings?.companyName || 'Oakstreet Events'}</div>
-                  <div className="company-address">
-                    {(companySettings?.address || '2nd Floor, Above Devas Studio\nOpposite Deshabhimani Press, Kaloor\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                    {companySettings?.gstNumber && <div style={{ marginTop: '4px' }}>GSTIN {companySettings.gstNumber}</div>}
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td style={{ width: '30%', textAlign: 'right', verticalAlign: 'top' }}>
-              <div className="doc-type doc-type-invoice">TAX INVOICE</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div className="info-row">
-        <div className="info-cell">
-          <div className="info-label">#</div>
-          <div className="info-value">{invoice.number}</div>
+      {/* Header */}
+      <div className="header">
+        <div className="company-info">
+          <div className="company-logo" style={{ background: '#1e40af' }}>
+            <img src={logo} alt="Logo" />
+          </div>
+          <div className="company-name" style={{ color: '#1e40af' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-address">
+            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              <div key={i}>{line}</div>
+            ))}
+            <div>{companySettings?.phone || '7902373354'}</div>
+            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+            <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+          </div>
         </div>
-        <div className="info-cell">
-          <div className="info-label">Invoice Date</div>
-          <div className="info-value">{format(new Date(invoice.date), 'dd/MM/yyyy')}</div>
+        <div className="doc-type-box">
+          <div className="doc-type" style={{ color: '#1e40af' }}>Tax Invoice</div>
+        </div>
+      </div>
+
+      {/* Document Info */}
+      <div className="doc-info">
+        <div className="doc-info-row">
+          <span className="doc-info-label">Invoice No</span>
+          <span>: {invoice.number}</span>
+        </div>
+        <div className="doc-info-row">
+          <span className="doc-info-label">Invoice Date</span>
+          <span>: {format(new Date(invoice.date), 'dd/MM/yyyy')}</span>
         </div>
         {invoice.dueDate && (
-          <div className="info-cell">
-            <div className="info-label">Due Date</div>
-            <div className="info-value">{format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</div>
+          <div className="doc-info-row">
+            <span className="doc-info-label">Due Date</span>
+            <span>: {format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</span>
           </div>
         )}
-        <div className="info-cell">
-          <div className="info-label">Place Of Supply</div>
-          <div className="info-value">{companySettings?.placeOfSupply || 'Kerala (32)'}</div>
-        </div>
+        {companySettings?.gstNumber && (
+          <div className="doc-info-row">
+            <span className="doc-info-label">GSTIN</span>
+            <span>: {companySettings.gstNumber}</span>
+          </div>
+        )}
       </div>
 
-      <div className="bill-ship-row">
-        <div className="bill-to">
-          <div className="section-label">Bill To</div>
+      {/* Bill To */}
+      <div className="bill-to-section">
+        <div className="bill-to-label">Bill To</div>
+        <div className="bill-to-content">
           <div className="customer-name">{customer?.name || '—'}</div>
-          <div className="customer-address">{invoice.customerAddress || customer?.address || ''}</div>
-          {customer?.gstNumber && <div className="gstin-row">GSTIN {customer.gstNumber}</div>}
-        </div>
-        <div className="ship-to">
-          <div className="section-label">Ship To</div>
-          <div className="customer-address">{invoice.shippingAddress || invoice.customerAddress || customer?.address || ''}</div>
-          {customer?.gstNumber && <div className="gstin-row">GSTIN {customer.gstNumber}</div>}
+          {(invoice.customerAddress || customer?.billingAddress || '').split('\n').map((line: string, i: number) => (
+            <div key={i}>{line}</div>
+          ))}
+          {customer?.gstNumber && <div>GSTIN: {customer.gstNumber}</div>}
         </div>
       </div>
 
+      {/* Subject */}
       {invoice.subject && (
-        <div className="subject-row">
-          <div className="section-label">Subject :</div>
-          <div>{invoice.subject}</div>
+        <div className="subject-section">
+          <span className="subject-label">Subject : </span>
+          <span className="subject-text">{invoice.subject}</span>
         </div>
       )}
 
+      {/* Items Table */}
       <table className="items-table">
         <thead>
           <tr>
-            <th style={{ width: '30px' }}>#</th>
+            <th className="sl-no">Sl<br/>No</th>
             <th>Item & Description</th>
-            <th style={{ width: '70px' }}>HSN/SAC</th>
-            <th className="text-right" style={{ width: '50px' }}>Qty</th>
-            <th className="text-right" style={{ width: '80px' }}>Rate</th>
-            {hasGst && (
-              <>
-                <th className="text-center" style={{ width: '80px' }}>
-                  <div className="gst-header">CGST</div>
-                  <div className="gst-subheader"><span>%</span><span>Amt</span></div>
-                </th>
-                <th className="text-center" style={{ width: '80px' }}>
-                  <div className="gst-header">SGST</div>
-                  <div className="gst-subheader"><span>%</span><span>Amt</span></div>
-                </th>
-              </>
-            )}
-            <th className="text-right" style={{ width: '90px' }}>Amount</th>
+            <th className="qty-col">Qty</th>
+            <th className="rate-col">Rate</th>
+            <th className="amount-col">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -530,245 +515,233 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
             if (item.isHeading) {
               return (
                 <tr key={index} className="heading-row">
-                  <td colSpan={hasGst ? 8 : 6}>{item.name}</td>
+                  <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
                 </tr>
               );
             }
-            const cgstPct = item.cgstPercent || (item.taxRate ? item.taxRate / 2 : 0);
-            const sgstPct = item.sgstPercent || (item.taxRate ? item.taxRate / 2 : 0);
-            const cgstAmt = item.cgstAmount || (item.total * cgstPct / 100);
-            const sgstAmt = item.sgstAmount || (item.total * sgstPct / 100);
             return (
               <tr key={index}>
-                <td>{item.slNo}</td>
+                <td className="sl-no">{item.slNo}</td>
                 <td>
-                  <div style={{ fontWeight: 500 }}>{item.name}</div>
-                  {item.description && <div style={{ color: '#666', fontSize: '10px' }}>{item.description}</div>}
+                  <div className="item-name">{item.name}</div>
+                  {item.description && <div className="item-desc">{item.description}</div>}
                 </td>
-                <td>{item.hsnCode || ''}</td>
-                <td className="text-right">{item.quantity.toFixed(2)}</td>
-                <td className="text-right">{formatIndianCurrency(item.rate)}</td>
-                {hasGst && (
-                  <>
-                    <td className="text-center">
-                      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                        <span>{cgstPct}%</span>
-                        <span>{formatIndianCurrency(cgstAmt)}</span>
-                      </div>
-                    </td>
-                    <td className="text-center">
-                      <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                        <span>{sgstPct}%</span>
-                        <span>{formatIndianCurrency(sgstAmt)}</span>
-                      </div>
-                    </td>
-                  </>
-                )}
-                <td className="text-right">{formatIndianCurrency(item.total + (hasGst ? cgstAmt + sgstAmt : 0))}</td>
+                <td className="qty-col">{item.quantity.toFixed(2)}</td>
+                <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
+                <td className="amount-col">{formatIndianCurrency(item.total)}</td>
               </tr>
             );
           })}
         </tbody>
       </table>
 
+      {/* Totals */}
       <div className="totals-section">
         <div className="totals-table">
           <div className="totals-row">
-            <span>Sub Total</span>
-            <span>{formatIndianCurrency(parseFloat(invoice.subtotal || invoice.total))}</span>
+            <span className="totals-label">Sub Total</span>
+            <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.subtotal || invoice.total))}</span>
           </div>
           {parseFloat(invoice.discountPercent) > 0 && (
             <div className="totals-row" style={{ color: '#dc2626' }}>
-              <span>Discount ({invoice.discountPercent}%)</span>
-              <span>-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
+              <span className="totals-label">Discount ({invoice.discountPercent}%)</span>
+              <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
             </div>
           )}
           {parseFloat(invoice.serviceChargePercent) > 0 && (
             <div className="totals-row">
-              <span>Service Charge ({invoice.serviceChargePercent}%)</span>
-              <span>{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
+              <span className="totals-label">Service Charge</span>
+              <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
             </div>
           )}
-          <div className="totals-row total" style={{ borderColor: '#2563eb' }}>
-            <span>Total</span>
-            <span>₹{formatIndianCurrency(parseFloat(invoice.total))}</span>
+          <div className="totals-row total-row" style={{ borderTopColor: '#1e40af' }}>
+            <span className="totals-label">Total</span>
+            <span className="totals-value">₹{formatIndianCurrency(parseFloat(invoice.total))}</span>
           </div>
-          {parseFloat(invoice.amountPaid) > 0 && (
-            <div className="totals-row" style={{ color: '#22c55e' }}>
-              <span>Amount Paid</span>
-              <span>-{formatIndianCurrency(parseFloat(invoice.amountPaid))}</span>
+          {parseFloat(invoice.amountPaid || 0) > 0 && (
+            <div className="totals-row" style={{ color: '#16a34a' }}>
+              <span className="totals-label">Amount Paid</span>
+              <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.amountPaid))}</span>
             </div>
           )}
-          <div className="totals-row" style={{ backgroundColor: '#f5f5f5', padding: '8px', borderRadius: '4px', fontWeight: 'bold' }}>
-            <span>Balance Due</span>
-            <span>₹{formatIndianCurrency(parseFloat(invoice.balanceDue))}</span>
+          <div className="totals-row" style={{ fontWeight: 'bold', background: '#f0f9ff', padding: '8px 5px', borderRadius: '4px' }}>
+            <span className="totals-label">Balance Due</span>
+            <span className="totals-value">₹{formatIndianCurrency(parseFloat(invoice.balanceDue))}</span>
           </div>
         </div>
       </div>
 
+      {/* Amount in Words */}
       <div className="amount-words">
-        <div className="amount-words-label">Total In Words</div>
-        <div>{invoice.totalInWords || `Indian Rupee ${numberToWords(Math.round(parseFloat(invoice.total)))} Only`}</div>
+        <span className="amount-words-label">Total In Words</span>
+        <div className="amount-words-text">
+          {invoice.totalInWords || `Indian Rupee ${numberToWords(Math.round(parseFloat(invoice.total)))} Only`}
+        </div>
       </div>
 
+      {/* Bank Details */}
       {(companySettings?.bankName || companySettings?.bankAccountNumber) && (
-        <div className="bank-details">
-          <div className="bank-title">Bank Details</div>
-          {companySettings?.bankName && (
-            <div className="bank-row"><span className="bank-label">Bank Name:</span><span>{companySettings.bankName}</span></div>
-          )}
-          {companySettings?.bankAccountNumber && (
-            <div className="bank-row"><span className="bank-label">Account Number:</span><span>{companySettings.bankAccountNumber}</span></div>
-          )}
-          {companySettings?.bankIfscCode && (
-            <div className="bank-row"><span className="bank-label">IFSC Code:</span><span>{companySettings.bankIfscCode}</span></div>
-          )}
-          {companySettings?.bankBranch && (
-            <div className="bank-row"><span className="bank-label">Branch:</span><span>{companySettings.bankBranch}</span></div>
-          )}
+        <div className="notes-section" style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px' }}>
+          <div className="notes-label">Bank Details</div>
+          <div style={{ fontSize: '10px', lineHeight: '1.6' }}>
+            {companySettings?.bankName && <div>Bank: {companySettings.bankName}</div>}
+            {companySettings?.bankAccountNumber && <div>A/C No: {companySettings.bankAccountNumber}</div>}
+            {companySettings?.bankIfscCode && <div>IFSC: {companySettings.bankIfscCode}</div>}
+            {companySettings?.bankBranch && <div>Branch: {companySettings.bankBranch}</div>}
+          </div>
         </div>
       )}
 
+      {/* Notes */}
       {invoice.notes && (
         <div className="notes-section">
-          <div className="section-title">Notes</div>
-          <div className="section-content">{invoice.notes}</div>
+          <div className="notes-label">Notes</div>
+          <div className="notes-text">{invoice.notes}</div>
         </div>
       )}
 
+      {/* Terms & Conditions */}
       {invoice.terms && (
         <div className="terms-section">
-          <div className="section-title">Terms & Conditions</div>
-          <div className="section-content">{invoice.terms}</div>
+          <div className="terms-label">Terms & Conditions</div>
+          <ol className="terms-list">
+            {invoice.terms.split('\n').filter((t: string) => t.trim()).map((term: string, i: number) => {
+              const cleanTerm = term.replace(/^\d+\.\s*/, '');
+              return <li key={i}>{i + 1}. {cleanTerm}</li>;
+            })}
+          </ol>
         </div>
       )}
 
+      {/* Signature */}
       <div className="signature-section">
         <div className="signature-box">
-          <div>For {companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="signature-line">Authorized Signatory</div>
+          <div className="signature-line">Authorized Signature</div>
         </div>
       </div>
 
-      <div className="footer">
-        {invoice.thankYouMessage || companySettings?.defaultThankYouMessage || 'Looking forward for your business.'}
-      </div>
+      {/* Footer */}
+      <div className="footer">POWERED BY</div>
     </div>
   );
 }
 
 function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any) {
+  const receiptStyles = baseStyles.replace(/#2c5530/g, '#16a34a');
+
   return (
-    <div className="doc-container bg-white p-6 max-w-3xl mx-auto">
-      <style>{printStyles.replace(/#8B7355/g, '#22c55e')}</style>
+    <div className="document">
+      <style>{receiptStyles}</style>
 
-      <table className="header-table">
-        <tbody>
-          <tr>
-            <td style={{ width: '60%' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <img src={logo} alt="Logo" className="company-logo" style={{ backgroundColor: '#22c55e', padding: '8px', borderRadius: '4px' }} />
-                <div>
-                  <div className="company-name">{companySettings?.companyName || 'Oakstreet Events'}</div>
-                  <div className="company-address">
-                    {(companySettings?.address || '2nd Floor, Above Devas Studio\nOpposite Deshabhimani Press, Kaloor\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                    {companySettings?.gstNumber && <div style={{ marginTop: '4px' }}>GSTIN {companySettings.gstNumber}</div>}
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td style={{ width: '40%', textAlign: 'right', verticalAlign: 'top' }}>
-              <div className="doc-type doc-type-receipt">PAYMENT<br/>RECEIPT</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div className="info-row" style={{ marginTop: '15px' }}>
-        <div className="info-cell">
-          <div className="info-label">Receipt No</div>
-          <div className="info-value">{payment.number}</div>
+      {/* Header */}
+      <div className="header">
+        <div className="company-info">
+          <div className="company-logo" style={{ background: '#16a34a' }}>
+            <img src={logo} alt="Logo" />
+          </div>
+          <div className="company-name" style={{ color: '#16a34a' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-address">
+            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              <div key={i}>{line}</div>
+            ))}
+            <div>{companySettings?.phone || '7902373354'}</div>
+            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+          </div>
         </div>
-        <div className="info-cell">
-          <div className="info-label">Date</div>
-          <div className="info-value">{format(new Date(payment.date), 'dd/MM/yyyy')}</div>
-        </div>
-        <div className="info-cell">
-          <div className="info-label">Payment Mode</div>
-          <div className="info-value" style={{ textTransform: 'capitalize' }}>{payment.paymentMode.replace('_', ' ')}</div>
+        <div className="doc-type-box">
+          <div className="doc-type" style={{ color: '#16a34a' }}>Payment Receipt</div>
         </div>
       </div>
 
-      <div className="bill-ship-row" style={{ marginTop: '0', borderTop: 'none' }}>
-        <div className="bill-to">
-          <div className="section-label">Received From</div>
+      {/* Document Info */}
+      <div className="doc-info">
+        <div className="doc-info-row">
+          <span className="doc-info-label">Receipt No</span>
+          <span>: {payment.number}</span>
+        </div>
+        <div className="doc-info-row">
+          <span className="doc-info-label">Date</span>
+          <span>: {format(new Date(payment.date), 'dd/MM/yyyy')}</span>
+        </div>
+        <div className="doc-info-row">
+          <span className="doc-info-label">Payment Mode</span>
+          <span>: {(payment.paymentMode || '').replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</span>
+        </div>
+      </div>
+
+      {/* Received From */}
+      <div className="bill-to-section">
+        <div className="bill-to-label">Received From</div>
+        <div className="bill-to-content">
           <div className="customer-name">{customer?.name || '—'}</div>
-          <div className="customer-address">{customer?.address || ''}</div>
-          {customer?.gstNumber && <div className="gstin-row">GSTIN {customer.gstNumber}</div>}
-        </div>
-        <div className="ship-to">
-          {invoice && (
-            <>
-              <div className="section-label">Against Invoice</div>
-              <div className="info-value">{invoice.number}</div>
-              <div style={{ marginTop: '8px' }}>
-                <span className="info-label">Invoice Amount: </span>
-                <span>₹{formatIndianCurrency(parseFloat(invoice.total))}</span>
-              </div>
-            </>
-          )}
-          {payment.reference && (
-            <div style={{ marginTop: '8px' }}>
-              <div className="section-label">Reference</div>
-              <div className="info-value">{payment.reference}</div>
-            </div>
-          )}
+          {customer?.billingAddress && customer.billingAddress.split('\n').map((line: string, i: number) => (
+            <div key={i}>{line}</div>
+          ))}
         </div>
       </div>
 
+      {/* Payment Details */}
       <div style={{ 
         margin: '20px 0', 
-        padding: '30px', 
-        backgroundColor: '#f0fdf4', 
-        border: '2px solid #22c55e', 
-        borderRadius: '8px', 
-        textAlign: 'center' 
+        padding: '25px', 
+        background: '#f0fdf4', 
+        border: '2px solid #16a34a', 
+        borderRadius: '8px',
+        textAlign: 'center'
       }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>Amount Received</div>
-        <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#22c55e' }}>
+        <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>Amount Received</div>
+        <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#16a34a' }}>
           ₹{formatIndianCurrency(parseFloat(payment.amount))}
         </div>
-        <div style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+        <div style={{ fontSize: '11px', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>
           Indian Rupee {numberToWords(Math.round(parseFloat(payment.amount)))} Only
         </div>
       </div>
 
-      {bank && (
-        <div className="bank-details" style={{ backgroundColor: '#f5f5f5' }}>
-          <div className="bank-title">Deposited To</div>
-          <div className="bank-row"><span className="bank-label">Bank/Account:</span><span>{bank.name}</span></div>
-          {bank.accountNumber && (
-            <div className="bank-row"><span className="bank-label">Account Number:</span><span>****{bank.accountNumber.slice(-4)}</span></div>
-          )}
+      {/* Invoice Reference */}
+      {invoice && (
+        <div className="notes-section" style={{ background: '#f8fafc', padding: '10px', borderRadius: '4px' }}>
+          <div className="notes-label">Against Invoice</div>
+          <div style={{ fontSize: '10px', lineHeight: '1.6' }}>
+            <div>Invoice No: {invoice.number}</div>
+            <div>Invoice Amount: ₹{formatIndianCurrency(parseFloat(invoice.total))}</div>
+            <div>Balance Due: ₹{formatIndianCurrency(parseFloat(invoice.balanceDue))}</div>
+          </div>
         </div>
       )}
 
+      {/* Bank/Account */}
+      {bank && (
+        <div className="notes-section">
+          <div className="notes-label">Deposited To</div>
+          <div className="notes-text">{bank.name}</div>
+        </div>
+      )}
+
+      {/* Reference */}
+      {payment.reference && (
+        <div className="notes-section">
+          <div className="notes-label">Reference</div>
+          <div className="notes-text">{payment.reference}</div>
+        </div>
+      )}
+
+      {/* Notes */}
       {payment.notes && (
         <div className="notes-section">
-          <div className="section-title">Notes</div>
-          <div className="section-content">{payment.notes}</div>
+          <div className="notes-label">Notes</div>
+          <div className="notes-text">{payment.notes}</div>
         </div>
       )}
 
+      {/* Signature */}
       <div className="signature-section">
         <div className="signature-box">
-          <div>For {companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="signature-line">Authorized Signatory</div>
+          <div className="signature-line">Authorized Signature</div>
         </div>
       </div>
 
+      {/* Footer */}
       <div className="footer">
         Thank you for your payment!
       </div>

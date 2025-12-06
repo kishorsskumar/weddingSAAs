@@ -2116,7 +2116,7 @@ export default function OakBook() {
       
       {/* Invoice Modal */}
       <Dialog open={invoiceModalOpen} onOpenChange={setInvoiceModalOpen}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
           </DialogHeader>
@@ -2137,7 +2137,7 @@ export default function OakBook() {
 
       {/* Estimate Modal */}
       <Dialog open={estimateModalOpen} onOpenChange={setEstimateModalOpen}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingEstimate ? "Edit Estimate" : "New Estimate"}</DialogTitle>
           </DialogHeader>
@@ -2249,6 +2249,17 @@ export default function OakBook() {
   );
 }
 
+interface LineItem {
+  name: string;
+  description?: string;
+  quantity: number;
+  rate: number;
+  total: number;
+  taxRate?: number;
+  isHeading?: boolean;
+  slNo?: number;
+}
+
 function InvoiceForm({ invoice, customers, onSubmit, onCancel }: { 
   invoice: Invoice | null; 
   customers: Customer[]; 
@@ -2260,40 +2271,89 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
     customerId: invoice?.customerId || "",
     date: invoice?.date || format(new Date(), "yyyy-MM-dd"),
     status: invoice?.status || "draft",
-    total: invoice?.total || "0",
-    balanceDue: invoice?.balanceDue || "0",
+    subject: (invoice as any)?.subject || "",
+    customerAddress: (invoice as any)?.customerAddress || "",
+    weddingPlannerName: (invoice as any)?.weddingPlannerName || "",
+    serviceChargePercent: (invoice as any)?.serviceChargePercent || "12.5",
+    discountPercent: (invoice as any)?.discountPercent || "0",
+    notes: (invoice as any)?.notes || "Looking forward for your business.",
+    terms: (invoice as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
+    thankYouMessage: (invoice as any)?.thankYouMessage || "Looking forward for your business.",
   });
 
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    (invoice as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
+  );
+
+  const addItem = () => {
+    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+  };
+
+  const addHeader = () => {
+    setLineItems([...lineItems, { name: "", quantity: 0, rate: 0, total: 0, isHeading: true }]);
+  };
+
+  const removeItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof LineItem, value: any) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      updated[index].total = updated[index].quantity * updated[index].rate;
+    }
+    setLineItems(updated);
+  };
+
+  const calculateTotals = () => {
+    const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
+    const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
+    const afterDiscount = subtotal - discountAmount;
+    const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
+    const total = afterDiscount + serviceChargeAmount;
+    return { subtotal, discountAmount, serviceChargeAmount, total };
+  };
+
+  const totals = calculateTotals();
+
+  const handleSubmit = () => {
+    let slNo = 0;
+    const numberedItems = lineItems.map(item => {
+      if (item.isHeading) {
+        return { ...item, slNo: undefined };
+      }
+      slNo++;
+      return { ...item, slNo };
+    });
+
+    onSubmit({
+      ...formData,
+      lineItems: numberedItems,
+      subtotal: totals.subtotal.toFixed(2),
+      discountAmount: totals.discountAmount.toFixed(2),
+      serviceChargeAmount: totals.serviceChargeAmount.toFixed(2),
+      total: totals.total.toFixed(2),
+      balanceDue: totals.total.toFixed(2),
+      taxTotal: "0.00",
+    });
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <Label>Invoice Number</Label>
-          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+          <Label className="text-xs">Invoice Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="h-8 text-sm" />
         </div>
         <div>
-          <Label>Date</Label>
-          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
-        </div>
-      </div>
-      <div>
-        <Label>Customer</Label>
-        <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
-          <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-          <SelectContent>
-            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Total Amount (₹)</Label>
-          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value, balanceDue: e.target.value })} />
+          <Label className="text-xs">Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="h-8 text-sm" />
         </div>
         <div>
-          <Label>Status</Label>
+          <Label className="text-xs">Status</Label>
           <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="sent">Sent</SelectItem>
@@ -2303,9 +2363,175 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel }: {
           </Select>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Customer</Label>
+          <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select customer" /></SelectTrigger>
+            <SelectContent>
+              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Wedding Planner Name</Label>
+          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Optional" className="h-8 text-sm" />
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs">Customer Address</Label>
+        <Textarea value={formData.customerAddress} onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })} rows={2} className="text-sm" />
+      </div>
+
+      <div>
+        <Label className="text-xs">Subject</Label>
+        <Input value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} placeholder="e.g., Welcome party, Sangeet & Wedding on 14&15th Dec 2025" className="h-8 text-sm" />
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-xs font-semibold">Line Items</Label>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addHeader} className="h-7 text-xs">
+              <Plus className="w-3 h-3 mr-1" /> Header
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
+              <Plus className="w-3 h-3 mr-1" /> Item
+            </Button>
+          </div>
+        </div>
+
+        <div className="border rounded-md overflow-hidden">
+          <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
+            <div className="col-span-5">Item & Description</div>
+            <div className="col-span-2 text-right">Qty</div>
+            <div className="col-span-2 text-right">Rate</div>
+            <div className="col-span-2 text-right">Amount</div>
+            <div className="col-span-1"></div>
+          </div>
+
+          {lineItems.map((item, index) => (
+            <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
+              {item.isHeading ? (
+                <>
+                  <div className="col-span-11">
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(index, 'name', e.target.value)}
+                      placeholder="Section heading (e.g., MEHANDI ARTIST)"
+                      className="h-7 text-xs font-bold uppercase"
+                    />
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="col-span-5">
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(index, 'name', e.target.value)}
+                      placeholder="Item name"
+                      className="h-7 text-xs mb-1"
+                    />
+                    <Textarea
+                      value={item.description || ""}
+                      onChange={(e) => updateItem(index, 'description', e.target.value)}
+                      placeholder="Description (optional)"
+                      rows={1}
+                      className="text-xs min-h-[28px]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                      className="h-7 text-xs text-right"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Input
+                      type="number"
+                      value={item.rate}
+                      onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                      className="h-7 text-xs text-right"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="col-span-2 text-right text-xs pt-2 font-medium">
+                    ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <div className="w-64 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Sub Total</span>
+            <span>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span>Discount (%)</span>
+            <Input
+              type="number"
+              value={formData.discountPercent}
+              onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+              className="h-6 w-16 text-xs text-right"
+              min="0"
+              max="100"
+            />
+            <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span>Service Charge (%)</span>
+            <Input
+              type="number"
+              value={formData.serviceChargePercent}
+              onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })}
+              className="h-6 w-16 text-xs text-right"
+              min="0"
+            />
+            <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between font-bold text-base border-t pt-1">
+            <span>Total</span>
+            <span>₹{totals.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Notes</Label>
+          <Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} className="text-xs" />
+        </div>
+        <div>
+          <Label className="text-xs">Terms & Conditions</Label>
+          <Textarea value={formData.terms} onChange={(e) => setFormData({ ...formData, terms: e.target.value })} rows={3} className="text-xs" />
+        </div>
+      </div>
+
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSubmit(formData)}>{invoice ? "Update" : "Create"}</Button>
+        <Button onClick={handleSubmit}>{invoice ? "Update Invoice" : "Create Invoice"}</Button>
       </DialogFooter>
     </div>
   );
@@ -2322,39 +2548,89 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
     customerId: estimate?.customerId || "",
     date: estimate?.date || format(new Date(), "yyyy-MM-dd"),
     status: estimate?.status || "draft",
-    total: estimate?.total || "0",
+    subject: (estimate as any)?.subject || "",
+    customerAddress: (estimate as any)?.customerAddress || "",
+    weddingPlannerName: (estimate as any)?.weddingPlannerName || "",
+    serviceChargePercent: (estimate as any)?.serviceChargePercent || "12.5",
+    discountPercent: (estimate as any)?.discountPercent || "0",
+    notes: (estimate as any)?.notes || "Looking forward for your business.",
+    terms: (estimate as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
+    thankYouMessage: (estimate as any)?.thankYouMessage || "Looking forward for your business.",
   });
 
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    (estimate as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
+  );
+
+  const addItem = () => {
+    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+  };
+
+  const addHeader = () => {
+    setLineItems([...lineItems, { name: "", quantity: 0, rate: 0, total: 0, isHeading: true }]);
+  };
+
+  const removeItem = (index: number) => {
+    setLineItems(lineItems.filter((_, i) => i !== index));
+  };
+
+  const updateItem = (index: number, field: keyof LineItem, value: any) => {
+    const updated = [...lineItems];
+    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'quantity' || field === 'rate') {
+      updated[index].total = updated[index].quantity * updated[index].rate;
+    }
+    setLineItems(updated);
+  };
+
+  const calculateTotals = () => {
+    const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
+    const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
+    const afterDiscount = subtotal - discountAmount;
+    const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
+    const total = afterDiscount + serviceChargeAmount;
+    return { subtotal, discountAmount, serviceChargeAmount, total };
+  };
+
+  const totals = calculateTotals();
+
+  const handleSubmit = () => {
+    let slNo = 0;
+    const numberedItems = lineItems.map(item => {
+      if (item.isHeading) {
+        return { ...item, slNo: undefined };
+      }
+      slNo++;
+      return { ...item, slNo };
+    });
+
+    onSubmit({
+      ...formData,
+      lineItems: numberedItems,
+      subtotal: totals.subtotal.toFixed(2),
+      discountAmount: totals.discountAmount.toFixed(2),
+      serviceChargeAmount: totals.serviceChargeAmount.toFixed(2),
+      total: totals.total.toFixed(2),
+      taxTotal: "0.00",
+    });
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      {/* Basic Info */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
-          <Label>Estimate Number</Label>
-          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} />
+          <Label className="text-xs">Estimate Number</Label>
+          <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="h-8 text-sm" />
         </div>
         <div>
-          <Label>Date</Label>
-          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} />
-        </div>
-      </div>
-      <div>
-        <Label>Customer</Label>
-        <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
-          <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-          <SelectContent>
-            {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label>Total Amount (₹)</Label>
-          <Input type="number" value={formData.total} onChange={(e) => setFormData({ ...formData, total: e.target.value })} />
+          <Label className="text-xs">Date</Label>
+          <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="h-8 text-sm" />
         </div>
         <div>
-          <Label>Status</Label>
+          <Label className="text-xs">Status</Label>
           <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="sent">Sent</SelectItem>
@@ -2364,9 +2640,179 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel }: {
           </Select>
         </div>
       </div>
+
+      {/* Customer & Address */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Customer</Label>
+          <Select value={formData.customerId || ""} onValueChange={(v) => setFormData({ ...formData, customerId: v })}>
+            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select customer" /></SelectTrigger>
+            <SelectContent>
+              {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-xs">Wedding Planner Name</Label>
+          <Input value={formData.weddingPlannerName} onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })} placeholder="Optional" className="h-8 text-sm" />
+        </div>
+      </div>
+
+      <div>
+        <Label className="text-xs">Customer Address</Label>
+        <Textarea value={formData.customerAddress} onChange={(e) => setFormData({ ...formData, customerAddress: e.target.value })} rows={2} className="text-sm" />
+      </div>
+
+      <div>
+        <Label className="text-xs">Subject</Label>
+        <Input value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} placeholder="e.g., Welcome party, Sangeet & Wedding on 14&15th Dec 2025" className="h-8 text-sm" />
+      </div>
+
+      {/* Line Items */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <Label className="text-xs font-semibold">Line Items</Label>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={addHeader} className="h-7 text-xs">
+              <Plus className="w-3 h-3 mr-1" /> Header
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-7 text-xs">
+              <Plus className="w-3 h-3 mr-1" /> Item
+            </Button>
+          </div>
+        </div>
+
+        <div className="border rounded-md overflow-hidden">
+          <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
+            <div className="col-span-5">Item & Description</div>
+            <div className="col-span-2 text-right">Qty</div>
+            <div className="col-span-2 text-right">Rate</div>
+            <div className="col-span-2 text-right">Amount</div>
+            <div className="col-span-1"></div>
+          </div>
+
+          {lineItems.map((item, index) => (
+            <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
+              {item.isHeading ? (
+                <>
+                  <div className="col-span-11">
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(index, 'name', e.target.value)}
+                      placeholder="Section heading (e.g., MEHANDI ARTIST)"
+                      className="h-7 text-xs font-bold uppercase"
+                    />
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="col-span-5">
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateItem(index, 'name', e.target.value)}
+                      placeholder="Item name"
+                      className="h-7 text-xs mb-1"
+                    />
+                    <Textarea
+                      value={item.description || ""}
+                      onChange={(e) => updateItem(index, 'description', e.target.value)}
+                      placeholder="Description (optional)"
+                      rows={1}
+                      className="text-xs min-h-[28px]"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                      className="h-7 text-xs text-right"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Input
+                      type="number"
+                      value={item.rate}
+                      onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                      className="h-7 text-xs text-right"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  <div className="col-span-2 text-right text-xs pt-2 font-medium">
+                    ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                      <Trash2 className="w-3 h-3 text-destructive" />
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Totals */}
+      <div className="flex justify-end">
+        <div className="w-64 space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span>Sub Total</span>
+            <span>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span>Discount (%)</span>
+            <Input
+              type="number"
+              value={formData.discountPercent}
+              onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+              className="h-6 w-16 text-xs text-right"
+              min="0"
+              max="100"
+            />
+            <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between items-center gap-2">
+            <span>Service Charge (%)</span>
+            <Input
+              type="number"
+              value={formData.serviceChargePercent}
+              onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })}
+              className="h-6 w-16 text-xs text-right"
+              min="0"
+            />
+            <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="flex justify-between font-bold text-base border-t pt-1">
+            <span>Total</span>
+            <span>₹{totals.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Notes & Terms */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Notes</Label>
+          <Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} className="text-xs" />
+        </div>
+        <div>
+          <Label className="text-xs">Terms & Conditions</Label>
+          <Textarea value={formData.terms} onChange={(e) => setFormData({ ...formData, terms: e.target.value })} rows={3} className="text-xs" />
+        </div>
+      </div>
+
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSubmit(formData)}>{estimate ? "Update" : "Create"}</Button>
+        <Button onClick={handleSubmit}>{estimate ? "Update Estimate" : "Create Estimate"}</Button>
       </DialogFooter>
     </div>
   );
