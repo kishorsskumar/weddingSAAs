@@ -532,7 +532,8 @@ export async function registerRoutes(
   app.post('/api/daybook', async (req, res) => {
     try {
       const data = insertDaybookEntrySchema.parse(req.body);
-      const entry = await storage.createDaybookEntry(data);
+      // Use event sync to automatically update event paymentReceived/cost
+      const entry = await storage.createDaybookEntryWithEventSync(data);
       if (entry.bankId) {
         const bank = await storage.getBank(entry.bankId);
         if (bank) {
@@ -569,6 +570,36 @@ export async function registerRoutes(
       }
     }
     await storage.deleteDaybookEntry(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Daybook Categories
+  app.get('/api/daybook-categories', async (req, res) => {
+    const { type } = req.query;
+    if (type) {
+      const categories = await storage.getDaybookCategoriesByType(type as string);
+      res.json(categories);
+    } else {
+      const categories = await storage.getAllDaybookCategories();
+      res.json(categories);
+    }
+  });
+
+  app.post('/api/daybook-categories', async (req, res) => {
+    try {
+      const { name, type } = req.body;
+      if (!name || !type) {
+        return res.status(400).json({ error: 'Name and type are required' });
+      }
+      const category = await storage.createDaybookCategory({ name, type, isSystem: false });
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create category' });
+    }
+  });
+
+  app.delete('/api/daybook-categories/:id', async (req, res) => {
+    await storage.deleteDaybookCategory(req.params.id);
     res.json({ success: true });
   });
 
