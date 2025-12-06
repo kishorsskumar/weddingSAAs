@@ -560,7 +560,12 @@ export async function registerRoutes(
 
   app.delete('/api/daybook/:id', async (req, res) => {
     const entry = await storage.getDaybookEntry(req.params.id);
-    if (entry && entry.bankId) {
+    if (!entry) {
+      return res.status(404).json({ error: 'Entry not found' });
+    }
+    
+    // Reverse bank balance adjustment
+    if (entry.bankId) {
       const bank = await storage.getBank(entry.bankId);
       if (bank) {
         const adjustment = entry.type === 'income' 
@@ -569,6 +574,22 @@ export async function registerRoutes(
         await storage.updateBank(bank.id, { balance: adjustment.toString() });
       }
     }
+    
+    // Reverse event sync - subtract from event's paymentReceived or cost
+    if (entry.eventId) {
+      const event = await storage.getEvent(entry.eventId);
+      if (event) {
+        const amount = parseFloat(entry.amount);
+        if (entry.type === 'income') {
+          const newPaymentReceived = Math.max(0, parseFloat(event.paymentReceived) - amount);
+          await storage.updateEvent(entry.eventId, { paymentReceived: newPaymentReceived.toFixed(2) });
+        } else {
+          const newCost = Math.max(0, parseFloat(event.cost) - amount);
+          await storage.updateEvent(entry.eventId, { cost: newCost.toFixed(2) });
+        }
+      }
+    }
+    
     await storage.deleteDaybookEntry(req.params.id);
     res.json({ success: true });
   });

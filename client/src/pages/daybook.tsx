@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import type { DaybookEntry, Bank, BankTransfer } from "@/lib/types";
+import type { DaybookEntry, Bank, BankTransfer, DaybookCategory, Vendor, Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,8 @@ import { useAuth } from "@/context/auth-context";
 
 export default function Daybook() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [isIncomeDialogOpen, setIsIncomeDialogOpen] = useState(false);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -51,6 +52,33 @@ export default function Daybook() {
     queryFn: async () => {
       const res = await fetch('/api/bank-transfers');
       if (!res.ok) throw new Error('Failed to fetch bank transfers');
+      return res.json();
+    },
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events');
+      if (!res.ok) throw new Error('Failed to fetch events');
+      return res.json();
+    },
+  });
+
+  const { data: categories = [] } = useQuery<DaybookCategory[]>({
+    queryKey: ['/api/daybook-categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/daybook-categories');
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+  });
+
+  const { data: vendors = [] } = useQuery<Vendor[]>({
+    queryKey: ['/api/vendors'],
+    queryFn: async () => {
+      const res = await fetch('/api/vendors');
+      if (!res.ok) throw new Error('Failed to fetch vendors');
       return res.json();
     },
   });
@@ -197,56 +225,74 @@ export default function Daybook() {
     },
   });
 
-  const incomeCategories = ['Sales', 'Payment Received', 'Advance', 'Refund', 'Interest', 'Commission', 'Other Income'];
-  const expenseCategories = ['Rent', 'Utilities', 'Salary', 'Office Supplies', 'Travel', 'Food', 'Marketing', 'Maintenance', 'Vendor Payment', 'Tax', 'Other Expense'];
+  const createCategoryMutation = useMutation({
+    mutationFn: async (data: { name: string; type: string }) => {
+      const res = await fetch('/api/daybook-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create category');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-categories'] });
+    },
+  });
 
-  const AddTransactionForm = ({ onClose }: { onClose: () => void }) => {
-    const { register, handleSubmit, setValue, watch, reset } = useForm<any>({
+  const createVendorMutation = useMutation({
+    mutationFn: async (data: Partial<Vendor>) => {
+      const res = await fetch('/api/vendors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create vendor');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+    },
+  });
+
+  const incomeCategories = categories.filter(c => c.type === 'income');
+  const expenseCategories = categories.filter(c => c.type === 'expense');
+
+  const SimpleTransactionForm = ({ type, onClose }: { type: 'income' | 'expense'; onClose: () => void }) => {
+    const { register, handleSubmit, setValue, reset } = useForm<any>({
       defaultValues: {
-        type: 'expense',
+        type,
         date: formattedDate,
       }
     });
-    const selectedType = watch("type") || 'expense';
-    const selectedDate = watch("date") || formattedDate;
+    
+    const typeCategories = type === 'income' ? incomeCategories : expenseCategories;
     
     const onSubmit = (data: any) => {
-      createMutation.mutate({
+      const submitData = {
         ...data,
+        type,
         date: data.date || formattedDate,
-      }, {
+      };
+      
+      createMutation.mutate(submitData, {
         onSuccess: () => {
           reset({
-            type: selectedType,
-            date: selectedDate,
+            type,
+            date: data.date,
             amount: '',
             bankId: undefined,
             category: '',
-            eventName: '',
-            vendorName: '',
             description: '',
           });
+          queryClient.invalidateQueries({ queryKey: ['/api/events'] });
         }
       });
     };
 
-    const categories = selectedType === 'income' ? incomeCategories : expenseCategories;
-
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Type</Label>
-            <Select defaultValue="expense" onValueChange={(v) => setValue("type", v)}>
-              <SelectTrigger data-testid="select-transaction-type">
-                <SelectValue placeholder="Select type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="expense">Expense</SelectItem>
-                <SelectItem value="income">Income</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <div className="space-y-2">
             <Label>Amount *</Label>
             <Input 
@@ -256,19 +302,19 @@ export default function Daybook() {
               required 
               placeholder="0.00" 
               data-testid="input-amount"
+              className="text-lg font-mono"
             />
           </div>
-        </div>
-        
-        <div className="space-y-2">
-          <Label>Date *</Label>
-          <Input 
-            type="date" 
-            {...register("date")} 
-            defaultValue={formattedDate}
-            required 
-            data-testid="input-date"
-          />
+          <div className="space-y-2">
+            <Label>Date *</Label>
+            <Input 
+              type="date" 
+              {...register("date")} 
+              defaultValue={formattedDate}
+              required 
+              data-testid="input-date"
+            />
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -292,37 +338,72 @@ export default function Daybook() {
               <SelectValue placeholder="Select a category..." />
             </SelectTrigger>
             <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              {typeCategories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Event Name (Optional)</Label>
-            <Input 
-              {...register("eventName")} 
-              placeholder="e.g., Smith Wedding" 
-              data-testid="input-event-name"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Vendor Name (Optional)</Label>
-            <Input 
-              {...register("vendorName")} 
-              placeholder="e.g., ABC Catering" 
-              data-testid="input-vendor-name"
-            />
-          </div>
+        <div className="space-y-2">
+          <Label>Link to Event (Optional - Updates Event P&L)</Label>
+          <Select onValueChange={(v) => {
+            const event = events.find(e => e.id === v);
+            if (event) {
+              setValue("eventId", event.id);
+              setValue("eventName", event.title);
+            }
+          }}>
+            <SelectTrigger data-testid="select-event">
+              <SelectValue placeholder="Select an event..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No event</SelectItem>
+              {events.map((event) => (
+                <SelectItem key={event.id} value={event.id}>
+                  {event.title} ({format(parseISO(event.date), "dd MMM yyyy")})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {type === 'income' 
+              ? "Linking to an event will add this amount to event's Payment Received"
+              : "Linking to an event will add this amount to event's Cost"
+            }
+          </p>
         </div>
+
+        {type === 'expense' && (
+          <div className="space-y-2">
+            <Label>Vendor (Optional)</Label>
+            <Select onValueChange={(v) => {
+              const vendor = vendors.find(vn => vn.id === v);
+              if (vendor) {
+                setValue("vendorId", vendor.id);
+                setValue("vendorName", vendor.name);
+              }
+            }}>
+              <SelectTrigger data-testid="select-vendor">
+                <SelectValue placeholder="Select a vendor..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No vendor</SelectItem>
+                {vendors.map((vendor) => (
+                  <SelectItem key={vendor.id} value={vendor.id}>
+                    {vendor.name} {vendor.category && `(${vendor.category})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label>Description</Label>
           <textarea 
             {...register("description")} 
-            className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-y"
+            className="w-full min-h-[60px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-y"
             placeholder="Add notes or details..."
             data-testid="input-description"
           />
@@ -332,9 +413,13 @@ export default function Daybook() {
           <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
             Close
           </Button>
-          <Button type="submit" className="flex-1 bg-amber-600 hover:bg-amber-700" disabled={createMutation.isPending}>
+          <Button 
+            type="submit" 
+            className={cn("flex-1", type === 'income' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+            disabled={createMutation.isPending}
+          >
             <Plus className="h-4 w-4 mr-1" />
-            {createMutation.isPending ? 'Adding...' : 'Add Transaction'}
+            {createMutation.isPending ? 'Adding...' : `Add ${type === 'income' ? 'Income' : 'Expense'}`}
           </Button>
         </div>
         
@@ -510,7 +595,7 @@ export default function Daybook() {
                   size="sm" 
                   className="gap-1 h-8 bg-green-600 hover:bg-green-700" 
                   data-testid="button-add-income"
-                  onClick={() => setIsTransactionDialogOpen(true)}
+                  onClick={() => setIsIncomeDialogOpen(true)}
                 >
                   <Plus className="h-3 w-3" /> Add
                 </Button>
@@ -584,7 +669,7 @@ export default function Daybook() {
                   size="sm" 
                   className="gap-1 h-8 bg-red-600 hover:bg-red-700" 
                   data-testid="button-add-expense"
-                  onClick={() => setIsTransactionDialogOpen(true)}
+                  onClick={() => setIsExpenseDialogOpen(true)}
                 >
                   <Plus className="h-3 w-3" /> Add
                 </Button>
@@ -896,12 +981,21 @@ export default function Daybook() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+      <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-serif">Add New Transaction</DialogTitle>
+            <DialogTitle className="text-lg font-serif text-green-700">Add Income</DialogTitle>
           </DialogHeader>
-          <AddTransactionForm onClose={() => setIsTransactionDialogOpen(false)} />
+          <SimpleTransactionForm type="income" onClose={() => setIsIncomeDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-serif text-red-700">Add Expense</DialogTitle>
+          </DialogHeader>
+          <SimpleTransactionForm type="expense" onClose={() => setIsExpenseDialogOpen(false)} />
         </DialogContent>
       </Dialog>
     </div>

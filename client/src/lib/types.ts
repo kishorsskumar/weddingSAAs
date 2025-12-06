@@ -43,8 +43,29 @@ export interface DaybookEntry {
   amount: string;
   category: string;
   bankId?: string | null;
+  eventId?: string | null;
   eventName?: string | null;
+  vendorId?: string | null;
   vendorName?: string | null;
+  createdAt?: string;
+}
+
+export interface DaybookCategory {
+  id: string;
+  name: string;
+  type: "income" | "expense";
+  isSystem: boolean;
+  createdAt?: string;
+}
+
+export interface Vendor {
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  gstNumber?: string | null;
+  category?: string | null;
+  billingAddress?: string | null;
   createdAt?: string;
 }
 
