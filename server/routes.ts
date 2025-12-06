@@ -2215,7 +2215,8 @@ export async function registerRoutes(
       const items = await storage.getEventInventoryItemsBySessionId(sessionId as string);
       res.json(items);
     } else {
-      res.json([]);
+      const items = await storage.getAllEventInventoryItems();
+      res.json(items);
     }
   });
 

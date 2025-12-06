@@ -41,7 +41,13 @@ import {
   CheckCircle,
   Clock,
   PackageOpen,
-  Eye
+  Eye,
+  Download,
+  Copy,
+  RotateCcw,
+  Printer,
+  Check,
+  XCircle
 } from "lucide-react";
 import type {
   InventoryItem,
@@ -58,8 +64,17 @@ import type {
   ProductionTask,
   Event,
   Vendor,
-  User
+  User,
+  CompanySettings
 } from "@shared/schema";
+
+const COMPANY_DEFAULTS = {
+  companyName: 'Oakstreet Events',
+  address: '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia',
+  phone: '7902373354',
+  email: 'oakstreetevents18@gmail.com',
+  gstNumber: '',
+};
 
 type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans';
 
@@ -491,6 +506,31 @@ function InventoryItemsSection({
   const totalItems = items.length;
   const activeItems = items.filter(i => i.isActive).length;
 
+  const handleDownloadExcel = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      const data = filteredItems.map((item, index) => ({
+        'SL No': index + 1,
+        'Item Name': item.name,
+        'Category': item.category,
+        'SKU': item.sku || '',
+        'Stock Qty': item.stockQuantity,
+        'Min Level': item.minStockLevel || 0,
+        'Unit Cost': item.unitCost || '0',
+        'Location': item.location || '',
+        'Status': item.isActive ? 'Active' : 'Inactive',
+      }));
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 10 }];
+      XLSX.writeFile(wb, `Inventory_Items_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast({ title: 'Excel downloaded successfully' });
+    } catch (error) {
+      toast({ title: 'Failed to download', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -498,10 +538,20 @@ function InventoryItemsSection({
           <h1 className="text-2xl font-bold">Inventory Items</h1>
           <p className="text-muted-foreground">Manage your equipment and materials</p>
         </div>
-        <Button onClick={handleAddNew} data-testid="button-add-item">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories">
+            <Edit className="w-4 h-4 mr-2" />
+            Categories
+          </Button>
+          <Button variant="outline" onClick={handleDownloadExcel} data-testid="button-download-inventory">
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </Button>
+          <Button onClick={handleAddNew} data-testid="button-add-item">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Item
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -896,6 +946,9 @@ function EventInventorySection({
     damageNotes: '',
   });
 
+  const [editingItem, setEditingItem] = useState<EventInventoryItem | null>(null);
+  const [isDeliveryNoteOpen, setIsDeliveryNoteOpen] = useState(false);
+
   const createSessionMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest('POST', '/api/inventory/sessions', data);
@@ -958,6 +1011,49 @@ function EventInventorySection({
     },
   });
 
+  const updateSessionItemMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return apiRequest('PATCH', `/api/inventory/session-items/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/session-items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/items'] });
+      setEditingItem(null);
+      toast({ title: 'Item updated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const cloneSessionMutation = useMutation({
+    mutationFn: async ({ sourceSessionId, newEventId }: { sourceSessionId: string; newEventId: string }) => {
+      const sourceItems = sessionItems.filter(si => si.sessionId === sourceSessionId);
+      const newSessionRes = await apiRequest('POST', '/api/inventory/sessions', { eventId: newEventId, status: 'draft', notes: 'Cloned from another event' });
+      const newSession = newSessionRes as unknown as EventInventorySession;
+      for (const item of sourceItems) {
+        await apiRequest('POST', '/api/inventory/session-items', {
+          sessionId: newSession.id,
+          itemId: item.itemId,
+          quantityIssued: item.quantityIssued,
+          quantityReturned: 0,
+          quantityDamaged: 0,
+          quantityLost: 0,
+          damageNotes: '',
+        });
+      }
+      return newSession;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/session-items'] });
+      toast({ title: 'Session cloned successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to clone session', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingSession) {
@@ -1000,6 +1096,62 @@ function EventInventorySection({
     ? sessionItems.filter(si => si.sessionId === selectedSession.id) 
     : [];
 
+  const getItemDetails = (itemId: string) => {
+    return inventoryItems.find(i => i.id === itemId);
+  };
+
+  const handleDownloadDeliveryNote = async () => {
+    if (!selectedSession) return;
+    try {
+      const XLSX = await import('xlsx');
+      const eventName = getEventName(selectedSession.eventId);
+      const data = sessionItemsForSelected.map((item, index) => {
+        const invItem = getItemDetails(item.itemId);
+        return {
+          'SL No': index + 1,
+          'Item Name': invItem?.name || 'Unknown',
+          'Category': invItem?.category || '-',
+          'Qty Issued': item.quantityIssued || 0,
+          'Qty Returned': item.quantityReturned || 0,
+          'Qty Damaged': item.quantityDamaged || 0,
+          'Qty Lost': item.quantityLost || 0,
+          'Status': item.quantityReturned === item.quantityIssued ? 'Returned' : 
+                   (item.quantityDamaged || item.quantityLost) > 0 ? 'Damaged/Lost' : 'Issued',
+          'Notes': item.damageNotes || '',
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Delivery Note');
+      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 25 }];
+      XLSX.writeFile(wb, `Delivery_Note_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      toast({ title: 'Delivery note downloaded' });
+    } catch (error) {
+      toast({ title: 'Failed to download', variant: 'destructive' });
+    }
+  };
+
+  const handleMarkReturned = (item: EventInventoryItem) => {
+    updateSessionItemMutation.mutate({
+      id: item.id,
+      data: { quantityReturned: item.quantityIssued, quantityDamaged: 0, quantityLost: 0 }
+    });
+  };
+
+  const handleMarkAllReturned = () => {
+    sessionItemsForSelected.forEach(item => {
+      if (item.quantityReturned !== item.quantityIssued) {
+        updateSessionItemMutation.mutate({
+          id: item.id,
+          data: { quantityReturned: item.quantityIssued }
+        });
+      }
+    });
+  };
+
+  const [cloneEventId, setCloneEventId] = useState('');
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1007,10 +1159,32 @@ function EventInventorySection({
           <h1 className="text-2xl font-bold">Event Inventory</h1>
           <p className="text-muted-foreground">Track material outflow & inflow per event</p>
         </div>
-        <Button onClick={() => { setEditingSession(null); setFormData({ eventId: '', status: 'draft', notes: '' }); setIsModalOpen(true); }} data-testid="button-add-session">
-          <Plus className="w-4 h-4 mr-2" />
-          New Session
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          {selectedSession && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleDownloadDeliveryNote} data-testid="button-download-delivery-note">
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsDeliveryNoteOpen(true)} data-testid="button-print-delivery-note">
+                <Printer className="w-4 h-4 mr-2" />
+                Print Note
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setIsCloneModalOpen(true)} data-testid="button-clone-session">
+                <Copy className="w-4 h-4 mr-2" />
+                Clone
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleMarkAllReturned} data-testid="button-mark-all-returned">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Mark All Returned
+              </Button>
+            </>
+          )}
+          <Button onClick={() => { setEditingSession(null); setFormData({ eventId: '', status: 'draft', notes: '' }); setIsModalOpen(true); }} data-testid="button-add-session">
+            <Plus className="w-4 h-4 mr-2" />
+            Create New
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -1081,28 +1255,63 @@ function EventInventorySection({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-8">SL</TableHead>
                     <TableHead>Item</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead className="text-right">Issued</TableHead>
                     <TableHead className="text-right">Returned</TableHead>
                     <TableHead className="text-right">Damaged</TableHead>
-                    <TableHead className="text-right">Lost</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sessionItemsForSelected.map(si => {
+                  {sessionItemsForSelected.map((si, index) => {
                     const item = inventoryItems.find(i => i.id === si.itemId);
+                    const isFullyReturned = si.quantityReturned === si.quantityIssued;
+                    const hasDamage = (si.quantityDamaged || 0) > 0 || (si.quantityLost || 0) > 0;
                     return (
-                      <TableRow key={si.id}>
-                        <TableCell>{item?.name || 'Unknown'}</TableCell>
-                        <TableCell className="text-right">{si.quantityIssued}</TableCell>
-                        <TableCell className="text-right">{si.quantityReturned}</TableCell>
-                        <TableCell className="text-right text-amber-600">{si.quantityDamaged}</TableCell>
-                        <TableCell className="text-right text-red-600">{si.quantityLost}</TableCell>
+                      <TableRow key={si.id} className={isFullyReturned ? 'bg-green-50' : hasDamage ? 'bg-red-50' : ''}>
+                        <TableCell className="font-medium">{index + 1}</TableCell>
+                        <TableCell className="font-medium">{item?.name || 'Unknown'}</TableCell>
+                        <TableCell className="text-muted-foreground">{item?.category || '-'}</TableCell>
+                        <TableCell className="text-right font-semibold">{si.quantityIssued}</TableCell>
+                        <TableCell className="text-right text-green-600">{si.quantityReturned || 0}</TableCell>
+                        <TableCell className="text-right text-red-600">{(si.quantityDamaged || 0) + (si.quantityLost || 0)}</TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => deleteSessionItemMutation.mutate(si.id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {isFullyReturned ? (
+                            <Badge className="bg-green-500"><Check className="w-3 h-3 mr-1" />Returned</Badge>
+                          ) : hasDamage ? (
+                            <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Damaged</Badge>
+                          ) : (
+                            <Badge variant="secondary">Issued</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {!isFullyReturned && (
+                              <Button variant="ghost" size="icon" title="Mark as returned" onClick={() => handleMarkReturned(si)}>
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" title="Edit" onClick={() => { 
+                              setEditingItem(si);
+                              setItemFormData({
+                                itemId: si.itemId,
+                                quantityIssued: String(si.quantityIssued || ''),
+                                quantityReturned: String(si.quantityReturned || ''),
+                                quantityDamaged: String(si.quantityDamaged || ''),
+                                quantityLost: String(si.quantityLost || ''),
+                                damageNotes: si.damageNotes || '',
+                              });
+                              setIsItemModalOpen(true);
+                            }}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Delete" onClick={() => deleteSessionItemMutation.mutate(si.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
@@ -1158,25 +1367,49 @@ function EventInventorySection({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isItemModalOpen} onOpenChange={setIsItemModalOpen}>
+      <Dialog open={isItemModalOpen} onOpenChange={(open) => { setIsItemModalOpen(open); if (!open) setEditingItem(null); }}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Item to Session</DialogTitle>
+            <DialogTitle>{editingItem ? 'Edit Session Item' : 'Add Item to Session'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleAddItem} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Item *</Label>
-              <Select value={itemFormData.itemId} onValueChange={(v) => setItemFormData({ ...itemFormData, itemId: v })}>
-                <SelectTrigger data-testid="select-session-item">
-                  <SelectValue placeholder="Select inventory item" />
-                </SelectTrigger>
-                <SelectContent>
-                  {inventoryItems.map(item => (
-                    <SelectItem key={item.id} value={item.id}>{item.name} (Stock: {item.stockQuantity})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (editingItem) {
+              updateSessionItemMutation.mutate({
+                id: editingItem.id,
+                data: {
+                  quantityIssued: parseInt(itemFormData.quantityIssued) || 0,
+                  quantityReturned: parseInt(itemFormData.quantityReturned) || 0,
+                  quantityDamaged: parseInt(itemFormData.quantityDamaged) || 0,
+                  quantityLost: parseInt(itemFormData.quantityLost) || 0,
+                  damageNotes: itemFormData.damageNotes,
+                }
+              });
+              setIsItemModalOpen(false);
+            } else {
+              handleAddItem(e);
+            }
+          }} className="space-y-4">
+            {!editingItem && (
+              <div className="space-y-2">
+                <Label>Item *</Label>
+                <Select value={itemFormData.itemId} onValueChange={(v) => setItemFormData({ ...itemFormData, itemId: v })}>
+                  <SelectTrigger data-testid="select-session-item">
+                    <SelectValue placeholder="Select inventory item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inventoryItems.map(item => (
+                      <SelectItem key={item.id} value={item.id}>{item.name} (Stock: {item.stockQuantity})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {editingItem && (
+              <div className="p-3 bg-muted rounded">
+                <p className="font-medium">{inventoryItems.find(i => i.id === editingItem.itemId)?.name || 'Unknown Item'}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Qty Issued</Label>
@@ -1191,19 +1424,141 @@ function EventInventorySection({
                 <Input type="number" value={itemFormData.quantityDamaged} onChange={(e) => setItemFormData({ ...itemFormData, quantityDamaged: e.target.value })} data-testid="input-qty-damaged" />
               </div>
               <div className="space-y-2">
-                <Label>Qty Lost</Label>
+                <Label>Qty Lost / Missing</Label>
                 <Input type="number" value={itemFormData.quantityLost} onChange={(e) => setItemFormData({ ...itemFormData, quantityLost: e.target.value })} data-testid="input-qty-lost" />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Damage Notes</Label>
-              <Textarea value={itemFormData.damageNotes} onChange={(e) => setItemFormData({ ...itemFormData, damageNotes: e.target.value })} data-testid="input-damage-notes" />
+              <Textarea value={itemFormData.damageNotes} onChange={(e) => setItemFormData({ ...itemFormData, damageNotes: e.target.value })} placeholder="Describe any damage or issues" data-testid="input-damage-notes" />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsItemModalOpen(false)}>Cancel</Button>
-              <Button type="submit" data-testid="button-submit-session-item">Add Item</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsItemModalOpen(false); setEditingItem(null); }}>Cancel</Button>
+              <Button type="submit" data-testid="button-submit-session-item">{editingItem ? 'Update Item' : 'Add Item'}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCloneModalOpen} onOpenChange={setIsCloneModalOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clone Session to Another Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Target Event *</Label>
+              <Select value={cloneEventId} onValueChange={setCloneEventId}>
+                <SelectTrigger data-testid="select-clone-event">
+                  <SelectValue placeholder="Select event to clone to" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.filter(e => e.id !== selectedSession?.eventId).map(event => (
+                    <SelectItem key={event.id} value={event.id}>{event.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This will create a new session for the selected event with the same items. All return/damage tracking will be reset.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCloneModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              if (selectedSession && cloneEventId) {
+                cloneSessionMutation.mutate({ sourceSessionId: selectedSession.id, newEventId: cloneEventId });
+                setIsCloneModalOpen(false);
+                setCloneEventId('');
+              }
+            }} disabled={!cloneEventId} data-testid="button-confirm-clone">
+              Clone Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeliveryNoteOpen} onOpenChange={setIsDeliveryNoteOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Delivery Out Note</DialogTitle>
+          </DialogHeader>
+          {selectedSession && (
+            <div className="space-y-6 p-6 bg-white" id="delivery-note-print">
+              <div className="text-center border-b pb-4">
+                <h1 className="text-2xl font-bold text-amber-700">{COMPANY_DEFAULTS.companyName}</h1>
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{COMPANY_DEFAULTS.address}</p>
+                <p className="text-sm">Phone: {COMPANY_DEFAULTS.phone} | Email: {COMPANY_DEFAULTS.email}</p>
+                {COMPANY_DEFAULTS.gstNumber && <p className="text-sm">GSTIN: {COMPANY_DEFAULTS.gstNumber}</p>}
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-bold">DELIVERY OUT NOTE</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p><strong>Event:</strong> {getEventName(selectedSession.eventId)}</p>
+                  <p><strong>Issue Date:</strong> {selectedSession.issuedAt ? format(new Date(selectedSession.issuedAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
+                </div>
+                <div className="text-right">
+                  <p><strong>Status:</strong> {selectedSession.status}</p>
+                  <p><strong>Note #:</strong> DN-{selectedSession.id.slice(0, 8).toUpperCase()}</p>
+                </div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-amber-50">
+                    <TableHead className="font-bold">SL No</TableHead>
+                    <TableHead className="font-bold">Item Description</TableHead>
+                    <TableHead className="font-bold">Category</TableHead>
+                    <TableHead className="text-right font-bold">Qty</TableHead>
+                    <TableHead className="text-right font-bold">Returned</TableHead>
+                    <TableHead className="font-bold">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sessionItemsForSelected.map((si, index) => {
+                    const item = inventoryItems.find(i => i.id === si.itemId);
+                    return (
+                      <TableRow key={si.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell className="font-medium">{item?.name || 'Unknown'}</TableCell>
+                        <TableCell>{item?.category || '-'}</TableCell>
+                        <TableCell className="text-right">{si.quantityIssued}</TableCell>
+                        <TableCell className="text-right">{si.quantityReturned || 0}</TableCell>
+                        <TableCell>
+                          {si.quantityReturned === si.quantityIssued ? 'Returned' : 
+                           (si.quantityDamaged || si.quantityLost) ? 'Damaged/Lost' : 'Issued'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <div className="grid grid-cols-2 gap-8 pt-8 border-t">
+                <div>
+                  <p className="font-bold mb-8">Issued By:</p>
+                  <div className="border-t border-black pt-2">Signature & Date</div>
+                </div>
+                <div>
+                  <p className="font-bold mb-8">Received By:</p>
+                  <div className="border-t border-black pt-2">Signature & Date</div>
+                </div>
+              </div>
+              {selectedSession.notes && (
+                <div className="pt-4 border-t">
+                  <p className="font-bold">Notes:</p>
+                  <p className="text-sm">{selectedSession.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeliveryNoteOpen(false)}>Close</Button>
+            <Button onClick={() => window.print()} data-testid="button-print">
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -1244,7 +1599,13 @@ function RentalsSection({
     quantity: '1',
     unitRate: '',
     condition: '',
+    quantityReturned: '0',
+    damageNotes: '',
   });
+
+  const [editingItem, setEditingItem] = useState<RentalItem | null>(null);
+  const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
+  const [cloneEventId, setCloneEventId] = useState('');
 
   const createRentalMutation = useMutation({
     mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/rentals', data),
@@ -1292,6 +1653,60 @@ function RentalsSection({
     },
   });
 
+  const updateRentalItemMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return apiRequest('PATCH', `/api/inventory/rental-items/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/rental-items'] });
+      setEditingItem(null);
+      toast({ title: 'Item updated successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const cloneRentalMutation = useMutation({
+    mutationFn: async ({ sourceRentalId, newEventId }: { sourceRentalId: string; newEventId: string }) => {
+      const sourceRental = rentals.find(r => r.id === sourceRentalId);
+      const sourceItems = rentalItems.filter(ri => ri.rentalId === sourceRentalId);
+      const newRentalRes = await apiRequest('POST', '/api/inventory/rentals', {
+        vendorId: sourceRental?.vendorId || null,
+        eventId: newEventId,
+        rentalDate: format(new Date(), 'yyyy-MM-dd'),
+        expectedReturnDate: null,
+        status: 'active',
+        totalCost: sourceRental?.totalCost || '0',
+        depositPaid: '0',
+        notes: 'Cloned from another rental',
+      });
+      const newRental = newRentalRes as unknown as RentalRecord;
+      for (const item of sourceItems) {
+        await apiRequest('POST', '/api/inventory/rental-items', {
+          rentalId: newRental.id,
+          itemName: item.itemName,
+          quantity: item.quantity,
+          unitRate: item.unitRate,
+          condition: item.condition,
+          quantityReturned: 0,
+          damageNotes: '',
+        });
+      }
+      return newRental;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/rentals'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/rental-items'] });
+      setIsCloneModalOpen(false);
+      setCloneEventId('');
+      toast({ title: 'Rental cloned successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to clone rental', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
@@ -1321,6 +1736,32 @@ function RentalsSection({
 
   const getVendorName = (vendorId: string | null) => vendors.find(v => v.id === vendorId)?.name || 'N/A';
   const getEventName = (eventId: string | null) => events.find(e => e.id === eventId)?.title || 'N/A';
+  const rentalItemsForSelected = selectedRental ? rentalItems.filter(ri => ri.rentalId === selectedRental.id) : [];
+
+  const handleDownloadRentalItems = async () => {
+    if (!selectedRental || rentalItemsForSelected.length === 0) return;
+    
+    const XLSX = await import('xlsx');
+    const data = rentalItemsForSelected.map((item, index) => ({
+      'SL No': index + 1,
+      'Item Name': item.itemName,
+      'Qty Issued': item.quantity,
+      'Qty Returned': item.quantityReturned || 0,
+      'Pending': item.quantity - (item.quantityReturned || 0),
+      'Unit Rate': item.unitRate || '0',
+      'Condition': item.condition || '',
+      'Return Condition': item.returnCondition || '',
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rental Items');
+    
+    const vendorName = getVendorName(selectedRental.vendorId);
+    const eventName = getEventName(selectedRental.eventId);
+    XLSX.writeFile(wb, `Rental_${vendorName}_${eventName}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    toast({ title: 'Rental items downloaded successfully' });
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -1331,8 +1772,6 @@ function RentalsSection({
       default: return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  const rentalItemsForSelected = selectedRental ? rentalItems.filter(ri => ri.rentalId === selectedRental.id) : [];
 
   return (
     <div className="space-y-6">
@@ -1377,8 +1816,11 @@ function RentalsSection({
                     <TableCell className="text-right">{formatCurrency(rental.totalCost)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); setIsItemModalOpen(true); }} data-testid={`button-add-rental-item-${rental.id}`}>
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); setIsItemModalOpen(true); }} title="Add item" data-testid={`button-add-rental-item-${rental.id}`}>
                           <PackageOpen className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); setIsCloneModalOpen(true); }} title="Clone to another event" data-testid={`button-clone-rental-${rental.id}`}>
+                          <Copy className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditingRental(rental); setFormData({ vendorId: rental.vendorId || '', eventId: rental.eventId || '', rentalDate: rental.rentalDate, expectedReturnDate: rental.expectedReturnDate || '', status: rental.status, totalCost: rental.totalCost || '', depositPaid: rental.depositPaid || '', notes: rental.notes || '' }); setIsModalOpen(true); }} data-testid={`button-edit-rental-${rental.id}`}>
                           <Edit className="h-4 w-4" />
@@ -1398,31 +1840,108 @@ function RentalsSection({
 
       {selectedRental && rentalItemsForSelected.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Rental Items for {getVendorName(selectedRental.vendorId)}</CardTitle>
+            <Button variant="outline" size="sm" onClick={() => handleDownloadRentalItems()} data-testid="button-download-rental-items">
+              <Download className="w-4 h-4 mr-2" />
+              Download
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>SL</TableHead>
                   <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
+                  <TableHead className="text-right">Qty Issued</TableHead>
+                  <TableHead className="text-right">Qty Returned</TableHead>
+                  <TableHead className="text-right">Pending</TableHead>
                   <TableHead className="text-right">Unit Rate</TableHead>
                   <TableHead>Condition</TableHead>
+                  <TableHead>Return Condition</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rentalItemsForSelected.map(item => (
-                  <TableRow key={item.id}>
+                {rentalItemsForSelected.map((item, index) => (
+                  <TableRow key={item.id} className={editingItem?.id === item.id ? 'bg-amber-50' : ''}>
+                    <TableCell>{index + 1}</TableCell>
                     <TableCell>{item.itemName}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
+                    <TableCell className="text-right">
+                      {editingItem?.id === item.id ? (
+                        <Input
+                          type="number"
+                          className="w-20 text-right"
+                          value={itemFormData.quantityReturned}
+                          onChange={(e) => setItemFormData({ ...itemFormData, quantityReturned: e.target.value })}
+                          min={0}
+                          max={item.quantity}
+                          data-testid={`input-returned-${item.id}`}
+                        />
+                      ) : (
+                        item.quantityReturned || 0
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {item.quantity - (item.quantityReturned || 0) > 0 ? (
+                        <Badge variant="destructive">{item.quantity - (item.quantityReturned || 0)}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-green-50 text-green-700">0</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(item.unitRate)}</TableCell>
                     <TableCell>{item.condition || '-'}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => deleteRentalItemMutation.mutate(item.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {editingItem?.id === item.id ? (
+                        <Input
+                          className="w-32"
+                          value={itemFormData.damageNotes}
+                          onChange={(e) => setItemFormData({ ...itemFormData, damageNotes: e.target.value })}
+                          placeholder="Return condition"
+                          data-testid={`input-return-condition-${item.id}`}
+                        />
+                      ) : (
+                        item.returnCondition || '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {editingItem?.id === item.id ? (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              updateRentalItemMutation.mutate({
+                                id: item.id,
+                                data: {
+                                  quantityReturned: parseInt(itemFormData.quantityReturned) || 0,
+                                  returnCondition: itemFormData.damageNotes,
+                                },
+                              });
+                            }} data-testid={`button-save-rental-item-${item.id}`}>
+                              <Check className="h-4 w-4 text-green-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => setEditingItem(null)} data-testid={`button-cancel-rental-item-${item.id}`}>
+                              <X className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => {
+                              setEditingItem(item);
+                              setItemFormData({
+                                ...itemFormData,
+                                quantityReturned: String(item.quantityReturned || 0),
+                                damageNotes: item.returnCondition || '',
+                              });
+                            }} title="Edit return status" data-testid={`button-edit-rental-item-${item.id}`}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => deleteRentalItemMutation.mutate(item.id)} data-testid={`button-delete-rental-item-${item.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1534,6 +2053,46 @@ function RentalsSection({
               <Button type="submit" data-testid="button-submit-rental-item">Add Item</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCloneModalOpen} onOpenChange={setIsCloneModalOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clone Rental to Another Event</DialogTitle>
+            <DialogDescription>
+              This will copy all items from the selected rental to a new rental for a different event.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Target Event *</Label>
+              <Select value={cloneEventId} onValueChange={setCloneEventId}>
+                <SelectTrigger data-testid="select-clone-rental-event">
+                  <SelectValue placeholder="Select event to clone to" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.filter(e => e.id !== selectedRental?.eventId).map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.title} - {e.eventDate ? format(new Date(e.eventDate), 'MMM d, yyyy') : 'No date'}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => { setIsCloneModalOpen(false); setCloneEventId(''); }}>Cancel</Button>
+              <Button
+                disabled={!cloneEventId || !selectedRental || cloneRentalMutation.isPending}
+                onClick={() => {
+                  if (selectedRental && cloneEventId) {
+                    cloneRentalMutation.mutate({ sourceRentalId: selectedRental.id, newEventId: cloneEventId });
+                  }
+                }}
+                data-testid="button-confirm-clone-rental"
+              >
+                {cloneRentalMutation.isPending ? 'Cloning...' : 'Clone Rental'}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

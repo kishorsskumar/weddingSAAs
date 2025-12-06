@@ -423,6 +423,7 @@ export interface IStorage {
   deleteEventInventorySession(id: string): Promise<void>;
 
   // Oak Inventory - Event Inventory Items
+  getAllEventInventoryItems(): Promise<EventInventoryItem[]>;
   getEventInventoryItemsBySessionId(sessionId: string): Promise<EventInventoryItem[]>;
   createEventInventoryItem(item: InsertEventInventoryItem): Promise<EventInventoryItem>;
   updateEventInventoryItem(id: string, item: Partial<InsertEventInventoryItem>): Promise<EventInventoryItem | undefined>;
@@ -1784,6 +1785,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Oak Inventory - Event Inventory Items
+  async getAllEventInventoryItems(): Promise<EventInventoryItem[]> {
+    return await db.select().from(eventInventoryItems);
+  }
+
   async getEventInventoryItemsBySessionId(sessionId: string): Promise<EventInventoryItem[]> {
     return await db.select().from(eventInventoryItems)
       .where(eq(eventInventoryItems.sessionId, sessionId));
