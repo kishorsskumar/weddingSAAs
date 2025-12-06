@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -248,6 +248,21 @@ export default function OakBook() {
 
   const { data: banks = [] } = useQuery<Bank[]>({
     queryKey: ["/api/banks"],
+  });
+
+  const { data: companySettings } = useQuery<any>({
+    queryKey: ["/api/company-settings"],
+  });
+
+  const updateCompanySettings = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/company-settings", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/company-settings"] });
+      toast({ title: "Settings saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
   });
 
   const createCustomer = useMutation({
@@ -1675,65 +1690,10 @@ export default function OakBook() {
   };
 
   const renderSettings = () => (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-serif font-bold text-primary">Settings</h1>
-
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Company Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <div>
-                <Label>Company Name</Label>
-                <Input placeholder="Oakstreet Events" />
-              </div>
-              <div>
-                <Label>GST Number</Label>
-                <Input placeholder="Enter GST Number" />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Address</Label>
-                <Textarea placeholder="Enter company address" />
-              </div>
-              <div>
-                <Label>Phone</Label>
-                <Input placeholder="Phone number" />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input placeholder="Email address" type="email" />
-              </div>
-            </div>
-            <Button>Save Changes</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Invoice Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <div>
-                <Label>Invoice Prefix</Label>
-                <Input placeholder="INV-" />
-              </div>
-              <div>
-                <Label>Estimate Prefix</Label>
-                <Input placeholder="QT-" />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Default Terms & Conditions</Label>
-                <Textarea placeholder="Enter default terms" />
-              </div>
-            </div>
-            <Button>Save Changes</Button>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <SettingsSection 
+      companySettings={companySettings} 
+      updateCompanySettings={updateCompanySettings}
+    />
   );
 
   const renderContent = () => {
@@ -2600,6 +2560,264 @@ function BillForm({ bill, vendors, onSubmit, onCancel }: {
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
         <Button onClick={() => onSubmit(formData)}>{bill ? "Update" : "Create"}</Button>
       </DialogFooter>
+    </div>
+  );
+}
+
+function SettingsSection({ companySettings, updateCompanySettings }: { companySettings: any; updateCompanySettings: any }) {
+  const [settingsForm, setSettingsForm] = useState({
+    companyName: companySettings?.companyName || 'Oakstreet Events',
+    address: companySettings?.address || '',
+    phone: companySettings?.phone || '',
+    email: companySettings?.email || '',
+    website: companySettings?.website || '',
+    gstNumber: companySettings?.gstNumber || '',
+    panNumber: companySettings?.panNumber || '',
+    placeOfSupply: companySettings?.placeOfSupply || 'Kerala (32)',
+    bankName: companySettings?.bankName || '',
+    bankAccountNumber: companySettings?.bankAccountNumber || '',
+    bankIfscCode: companySettings?.bankIfscCode || '',
+    bankBranch: companySettings?.bankBranch || '',
+    defaultTerms: companySettings?.defaultTerms || '',
+    defaultThankYouMessage: companySettings?.defaultThankYouMessage || 'Looking forward for your business.',
+  });
+
+  useEffect(() => {
+    if (companySettings) {
+      setSettingsForm({
+        companyName: companySettings.companyName || 'Oakstreet Events',
+        address: companySettings.address || '',
+        phone: companySettings.phone || '',
+        email: companySettings.email || '',
+        website: companySettings.website || '',
+        gstNumber: companySettings.gstNumber || '',
+        panNumber: companySettings.panNumber || '',
+        placeOfSupply: companySettings.placeOfSupply || 'Kerala (32)',
+        bankName: companySettings.bankName || '',
+        bankAccountNumber: companySettings.bankAccountNumber || '',
+        bankIfscCode: companySettings.bankIfscCode || '',
+        bankBranch: companySettings.bankBranch || '',
+        defaultTerms: companySettings.defaultTerms || '',
+        defaultThankYouMessage: companySettings.defaultThankYouMessage || 'Looking forward for your business.',
+      });
+    }
+  }, [companySettings]);
+
+  const handleSaveSettings = () => {
+    updateCompanySettings.mutate(settingsForm);
+  };
+
+  const indianStates = [
+    'Andhra Pradesh (37)', 'Arunachal Pradesh (12)', 'Assam (18)', 'Bihar (10)', 'Chhattisgarh (22)',
+    'Goa (30)', 'Gujarat (24)', 'Haryana (06)', 'Himachal Pradesh (02)', 'Jharkhand (20)',
+    'Karnataka (29)', 'Kerala (32)', 'Madhya Pradesh (23)', 'Maharashtra (27)', 'Manipur (14)',
+    'Meghalaya (17)', 'Mizoram (15)', 'Nagaland (13)', 'Odisha (21)', 'Punjab (03)',
+    'Rajasthan (08)', 'Sikkim (11)', 'Tamil Nadu (33)', 'Telangana (36)', 'Tripura (16)',
+    'Uttar Pradesh (09)', 'Uttarakhand (05)', 'West Bengal (19)', 'Delhi (07)'
+  ];
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-serif font-bold text-primary">Settings</h1>
+
+      <Tabs defaultValue="company" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-4 h-auto">
+          <TabsTrigger value="company" className="text-xs sm:text-sm">Company</TabsTrigger>
+          <TabsTrigger value="tax" className="text-xs sm:text-sm">Tax & GST</TabsTrigger>
+          <TabsTrigger value="bank" className="text-xs sm:text-sm">Bank</TabsTrigger>
+          <TabsTrigger value="documents" className="text-xs sm:text-sm">Documents</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="company" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                <div>
+                  <Label>Company Name *</Label>
+                  <Input 
+                    value={settingsForm.companyName} 
+                    onChange={(e) => setSettingsForm({...settingsForm, companyName: e.target.value})}
+                    placeholder="Oakstreet Events" 
+                  />
+                </div>
+                <div>
+                  <Label>Website</Label>
+                  <Input 
+                    value={settingsForm.website} 
+                    onChange={(e) => setSettingsForm({...settingsForm, website: e.target.value})}
+                    placeholder="www.oakstreetevents.com" 
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Address</Label>
+                  <Textarea 
+                    value={settingsForm.address} 
+                    onChange={(e) => setSettingsForm({...settingsForm, address: e.target.value})}
+                    placeholder="Enter company address (will appear on invoices)" 
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input 
+                    value={settingsForm.phone} 
+                    onChange={(e) => setSettingsForm({...settingsForm, phone: e.target.value})}
+                    placeholder="Phone number" 
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input 
+                    value={settingsForm.email} 
+                    onChange={(e) => setSettingsForm({...settingsForm, email: e.target.value})}
+                    placeholder="Email address" 
+                    type="email" 
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveSettings} disabled={updateCompanySettings.isPending}>
+                {updateCompanySettings.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tax" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>GST & Tax Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                <div>
+                  <Label>GSTIN</Label>
+                  <Input 
+                    value={settingsForm.gstNumber} 
+                    onChange={(e) => setSettingsForm({...settingsForm, gstNumber: e.target.value.toUpperCase()})}
+                    placeholder="e.g., 32AAACU3566G1Z8" 
+                    className="uppercase"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">15-digit GST Identification Number</p>
+                </div>
+                <div>
+                  <Label>PAN Number</Label>
+                  <Input 
+                    value={settingsForm.panNumber} 
+                    onChange={(e) => setSettingsForm({...settingsForm, panNumber: e.target.value.toUpperCase()})}
+                    placeholder="e.g., AAACU3566G" 
+                    className="uppercase"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <Label>Place of Supply (Default)</Label>
+                  <Select 
+                    value={settingsForm.placeOfSupply} 
+                    onValueChange={(v) => setSettingsForm({...settingsForm, placeOfSupply: v})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {indianStates.map((state) => (
+                        <SelectItem key={state} value={state}>{state}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">This will appear on invoices and estimates</p>
+                </div>
+              </div>
+              <Button onClick={handleSaveSettings} disabled={updateCompanySettings.isPending}>
+                {updateCompanySettings.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="bank" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank Details (for Invoices)</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">These details will appear on your invoices for customer payments.</p>
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                <div>
+                  <Label>Bank Name</Label>
+                  <Input 
+                    value={settingsForm.bankName} 
+                    onChange={(e) => setSettingsForm({...settingsForm, bankName: e.target.value})}
+                    placeholder="e.g., State Bank of India" 
+                  />
+                </div>
+                <div>
+                  <Label>Account Number</Label>
+                  <Input 
+                    value={settingsForm.bankAccountNumber} 
+                    onChange={(e) => setSettingsForm({...settingsForm, bankAccountNumber: e.target.value})}
+                    placeholder="Account number" 
+                  />
+                </div>
+                <div>
+                  <Label>IFSC Code</Label>
+                  <Input 
+                    value={settingsForm.bankIfscCode} 
+                    onChange={(e) => setSettingsForm({...settingsForm, bankIfscCode: e.target.value.toUpperCase()})}
+                    placeholder="e.g., SBIN0001234" 
+                    className="uppercase"
+                  />
+                </div>
+                <div>
+                  <Label>Branch</Label>
+                  <Input 
+                    value={settingsForm.bankBranch} 
+                    onChange={(e) => setSettingsForm({...settingsForm, bankBranch: e.target.value})}
+                    placeholder="Branch name" 
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveSettings} disabled={updateCompanySettings.isPending}>
+                {updateCompanySettings.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Document Defaults</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4">
+                <div>
+                  <Label>Default Terms & Conditions</Label>
+                  <Textarea 
+                    value={settingsForm.defaultTerms} 
+                    onChange={(e) => setSettingsForm({...settingsForm, defaultTerms: e.target.value})}
+                    placeholder="Enter default terms that will appear on estimates and invoices" 
+                    rows={4}
+                  />
+                </div>
+                <div>
+                  <Label>Thank You Message</Label>
+                  <Textarea 
+                    value={settingsForm.defaultThankYouMessage} 
+                    onChange={(e) => setSettingsForm({...settingsForm, defaultThankYouMessage: e.target.value})}
+                    placeholder="Thank you message for documents" 
+                    rows={2}
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSaveSettings} disabled={updateCompanySettings.isPending}>
+                {updateCompanySettings.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
