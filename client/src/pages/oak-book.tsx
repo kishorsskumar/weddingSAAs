@@ -507,18 +507,16 @@ export default function OakBook() {
   const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string) => {
     try {
       toast({ title: "Generating PDF..." });
-      const response = await fetch(`/api/pdf/${type}/${id}`);
-      if (!response.ok) throw new Error("PDF generation failed");
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${type}-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast({ title: "PDF downloaded successfully" });
+      
+      const printWindow = window.open(`/print/${type}/${id}`, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 1000);
+        };
+      }
+      toast({ title: "Print dialog opened - save as PDF" });
     } catch (error) {
       toast({ title: "Failed to generate PDF", variant: "destructive" });
     }
