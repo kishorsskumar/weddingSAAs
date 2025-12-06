@@ -26,6 +26,8 @@ export default function Daybook() {
   const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [editingCategory, setEditingCategory] = useState<DaybookCategory | null>(null);
+  const [editingEntry, setEditingEntry] = useState<DaybookEntry | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [periodType, setPeriodType] = useState<"day" | "month" | "year" | "custom">("month");
   const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
@@ -155,6 +157,25 @@ export default function Daybook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+    },
+  });
+
+  const updateEntryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<DaybookEntry> }) => {
+      const res = await fetch(`/api/daybook/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setEditingEntry(null);
+      setIsEditDialogOpen(false);
     },
   });
 
@@ -756,6 +777,201 @@ export default function Daybook() {
     );
   };
 
+  const EditEntryForm = ({ 
+    entry, 
+    banks, 
+    events, 
+    categories,
+    onSubmit, 
+    onCancel,
+    isPending 
+  }: { 
+    entry: DaybookEntry;
+    banks: Bank[];
+    events: Event[];
+    categories: DaybookCategory[];
+    onSubmit: (data: Partial<DaybookEntry>) => void;
+    onCancel: () => void;
+    isPending: boolean;
+  }) => {
+    const { register, handleSubmit, setValue, watch } = useForm<any>({
+      defaultValues: {
+        amount: entry.amount,
+        date: entry.date,
+        bankId: entry.bankId || '',
+        category: entry.category || '',
+        description: entry.description || '',
+        eventId: entry.eventId || '',
+      }
+    });
+    
+    const [eventSearchOpen, setEventSearchOpen] = useState(false);
+    const [eventSearch, setEventSearch] = useState("");
+    const [selectedEvent, setSelectedEvent] = useState<Event | null>(
+      entry.eventId ? events.find(e => e.id === entry.eventId) || null : null
+    );
+    
+    const filteredEvents = events.filter(e => 
+      e.title.toLowerCase().includes(eventSearch.toLowerCase()) ||
+      e.customer?.toLowerCase().includes(eventSearch.toLowerCase())
+    );
+    
+    const handleFormSubmit = (data: any) => {
+      onSubmit({
+        amount: data.amount,
+        date: data.date,
+        bankId: data.bankId || null,
+        category: data.category,
+        description: data.description,
+        eventId: data.eventId || null,
+      });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Amount *</Label>
+            <Input 
+              type="number" 
+              step="0.01" 
+              {...register("amount")} 
+              required 
+              placeholder="0.00" 
+              data-testid="input-edit-amount"
+              className="text-lg font-mono"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Date *</Label>
+            <Input 
+              type="date" 
+              {...register("date")} 
+              required 
+              data-testid="input-edit-date"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Bank *</Label>
+          <Select defaultValue={entry.bankId || ''} onValueChange={(v) => setValue("bankId", v)}>
+            <SelectTrigger data-testid="select-edit-bank">
+              <SelectValue placeholder="Select a bank..." />
+            </SelectTrigger>
+            <SelectContent>
+              {banks.map((bank) => (
+                <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Category *</Label>
+          <Select defaultValue={entry.category || ''} onValueChange={(v) => setValue("category", v)}>
+            <SelectTrigger data-testid="select-edit-category">
+              <SelectValue placeholder="Select a category..." />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Link to Event (Optional)</Label>
+          <Popover open={eventSearchOpen} onOpenChange={setEventSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={eventSearchOpen}
+                className="w-full justify-between font-normal"
+                data-testid="select-edit-event"
+              >
+                {selectedEvent ? (
+                  <span>{selectedEvent.title} ({format(parseISO(selectedEvent.date), "dd MMM yyyy")})</span>
+                ) : (
+                  <span className="text-muted-foreground">Search events...</span>
+                )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search events..." 
+                  value={eventSearch}
+                  onValueChange={setEventSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>No events found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setSelectedEvent(null);
+                        setValue("eventId", "");
+                        setEventSearchOpen(false);
+                      }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", !selectedEvent ? "opacity-100" : "opacity-0")} />
+                      <span className="text-muted-foreground">No event link</span>
+                    </CommandItem>
+                    {filteredEvents.map((event) => (
+                      <CommandItem
+                        key={event.id}
+                        onSelect={() => {
+                          setSelectedEvent(event);
+                          setValue("eventId", event.id);
+                          setEventSearchOpen(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", selectedEvent?.id === event.id ? "opacity-100" : "opacity-0")} />
+                        <div className="flex flex-col">
+                          <span>{event.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {event.customer} - {format(parseISO(event.date), "dd MMM yyyy")}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Description</Label>
+          <textarea 
+            {...register("description")} 
+            className="w-full min-h-[60px] px-3 py-2 rounded-md border border-input bg-background text-sm resize-y"
+            placeholder="Add notes or details..."
+            data-testid="input-edit-description"
+          />
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            className={cn("flex-1", entry.type === 'income' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+            disabled={isPending}
+          >
+            <Pencil className="h-4 w-4 mr-1" />
+            {isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
   const TransferForm = () => {
     const { register, handleSubmit, setValue, watch } = useForm<{ fromBankId: string; toBankId: string; amount: string; description: string }>();
     const fromBank = watch("fromBankId");
@@ -975,17 +1191,31 @@ export default function Daybook() {
                               </TableCell>
                               {isAdmin && (
                                 <TableCell>
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost" 
-                                    className="h-7 w-7 text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                    }}
-                                    data-testid={`button-delete-income-${entry.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                      onClick={() => {
+                                        setEditingEntry(entry);
+                                        setIsEditDialogOpen(true);
+                                      }}
+                                      data-testid={`button-edit-income-${entry.id}`}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                      }}
+                                      data-testid={`button-delete-income-${entry.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               )}
                             </TableRow>
@@ -1049,17 +1279,31 @@ export default function Daybook() {
                               </TableCell>
                               {isAdmin && (
                                 <TableCell>
-                                  <Button 
-                                    size="icon" 
-                                    variant="ghost" 
-                                    className="h-7 w-7 text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                    }}
-                                    data-testid={`button-delete-expense-${entry.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                      onClick={() => {
+                                        setEditingEntry(entry);
+                                        setIsEditDialogOpen(true);
+                                      }}
+                                      data-testid={`button-edit-expense-${entry.id}`}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button 
+                                      size="icon" 
+                                      variant="ghost" 
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                      }}
+                                      data-testid={`button-delete-expense-${entry.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </TableCell>
                               )}
                             </TableRow>
@@ -1476,6 +1720,35 @@ export default function Daybook() {
             <DialogTitle className="text-lg font-serif text-red-700">Add Expense</DialogTitle>
           </DialogHeader>
           <SimpleTransactionForm type="expense" onClose={() => setIsExpenseDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+        setIsEditDialogOpen(open);
+        if (!open) setEditingEntry(null);
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className={`text-lg font-serif ${editingEntry?.type === 'income' ? 'text-green-700' : 'text-red-700'}`}>
+              Edit {editingEntry?.type === 'income' ? 'Income' : 'Expense'}
+            </DialogTitle>
+          </DialogHeader>
+          {editingEntry && (
+            <EditEntryForm 
+              entry={editingEntry} 
+              banks={banks}
+              events={events}
+              categories={editingEntry.type === 'income' ? incomeCategories : expenseCategories}
+              onSubmit={(data) => {
+                updateEntryMutation.mutate({ id: editingEntry.id, data });
+              }}
+              onCancel={() => {
+                setEditingEntry(null);
+                setIsEditDialogOpen(false);
+              }}
+              isPending={updateEntryMutation.isPending}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
