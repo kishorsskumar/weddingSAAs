@@ -1,13 +1,45 @@
 import { useMemo } from "react";
+import { Link } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, DollarSign, Users, TrendingUp } from "lucide-react";
+import { 
+  Calendar, 
+  DollarSign, 
+  Users, 
+  TrendingUp,
+  LayoutDashboard,
+  Database,
+  CheckSquare,
+  BookOpen,
+  Receipt,
+  Target,
+  Briefcase,
+  Shield
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Event } from "@/lib/types";
 
+const ALL_PAGES = [
+  { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard, description: "Overview & stats" },
+  { id: "event-calendar", label: "Oak Event Calendar", path: "/events", icon: Calendar, description: "Manage events" },
+  { id: "team-calendar", label: "Oak Team Calendar", path: "/team", icon: Users, description: "Team scheduling" },
+  { id: "event-database", label: "Oak Event Database", path: "/database", icon: Database, description: "Event records" },
+  { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
+  { id: "daybook", label: "Oak Daybook", path: "/daybook", icon: BookOpen, description: "Daily finances" },
+  { id: "oak-book", label: "Oak Book", path: "/oak-book", icon: Receipt, description: "Invoices & estimates" },
+  { id: "oak-sales", label: "Oak Sales", path: "/oak-sales", icon: Target, description: "CRM & pipeline" },
+  { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
+  { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
+];
+
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, allowedPages } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
+  
+  const accessiblePages = isSuperAdmin 
+    ? ALL_PAGES.filter(p => p.id !== 'dashboard')
+    : ALL_PAGES.filter(p => allowedPages.includes(p.id) && p.id !== 'dashboard');
   const isWeddingPlanner = user?.role === 'wedding_planner' || user?.role === 'employee';
 
   const { data: allEvents = [] } = useQuery<Event[]>({
@@ -96,6 +128,34 @@ export default function Dashboard() {
             <p className="text-[10px] sm:text-xs text-muted-foreground">+2.5% from target</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quick Access Section */}
+      <div>
+        <h2 className="text-lg sm:text-xl font-serif font-semibold text-primary mb-4">Quick Access</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {accessiblePages.map((page) => {
+            const Icon = page.icon;
+            return (
+              <Link key={page.id} href={page.path}>
+                <Card 
+                  className="cursor-pointer hover:shadow-lg transition-all hover:border-primary/50 hover:-translate-y-1 group"
+                  data-testid={`quick-access-${page.id}`}
+                >
+                  <CardContent className="p-4 sm:p-5 flex flex-col items-center text-center gap-2 sm:gap-3">
+                    <div className="p-2 sm:p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-xs sm:text-sm">{page.label}</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 hidden sm:block">{page.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:gap-8 grid-cols-1 md:grid-cols-2">

@@ -59,6 +59,7 @@ export async function registerRoutes(
     'event-milestones',
     'daybook',
     'oak-book',
+    'oak-sales',
     'hr',
     'admin',
   ];

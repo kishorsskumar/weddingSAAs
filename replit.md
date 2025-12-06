@@ -8,6 +8,14 @@ Oak Event Management is a comprehensive full-stack web application designed for 
 
 Preferred communication style: Simple, everyday language.
 
+**Important Development Rules:**
+- When creating new pages, ALWAYS add them to:
+  1. `client/src/components/layout.tsx` - ALL_PAGES array and ICONS object for sidebar navigation
+  2. `client/src/pages/dashboard.tsx` - ALL_PAGES array for Quick Access section on Superadmin dashboard
+  3. `client/src/App.tsx` - Route definition
+  4. `server/routes.ts` - ALL_PAGES array for permission system
+- Superadmin dashboard must always display Quick Access cards for ALL available pages
+
 ## System Architecture
 
 ### Frontend Architecture
