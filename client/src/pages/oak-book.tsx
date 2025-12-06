@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -613,10 +614,10 @@ export default function OakBook() {
   const renderSidebar = () => (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground">
       <div className="p-4 border-b border-sidebar-border">
-        <a href="/" className="flex items-center gap-2 text-sidebar-foreground/80 hover:text-primary transition-colors mb-3">
+        <Link href="/" className="flex items-center gap-2 text-sidebar-foreground/80 hover:text-primary transition-colors mb-3">
           <LayoutDashboard className="h-4 w-4" />
           <span className="text-sm font-medium">Dashboard</span>
-        </a>
+        </Link>
         <h2 className="text-lg font-serif font-semibold text-primary">Oak Book</h2>
         <p className="text-xs text-sidebar-foreground/60">Accounting & Invoicing</p>
       </div>
