@@ -619,6 +619,19 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/daybook-categories/:id', async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: 'Name is required' });
+      }
+      const category = await storage.updateDaybookCategory(req.params.id, { name });
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update category' });
+    }
+  });
+
   app.delete('/api/daybook-categories/:id', async (req, res) => {
     await storage.deleteDaybookCategory(req.params.id);
     res.json({ success: true });

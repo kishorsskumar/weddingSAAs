@@ -163,6 +163,7 @@ export interface IStorage {
   getDaybookCategoriesByType(type: string): Promise<DaybookCategory[]>;
   getAllDaybookCategories(): Promise<DaybookCategory[]>;
   createDaybookCategory(category: InsertDaybookCategory): Promise<DaybookCategory>;
+  updateDaybookCategory(id: string, category: Partial<InsertDaybookCategory>): Promise<DaybookCategory | undefined>;
   deleteDaybookCategory(id: string): Promise<void>;
   
   // Banks
@@ -583,6 +584,11 @@ export class DatabaseStorage implements IStorage {
   async createDaybookCategory(insertCategory: InsertDaybookCategory): Promise<DaybookCategory> {
     const [category] = await db.insert(daybookCategories).values(insertCategory).returning();
     return category;
+  }
+
+  async updateDaybookCategory(id: string, updateData: Partial<InsertDaybookCategory>): Promise<DaybookCategory | undefined> {
+    const [category] = await db.update(daybookCategories).set(updateData).where(eq(daybookCategories.id, id)).returning();
+    return category || undefined;
   }
 
   async deleteDaybookCategory(id: string): Promise<void> {

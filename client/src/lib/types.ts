@@ -72,6 +72,7 @@ export interface Vendor {
 export interface Bank {
   id: string;
   name: string;
+  openingBalance: string;
   balance: string;
   createdAt?: string;
 }

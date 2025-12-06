@@ -97,6 +97,7 @@ export const daybookCategories = pgTable("daybook_categories", {
 export const banks = pgTable("banks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).notNull().default('0'),
   balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default('0'),
   createdAt: timestamp("created_at").defaultNow(),
 });

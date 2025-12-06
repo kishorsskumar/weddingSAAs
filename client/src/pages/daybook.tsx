@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags } from "lucide-react";
 import { format, addDays, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -21,13 +23,16 @@ export default function Daybook() {
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const [isBankDialogOpen, setIsBankDialogOpen] = useState(false);
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [editingCategory, setEditingCategory] = useState<DaybookCategory | null>(null);
   const [periodType, setPeriodType] = useState<"day" | "month" | "year" | "custom">("month");
   const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -154,7 +159,7 @@ export default function Daybook() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: { name: string; balance: string }) => {
+    mutationFn: async (data: { name: string; openingBalance: string; balance: string }) => {
       const res = await fetch('/api/banks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -237,6 +242,34 @@ export default function Daybook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook-categories'] });
+      setIsCategoryDialogOpen(false);
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name: string } }) => {
+      const res = await fetch(`/api/daybook-categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update category');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-categories'] });
+      setEditingCategory(null);
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/daybook-categories/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete category');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook-categories'] });
     },
   });
 
@@ -259,14 +292,32 @@ export default function Daybook() {
   const expenseCategories = categories.filter(c => c.type === 'expense');
 
   const SimpleTransactionForm = ({ type, onClose }: { type: 'income' | 'expense'; onClose: () => void }) => {
-    const { register, handleSubmit, setValue, reset } = useForm<any>({
+    const { register, handleSubmit, setValue, reset, watch } = useForm<any>({
       defaultValues: {
         type,
         date: formattedDate,
       }
     });
     
+    const [eventSearchOpen, setEventSearchOpen] = useState(false);
+    const [eventSearch, setEventSearch] = useState("");
+    const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+    const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
+    const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+    const [showNewVendor, setShowNewVendor] = useState(false);
+    const [newVendorName, setNewVendorName] = useState("");
+    const [newVendorAddress, setNewVendorAddress] = useState("");
+    const [newVendorCategory, setNewVendorCategory] = useState("");
+    const [newVendorContact, setNewVendorContact] = useState("");
+    const [showNewCategory, setShowNewCategory] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
+    
     const typeCategories = type === 'income' ? incomeCategories : expenseCategories;
+    
+    const filteredEvents = events.filter(e => 
+      e.title.toLowerCase().includes(eventSearch.toLowerCase()) ||
+      e.customer?.toLowerCase().includes(eventSearch.toLowerCase())
+    );
     
     const onSubmit = (data: any) => {
       const submitData = {
@@ -285,7 +336,44 @@ export default function Daybook() {
             category: '',
             description: '',
           });
+          setSelectedEvent(null);
+          setSelectedVendor(null);
           queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+        }
+      });
+    };
+
+    const handleCreateVendor = () => {
+      if (!newVendorName.trim()) return;
+      createVendorMutation.mutate({
+        name: newVendorName,
+        billingAddress: newVendorAddress,
+        category: newVendorCategory,
+        phone: newVendorContact,
+      }, {
+        onSuccess: (newVendor) => {
+          setSelectedVendor(newVendor);
+          setValue("vendorId", newVendor.id);
+          setValue("vendorName", newVendor.name);
+          setShowNewVendor(false);
+          setNewVendorName("");
+          setNewVendorAddress("");
+          setNewVendorCategory("");
+          setNewVendorContact("");
+        }
+      });
+    };
+
+    const handleCreateCategory = () => {
+      if (!newCategoryName.trim()) return;
+      createCategoryMutation.mutate({
+        name: newCategoryName,
+        type: type,
+      }, {
+        onSuccess: (newCat) => {
+          setValue("category", newCat.name);
+          setShowNewCategory(false);
+          setNewCategoryName("");
         }
       });
     };
@@ -332,40 +420,126 @@ export default function Daybook() {
         </div>
 
         <div className="space-y-2">
-          <Label>Category *</Label>
-          <Select onValueChange={(v) => setValue("category", v)} required>
-            <SelectTrigger data-testid="select-category">
-              <SelectValue placeholder="Select a category..." />
-            </SelectTrigger>
-            <SelectContent>
-              {typeCategories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center justify-between">
+            <Label>Category *</Label>
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="h-6 text-xs"
+              onClick={() => setShowNewCategory(!showNewCategory)}
+            >
+              <Plus className="h-3 w-3 mr-1" /> New
+            </Button>
+          </div>
+          {showNewCategory ? (
+            <div className="flex gap-2">
+              <Input
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                placeholder="Category name..."
+                className="flex-1"
+              />
+              <Button 
+                type="button" 
+                size="sm" 
+                onClick={handleCreateCategory}
+                disabled={createCategoryMutation.isPending}
+              >
+                Add
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setShowNewCategory(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Select onValueChange={(v) => setValue("category", v)} required>
+              <SelectTrigger data-testid="select-category">
+                <SelectValue placeholder="Select a category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {typeCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         <div className="space-y-2">
           <Label>Link to Event (Optional - Updates Event P&L)</Label>
-          <Select onValueChange={(v) => {
-            const event = events.find(e => e.id === v);
-            if (event) {
-              setValue("eventId", event.id);
-              setValue("eventName", event.title);
-            }
-          }}>
-            <SelectTrigger data-testid="select-event">
-              <SelectValue placeholder="Select an event..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No event</SelectItem>
-              {events.map((event) => (
-                <SelectItem key={event.id} value={event.id}>
-                  {event.title} ({format(parseISO(event.date), "dd MMM yyyy")})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={eventSearchOpen} onOpenChange={setEventSearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={eventSearchOpen}
+                className="w-full justify-between font-normal"
+                data-testid="select-event"
+              >
+                {selectedEvent ? (
+                  <span>{selectedEvent.title} ({format(parseISO(selectedEvent.date), "dd MMM yyyy")})</span>
+                ) : (
+                  <span className="text-muted-foreground">Search events...</span>
+                )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search events..." 
+                  value={eventSearch}
+                  onValueChange={setEventSearch}
+                />
+                <CommandList>
+                  <CommandEmpty>No events found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => {
+                        setSelectedEvent(null);
+                        setValue("eventId", undefined);
+                        setValue("eventName", undefined);
+                        setEventSearchOpen(false);
+                      }}
+                    >
+                      <span className="text-muted-foreground">No event</span>
+                    </CommandItem>
+                    {filteredEvents.map((event) => (
+                      <CommandItem
+                        key={event.id}
+                        value={event.title}
+                        onSelect={() => {
+                          setSelectedEvent(event);
+                          setValue("eventId", event.id);
+                          setValue("eventName", event.title);
+                          setEventSearchOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedEvent?.id === event.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col">
+                          <span>{event.title}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(parseISO(event.date), "dd MMM yyyy")} • {event.customer}
+                          </span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <p className="text-xs text-muted-foreground">
             {type === 'income' 
               ? "Linking to an event will add this amount to event's Payment Received"
@@ -376,26 +550,103 @@ export default function Daybook() {
 
         {type === 'expense' && (
           <div className="space-y-2">
-            <Label>Vendor (Optional)</Label>
-            <Select onValueChange={(v) => {
-              const vendor = vendors.find(vn => vn.id === v);
-              if (vendor) {
-                setValue("vendorId", vendor.id);
-                setValue("vendorName", vendor.name);
-              }
-            }}>
-              <SelectTrigger data-testid="select-vendor">
-                <SelectValue placeholder="Select a vendor..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No vendor</SelectItem>
-                {vendors.map((vendor) => (
-                  <SelectItem key={vendor.id} value={vendor.id}>
-                    {vendor.name} {vendor.category && `(${vendor.category})`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between">
+              <Label>Vendor (Optional)</Label>
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 text-xs"
+                onClick={() => setShowNewVendor(!showNewVendor)}
+              >
+                <Plus className="h-3 w-3 mr-1" /> New Vendor
+              </Button>
+            </div>
+            
+            {showNewVendor ? (
+              <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                <div className="space-y-2">
+                  <Label className="text-xs">Vendor Name *</Label>
+                  <Input
+                    value={newVendorName}
+                    onChange={(e) => setNewVendorName(e.target.value)}
+                    placeholder="Vendor name..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Address</Label>
+                  <Input
+                    value={newVendorAddress}
+                    onChange={(e) => setNewVendorAddress(e.target.value)}
+                    placeholder="Address..."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Category</Label>
+                    <Input
+                      value={newVendorCategory}
+                      onChange={(e) => setNewVendorCategory(e.target.value)}
+                      placeholder="e.g. Catering"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Contact</Label>
+                    <Input
+                      value={newVendorContact}
+                      onChange={(e) => setNewVendorContact(e.target.value)}
+                      placeholder="Phone/Email"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    onClick={handleCreateVendor}
+                    disabled={createVendorMutation.isPending || !newVendorName.trim()}
+                    className="flex-1"
+                  >
+                    {createVendorMutation.isPending ? 'Creating...' : 'Create Vendor'}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowNewVendor(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Select onValueChange={(v) => {
+                if (v === "none") {
+                  setSelectedVendor(null);
+                  setValue("vendorId", undefined);
+                  setValue("vendorName", undefined);
+                } else {
+                  const vendor = vendors.find(vn => vn.id === v);
+                  if (vendor) {
+                    setSelectedVendor(vendor);
+                    setValue("vendorId", vendor.id);
+                    setValue("vendorName", vendor.name);
+                  }
+                }
+              }}>
+                <SelectTrigger data-testid="select-vendor">
+                  <SelectValue placeholder="Select a vendor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No vendor</SelectItem>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name} {vendor.category && `(${vendor.category})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
 
@@ -431,10 +682,14 @@ export default function Daybook() {
   };
 
   const AddBankForm = () => {
-    const { register, handleSubmit } = useForm<{ name: string; balance: string }>();
+    const { register, handleSubmit } = useForm<{ name: string; openingBalance: string }>();
     
     const onSubmit = (data: any) => {
-      createBankMutation.mutate(data);
+      createBankMutation.mutate({
+        name: data.name,
+        openingBalance: data.openingBalance || '0',
+        balance: data.openingBalance || '0',
+      });
     };
 
     return (
@@ -445,7 +700,8 @@ export default function Daybook() {
         </div>
         <div className="space-y-2">
           <Label>Opening Balance</Label>
-          <Input type="number" step="0.01" {...register("balance")} required placeholder="0" />
+          <Input type="number" step="0.01" {...register("openingBalance")} required placeholder="0" />
+          <p className="text-xs text-muted-foreground">Initial balance when adding this bank account</p>
         </div>
         <Button type="submit" className="w-full" disabled={createBankMutation.isPending}>
           {createBankMutation.isPending ? 'Adding...' : 'Add Bank'}
@@ -455,12 +711,23 @@ export default function Daybook() {
   };
 
   const EditBankForm = ({ bank, onClose }: { bank: Bank; onClose: () => void }) => {
-    const { register, handleSubmit } = useForm<{ name: string; balance: string }>({
-      defaultValues: { name: bank.name, balance: bank.balance }
+    const { register, handleSubmit } = useForm<{ name: string; openingBalance: string }>({
+      defaultValues: { 
+        name: bank.name, 
+        openingBalance: (bank as any).openingBalance || bank.balance 
+      }
     });
     
     const onSubmit = (data: any) => {
-      updateBankMutation.mutate({ id: bank.id, data });
+      const updateData: any = { name: data.name };
+      if (isSuperAdmin && data.openingBalance) {
+        const oldOpening = parseFloat((bank as any).openingBalance || bank.balance);
+        const newOpening = parseFloat(data.openingBalance);
+        const difference = newOpening - oldOpening;
+        updateData.openingBalance = data.openingBalance;
+        updateData.balance = (parseFloat(bank.balance) + difference).toFixed(2);
+      }
+      updateBankMutation.mutate({ id: bank.id, data: updateData });
     };
 
     return (
@@ -469,9 +736,18 @@ export default function Daybook() {
           <Label>Bank Name</Label>
           <Input {...register("name")} required />
         </div>
-        <div className="space-y-2">
-          <Label>Balance</Label>
-          <Input type="number" step="0.01" {...register("balance")} required />
+        {isSuperAdmin && (
+          <div className="space-y-2">
+            <Label>Opening Balance</Label>
+            <Input type="number" step="0.01" {...register("openingBalance")} required />
+            <p className="text-xs text-muted-foreground">Only superadmin can edit opening balance</p>
+          </div>
+        )}
+        <div className="p-3 bg-muted rounded-md">
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Current Balance</span>
+            <span className="font-mono font-bold">₹{Number(bank.balance).toLocaleString()}</span>
+          </div>
         </div>
         <Button type="submit" className="w-full" disabled={updateBankMutation.isPending}>
           {updateBankMutation.isPending ? 'Saving...' : 'Save Changes'}
@@ -536,6 +812,74 @@ export default function Daybook() {
     );
   };
 
+  const AddCategoryForm = () => {
+    const [name, setName] = useState("");
+    const [type, setType] = useState<string>("income");
+    
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!name.trim()) return;
+      createCategoryMutation.mutate({ name: name.trim(), type });
+      setName("");
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label>Category Name</Label>
+          <Input 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required 
+            placeholder="e.g. Event Booking" 
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Category Type</Label>
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="income">Income</SelectItem>
+              <SelectItem value="expense">Expense</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button type="submit" className="w-full" disabled={createCategoryMutation.isPending}>
+          {createCategoryMutation.isPending ? 'Adding...' : 'Add Category'}
+        </Button>
+      </form>
+    );
+  };
+
+  const EditCategoryInline = ({ category, onClose }: { category: DaybookCategory; onClose: () => void }) => {
+    const [name, setName] = useState(category.name);
+    
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!name.trim()) return;
+      updateCategoryMutation.mutate({ id: category.id, data: { name: name.trim() } });
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 w-full">
+        <Input 
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="h-8 text-sm flex-1"
+          autoFocus
+        />
+        <Button type="submit" size="sm" className="h-8" disabled={updateCategoryMutation.isPending}>
+          Save
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="h-8" onClick={onClose}>
+          Cancel
+        </Button>
+      </form>
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -577,10 +921,11 @@ export default function Daybook() {
       </div>
 
       <Tabs defaultValue="daily" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+        <TabsList className="grid w-full grid-cols-4 max-w-lg">
           <TabsTrigger value="daily" className="text-xs sm:text-sm">Daily View</TabsTrigger>
-          <TabsTrigger value="summary" className="text-xs sm:text-sm">Period Summary</TabsTrigger>
+          <TabsTrigger value="summary" className="text-xs sm:text-sm">Summary</TabsTrigger>
           <TabsTrigger value="banks" className="text-xs sm:text-sm">Banks</TabsTrigger>
+          <TabsTrigger value="categories" className="text-xs sm:text-sm">Categories</TabsTrigger>
         </TabsList>
 
         <TabsContent value="daily" className="space-y-4 mt-4">
@@ -976,6 +1321,141 @@ export default function Daybook() {
                   <span className="text-2xl font-bold font-mono text-primary">₹{totalBankBalance.toLocaleString()}</span>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between p-4 sm:p-6">
+              <div className="flex items-center gap-2">
+                <Tags className="h-5 w-5 text-primary" />
+                <CardTitle className="font-serif text-lg">Daybook Categories</CardTitle>
+              </div>
+              {isAdmin && (
+                <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="gap-1 h-8" data-testid="button-add-category">
+                      <Plus className="h-3 w-3" /> Add Category
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add New Category</DialogTitle>
+                    </DialogHeader>
+                    <AddCategoryForm />
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-3">
+                  <h3 className="font-medium text-green-700 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    Income Categories
+                  </h3>
+                  <div className="space-y-2">
+                    {incomeCategories.map((cat) => (
+                      <div key={cat.id} className="flex items-center justify-between p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
+                        {editingCategory?.id === cat.id ? (
+                          <EditCategoryInline 
+                            category={cat} 
+                            onClose={() => setEditingCategory(null)} 
+                          />
+                        ) : (
+                          <>
+                            <span className="text-sm">{cat.name}</span>
+                            {isAdmin && !cat.isSystem && (
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7"
+                                  onClick={() => setEditingCategory(cat)}
+                                  data-testid={`button-edit-category-${cat.id}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
+                                  }}
+                                  data-testid={`button-delete-category-${cat.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                            {cat.isSystem && (
+                              <span className="text-xs text-muted-foreground">System</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    {incomeCategories.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No income categories</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <h3 className="font-medium text-red-700 flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4" />
+                    Expense Categories
+                  </h3>
+                  <div className="space-y-2">
+                    {expenseCategories.map((cat) => (
+                      <div key={cat.id} className="flex items-center justify-between p-3 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+                        {editingCategory?.id === cat.id ? (
+                          <EditCategoryInline 
+                            category={cat} 
+                            onClose={() => setEditingCategory(null)} 
+                          />
+                        ) : (
+                          <>
+                            <span className="text-sm">{cat.name}</span>
+                            {isAdmin && !cat.isSystem && (
+                              <div className="flex gap-1">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7"
+                                  onClick={() => setEditingCategory(cat)}
+                                  data-testid={`button-edit-category-${cat.id}`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => {
+                                    if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
+                                  }}
+                                  data-testid={`button-delete-category-${cat.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                            {cat.isSystem && (
+                              <span className="text-xs text-muted-foreground">System</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ))}
+                    {expenseCategories.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">No expense categories</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
