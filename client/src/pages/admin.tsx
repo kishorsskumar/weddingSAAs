@@ -59,22 +59,32 @@ export default function Admin() {
   const [editRoleLabel, setEditRoleLabel] = useState('');
   const [editRoleDescription, setEditRoleDescription] = useState('');
 
-  const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
     queryKey: ['/api/users'],
     queryFn: async () => {
-      const res = await fetch('/api/users');
+      const res = await fetch('/api/users', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       if (!res.ok) throw new Error('Failed to fetch users');
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
-  const { data: roles = [], isLoading: rolesLoading } = useQuery<Role[]>({
+  const { data: roles = [], isLoading: rolesLoading, error: rolesError } = useQuery<Role[]>({
     queryKey: ['/api/roles'],
     queryFn: async () => {
-      const res = await fetch('/api/roles');
+      const res = await fetch('/api/roles', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
       if (!res.ok) throw new Error('Failed to fetch roles');
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
