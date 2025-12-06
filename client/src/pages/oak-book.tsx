@@ -1845,28 +1845,28 @@ export default function OakBook() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="hidden lg:block w-64 border-r flex-shrink-0">
-        {renderSidebar()}
-      </div>
-
-      <div className="lg:hidden fixed top-16 left-0 z-40">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden">
+      <div className="md:hidden flex items-center justify-between p-3 border-b bg-card">
         <Button
-          variant="ghost"
-          size="icon"
-          className="m-2"
-          onClick={() => setMobileMenuOpen(true)}
+          variant="outline"
+          size="sm"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           data-testid="btn-mobile-menu"
+          className="flex items-center gap-2"
         >
-          <Menu className="h-6 w-6" />
+          <Menu className="h-4 w-4" />
+          <span>Menu</span>
         </Button>
+        <span className="text-sm font-medium text-muted-foreground capitalize">
+          {activeSection.replace("-", " ")}
+        </span>
       </div>
 
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-          <div className="fixed inset-y-0 left-0 w-72 bg-background shadow-lg">
+        <div className="md:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
+          <div className="fixed inset-y-0 left-0 w-72 bg-background shadow-lg border-r" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
-              <span className="font-semibold">Menu</span>
+              <span className="font-semibold">Oak Book</span>
               <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(false)}>
                 <X className="h-5 w-5" />
               </Button>
@@ -1875,6 +1875,10 @@ export default function OakBook() {
           </div>
         </div>
       )}
+
+      <div className="hidden md:block w-64 border-r flex-shrink-0 bg-card">
+        {renderSidebar()}
+      </div>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {renderContent()}
