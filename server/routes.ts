@@ -161,26 +161,48 @@ export async function registerRoutes(
   // Users
   app.get('/api/users', async (req, res) => {
     try {
+      console.log('[/api/users] Starting request...');
       const auth = await verifyAdminAccess(req, res);
-      if (!auth) return;
+      if (!auth) {
+        console.log('[/api/users] Auth failed');
+        return;
+      }
+      console.log('[/api/users] Auth successful for:', auth.user.email);
 
-      const users = await storage.getAllUsers();
+      console.log('[/api/users] Fetching all users...');
+      let users;
+      try {
+        users = await storage.getAllUsers();
+      } catch (dbError: any) {
+        console.error('[/api/users] Database error in getAllUsers:', dbError?.message);
+        return res.status(500).json({ error: 'Database error fetching users', details: dbError?.message });
+      }
       console.log(`[/api/users] Found ${users.length} users`);
       
       const usersWithPermissions = await Promise.all(
         users.map(async (user) => {
-          const permissions = await storage.getUserPermissions(user.id);
-          return {
-            ...user,
-            password: undefined,
-            allowedPages: permissions.map(p => p.pageId),
-          };
+          try {
+            const permissions = await storage.getUserPermissions(user.id);
+            return {
+              ...user,
+              password: undefined,
+              allowedPages: permissions.map(p => p.pageId),
+            };
+          } catch (permError: any) {
+            console.error(`[/api/users] Error fetching permissions for user ${user.id}:`, permError?.message);
+            return {
+              ...user,
+              password: undefined,
+              allowedPages: [],
+            };
+          }
         })
       );
       res.json(usersWithPermissions);
-    } catch (error) {
-      console.error('[/api/users] Error:', error);
-      res.status(500).json({ error: 'Failed to fetch users' });
+    } catch (error: any) {
+      console.error('[/api/users] Unexpected error:', error?.message || error);
+      console.error('[/api/users] Stack:', error?.stack);
+      res.status(500).json({ error: 'Failed to fetch users', details: error?.message });
     }
   });
 

@@ -371,7 +371,11 @@ export default function Admin() {
                 <div className="text-center py-8 text-muted-foreground">Loading users...</div>
               ) : usersError ? (
                 <div className="text-center py-8 text-destructive text-sm">
-                  Error loading users: {(usersError as Error).message}
+                  <p>Error loading users: {(usersError as any).message || 'Unknown error'}</p>
+                  {(usersError as any).details && (
+                    <p className="mt-1 text-xs">Details: {(usersError as any).details}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted-foreground">Please try refreshing the page. If the problem persists, contact support.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
