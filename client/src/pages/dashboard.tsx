@@ -13,6 +13,7 @@ import {
   BookOpen,
   Receipt,
   Target,
+  Package,
   Briefcase,
   Shield
 } from "lucide-react";
@@ -28,6 +29,7 @@ const ALL_PAGES = [
   { id: "daybook", label: "Oak Daybook", path: "/daybook", icon: BookOpen, description: "Daily finances" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book", icon: Receipt, description: "Invoices & estimates" },
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales", icon: Target, description: "CRM & pipeline" },
+  { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory", icon: Package, description: "Inventory & rentals" },
   { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];

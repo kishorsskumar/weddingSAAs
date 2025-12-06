@@ -101,6 +101,7 @@ export async function registerRoutes(
     'daybook',
     'oak-book',
     'oak-sales',
+    'oak-inventory',
     'hr',
     'admin',
   ];
@@ -2100,6 +2101,415 @@ export async function registerRoutes(
 
   app.delete('/api/sales/automations/:id', async (req, res) => {
     await storage.deleteSalesAutomation(req.params.id);
+    res.json({ success: true });
+  });
+
+  // =====================
+  // OAK INVENTORY ROUTES
+  // =====================
+
+  // Inventory Items
+  app.get('/api/inventory/items', async (req, res) => {
+    try {
+      const items = await storage.getAllInventoryItems();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch inventory items' });
+    }
+  });
+
+  app.get('/api/inventory/items/:id', async (req, res) => {
+    const item = await storage.getInventoryItem(req.params.id);
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    res.json(item);
+  });
+
+  app.post('/api/inventory/items', async (req, res) => {
+    try {
+      const item = await storage.createInventoryItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create inventory item' });
+    }
+  });
+
+  app.patch('/api/inventory/items/:id', async (req, res) => {
+    try {
+      const item = await storage.updateInventoryItem(req.params.id, req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update inventory item' });
+    }
+  });
+
+  app.delete('/api/inventory/items/:id', async (req, res) => {
+    await storage.deleteInventoryItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Inventory Transactions
+  app.get('/api/inventory/transactions', async (req, res) => {
+    const { itemId } = req.query;
+    if (itemId) {
+      const transactions = await storage.getInventoryTransactionsByItemId(itemId as string);
+      res.json(transactions);
+    } else {
+      res.status(400).json({ error: 'itemId is required' });
+    }
+  });
+
+  app.post('/api/inventory/transactions', async (req, res) => {
+    try {
+      const transaction = await storage.createInventoryTransaction(req.body);
+      res.json(transaction);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create transaction' });
+    }
+  });
+
+  // Event Inventory Sessions
+  app.get('/api/inventory/sessions', async (req, res) => {
+    const { eventId } = req.query;
+    if (eventId) {
+      const sessions = await storage.getEventInventorySessionsByEventId(eventId as string);
+      res.json(sessions);
+    } else {
+      const sessions = await storage.getAllEventInventorySessions();
+      res.json(sessions);
+    }
+  });
+
+  app.get('/api/inventory/sessions/:id', async (req, res) => {
+    const session = await storage.getEventInventorySession(req.params.id);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    res.json(session);
+  });
+
+  app.post('/api/inventory/sessions', async (req, res) => {
+    try {
+      const session = await storage.createEventInventorySession(req.body);
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create session' });
+    }
+  });
+
+  app.patch('/api/inventory/sessions/:id', async (req, res) => {
+    try {
+      const session = await storage.updateEventInventorySession(req.params.id, req.body);
+      res.json(session);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update session' });
+    }
+  });
+
+  app.delete('/api/inventory/sessions/:id', async (req, res) => {
+    await storage.deleteEventInventorySession(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Event Inventory Items (items within a session)
+  app.get('/api/inventory/session-items', async (req, res) => {
+    const { sessionId } = req.query;
+    if (sessionId) {
+      const items = await storage.getEventInventoryItemsBySessionId(sessionId as string);
+      res.json(items);
+    } else {
+      res.json([]);
+    }
+  });
+
+  app.post('/api/inventory/session-items', async (req, res) => {
+    try {
+      const item = await storage.createEventInventoryItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create session item' });
+    }
+  });
+
+  app.patch('/api/inventory/session-items/:id', async (req, res) => {
+    try {
+      const item = await storage.updateEventInventoryItem(req.params.id, req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update session item' });
+    }
+  });
+
+  app.delete('/api/inventory/session-items/:id', async (req, res) => {
+    await storage.deleteEventInventoryItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Rental Records
+  app.get('/api/inventory/rentals', async (req, res) => {
+    const { eventId } = req.query;
+    if (eventId) {
+      const rentals = await storage.getRentalRecordsByEventId(eventId as string);
+      res.json(rentals);
+    } else {
+      const rentals = await storage.getAllRentalRecords();
+      res.json(rentals);
+    }
+  });
+
+  app.get('/api/inventory/rentals/:id', async (req, res) => {
+    const rental = await storage.getRentalRecord(req.params.id);
+    if (!rental) return res.status(404).json({ error: 'Rental not found' });
+    res.json(rental);
+  });
+
+  app.post('/api/inventory/rentals', async (req, res) => {
+    try {
+      const rental = await storage.createRentalRecord(req.body);
+      res.json(rental);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create rental' });
+    }
+  });
+
+  app.patch('/api/inventory/rentals/:id', async (req, res) => {
+    try {
+      const rental = await storage.updateRentalRecord(req.params.id, req.body);
+      res.json(rental);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update rental' });
+    }
+  });
+
+  app.delete('/api/inventory/rentals/:id', async (req, res) => {
+    await storage.deleteRentalRecord(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Rental Items
+  app.get('/api/inventory/rental-items', async (req, res) => {
+    const { rentalId } = req.query;
+    if (rentalId) {
+      const items = await storage.getRentalItemsByRentalId(rentalId as string);
+      res.json(items);
+    } else {
+      res.json([]);
+    }
+  });
+
+  app.post('/api/inventory/rental-items', async (req, res) => {
+    try {
+      const item = await storage.createRentalItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create rental item' });
+    }
+  });
+
+  app.patch('/api/inventory/rental-items/:id', async (req, res) => {
+    try {
+      const item = await storage.updateRentalItem(req.params.id, req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update rental item' });
+    }
+  });
+
+  app.delete('/api/inventory/rental-items/:id', async (req, res) => {
+    await storage.deleteRentalItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Inventory Templates
+  app.get('/api/inventory/templates', async (req, res) => {
+    const templates = await storage.getAllInventoryTemplates();
+    res.json(templates);
+  });
+
+  app.get('/api/inventory/templates/:id', async (req, res) => {
+    const template = await storage.getInventoryTemplate(req.params.id);
+    if (!template) return res.status(404).json({ error: 'Template not found' });
+    res.json(template);
+  });
+
+  app.post('/api/inventory/templates', async (req, res) => {
+    try {
+      const template = await storage.createInventoryTemplate(req.body);
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create template' });
+    }
+  });
+
+  app.patch('/api/inventory/templates/:id', async (req, res) => {
+    try {
+      const template = await storage.updateInventoryTemplate(req.params.id, req.body);
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update template' });
+    }
+  });
+
+  app.delete('/api/inventory/templates/:id', async (req, res) => {
+    await storage.deleteInventoryTemplate(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Inventory Template Items
+  app.get('/api/inventory/template-items', async (req, res) => {
+    const { templateId } = req.query;
+    if (templateId) {
+      const items = await storage.getInventoryTemplateItemsByTemplateId(templateId as string);
+      res.json(items);
+    } else {
+      res.json([]);
+    }
+  });
+
+  app.post('/api/inventory/template-items', async (req, res) => {
+    try {
+      const item = await storage.createInventoryTemplateItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create template item' });
+    }
+  });
+
+  app.delete('/api/inventory/template-items/:id', async (req, res) => {
+    await storage.deleteInventoryTemplateItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Purchase Orders
+  app.get('/api/inventory/purchase-orders', async (req, res) => {
+    const orders = await storage.getAllPurchaseOrders();
+    res.json(orders);
+  });
+
+  app.get('/api/inventory/purchase-orders/:id', async (req, res) => {
+    const order = await storage.getPurchaseOrder(req.params.id);
+    if (!order) return res.status(404).json({ error: 'Purchase order not found' });
+    res.json(order);
+  });
+
+  app.post('/api/inventory/purchase-orders', async (req, res) => {
+    try {
+      const poNumber = await storage.getNextPurchaseOrderNumber();
+      const order = await storage.createPurchaseOrder({ ...req.body, poNumber });
+      res.json(order);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create purchase order' });
+    }
+  });
+
+  app.patch('/api/inventory/purchase-orders/:id', async (req, res) => {
+    try {
+      const order = await storage.updatePurchaseOrder(req.params.id, req.body);
+      res.json(order);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update purchase order' });
+    }
+  });
+
+  app.delete('/api/inventory/purchase-orders/:id', async (req, res) => {
+    await storage.deletePurchaseOrder(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Purchase Order Items
+  app.get('/api/inventory/po-items', async (req, res) => {
+    const { poId } = req.query;
+    if (poId) {
+      const items = await storage.getPurchaseOrderItemsByPOId(poId as string);
+      res.json(items);
+    } else {
+      res.json([]);
+    }
+  });
+
+  app.post('/api/inventory/po-items', async (req, res) => {
+    try {
+      const item = await storage.createPurchaseOrderItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create PO item' });
+    }
+  });
+
+  app.delete('/api/inventory/po-items/:id', async (req, res) => {
+    await storage.deletePurchaseOrderItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Production Plans
+  app.get('/api/inventory/production-plans', async (req, res) => {
+    const { eventId } = req.query;
+    if (eventId) {
+      const plans = await storage.getProductionPlansByEventId(eventId as string);
+      res.json(plans);
+    } else {
+      const plans = await storage.getAllProductionPlans();
+      res.json(plans);
+    }
+  });
+
+  app.get('/api/inventory/production-plans/:id', async (req, res) => {
+    const plan = await storage.getProductionPlan(req.params.id);
+    if (!plan) return res.status(404).json({ error: 'Production plan not found' });
+    res.json(plan);
+  });
+
+  app.post('/api/inventory/production-plans', async (req, res) => {
+    try {
+      const plan = await storage.createProductionPlan(req.body);
+      res.json(plan);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create production plan' });
+    }
+  });
+
+  app.patch('/api/inventory/production-plans/:id', async (req, res) => {
+    try {
+      const plan = await storage.updateProductionPlan(req.params.id, req.body);
+      res.json(plan);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update production plan' });
+    }
+  });
+
+  app.delete('/api/inventory/production-plans/:id', async (req, res) => {
+    await storage.deleteProductionPlan(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Production Tasks
+  app.get('/api/inventory/production-tasks', async (req, res) => {
+    const { planId } = req.query;
+    if (planId) {
+      const tasks = await storage.getProductionTasksByPlanId(planId as string);
+      res.json(tasks);
+    } else {
+      res.json([]);
+    }
+  });
+
+  app.post('/api/inventory/production-tasks', async (req, res) => {
+    try {
+      const task = await storage.createProductionTask(req.body);
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create production task' });
+    }
+  });
+
+  app.patch('/api/inventory/production-tasks/:id', async (req, res) => {
+    try {
+      const task = await storage.updateProductionTask(req.params.id, req.body);
+      res.json(task);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update production task' });
+    }
+  });
+
+  app.delete('/api/inventory/production-tasks/:id', async (req, res) => {
+    await storage.deleteProductionTask(req.params.id);
     res.json({ success: true });
   });
 

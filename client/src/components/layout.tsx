@@ -14,7 +14,8 @@ import {
   Briefcase,
   CheckSquare,
   Receipt,
-  Target
+  Target,
+  Package
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,6 +31,7 @@ const ALL_PAGES = [
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales" },
+  { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
@@ -43,11 +45,12 @@ const ICONS: Record<string, any> = {
   daybook: BookOpen,
   "oak-book": Receipt,
   "oak-sales": Target,
+  "oak-inventory": Package,
   hr: Briefcase,
   admin: Shield,
 };
 
-const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales"];
+const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales", "/oak-inventory"];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
