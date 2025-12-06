@@ -78,8 +78,19 @@ export const daybookEntries = pgTable("daybook_entries", {
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   category: text("category").notNull(),
   bankId: varchar("bank_id"),
-  eventName: text("event_name"),
-  vendorName: text("vendor_name"),
+  eventId: varchar("event_id").references(() => events.id), // Links to event for P&L tracking
+  eventName: text("event_name"), // Legacy/display field
+  vendorId: varchar("vendor_id").references(() => vendors.id), // Links to vendor
+  vendorName: text("vendor_name"), // Legacy/display field
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Daybook Categories - Custom categories for income/expense
+export const daybookCategories = pgTable("daybook_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // 'income' | 'expense'
+  isSystem: boolean("is_system").notNull().default(false), // System categories can't be deleted
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -398,6 +409,7 @@ export const insertEventSchema = createInsertSchema(events).omit({ id: true, cre
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
 export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit({ id: true, createdAt: true });
+export const insertDaybookCategorySchema = createInsertSchema(daybookCategories).omit({ id: true, createdAt: true });
 export const insertBankSchema = createInsertSchema(banks).omit({ id: true, createdAt: true });
 export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({ id: true, createdAt: true });
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true });
@@ -605,6 +617,9 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 
 export type DaybookEntry = typeof daybookEntries.$inferSelect;
 export type InsertDaybookEntry = z.infer<typeof insertDaybookEntrySchema>;
+
+export type DaybookCategory = typeof daybookCategories.$inferSelect;
+export type InsertDaybookCategory = z.infer<typeof insertDaybookCategorySchema>;
 
 export type Bank = typeof banks.$inferSelect;
 export type InsertBank = z.infer<typeof insertBankSchema>;

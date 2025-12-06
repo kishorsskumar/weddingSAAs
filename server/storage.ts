@@ -5,7 +5,8 @@ import {
   events, 
   meetings, 
   employees, 
-  daybookEntries, 
+  daybookEntries,
+  daybookCategories,
   banks,
   bankTransfers,
   leaveRequests,
@@ -47,6 +48,8 @@ import {
   type InsertEmployee,
   type DaybookEntry,
   type InsertDaybookEntry,
+  type DaybookCategory,
+  type InsertDaybookCategory,
   type Bank,
   type InsertBank,
   type BankTransfer,
@@ -152,8 +155,15 @@ export interface IStorage {
   getDaybookEntry(id: string): Promise<DaybookEntry | undefined>;
   getDaybookEntriesByDateRange(startDate: string, endDate: string): Promise<DaybookEntry[]>;
   createDaybookEntry(entry: InsertDaybookEntry): Promise<DaybookEntry>;
+  createDaybookEntryWithEventSync(entry: InsertDaybookEntry): Promise<DaybookEntry>;
   updateDaybookEntry(id: string, entry: Partial<InsertDaybookEntry>): Promise<DaybookEntry | undefined>;
   deleteDaybookEntry(id: string): Promise<void>;
+  
+  // Daybook Categories
+  getDaybookCategoriesByType(type: string): Promise<DaybookCategory[]>;
+  getAllDaybookCategories(): Promise<DaybookCategory[]>;
+  createDaybookCategory(category: InsertDaybookCategory): Promise<DaybookCategory>;
+  deleteDaybookCategory(id: string): Promise<void>;
   
   // Banks
   getAllBanks(): Promise<Bank[]>;
@@ -532,6 +542,55 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDaybookEntry(id: string): Promise<void> {
     await db.delete(daybookEntries).where(eq(daybookEntries.id, id));
+  }
+
+  async createDaybookEntryWithEventSync(insertEntry: InsertDaybookEntry): Promise<DaybookEntry> {
+    const [entry] = await db.insert(daybookEntries).values(insertEntry).returning();
+    
+    // If linked to an event, update the event's paymentReceived or cost
+    if (entry.eventId) {
+      const [event] = await db.select().from(events).where(eq(events.id, entry.eventId));
+      if (event) {
+        const amount = parseFloat(entry.amount);
+        if (entry.type === 'income') {
+          // Add to paymentReceived
+          const newPaymentReceived = parseFloat(event.paymentReceived) + amount;
+          await db.update(events).set({ 
+            paymentReceived: newPaymentReceived.toFixed(2) 
+          }).where(eq(events.id, entry.eventId));
+        } else {
+          // Add to cost
+          const newCost = parseFloat(event.cost) + amount;
+          await db.update(events).set({ 
+            cost: newCost.toFixed(2) 
+          }).where(eq(events.id, entry.eventId));
+        }
+      }
+    }
+    
+    return entry;
+  }
+
+  // Daybook Categories
+  async getDaybookCategoriesByType(type: string): Promise<DaybookCategory[]> {
+    return await db.select().from(daybookCategories).where(eq(daybookCategories.type, type));
+  }
+
+  async getAllDaybookCategories(): Promise<DaybookCategory[]> {
+    return await db.select().from(daybookCategories);
+  }
+
+  async createDaybookCategory(insertCategory: InsertDaybookCategory): Promise<DaybookCategory> {
+    const [category] = await db.insert(daybookCategories).values(insertCategory).returning();
+    return category;
+  }
+
+  async deleteDaybookCategory(id: string): Promise<void> {
+    // Only delete non-system categories
+    await db.delete(daybookCategories).where(and(
+      eq(daybookCategories.id, id),
+      eq(daybookCategories.isSystem, false)
+    ));
   }
 
   // Banks
