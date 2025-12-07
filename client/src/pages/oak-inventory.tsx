@@ -2317,6 +2317,242 @@ function RentalsSection({
     toast({ title: 'Rental items downloaded successfully' });
   };
 
+  const handleDownloadRentalPDF = async () => {
+    if (!selectedRental) return;
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const vendorName = getVendorName(selectedRental.vendorId);
+      const eventName = getEventName(selectedRental.eventId);
+      const event = events.find(e => e.id === selectedRental.eventId);
+      const vendor = vendors.find(v => v.id === selectedRental.vendorId);
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+      
+      const loadImage = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      };
+
+      try {
+        const logoUrl = `${window.location.origin}/oak-street-logo.png`;
+        const logoDataUrl = await loadImage(logoUrl);
+        doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
+      } catch (e) {
+        console.log('Rental PDF Logo could not be loaded:', e);
+      }
+      
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      let headerY = 10;
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth - 15, headerY, { align: 'right' });
+        headerY += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      doc.text(`Email: ${COMPANY_DEFAULTS.email}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      if (COMPANY_DEFAULTS.gstNumber) {
+        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth - 15, headerY, { align: 'right' });
+      }
+      
+      y = 32;
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0);
+      doc.text('RENTAL RECORD', pageWidth / 2, y, { align: 'center' });
+      y += 12;
+      
+      doc.setFontSize(10);
+      const leftCol = 15;
+      const rightCol = pageWidth / 2 + 10;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Vendor:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      const vendorText = doc.splitTextToSize(vendorName, 60);
+      doc.text(vendorText, leftCol + 25, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Status:', rightCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(selectedRental.status.replace('_', ' ').toUpperCase(), rightCol + 20, y);
+      y += vendorText.length > 1 ? vendorText.length * 5 : 7;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Event:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      const eventText = doc.splitTextToSize(eventName, 60);
+      doc.text(eventText, leftCol + 25, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Rental Date:', rightCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(format(new Date(selectedRental.rentalDate), 'dd/MM/yyyy'), rightCol + 30, y);
+      y += eventText.length > 1 ? eventText.length * 5 : 7;
+      
+      if (event?.venue) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Venue:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const venueText = doc.splitTextToSize(event.venue, 60);
+        doc.text(venueText, leftCol + 25, y);
+      }
+      
+      if (selectedRental.expectedReturnDate) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Expected Return:', rightCol, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(format(new Date(selectedRental.expectedReturnDate), 'dd/MM/yyyy'), rightCol + 35, y);
+      }
+      y += 7;
+      
+      if (event?.customer) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Customer:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(event.customer, leftCol + 25, y);
+        y += 7;
+      }
+      
+      if (vendor?.billingAddress) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Vendor Address:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const addrText = doc.splitTextToSize(vendor.billingAddress, 140);
+        doc.text(addrText, leftCol + 35, y);
+        y += addrText.length * 5 + 2;
+      }
+      
+      y += 8;
+      
+      doc.setFillColor(253, 246, 227);
+      doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SL', 17, y);
+      doc.text('Item Name', 27, y);
+      doc.text('Qty Issued', 85, y);
+      doc.text('Qty Returned', 110, y);
+      doc.text('Pending', 140, y);
+      doc.text('Unit Rate', 160, y);
+      doc.text('Condition', 185, y);
+      y += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      let totalValue = 0;
+      rentalItemsForSelected.forEach((item, index) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+          doc.setFillColor(253, 246, 227);
+          doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.text('SL', 17, y);
+          doc.text('Item Name', 27, y);
+          doc.text('Qty Issued', 85, y);
+          doc.text('Qty Returned', 110, y);
+          doc.text('Pending', 140, y);
+          doc.text('Unit Rate', 160, y);
+          doc.text('Condition', 185, y);
+          y += 8;
+          doc.setFont('helvetica', 'normal');
+        }
+        
+        const pending = item.quantity - (item.quantityReturned || 0);
+        const rate = parseFloat(item.unitRate || '0');
+        totalValue += rate * item.quantity;
+        
+        doc.text(String(index + 1), 17, y);
+        const itemText = doc.splitTextToSize(item.itemName, 50);
+        doc.text(itemText[0].substring(0, 28), 27, y);
+        doc.text(String(item.quantity), 92, y);
+        doc.text(String(item.quantityReturned || 0), 120, y);
+        doc.text(String(pending), 145, y);
+        doc.text(formatCurrency(item.unitRate || '0'), 160, y);
+        doc.text((item.condition || '-').substring(0, 10), 185, y);
+        
+        y += itemText.length > 1 ? 8 : 6;
+      });
+      
+      y += 5;
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 8;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Items:', pageWidth - 80, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(rentalItemsForSelected.length), pageWidth - 50, y);
+      y += 6;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Value:', pageWidth - 80, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(formatCurrency(String(totalValue)), pageWidth - 50, y);
+      y += 6;
+      
+      if (selectedRental.depositPaid && parseFloat(selectedRental.depositPaid) > 0) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Deposit Paid:', pageWidth - 80, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(formatCurrency(selectedRental.depositPaid), pageWidth - 50, y);
+        y += 6;
+      }
+      
+      if (selectedRental.notes) {
+        y += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Notes:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const notesText = doc.splitTextToSize(selectedRental.notes, pageWidth - 45);
+        doc.text(notesText, leftCol + 20, y);
+        y += notesText.length * 5;
+      }
+      
+      y += 10;
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+      
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(`Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth / 2, y, { align: 'center' });
+      y += 5;
+      doc.text(`Total Items: ${rentalItemsForSelected.length}`, pageWidth / 2, y, { align: 'center' });
+      
+      const fileName = `Rental_${vendorName.replace(/[^a-z0-9]/gi, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`;
+      doc.save(fileName);
+      toast({ title: 'PDF Downloaded', description: `${fileName} has been downloaded` });
+    } catch (error) {
+      console.error('Error generating Rental PDF:', error);
+      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active': return <Badge variant="default" className="bg-blue-500">Active</Badge>;
@@ -2408,10 +2644,16 @@ function RentalsSection({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Rental Items for {getVendorName(selectedRental.vendorId)}</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => handleDownloadRentalItems()} data-testid="button-download-rental-items">
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleDownloadRentalPDF()} data-testid="button-download-rental-pdf">
+                <FileText className="w-4 h-4 mr-2" />
+                Download PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleDownloadRentalItems()} data-testid="button-download-rental-items">
+                <Download className="w-4 h-4 mr-2" />
+                Download Excel
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
