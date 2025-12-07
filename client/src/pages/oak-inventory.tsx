@@ -2342,9 +2342,11 @@ function RentalsSection({
     condition: '',
     quantityReturned: '0',
     damageNotes: '',
+    photos: [] as string[],
   });
 
   const [editingItem, setEditingItem] = useState<RentalItem | null>(null);
+  const [viewingRentalItem, setViewingRentalItem] = useState<RentalItem | null>(null);
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   const [cloneEventId, setCloneEventId] = useState('');
   const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
@@ -2413,7 +2415,7 @@ function RentalsSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/rental-items'] });
       setIsItemModalOpen(false);
-      setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '' });
+      setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '', photos: [] });
       toast({ title: 'Rental item added' });
     },
     onError: (error: any) => {
@@ -2508,6 +2510,19 @@ function RentalsSection({
       quantity: parseInt(itemFormData.quantity) || 1,
       unitRate: itemFormData.unitRate || '0',
       condition: itemFormData.condition || null,
+      photos: itemFormData.photos,
+    });
+  };
+
+  const resetItemForm = () => {
+    setItemFormData({
+      itemName: '',
+      quantity: '1',
+      unitRate: '',
+      condition: '',
+      quantityReturned: '0',
+      damageNotes: '',
+      photos: [],
     });
   };
 
@@ -2751,6 +2766,48 @@ function RentalsSection({
         y += notesText.length * 5;
       }
       
+      const itemsWithPhotos = rentalItemsForSelected.filter(item => item.photos && item.photos.length > 0);
+      if (itemsWithPhotos.length > 0) {
+        doc.addPage();
+        y = 20;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0);
+        doc.text('Item Images', pageWidth / 2, y, { align: 'center' });
+        y += 15;
+        
+        for (const item of itemsWithPhotos) {
+          if (y > 240) {
+            doc.addPage();
+            y = 20;
+          }
+          
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(item.itemName, 15, y);
+          y += 8;
+          
+          let x = 15;
+          const imgWidth = 40;
+          const imgHeight = 40;
+          
+          for (const photo of (item.photos || []).slice(0, 4)) {
+            try {
+              const imgDataUrl = await loadImage(photo);
+              doc.addImage(imgDataUrl, 'PNG', x, y, imgWidth, imgHeight);
+              x += imgWidth + 5;
+              if (x > pageWidth - imgWidth - 15) {
+                x = 15;
+                y += imgHeight + 5;
+              }
+            } catch (e) {
+              console.log('Could not load image:', photo, e);
+            }
+          }
+          y += imgHeight + 15;
+        }
+      }
+      
       y += 10;
       if (y > 260) {
         doc.addPage();
@@ -2871,7 +2928,7 @@ function RentalsSection({
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Rental Items for {getVendorName(selectedRental.vendorId)}</CardTitle>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => { setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '' }); setIsItemModalOpen(true); }} data-testid="button-add-item-to-rental">
+              <Button size="sm" onClick={() => { setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '', photos: [] }); setIsItemModalOpen(true); }} data-testid="button-add-item-to-rental">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
               </Button>
@@ -2976,6 +3033,9 @@ function RentalsSection({
                           </>
                         ) : (
                           <>
+                            <Button variant="ghost" size="icon" onClick={() => setViewingRentalItem(item)} title="View item" data-testid={`button-view-rental-item-${item.id}`}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => {
                               setEditingItem(item);
                               setItemFormData({
@@ -3177,11 +3237,65 @@ function RentalsSection({
               <Label>Condition Notes</Label>
               <Textarea value={itemFormData.condition} onChange={(e) => setItemFormData({ ...itemFormData, condition: e.target.value })} data-testid="input-rental-item-condition" />
             </div>
+            <ImageUpload
+              photos={itemFormData.photos}
+              onPhotosChange={(photos) => setItemFormData({ ...itemFormData, photos })}
+              maxFiles={5}
+            />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsItemModalOpen(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsItemModalOpen(false); resetItemForm(); }}>Cancel</Button>
               <Button type="submit" data-testid="button-submit-rental-item">Add Item</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingRentalItem} onOpenChange={() => setViewingRentalItem(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingRentalItem?.itemName}</DialogTitle>
+          </DialogHeader>
+          {viewingRentalItem && (
+            <div className="space-y-4">
+              <ImageGallery photos={viewingRentalItem.photos || []} />
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Quantity</p>
+                  <p className="font-medium">{viewingRentalItem.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Unit Rate</p>
+                  <p className="font-medium">{formatCurrency(viewingRentalItem.unitRate)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Qty Returned</p>
+                  <p className="font-medium">{viewingRentalItem.quantityReturned || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total</p>
+                  <p className="font-medium">{formatCurrency(String(viewingRentalItem.quantity * parseFloat(viewingRentalItem.unitRate || '0')))}</p>
+                </div>
+              </div>
+              
+              {viewingRentalItem.condition && (
+                <div>
+                  <p className="text-muted-foreground text-sm">Condition</p>
+                  <p className="text-sm">{viewingRentalItem.condition}</p>
+                </div>
+              )}
+              
+              {viewingRentalItem.returnCondition && (
+                <div>
+                  <p className="text-muted-foreground text-sm">Return Condition</p>
+                  <p className="text-sm">{viewingRentalItem.returnCondition}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingRentalItem(null)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
