@@ -122,10 +122,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Seed default roles and superadmin on startup
-  await ensureDefaultRoles();
-  await ensureDefaultSuperAdmin();
-  
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -159,6 +155,18 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Seed default roles and superadmin in background after server starts
+      // This ensures health checks pass quickly
+      (async () => {
+        try {
+          await ensureDefaultRoles();
+          await ensureDefaultSuperAdmin();
+          log('Database seeding completed');
+        } catch (error) {
+          console.error('Error during database seeding:', error);
+        }
+      })();
     },
   );
 })();
