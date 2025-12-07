@@ -235,14 +235,23 @@ export function NotificationBell() {
         method: "POST",
         credentials: "include",
       });
+      if (res.status === 401) {
+        return { notificationsGenerated: 0, authRequired: true };
+      }
       if (!res.ok) throw new Error("Failed to generate notifications");
       return res.json();
     },
     onSuccess: (data) => {
+      if (data.authRequired) {
+        toast({ title: "Sign in required", description: "Please sign in to check for notifications" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
       if (data.notificationsGenerated > 0) {
         toast({ title: "Updated", description: `${data.notificationsGenerated} new notification(s) found` });
+      } else {
+        toast({ title: "Up to date", description: "No new notifications" });
       }
     },
     onError: () => {
