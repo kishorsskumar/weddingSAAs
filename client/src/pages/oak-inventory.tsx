@@ -2195,7 +2195,12 @@ function RentalsSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/rental-items'] });
       setIsItemModalOpen(false);
+      setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '' });
       toast({ title: 'Rental item added' });
+    },
+    onError: (error: any) => {
+      console.error('Failed to add rental item:', error);
+      toast({ title: 'Failed to add item', description: error.message, variant: 'destructive' });
     },
   });
 
