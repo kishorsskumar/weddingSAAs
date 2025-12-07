@@ -1289,6 +1289,7 @@ function EventInventorySection({
             ) : sessionItemsForSelected.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No items in this session</p>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1355,6 +1356,7 @@ function EventInventorySection({
                   })}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -1990,6 +1992,7 @@ function RentalsSection({
 
       <Card>
         <CardContent className="pt-6">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -2037,6 +2040,7 @@ function RentalsSection({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -2050,6 +2054,7 @@ function RentalsSection({
             </Button>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -2149,6 +2154,7 @@ function RentalsSection({
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -2578,6 +2584,7 @@ function TemplatesSection({
             ) : templateItemsForSelected.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No items in this template</p>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -2602,6 +2609,7 @@ function TemplatesSection({
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -2815,6 +2823,7 @@ function PurchaseOrdersSection({
 
       <Card>
         <CardContent className="pt-6">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -2859,6 +2868,7 @@ function PurchaseOrdersSection({
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -2868,6 +2878,7 @@ function PurchaseOrdersSection({
             <CardTitle>Items in {selectedPO.poNumber}</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -2894,6 +2905,7 @@ function PurchaseOrdersSection({
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -3221,6 +3233,7 @@ function ProductionPlansSection({
             ) : tasksForSelected.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No tasks in this plan</p>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -3263,6 +3276,7 @@ function ProductionPlansSection({
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
