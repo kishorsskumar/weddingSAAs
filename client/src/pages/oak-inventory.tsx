@@ -101,7 +101,7 @@ const sidebarItems = [
   { id: 'rentals', label: 'Rentals', icon: Truck },
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
-  { id: 'production-plans', label: 'Production Plans', icon: Factory },
+  { id: 'execution-plans', label: 'Execution Plans', icon: Factory },
 ];
 
 export default function OakInventory() {
@@ -3321,7 +3321,7 @@ function ProductionPlansSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-plans'] });
       setIsModalOpen(false);
-      toast({ title: 'Production plan created' });
+      toast({ title: 'Execution plan created' });
     },
   });
 
@@ -3330,7 +3330,7 @@ function ProductionPlansSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-plans'] });
       setIsModalOpen(false);
-      toast({ title: 'Production plan updated' });
+      toast({ title: 'Execution plan updated' });
     },
   });
 
@@ -3338,7 +3338,7 @@ function ProductionPlansSection({
     mutationFn: async (id: string) => apiRequest('DELETE', `/api/inventory/production-plans/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-plans'] });
-      toast({ title: 'Production plan deleted' });
+      toast({ title: 'Execution plan deleted' });
     },
   });
 
@@ -3485,7 +3485,7 @@ function ProductionPlansSection({
         const logoDataUrl = await loadImage(logoUrl);
         doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
       } catch (e) {
-        console.log('Production Plan Logo could not be loaded:', e);
+        console.log('Execution Plan Logo could not be loaded:', e);
       }
       
       doc.setFontSize(11);
@@ -3511,7 +3511,7 @@ function ProductionPlansSection({
       
       doc.setFontSize(16);
       doc.setTextColor(0);
-      doc.text('PRODUCTION PLAN', pageWidth / 2, y, { align: 'center' });
+      doc.text('EXECUTION PLAN', pageWidth / 2, y, { align: 'center' });
       y += 12;
       
       doc.setFontSize(10);
@@ -3627,7 +3627,7 @@ function ProductionPlansSection({
       y += 5;
       doc.text(`Total Tasks: ${tasksForSelected.length}`, pageWidth / 2, y, { align: 'center' });
       
-      const fileName = `Production_Plan_${selectedPlan.name.replace(/[^a-z0-9]/gi, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`;
+      const fileName = `Execution_Plan_${selectedPlan.name.replace(/[^a-z0-9]/gi, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`;
       doc.save(fileName);
       toast({ title: 'PDF Downloaded', description: `${fileName} has been downloaded` });
     } catch (error) {
@@ -3640,7 +3640,7 @@ function ProductionPlansSection({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Production Plans</h1>
+          <h1 className="text-2xl font-bold">Execution Plans</h1>
           <p className="text-muted-foreground">Event execution schedules and tasks</p>
         </div>
         <Button onClick={() => { setEditingPlan(null); setFormData({ name: '', eventId: '', status: 'draft' }); setIsModalOpen(true); }} data-testid="button-add-plan">
@@ -3779,7 +3779,7 @@ function ProductionPlansSection({
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingPlan ? 'Edit Production Plan' : 'New Production Plan'}</DialogTitle>
+            <DialogTitle>{editingPlan ? 'Edit Execution Plan' : 'New Execution Plan'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
