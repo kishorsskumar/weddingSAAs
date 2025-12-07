@@ -3249,14 +3249,12 @@ function ProductionPlansSection({
   plans,
   tasks,
   events,
-  vendors,
-  users,
 }: {
   plans: ProductionPlan[];
   tasks: ProductionTask[];
   events: Event[];
-  vendors: Vendor[];
-  users: User[];
+  vendors?: Vendor[];
+  users?: User[];
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -3266,13 +3264,24 @@ function ProductionPlansSection({
   const [selectedPlan, setSelectedPlan] = useState<ProductionPlan | null>(null);
 
   const [formData, setFormData] = useState({ name: '', eventId: '', status: 'draft' });
-  const [taskFormData, setTaskFormData] = useState({ activity: '', startTime: '', endTime: '', vendorId: '', responsiblePersonId: '', responsiblePersonName: '', status: 'pending', notes: '' });
+  const [taskFormData, setTaskFormData] = useState({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' });
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchValue, setEventSearchValue] = useState('');
-  const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
-  const [vendorSearchValue, setVendorSearchValue] = useState('');
-  const [userSearchOpen, setUserSearchOpen] = useState(false);
-  const [userSearchValue, setUserSearchValue] = useState('');
+  
+  const [localVendors, setLocalVendors] = useState<string[]>([]);
+  const [localPersons, setLocalPersons] = useState<string[]>([]);
+  const [vendorInputOpen, setVendorInputOpen] = useState(false);
+  const [personInputOpen, setPersonInputOpen] = useState(false);
+
+  const allLocalVendors = useMemo(() => {
+    const fromTasks = tasks.map(t => t.vendorId).filter(Boolean) as string[];
+    return Array.from(new Set([...localVendors, ...fromTasks]));
+  }, [localVendors, tasks]);
+
+  const allLocalPersons = useMemo(() => {
+    const fromTasks = tasks.map(t => t.responsiblePersonName).filter(Boolean) as string[];
+    return Array.from(new Set([...localPersons, ...fromTasks]));
+  }, [localPersons, tasks]);
 
   const filteredEvents = useMemo(() => {
     if (!eventSearchValue) return events;
@@ -3282,18 +3291,6 @@ function ProductionPlansSection({
       e.customer?.toLowerCase().includes(search)
     );
   }, [events, eventSearchValue]);
-
-  const filteredVendors = useMemo(() => {
-    if (!vendorSearchValue) return vendors;
-    const search = vendorSearchValue.toLowerCase();
-    return vendors.filter(v => v.name?.toLowerCase().includes(search));
-  }, [vendors, vendorSearchValue]);
-
-  const filteredUsers = useMemo(() => {
-    if (!userSearchValue) return users;
-    const search = userSearchValue.toLowerCase();
-    return users.filter(u => u.name?.toLowerCase().includes(search));
-  }, [users, userSearchValue]);
 
   const createPlanMutation = useMutation({
     mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/production-plans', data),
@@ -3359,22 +3356,29 @@ function ProductionPlansSection({
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlan) return;
-    const selectedUser = users.find(u => u.id === taskFormData.responsiblePersonId);
+    
+    if (taskFormData.vendorName && !localVendors.includes(taskFormData.vendorName)) {
+      setLocalVendors(prev => [...prev, taskFormData.vendorName]);
+    }
+    if (taskFormData.responsiblePersonName && !localPersons.includes(taskFormData.responsiblePersonName)) {
+      setLocalPersons(prev => [...prev, taskFormData.responsiblePersonName]);
+    }
+    
     addTaskMutation.mutate({
       planId: selectedPlan.id,
       activity: taskFormData.activity,
       startTime: taskFormData.startTime || null,
       endTime: taskFormData.endTime || null,
-      vendorId: taskFormData.vendorId || null,
-      responsiblePersonId: taskFormData.responsiblePersonId || null,
-      responsiblePersonName: selectedUser?.name || taskFormData.responsiblePersonName || null,
+      vendorId: taskFormData.vendorName || null,
+      responsiblePersonId: null,
+      responsiblePersonName: taskFormData.responsiblePersonName || null,
       status: taskFormData.status,
       notes: taskFormData.notes || null,
     });
   };
 
   const getEventName = (eventId: string | null) => events.find(e => e.id === eventId)?.title || 'N/A';
-  const getVendorName = (vendorId: string | null) => vendors.find(v => v.id === vendorId)?.name || '-';
+  const getVendorName = (vendorId: string | null) => vendorId || '-';
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = { draft: 'bg-gray-500', active: 'bg-blue-500', completed: 'bg-green-500', pending: 'bg-gray-500', in_progress: 'bg-amber-500' };
@@ -3446,7 +3450,7 @@ function ProductionPlansSection({
             <div className="flex items-center justify-between">
               <CardTitle>{selectedPlan ? `Tasks for ${selectedPlan.name}` : 'Select a Plan'}</CardTitle>
               {selectedPlan && (
-                <Button size="sm" onClick={() => { setTaskFormData({ activity: '', startTime: '', endTime: '', vendorId: '', responsiblePersonId: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
+                <Button size="sm" onClick={() => { setTaskFormData({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
@@ -3617,102 +3621,94 @@ function ProductionPlansSection({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Popover open={vendorSearchOpen} onOpenChange={setVendorSearchOpen}>
+                <Popover open={vendorInputOpen} onOpenChange={setVendorInputOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={vendorSearchOpen}
-                      className="w-full justify-between"
-                      data-testid="select-task-vendor"
-                    >
-                      {taskFormData.vendorId
-                        ? vendors.find(v => v.id === taskFormData.vendorId)?.name || "Select vendor"
-                        : "Select vendor"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search vendors..." 
-                        value={vendorSearchValue}
-                        onValueChange={setVendorSearchValue}
+                    <div className="relative">
+                      <Input
+                        value={taskFormData.vendorName}
+                        onChange={(e) => {
+                          setTaskFormData({ ...taskFormData, vendorName: e.target.value });
+                          if (e.target.value.length > 0) setVendorInputOpen(true);
+                        }}
+                        onFocus={() => allLocalVendors.length > 0 && setVendorInputOpen(true)}
+                        placeholder="Enter or select vendor"
+                        data-testid="input-task-vendor"
                       />
-                      <CommandList>
-                        <CommandEmpty>No vendors found.</CommandEmpty>
-                        <CommandGroup>
-                          {filteredVendors.map(v => (
-                            <CommandItem
-                              key={v.id}
-                              value={v.name}
-                              onSelect={() => {
-                                setTaskFormData({ ...taskFormData, vendorId: v.id });
-                                setVendorSearchOpen(false);
-                                setVendorSearchValue('');
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", taskFormData.vendorId === v.id ? "opacity-100" : "opacity-0")} />
-                              {v.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
+                    </div>
+                  </PopoverTrigger>
+                  {allLocalVendors.length > 0 && (
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup heading="Previously used vendors">
+                            {allLocalVendors
+                              .filter(v => v.toLowerCase().includes(taskFormData.vendorName.toLowerCase()))
+                              .map(v => (
+                                <CommandItem
+                                  key={v}
+                                  value={v}
+                                  onSelect={() => {
+                                    setTaskFormData({ ...taskFormData, vendorName: v });
+                                    setVendorInputOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", taskFormData.vendorName === v ? "opacity-100" : "opacity-0")} />
+                                  {v}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  )}
                 </Popover>
+                <p className="text-xs text-muted-foreground">Type a new vendor name or select from previously used</p>
               </div>
               <div className="space-y-2">
                 <Label>Responsible Person</Label>
-                <Popover open={userSearchOpen} onOpenChange={setUserSearchOpen}>
+                <Popover open={personInputOpen} onOpenChange={setPersonInputOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={userSearchOpen}
-                      className="w-full justify-between"
-                      data-testid="select-task-person"
-                    >
-                      {taskFormData.responsiblePersonId
-                        ? users.find(u => u.id === taskFormData.responsiblePersonId)?.name || "Select person"
-                        : "Select person"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search people..." 
-                        value={userSearchValue}
-                        onValueChange={setUserSearchValue}
+                    <div className="relative">
+                      <Input
+                        value={taskFormData.responsiblePersonName}
+                        onChange={(e) => {
+                          setTaskFormData({ ...taskFormData, responsiblePersonName: e.target.value });
+                          if (e.target.value.length > 0) setPersonInputOpen(true);
+                        }}
+                        onFocus={() => allLocalPersons.length > 0 && setPersonInputOpen(true)}
+                        placeholder="Enter or select person"
+                        data-testid="input-task-person"
                       />
-                      <CommandList>
-                        <CommandEmpty>No people found.</CommandEmpty>
-                        <CommandGroup>
-                          {filteredUsers.map(u => (
-                            <CommandItem
-                              key={u.id}
-                              value={u.name}
-                              onSelect={() => {
-                                setTaskFormData({ ...taskFormData, responsiblePersonId: u.id });
-                                setUserSearchOpen(false);
-                                setUserSearchValue('');
-                              }}
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", taskFormData.responsiblePersonId === u.id ? "opacity-100" : "opacity-0")} />
-                              {u.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
+                    </div>
+                  </PopoverTrigger>
+                  {allLocalPersons.length > 0 && (
+                    <PopoverContent className="w-full p-0" align="start">
+                      <Command>
+                        <CommandList>
+                          <CommandGroup heading="Previously used persons">
+                            {allLocalPersons
+                              .filter(p => p.toLowerCase().includes(taskFormData.responsiblePersonName.toLowerCase()))
+                              .map(p => (
+                                <CommandItem
+                                  key={p}
+                                  value={p}
+                                  onSelect={() => {
+                                    setTaskFormData({ ...taskFormData, responsiblePersonName: p });
+                                    setPersonInputOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", taskFormData.responsiblePersonName === p ? "opacity-100" : "opacity-0")} />
+                                  {p}
+                                </CommandItem>
+                              ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  )}
                 </Popover>
+                <p className="text-xs text-muted-foreground">Type a new name or select from previously used</p>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Or enter person name</Label>
-              <Input value={taskFormData.responsiblePersonName} onChange={(e) => setTaskFormData({ ...taskFormData, responsiblePersonName: e.target.value })} placeholder="Person name" data-testid="input-task-person-name" />
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
