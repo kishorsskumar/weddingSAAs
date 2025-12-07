@@ -1773,6 +1773,7 @@ export async function registerRoutes(
   });
 
   // PDF Generation endpoint
+  // Note: This feature requires Chromium and may not work in all deployment environments
   app.get('/api/pdf/:type/:id', async (req, res) => {
     try {
       const { type, id } = req.params;
@@ -1781,11 +1782,37 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Invalid document type' });
       }
 
-      const puppeteer = await import('puppeteer');
-      const browser = await puppeteer.default.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      });
+      let puppeteer;
+      try {
+        puppeteer = await import('puppeteer');
+      } catch (importError) {
+        console.error('Puppeteer not available:', importError);
+        return res.status(503).json({ 
+          error: 'PDF generation is not available in this environment. Please use the browser print function instead.',
+          suggestion: 'Use browser print (Ctrl+P or Cmd+P) on the document page'
+        });
+      }
+
+      let browser;
+      try {
+        browser = await puppeteer.default.launch({
+          headless: true,
+          args: [
+            '--no-sandbox', 
+            '--disable-setuid-sandbox', 
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--single-process',
+            '--no-zygote'
+          ],
+        });
+      } catch (launchError) {
+        console.error('Failed to launch browser:', launchError);
+        return res.status(503).json({ 
+          error: 'PDF generation service is temporarily unavailable. Please use the browser print function instead.',
+          suggestion: 'Use browser print (Ctrl+P or Cmd+P) on the document page'
+        });
+      }
 
       try {
         const page = await browser.newPage();
@@ -1816,11 +1843,13 @@ export async function registerRoutes(
         res.setHeader('Content-Disposition', `attachment; filename="${type}-${id}.pdf"`);
         res.send(pdf);
       } finally {
-        await browser.close();
+        if (browser) {
+          await browser.close();
+        }
       }
     } catch (error) {
       console.error('PDF generation error:', error);
-      res.status(500).json({ error: 'Failed to generate PDF' });
+      res.status(500).json({ error: 'Failed to generate PDF. Please use the browser print function instead.' });
     }
   });
 

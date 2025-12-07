@@ -14,8 +14,11 @@ if (!databaseUrl) {
 // This is critical for autoscale deployments as the database may sleep
 if (databaseUrl && process.env.NODE_ENV === 'production') {
   // Convert to pooler endpoint if using Neon
-  if (databaseUrl.includes('.neon.tech') && !databaseUrl.includes('-pooler')) {
-    databaseUrl = databaseUrl.replace('.us-east-2', '-pooler.us-east-2');
+  // Neon URL format: ep-xyz-123456.region.aws.neon.tech
+  // Pooler format: ep-xyz-123456-pooler.region.aws.neon.tech
+  if (databaseUrl.includes('.aws.neon.tech') && !databaseUrl.includes('-pooler')) {
+    // Add -pooler before the first dot after @ in the hostname
+    databaseUrl = databaseUrl.replace(/@([^.]+)\./, '@$1-pooler.');
     console.log('Using Neon connection pooler for production');
   }
 }
