@@ -953,6 +953,10 @@ function EventInventorySection({
   const [isDeliveryNoteOpen, setIsDeliveryNoteOpen] = useState(false);
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchValue, setEventSearchValue] = useState('');
+  const [itemSearchOpen, setItemSearchOpen] = useState(false);
+  const [itemSearchValue, setItemSearchValue] = useState('');
+  const [cloneEventSearchOpen, setCloneEventSearchOpen] = useState(false);
+  const [cloneEventSearchValue, setCloneEventSearchValue] = useState('');
 
   const filteredEvents = useMemo(() => {
     if (!eventSearchValue) return events;
@@ -962,6 +966,25 @@ function EventInventorySection({
       e.customer?.toLowerCase().includes(search)
     );
   }, [events, eventSearchValue]);
+
+  const filteredInventoryItems = useMemo(() => {
+    if (!itemSearchValue) return inventoryItems;
+    const search = itemSearchValue.toLowerCase();
+    return inventoryItems.filter(item => 
+      item.name?.toLowerCase().includes(search) ||
+      item.category?.toLowerCase().includes(search)
+    );
+  }, [inventoryItems, itemSearchValue]);
+
+  const filteredCloneEvents = useMemo(() => {
+    const availableEvents = events.filter(e => e.id !== selectedSession?.eventId);
+    if (!cloneEventSearchValue) return availableEvents;
+    const search = cloneEventSearchValue.toLowerCase();
+    return availableEvents.filter(e => 
+      e.title?.toLowerCase().includes(search) || 
+      e.customer?.toLowerCase().includes(search)
+    );
+  }, [events, selectedSession?.eventId, cloneEventSearchValue]);
 
   const createSessionMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1451,16 +1474,60 @@ function EventInventorySection({
             {!editingItem && (
               <div className="space-y-2">
                 <Label>Item *</Label>
-                <Select value={itemFormData.itemId} onValueChange={(v) => setItemFormData({ ...itemFormData, itemId: v })}>
-                  <SelectTrigger data-testid="select-session-item">
-                    <SelectValue placeholder="Select inventory item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {inventoryItems.map(item => (
-                      <SelectItem key={item.id} value={item.id}>{item.name} (Stock: {item.stockQuantity})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={itemSearchOpen} onOpenChange={setItemSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={itemSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="select-session-item"
+                    >
+                      {itemFormData.itemId
+                        ? inventoryItems.find(i => i.id === itemFormData.itemId)?.name || "Select inventory item"
+                        : "Select inventory item"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search items..." 
+                        value={itemSearchValue}
+                        onValueChange={setItemSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No items found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredInventoryItems.map(item => (
+                            <CommandItem
+                              key={item.id}
+                              value={item.name}
+                              onSelect={() => {
+                                setItemFormData({ ...itemFormData, itemId: item.id });
+                                setItemSearchOpen(false);
+                                setItemSearchValue('');
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  itemFormData.itemId === item.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span>{item.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {item.category} - Stock: {item.stockQuantity}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             {editingItem && (
@@ -1506,16 +1573,60 @@ function EventInventorySection({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Select Target Event *</Label>
-              <Select value={cloneEventId} onValueChange={setCloneEventId}>
-                <SelectTrigger data-testid="select-clone-event">
-                  <SelectValue placeholder="Select event to clone to" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.filter(e => e.id !== selectedSession?.eventId).map(event => (
-                    <SelectItem key={event.id} value={event.id}>{event.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={cloneEventSearchOpen} onOpenChange={setCloneEventSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={cloneEventSearchOpen}
+                    className="w-full justify-between"
+                    data-testid="select-clone-event"
+                  >
+                    {cloneEventId
+                      ? events.find(e => e.id === cloneEventId)?.title || "Select event to clone to"
+                      : "Select event to clone to"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={cloneEventSearchValue}
+                      onValueChange={setCloneEventSearchValue}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredCloneEvents.map(event => (
+                          <CommandItem
+                            key={event.id}
+                            value={event.title}
+                            onSelect={() => {
+                              setCloneEventId(event.id);
+                              setCloneEventSearchOpen(false);
+                              setCloneEventSearchValue('');
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                cloneEventId === event.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{event.title}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {event.customer} - {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'No date'}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <p className="text-sm text-muted-foreground">
               This will create a new session for the selected event with the same items. All return/damage tracking will be reset.
@@ -1664,6 +1775,37 @@ function RentalsSection({
   const [editingItem, setEditingItem] = useState<RentalItem | null>(null);
   const [isCloneModalOpen, setIsCloneModalOpen] = useState(false);
   const [cloneEventId, setCloneEventId] = useState('');
+  const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
+  const [vendorSearchValue, setVendorSearchValue] = useState('');
+  const [eventSearchOpen, setEventSearchOpen] = useState(false);
+  const [eventSearchValue, setEventSearchValue] = useState('');
+  const [cloneEventSearchOpen, setCloneEventSearchOpen] = useState(false);
+  const [cloneEventSearchValue, setCloneEventSearchValue] = useState('');
+
+  const filteredVendors = useMemo(() => {
+    if (!vendorSearchValue) return vendors;
+    const search = vendorSearchValue.toLowerCase();
+    return vendors.filter(v => v.name?.toLowerCase().includes(search));
+  }, [vendors, vendorSearchValue]);
+
+  const filteredEvents = useMemo(() => {
+    if (!eventSearchValue) return events;
+    const search = eventSearchValue.toLowerCase();
+    return events.filter(e => 
+      e.title?.toLowerCase().includes(search) || 
+      e.customer?.toLowerCase().includes(search)
+    );
+  }, [events, eventSearchValue]);
+
+  const filteredCloneEvents = useMemo(() => {
+    const availableEvents = events.filter(e => e.id !== selectedRental?.eventId);
+    if (!cloneEventSearchValue) return availableEvents;
+    const search = cloneEventSearchValue.toLowerCase();
+    return availableEvents.filter(e => 
+      e.title?.toLowerCase().includes(search) || 
+      e.customer?.toLowerCase().includes(search)
+    );
+  }, [events, selectedRental?.eventId, cloneEventSearchValue]);
 
   const createRentalMutation = useMutation({
     mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/rentals', data),
@@ -2018,25 +2160,102 @@ function RentalsSection({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Select value={formData.vendorId} onValueChange={(v) => setFormData({ ...formData, vendorId: v })}>
-                  <SelectTrigger data-testid="select-rental-vendor">
-                    <SelectValue placeholder="Select vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={vendorSearchOpen} onOpenChange={setVendorSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={vendorSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="select-rental-vendor"
+                    >
+                      {formData.vendorId
+                        ? vendors.find(v => v.id === formData.vendorId)?.name || "Select vendor"
+                        : "Select vendor"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search vendors..." 
+                        value={vendorSearchValue}
+                        onValueChange={setVendorSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No vendors found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredVendors.map(v => (
+                            <CommandItem
+                              key={v.id}
+                              value={v.name}
+                              onSelect={() => {
+                                setFormData({ ...formData, vendorId: v.id });
+                                setVendorSearchOpen(false);
+                                setVendorSearchValue('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", formData.vendorId === v.id ? "opacity-100" : "opacity-0")} />
+                              {v.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Event</Label>
-                <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
-                  <SelectTrigger data-testid="select-rental-event">
-                    <SelectValue placeholder="Select event" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {events.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={eventSearchOpen} onOpenChange={setEventSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={eventSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="select-rental-event"
+                    >
+                      {formData.eventId
+                        ? events.find(e => e.id === formData.eventId)?.title || "Select event"
+                        : "Select event"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search events..." 
+                        value={eventSearchValue}
+                        onValueChange={setEventSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No events found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredEvents.map(event => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.title}
+                              onSelect={() => {
+                                setFormData({ ...formData, eventId: event.id });
+                                setEventSearchOpen(false);
+                                setEventSearchValue('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", formData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col">
+                                <span>{event.title}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {event.customer} - {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'No date'}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -2125,19 +2344,58 @@ function RentalsSection({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Target Event *</Label>
-              <Select value={cloneEventId} onValueChange={setCloneEventId}>
-                <SelectTrigger data-testid="select-clone-rental-event">
-                  <SelectValue placeholder="Select event to clone to" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.filter(e => e.id !== selectedRental?.eventId).map(e => (
-                    <SelectItem key={e.id} value={e.id}>{e.title} - {e.date ? format(new Date(e.date), 'MMM d, yyyy') : 'No date'}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={cloneEventSearchOpen} onOpenChange={setCloneEventSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={cloneEventSearchOpen}
+                    className="w-full justify-between"
+                    data-testid="select-clone-rental-event"
+                  >
+                    {cloneEventId
+                      ? events.find(e => e.id === cloneEventId)?.title || "Select event to clone to"
+                      : "Select event to clone to"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={cloneEventSearchValue}
+                      onValueChange={setCloneEventSearchValue}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredCloneEvents.map(event => (
+                          <CommandItem
+                            key={event.id}
+                            value={event.title}
+                            onSelect={() => {
+                              setCloneEventId(event.id);
+                              setCloneEventSearchOpen(false);
+                              setCloneEventSearchValue('');
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", cloneEventId === event.id ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col">
+                              <span>{event.title}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {event.customer} - {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'No date'}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => { setIsCloneModalOpen(false); setCloneEventId(''); }}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsCloneModalOpen(false); setCloneEventId(''); setCloneEventSearchValue(''); }}>Cancel</Button>
               <Button
                 disabled={!cloneEventId || !selectedRental || cloneRentalMutation.isPending}
                 onClick={() => {
@@ -2771,6 +3029,10 @@ function ProductionPlansSection({
   const [taskFormData, setTaskFormData] = useState({ activity: '', startTime: '', endTime: '', vendorId: '', responsiblePersonId: '', responsiblePersonName: '', status: 'pending', notes: '' });
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchValue, setEventSearchValue] = useState('');
+  const [vendorSearchOpen, setVendorSearchOpen] = useState(false);
+  const [vendorSearchValue, setVendorSearchValue] = useState('');
+  const [userSearchOpen, setUserSearchOpen] = useState(false);
+  const [userSearchValue, setUserSearchValue] = useState('');
 
   const filteredEvents = useMemo(() => {
     if (!eventSearchValue) return events;
@@ -2780,6 +3042,18 @@ function ProductionPlansSection({
       e.customer?.toLowerCase().includes(search)
     );
   }, [events, eventSearchValue]);
+
+  const filteredVendors = useMemo(() => {
+    if (!vendorSearchValue) return vendors;
+    const search = vendorSearchValue.toLowerCase();
+    return vendors.filter(v => v.name?.toLowerCase().includes(search));
+  }, [vendors, vendorSearchValue]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearchValue) return users;
+    const search = userSearchValue.toLowerCase();
+    return users.filter(u => u.name?.toLowerCase().includes(search));
+  }, [users, userSearchValue]);
 
   const createPlanMutation = useMutation({
     mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/production-plans', data),
@@ -3101,25 +3375,97 @@ function ProductionPlansSection({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Select value={taskFormData.vendorId} onValueChange={(v) => setTaskFormData({ ...taskFormData, vendorId: v })}>
-                  <SelectTrigger data-testid="select-task-vendor">
-                    <SelectValue placeholder="Select vendor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vendors.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={vendorSearchOpen} onOpenChange={setVendorSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={vendorSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="select-task-vendor"
+                    >
+                      {taskFormData.vendorId
+                        ? vendors.find(v => v.id === taskFormData.vendorId)?.name || "Select vendor"
+                        : "Select vendor"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search vendors..." 
+                        value={vendorSearchValue}
+                        onValueChange={setVendorSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No vendors found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredVendors.map(v => (
+                            <CommandItem
+                              key={v.id}
+                              value={v.name}
+                              onSelect={() => {
+                                setTaskFormData({ ...taskFormData, vendorId: v.id });
+                                setVendorSearchOpen(false);
+                                setVendorSearchValue('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", taskFormData.vendorId === v.id ? "opacity-100" : "opacity-0")} />
+                              {v.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Responsible Person</Label>
-                <Select value={taskFormData.responsiblePersonId} onValueChange={(v) => setTaskFormData({ ...taskFormData, responsiblePersonId: v })}>
-                  <SelectTrigger data-testid="select-task-person">
-                    <SelectValue placeholder="Select person" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Popover open={userSearchOpen} onOpenChange={setUserSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={userSearchOpen}
+                      className="w-full justify-between"
+                      data-testid="select-task-person"
+                    >
+                      {taskFormData.responsiblePersonId
+                        ? users.find(u => u.id === taskFormData.responsiblePersonId)?.name || "Select person"
+                        : "Select person"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput 
+                        placeholder="Search people..." 
+                        value={userSearchValue}
+                        onValueChange={setUserSearchValue}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No people found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredUsers.map(u => (
+                            <CommandItem
+                              key={u.id}
+                              value={u.name}
+                              onSelect={() => {
+                                setTaskFormData({ ...taskFormData, responsiblePersonId: u.id });
+                                setUserSearchOpen(false);
+                                setUserSearchValue('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", taskFormData.responsiblePersonId === u.id ? "opacity-100" : "opacity-0")} />
+                              {u.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="space-y-2">
