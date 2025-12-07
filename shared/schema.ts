@@ -905,6 +905,7 @@ export const productionTasks = pgTable("production_tasks", {
   startTime: text("start_time"),
   endTime: text("end_time"),
   vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"), // Local vendor name (not linked to global vendors)
   responsiblePersonId: varchar("responsible_person_id").references(() => users.id),
   responsiblePersonName: text("responsible_person_name"),
   status: text("status").notNull().default('pending'), // 'pending' | 'in_progress' | 'completed'

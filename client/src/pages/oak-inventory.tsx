@@ -3369,7 +3369,8 @@ function ProductionPlansSection({
       activity: taskFormData.activity,
       startTime: taskFormData.startTime || null,
       endTime: taskFormData.endTime || null,
-      vendorId: taskFormData.vendorName || null,
+      vendorId: null,
+      vendorName: taskFormData.vendorName || null,
       responsiblePersonId: null,
       responsiblePersonName: taskFormData.responsiblePersonName || null,
       status: taskFormData.status,
@@ -3378,7 +3379,6 @@ function ProductionPlansSection({
   };
 
   const getEventName = (eventId: string | null) => events.find(e => e.id === eventId)?.title || 'N/A';
-  const getVendorName = (vendorId: string | null) => vendorId || '-';
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = { draft: 'bg-gray-500', active: 'bg-blue-500', completed: 'bg-green-500', pending: 'bg-gray-500', in_progress: 'bg-amber-500' };
@@ -3482,7 +3482,7 @@ function ProductionPlansSection({
                       <TableCell className="text-sm">
                         {task.startTime && task.endTime ? `${task.startTime} - ${task.endTime}` : task.startTime || task.endTime || '-'}
                       </TableCell>
-                      <TableCell>{getVendorName(task.vendorId)}</TableCell>
+                      <TableCell>{task.vendorName || '-'}</TableCell>
                       <TableCell>{task.responsiblePersonName || '-'}</TableCell>
                       <TableCell>
                         <Select
