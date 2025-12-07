@@ -1033,6 +1033,9 @@ export const notificationPreferences = pgTable("notification_preferences", {
   dailyDigestEnabled: boolean("daily_digest_enabled").notNull().default(false),
   quietHoursStart: text("quiet_hours_start"), // e.g., "22:00"
   quietHoursEnd: text("quiet_hours_end"), // e.g., "08:00"
+  // WhatsApp settings
+  whatsappEnabled: boolean("whatsapp_enabled").notNull().default(false),
+  whatsappPhoneNumber: text("whatsapp_phone_number"), // User's WhatsApp number with country code e.g., "+919876543210"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
