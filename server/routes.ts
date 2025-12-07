@@ -3288,6 +3288,13 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Phone number is required' });
       }
 
+      // Basic phone number validation
+      const phoneRegex = /^\+?[1-9]\d{6,14}$/;
+      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+      if (!phoneRegex.test(cleanPhone)) {
+        return res.status(400).json({ error: 'Invalid phone number format. Please include country code (e.g., +91 98765 43210)' });
+      }
+
       const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
       
       if (!isWhatsAppConfigured()) {
