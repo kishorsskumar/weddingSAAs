@@ -284,39 +284,41 @@ function EstimateView({ doc, customer, companySettings }: any) {
         </div>
       )}
 
-      <table className="w-full text-sm border-collapse mb-6">
-        <thead>
-          <tr className="border-y">
-            <th className="text-left p-2 w-12">#</th>
-            <th className="text-left p-2">Item & Description</th>
-            <th className="text-right p-2">Qty</th>
-            <th className="text-right p-2">Rate</th>
-            <th className="text-right p-2">Tax %</th>
-            <th className="text-right p-2">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lineItems.map((item, index) => (
-            item.type === 'section' ? (
-              <tr key={index} className="bg-muted/30">
-                <td colSpan={6} className="p-2 font-semibold">{item.description}</td>
-              </tr>
-            ) : (
-              <tr key={index} className="border-b">
-                <td className="p-2">{item.slNo}</td>
-                <td className="p-2">{item.description}</td>
-                <td className="p-2 text-right">{item.quantity || 0}</td>
-                <td className="p-2 text-right">{formatIndianCurrency(item.rate || 0)}</td>
-                <td className="p-2 text-right">{item.taxPercent || 0}%</td>
-                <td className="p-2 text-right">{formatIndianCurrency(item.amount || 0)}</td>
-              </tr>
-            )
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse mb-6">
+          <thead>
+            <tr className="border-y">
+              <th className="text-left p-2 w-12">#</th>
+              <th className="text-left p-2">Item & Description</th>
+              <th className="text-right p-2">Qty</th>
+              <th className="text-right p-2">Rate</th>
+              <th className="text-right p-2">Tax %</th>
+              <th className="text-right p-2">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => (
+              item.type === 'section' ? (
+                <tr key={index} className="bg-muted/30">
+                  <td colSpan={6} className="p-2 font-semibold">{item.description}</td>
+                </tr>
+              ) : (
+                <tr key={index} className="border-b">
+                  <td className="p-2">{item.slNo}</td>
+                  <td className="p-2">{item.description}</td>
+                  <td className="p-2 text-right">{item.quantity || 0}</td>
+                  <td className="p-2 text-right">{formatIndianCurrency(item.rate || 0)}</td>
+                  <td className="p-2 text-right">{item.taxPercent || 0}%</td>
+                  <td className="p-2 text-right">{formatIndianCurrency(item.amount || 0)}</td>
+                </tr>
+              )
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="flex justify-end">
-        <div className="w-64 space-y-2">
+        <div className="w-full sm:w-64 space-y-2">
           <div className="flex justify-between">
             <span>Sub Total</span>
             <span>{formatIndianCurrency(parseFloat(doc.subtotal))}</span>
@@ -439,39 +441,41 @@ function InvoiceView({ doc, customer, companySettings }: any) {
         </div>
       )}
 
-      <table className="w-full text-sm border-collapse mb-6">
-        <thead>
-          <tr className="border-y">
-            <th className="text-left p-2 w-12">#</th>
-            <th className="text-left p-2">Item & Description</th>
-            <th className="text-right p-2">Qty</th>
-            <th className="text-right p-2">Rate</th>
-            <th className="text-right p-2">Tax %</th>
-            <th className="text-right p-2">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lineItems.map((item, index) => (
-            item.type === 'section' ? (
-              <tr key={index} className="bg-muted/30">
-                <td colSpan={6} className="p-2 font-semibold">{item.description}</td>
-              </tr>
-            ) : (
-              <tr key={index} className="border-b">
-                <td className="p-2">{item.slNo}</td>
-                <td className="p-2">{item.description}</td>
-                <td className="p-2 text-right">{item.quantity || 0}</td>
-                <td className="p-2 text-right">{formatIndianCurrency(item.rate || 0)}</td>
-                <td className="p-2 text-right">{item.taxPercent || 0}%</td>
-                <td className="p-2 text-right">{formatIndianCurrency(item.amount || 0)}</td>
-              </tr>
-            )
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse mb-6">
+          <thead>
+            <tr className="border-y">
+              <th className="text-left p-2 w-12">#</th>
+              <th className="text-left p-2">Item & Description</th>
+              <th className="text-right p-2">Qty</th>
+              <th className="text-right p-2">Rate</th>
+              <th className="text-right p-2">Tax %</th>
+              <th className="text-right p-2">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => (
+              item.type === 'section' ? (
+                <tr key={index} className="bg-muted/30">
+                  <td colSpan={6} className="p-2 font-semibold">{item.description}</td>
+                </tr>
+              ) : (
+                <tr key={index} className="border-b">
+                  <td className="p-2">{item.slNo}</td>
+                  <td className="p-2">{item.description}</td>
+                  <td className="p-2 text-right">{item.quantity || 0}</td>
+                  <td className="p-2 text-right">{formatIndianCurrency(item.rate || 0)}</td>
+                  <td className="p-2 text-right">{item.taxPercent || 0}%</td>
+                  <td className="p-2 text-right">{formatIndianCurrency(item.amount || 0)}</td>
+                </tr>
+              )
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="flex justify-end">
-        <div className="w-64 space-y-2">
+        <div className="w-full sm:w-64 space-y-2">
           <div className="flex justify-between">
             <span>Sub Total</span>
             <span>{formatIndianCurrency(parseFloat(doc.subtotal))}</span>
