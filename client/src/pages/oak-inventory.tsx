@@ -1151,25 +1151,47 @@ function EventInventorySection({
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 15;
       
-      doc.setFontSize(20);
-      doc.setTextColor(180, 120, 60);
-      doc.text(COMPANY_DEFAULTS.companyName, pageWidth / 2, y, { align: 'center' });
-      y += 8;
-      
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      const addressLines = COMPANY_DEFAULTS.address.split('\n');
-      addressLines.forEach(line => {
-        doc.text(line, pageWidth / 2, y, { align: 'center' });
-        y += 4;
-      });
-      doc.text(`Phone: ${COMPANY_DEFAULTS.phone} | Email: ${COMPANY_DEFAULTS.email}`, pageWidth / 2, y, { align: 'center' });
-      y += 6;
-      if (COMPANY_DEFAULTS.gstNumber) {
-        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth / 2, y, { align: 'center' });
-        y += 6;
+      const loadImage = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      };
+
+      try {
+        const logoDataUrl = await loadImage('/attached_assets/Oakstreet_1765077046310.png');
+        doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
+      } catch (e) {
+        console.log('Logo could not be loaded');
       }
       
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      let headerY = 10;
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth - 15, headerY, { align: 'right' });
+        headerY += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      doc.text(`Email: ${COMPANY_DEFAULTS.email}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      if (COMPANY_DEFAULTS.gstNumber) {
+        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth - 15, headerY, { align: 'right' });
+      }
+      
+      y = 32;
       doc.setDrawColor(200);
       doc.line(15, y, pageWidth - 15, y);
       y += 10;
@@ -3398,25 +3420,47 @@ function ProductionPlansSection({
       const pageWidth = doc.internal.pageSize.getWidth();
       let y = 15;
       
-      doc.setFontSize(20);
-      doc.setTextColor(180, 120, 60);
-      doc.text(COMPANY_DEFAULTS.companyName, pageWidth / 2, y, { align: 'center' });
-      y += 8;
-      
-      doc.setFontSize(9);
-      doc.setTextColor(100);
-      const addressLines = COMPANY_DEFAULTS.address.split('\n');
-      addressLines.forEach(line => {
-        doc.text(line, pageWidth / 2, y, { align: 'center' });
-        y += 4;
-      });
-      doc.text(`Phone: ${COMPANY_DEFAULTS.phone} | Email: ${COMPANY_DEFAULTS.email}`, pageWidth / 2, y, { align: 'center' });
-      y += 6;
-      if (COMPANY_DEFAULTS.gstNumber) {
-        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth / 2, y, { align: 'center' });
-        y += 6;
+      const loadImage = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = reject;
+          img.src = url;
+        });
+      };
+
+      try {
+        const logoDataUrl = await loadImage('/attached_assets/Oakstreet_1765077046310.png');
+        doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
+      } catch (e) {
+        console.log('Logo could not be loaded');
       }
       
+      doc.setFontSize(11);
+      doc.setTextColor(100);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      let headerY = 10;
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth - 15, headerY, { align: 'right' });
+        headerY += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      doc.text(`Email: ${COMPANY_DEFAULTS.email}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      if (COMPANY_DEFAULTS.gstNumber) {
+        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth - 15, headerY, { align: 'right' });
+      }
+      
+      y = 32;
       doc.setDrawColor(200);
       doc.line(15, y, pageWidth - 15, y);
       y += 10;
