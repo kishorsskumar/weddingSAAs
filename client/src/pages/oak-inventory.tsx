@@ -5660,11 +5660,12 @@ function DecorPlanningSection({
               </div>
               <div className="space-y-2">
                 <Label>Linked Event</Label>
-                <Select value={itemFormData.eventId} onValueChange={(v) => {
-                  const event = events.find(e => e.id === v);
+                <Select value={itemFormData.eventId || 'none'} onValueChange={(v) => {
+                  const actualValue = v === 'none' ? '' : v;
+                  const event = events.find(e => e.id === actualValue);
                   setItemFormData({ 
                     ...itemFormData, 
-                    eventId: v,
+                    eventId: actualValue,
                     eventName: event?.title || itemFormData.eventName,
                     eventDate: event?.date || itemFormData.eventDate,
                     venue: event?.venue || itemFormData.venue,
@@ -5674,7 +5675,7 @@ function DecorPlanningSection({
                     <SelectValue placeholder="Optional - link to event" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {events.map(e => (
                       <SelectItem key={e.id} value={e.id}>{e.title} - {e.date ? format(new Date(e.date), 'dd MMM yyyy') : 'No date'}</SelectItem>
                     ))}
@@ -5953,14 +5954,14 @@ function DecorPlanningSection({
             <div className="space-y-2">
               <Label>Link to Inventory Item</Label>
               <Select 
-                value={elementFormData.linkedInventoryItemId} 
-                onValueChange={(v) => setElementFormData({ ...elementFormData, linkedInventoryItemId: v })}
+                value={elementFormData.linkedInventoryItemId || 'none'} 
+                onValueChange={(v) => setElementFormData({ ...elementFormData, linkedInventoryItemId: v === 'none' ? '' : v })}
               >
                 <SelectTrigger data-testid="select-linked-inventory">
                   <SelectValue placeholder="Optional - link to inventory" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {inventoryItems.map(inv => (
                     <SelectItem key={inv.id} value={inv.id}>
                       {inv.name} ({inv.stockQuantity} in stock)
