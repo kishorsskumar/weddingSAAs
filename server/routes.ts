@@ -3232,6 +3232,103 @@ export async function registerRoutes(
     }
   });
 
+  // WhatsApp API Routes
+  app.get('/api/whatsapp/status', async (req, res) => {
+    try {
+      const { isWhatsAppConfigured } = await import('./whatsapp-service');
+      res.json({ 
+        configured: isWhatsAppConfigured(),
+        message: isWhatsAppConfigured() 
+          ? 'WhatsApp is configured and ready' 
+          : 'WhatsApp is not configured. Please set Twilio credentials.'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to check WhatsApp status' });
+    }
+  });
+
+  app.post('/api/whatsapp/send-test', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { phoneNumber } = req.body;
+      if (!phoneNumber) {
+        return res.status(400).json({ error: 'Phone number is required' });
+      }
+
+      const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
+      
+      if (!isWhatsAppConfigured()) {
+        return res.status(400).json({ error: 'WhatsApp is not configured. Please set Twilio credentials.' });
+      }
+
+      const result = await sendNotificationViaWhatsApp(
+        phoneNumber,
+        'Test Notification',
+        'This is a test message from Oak Event Management. If you received this, WhatsApp notifications are working correctly!',
+        'normal'
+      );
+
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(400).json({ error: result.error || 'Failed to send test message' });
+      }
+    } catch (error: any) {
+      console.error('WhatsApp test error:', error);
+      res.status(500).json({ error: error.message || 'Failed to send test message' });
+    }
+  });
+
+  app.post('/api/whatsapp/send-notification', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { notificationId } = req.body;
+      if (!notificationId) {
+        return res.status(400).json({ error: 'Notification ID is required' });
+      }
+
+      const preferences = await storage.getNotificationPreferences(userId);
+      if (!preferences?.whatsappEnabled || !preferences?.whatsappPhoneNumber) {
+        return res.status(400).json({ error: 'WhatsApp notifications not enabled or phone number not set' });
+      }
+
+      const notification = await storage.getNotification(notificationId);
+      if (!notification) {
+        return res.status(404).json({ error: 'Notification not found' });
+      }
+
+      const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
+      
+      if (!isWhatsAppConfigured()) {
+        return res.status(400).json({ error: 'WhatsApp is not configured' });
+      }
+
+      const result = await sendNotificationViaWhatsApp(
+        preferences.whatsappPhoneNumber,
+        notification.title,
+        notification.message,
+        notification.priority
+      );
+
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(400).json({ error: result.error || 'Failed to send notification' });
+      }
+    } catch (error: any) {
+      console.error('WhatsApp notification error:', error);
+      res.status(500).json({ error: error.message || 'Failed to send notification' });
+    }
+  });
+
   // Object Storage - Image Upload Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {

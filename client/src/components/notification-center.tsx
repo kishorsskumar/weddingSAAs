@@ -57,6 +57,8 @@ interface NotificationPreference {
   dailyDigestEnabled: boolean;
   quietHoursStart?: string;
   quietHoursEnd?: string;
+  whatsappEnabled: boolean;
+  whatsappPhoneNumber?: string;
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -629,6 +631,161 @@ function NotificationSettings({
           />
         </div>
       </div>
+
+      <Separator />
+
+      <WhatsAppSettings
+        preferences={preferences}
+        onUpdate={onUpdate}
+        isUpdating={isUpdating}
+      />
+    </div>
+  );
+}
+
+function WhatsAppSettings({
+  preferences,
+  onUpdate,
+  isUpdating,
+}: {
+  preferences: NotificationPreference;
+  onUpdate: (data: Partial<NotificationPreference>) => void;
+  isUpdating: boolean;
+}) {
+  const [phoneNumber, setPhoneNumber] = useState(preferences.whatsappPhoneNumber || '');
+  const [testLoading, setTestLoading] = useState(false);
+  const { toast } = useToast();
+
+  const { data: whatsappStatus } = useQuery<{ configured: boolean; message: string }>({
+    queryKey: ["/api/whatsapp/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/whatsapp/status", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to check WhatsApp status");
+      return res.json();
+    },
+  });
+
+  const handlePhoneChange = (value: string) => {
+    setPhoneNumber(value);
+  };
+
+  const handleSavePhone = () => {
+    onUpdate({ whatsappPhoneNumber: phoneNumber });
+  };
+
+  const handleSendTest = async () => {
+    if (!phoneNumber) {
+      toast({ title: "Error", description: "Please enter your phone number first", variant: "destructive" });
+      return;
+    }
+
+    setTestLoading(true);
+    try {
+      const res = await fetch("/api/whatsapp/send-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ phoneNumber }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast({ title: "Success", description: "Test message sent! Check your WhatsApp." });
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to send test message", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send test message", variant: "destructive" });
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <h4 className="font-medium text-sm">WhatsApp Notifications</h4>
+        {whatsappStatus?.configured ? (
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Connected</span>
+        ) : (
+          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not Configured</span>
+        )}
+      </div>
+
+      {!whatsappStatus?.configured && (
+        <p className="text-xs text-muted-foreground">
+          WhatsApp notifications require Twilio credentials to be configured by your administrator.
+        </p>
+      )}
+
+      {whatsappStatus?.configured && (
+        <>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="whatsapp-enabled" className="text-sm">
+              Enable WhatsApp notifications
+            </Label>
+            <Switch
+              id="whatsapp-enabled"
+              checked={preferences.whatsappEnabled}
+              onCheckedChange={(checked) => onUpdate({ whatsappEnabled: checked })}
+              disabled={isUpdating}
+              data-testid="switch-whatsapp-enabled"
+            />
+          </div>
+
+          {preferences.whatsappEnabled && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-phone" className="text-xs text-muted-foreground">
+                  Your WhatsApp Number (with country code, e.g., +91 98765 43210)
+                </Label>
+                <div className="flex gap-2">
+                  <input
+                    id="whatsapp-phone"
+                    type="tel"
+                    value={phoneNumber}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
+                    placeholder="+91 98765 43210"
+                    className="flex-1 px-3 py-2 text-sm border rounded-md bg-background"
+                    data-testid="input-whatsapp-phone"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSavePhone}
+                    disabled={isUpdating || phoneNumber === preferences.whatsappPhoneNumber}
+                    data-testid="button-save-phone"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSendTest}
+                disabled={testLoading || !phoneNumber}
+                className="w-full"
+                data-testid="button-send-test-whatsapp"
+              >
+                {testLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Send Test Message"
+                )}
+              </Button>
+
+              <p className="text-xs text-muted-foreground">
+                Note: For Twilio sandbox, you must first send "join &lt;sandbox-code&gt;" to the WhatsApp number before receiving messages.
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
