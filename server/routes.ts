@@ -2884,7 +2884,8 @@ export async function registerRoutes(
       try {
         console.log(`[PDF Parse] Using pdfjs-dist library`);
         
-        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+        const pdfUint8Array = new Uint8Array(pdfBuffer);
+        const loadingTask = pdfjsLib.getDocument({ data: pdfUint8Array });
         const pdfDoc = await loadingTask.promise;
         console.log(`[PDF Parse] PDF loaded, pages: ${pdfDoc.numPages}`);
         
