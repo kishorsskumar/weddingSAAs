@@ -78,24 +78,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Total Revenue (FY)
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary hidden sm:block" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-xl sm:text-2xl font-bold">₹{(totalSales / 100000).toFixed(2)}L</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">+20.1% from last month</p>
-          </CardContent>
-        </Card>
+      <div className={`grid gap-3 sm:gap-4 ${isSuperAdmin ? 'grid-cols-2 lg:grid-cols-4' : isWeddingPlanner ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
+        {(isSuperAdmin || isWeddingPlanner) && (
+          <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                {isWeddingPlanner ? 'My Revenue (FY)' : 'Total Revenue (FY)'}
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-primary hidden sm:block" />
+            </CardHeader>
+            <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+              <div className="text-xl sm:text-2xl font-bold">₹{(totalSales / 100000).toFixed(2)}L</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{isWeddingPlanner ? 'Your events total' : '+20.1% from last month'}</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-l-4 border-l-chart-2 shadow-sm hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Upcoming Events
+              {isWeddingPlanner ? 'My Upcoming Events' : 'Upcoming Events'}
             </CardTitle>
             <Calendar className="h-4 w-4 text-chart-2 hidden sm:block" />
           </CardHeader>
@@ -105,31 +107,35 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-chart-3 shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Active Leads
-            </CardTitle>
-            <Users className="h-4 w-4 text-chart-3 hidden sm:block" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-xl sm:text-2xl font-bold">12</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">+2 new today</p>
-          </CardContent>
-        </Card>
+        {isSuperAdmin && (
+          <>
+            <Card className="border-l-4 border-l-chart-3 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  Active Leads
+                </CardTitle>
+                <Users className="h-4 w-4 text-chart-3 hidden sm:block" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">12</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">+2 new today</p>
+              </CardContent>
+            </Card>
 
-        <Card className="border-l-4 border-l-chart-4 shadow-sm hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
-            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Monthly Profit
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-chart-4 hidden sm:block" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-            <div className="text-xl sm:text-2xl font-bold">18%</div>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">+2.5% from target</p>
-          </CardContent>
-        </Card>
+            <Card className="border-l-4 border-l-chart-4 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  Monthly Profit
+                </CardTitle>
+                <TrendingUp className="h-4 w-4 text-chart-4 hidden sm:block" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">18%</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">+2.5% from target</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Quick Access Section */}
