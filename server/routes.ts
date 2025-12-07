@@ -2297,7 +2297,8 @@ export async function registerRoutes(
       const items = await storage.getRentalItemsByRentalId(rentalId as string);
       res.json(items);
     } else {
-      res.json([]);
+      const items = await storage.getAllRentalItems();
+      res.json(items);
     }
   });
 

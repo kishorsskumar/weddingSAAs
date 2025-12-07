@@ -438,6 +438,7 @@ export interface IStorage {
   deleteRentalRecord(id: string): Promise<void>;
 
   // Oak Inventory - Rental Items
+  getAllRentalItems(): Promise<RentalItem[]>;
   getRentalItemsByRentalId(rentalId: string): Promise<RentalItem[]>;
   createRentalItem(item: InsertRentalItem): Promise<RentalItem>;
   updateRentalItem(id: string, item: Partial<InsertRentalItem>): Promise<RentalItem | undefined>;
@@ -1846,6 +1847,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Oak Inventory - Rental Items
+  async getAllRentalItems(): Promise<RentalItem[]> {
+    return await db.select().from(rentalItems);
+  }
+
   async getRentalItemsByRentalId(rentalId: string): Promise<RentalItem[]> {
     return await db.select().from(rentalItems)
       .where(eq(rentalItems.rentalId, rentalId));
