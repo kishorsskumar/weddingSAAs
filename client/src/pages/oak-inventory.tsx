@@ -4981,6 +4981,8 @@ function DecorPlanningSection({
   });
   const [newDecorType, setNewDecorType] = useState('');
   const [showNewTypeInput, setShowNewTypeInput] = useState(false);
+  const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
+  const [inventoryPopoverOpen, setInventoryPopoverOpen] = useState(false);
   
   const allDecorTypes = useMemo(() => {
     const combinedTypes = [...DECOR_TYPES, ...customDecorTypes];
@@ -5660,27 +5662,68 @@ function DecorPlanningSection({
               </div>
               <div className="space-y-2">
                 <Label>Linked Event</Label>
-                <Select value={itemFormData.eventId || 'none'} onValueChange={(v) => {
-                  const actualValue = v === 'none' ? '' : v;
-                  const event = events.find(e => e.id === actualValue);
-                  setItemFormData({ 
-                    ...itemFormData, 
-                    eventId: actualValue,
-                    eventName: event?.title || itemFormData.eventName,
-                    eventDate: event?.date || itemFormData.eventDate,
-                    venue: event?.venue || itemFormData.venue,
-                  });
-                }}>
-                  <SelectTrigger data-testid="select-linked-event">
-                    <SelectValue placeholder="Optional - link to event" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {events.map(e => (
-                      <SelectItem key={e.id} value={e.id}>{e.title} - {e.date ? format(new Date(e.date), 'dd MMM yyyy') : 'No date'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={eventPopoverOpen} onOpenChange={setEventPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={eventPopoverOpen}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-linked-event"
+                    >
+                      {itemFormData.eventId
+                        ? events.find(e => e.id === itemFormData.eventId)?.title || 'Select event...'
+                        : 'Select event...'}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[350px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search events..." />
+                      <CommandList>
+                        <ScrollArea className="h-[280px]">
+                          <CommandEmpty>No event found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem
+                              value="none"
+                              onSelect={() => {
+                                setItemFormData({ ...itemFormData, eventId: '' });
+                                setEventPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", !itemFormData.eventId ? "opacity-100" : "opacity-0")} />
+                              None
+                            </CommandItem>
+                            {events.map(event => (
+                              <CommandItem
+                                key={event.id}
+                                value={`${event.title} ${event.venue || ''} ${event.date || ''}`}
+                                onSelect={() => {
+                                  setItemFormData({
+                                    ...itemFormData,
+                                    eventId: event.id,
+                                    eventName: event.title || itemFormData.eventName,
+                                    eventDate: event.date || itemFormData.eventDate,
+                                    venue: event.venue || itemFormData.venue,
+                                  });
+                                  setEventPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", itemFormData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{event.title}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {event.venue} {event.date ? `- ${format(new Date(event.date), 'dd MMM yyyy')}` : ''}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </ScrollArea>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -5953,22 +5996,62 @@ function DecorPlanningSection({
 
             <div className="space-y-2">
               <Label>Link to Inventory Item</Label>
-              <Select 
-                value={elementFormData.linkedInventoryItemId || 'none'} 
-                onValueChange={(v) => setElementFormData({ ...elementFormData, linkedInventoryItemId: v === 'none' ? '' : v })}
-              >
-                <SelectTrigger data-testid="select-linked-inventory">
-                  <SelectValue placeholder="Optional - link to inventory" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {inventoryItems.map(inv => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      {inv.name} ({inv.stockQuantity} in stock)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={inventoryPopoverOpen} onOpenChange={setInventoryPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={inventoryPopoverOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-linked-inventory"
+                  >
+                    {elementFormData.linkedInventoryItemId
+                      ? inventoryItems.find(i => i.id === elementFormData.linkedInventoryItemId)?.name || 'Select item...'
+                      : 'Select inventory item...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search inventory items..." />
+                    <CommandList>
+                      <ScrollArea className="h-[280px]">
+                        <CommandEmpty>No inventory item found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setElementFormData({ ...elementFormData, linkedInventoryItemId: '' });
+                              setInventoryPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !elementFormData.linkedInventoryItemId ? "opacity-100" : "opacity-0")} />
+                            None
+                          </CommandItem>
+                          {inventoryItems.map(inv => (
+                            <CommandItem
+                              key={inv.id}
+                              value={`${inv.name} ${inv.category || ''}`}
+                              onSelect={() => {
+                                setElementFormData({ ...elementFormData, linkedInventoryItemId: inv.id });
+                                setInventoryPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", elementFormData.linkedInventoryItemId === inv.id ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{inv.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {inv.category} - {inv.stockQuantity} in stock
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </ScrollArea>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
