@@ -5662,7 +5662,7 @@ function DecorPlanningSection({
               </div>
               <div className="space-y-2">
                 <Label>Linked Event</Label>
-                <Popover open={eventPopoverOpen} onOpenChange={setEventPopoverOpen}>
+                <Popover open={eventPopoverOpen} onOpenChange={setEventPopoverOpen} modal={false}>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -5996,7 +5996,7 @@ function DecorPlanningSection({
 
             <div className="space-y-2">
               <Label>Link to Inventory Item</Label>
-              <Popover open={inventoryPopoverOpen} onOpenChange={setInventoryPopoverOpen}>
+              <Popover open={inventoryPopoverOpen} onOpenChange={setInventoryPopoverOpen} modal={false}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
