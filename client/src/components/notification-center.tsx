@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, CheckCheck, X, Settings, Calendar, FileText, Receipt, Package, Users, AlertCircle } from "lucide-react";
+import { Bell, Check, CheckCheck, X, Settings, Calendar, FileText, Receipt, Package, Users, AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useLocation } from "wouter";
@@ -81,6 +82,7 @@ export function NotificationBell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: unreadCount = 0 } = useQuery<number>({
     queryKey: ["/api/notifications/unread-count"],
@@ -93,17 +95,27 @@ export function NotificationBell() {
     refetchInterval: 30000,
   });
 
-  const { data: notifications = [] } = useQuery<Notification[]>({
+  const { 
+    data: notifications = [], 
+    isLoading: notificationsLoading,
+    isError: notificationsError,
+    refetch: refetchNotifications
+  } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=20", { credentials: "include" });
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json();
     },
     enabled: isOpen,
   });
 
-  const { data: preferences } = useQuery<NotificationPreference>({
+  const { 
+    data: preferences,
+    isLoading: preferencesLoading,
+    isError: preferencesError,
+    refetch: refetchPreferences
+  } = useQuery<NotificationPreference>({
     queryKey: ["/api/notification-preferences"],
     queryFn: async () => {
       const res = await fetch("/api/notification-preferences", { credentials: "include" });
@@ -126,6 +138,9 @@ export function NotificationBell() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark notification as read", variant: "destructive" });
+    },
   });
 
   const markAllReadMutation = useMutation({
@@ -140,6 +155,10 @@ export function NotificationBell() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      toast({ title: "Done", description: "All notifications marked as read" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to mark all as read", variant: "destructive" });
     },
   });
 
@@ -156,6 +175,9 @@ export function NotificationBell() {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
     },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to dismiss notification", variant: "destructive" });
+    },
   });
 
   const dismissAllMutation = useMutation({
@@ -170,6 +192,10 @@ export function NotificationBell() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      toast({ title: "Done", description: "All notifications cleared" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to clear notifications", variant: "destructive" });
     },
   });
 
@@ -182,9 +208,15 @@ export function NotificationBell() {
       if (!res.ok) throw new Error("Failed to generate notifications");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      if (data.notificationsGenerated > 0) {
+        toast({ title: "Updated", description: `${data.notificationsGenerated} new notification(s) found` });
+      }
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to check for notifications", variant: "destructive" });
     },
   });
 
@@ -201,6 +233,10 @@ export function NotificationBell() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+      toast({ title: "Saved", description: "Notification preferences updated" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save preferences", variant: "destructive" });
     },
   });
 
@@ -266,6 +302,9 @@ export function NotificationBell() {
                     preferences={preferences}
                     onUpdate={(data) => updatePreferencesMutation.mutate(data)}
                     isUpdating={updatePreferencesMutation.isPending}
+                    isLoading={preferencesLoading}
+                    isError={preferencesError}
+                    onRetry={() => refetchPreferences()}
                   />
                 </DialogContent>
               </Dialog>
@@ -299,7 +338,26 @@ export function NotificationBell() {
           )}
 
           <ScrollArea className="max-h-80">
-            {notifications.length === 0 ? (
+            {notificationsLoading ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin opacity-50" />
+                <p className="text-sm">Loading notifications...</p>
+              </div>
+            ) : notificationsError ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2 text-red-400" />
+                <p className="text-sm text-red-600">Failed to load notifications</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => refetchNotifications()}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Try again
+                </Button>
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No notifications yet</p>
@@ -384,11 +442,41 @@ function NotificationSettings({
   preferences,
   onUpdate,
   isUpdating,
+  isLoading,
+  isError,
+  onRetry,
 }: {
   preferences?: NotificationPreference;
   onUpdate: (data: Partial<NotificationPreference>) => void;
   isUpdating: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }) {
+  if (isLoading) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 mx-auto mb-2 animate-spin" />
+        <p className="text-sm">Loading preferences...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="py-8 text-center text-muted-foreground">
+        <AlertCircle className="h-6 w-6 mx-auto mb-2 text-red-400" />
+        <p className="text-sm text-red-600">Failed to load preferences</p>
+        {onRetry && (
+          <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
+            <RefreshCw className="h-3 w-3 mr-1" />
+            Try again
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   if (!preferences) {
     return <div className="py-4 text-center text-muted-foreground">Loading...</div>;
   }
