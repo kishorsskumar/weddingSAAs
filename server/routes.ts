@@ -3220,6 +3220,35 @@ export async function registerRoutes(
       // Create notifications if any were generated
       if (notifications.length > 0) {
         await storage.createManyNotifications(notifications);
+
+        // Send WhatsApp notifications for high-priority items if enabled
+        if (preferences.whatsappEnabled && preferences.whatsappPhoneNumber) {
+          const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
+          
+          if (isWhatsAppConfigured()) {
+            // Only send WhatsApp for high/urgent priority notifications
+            const priorityNotifications = notifications.filter(n => 
+              n.priority === 'high' || n.priority === 'urgent'
+            );
+            
+            // Limit to max 5 WhatsApp messages per batch to avoid spam
+            const toSend = priorityNotifications.slice(0, 5);
+            
+            for (const notification of toSend) {
+              try {
+                await sendNotificationViaWhatsApp(
+                  preferences.whatsappPhoneNumber,
+                  notification.title,
+                  notification.message,
+                  notification.priority
+                );
+                console.log(`[WhatsApp] Sent notification: ${notification.title}`);
+              } catch (error) {
+                console.error(`[WhatsApp] Failed to send: ${notification.title}`, error);
+              }
+            }
+          }
+        }
       }
 
       res.json({ 
