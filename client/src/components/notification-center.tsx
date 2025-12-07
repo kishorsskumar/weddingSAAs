@@ -106,10 +106,15 @@ export function NotificationBell() {
     queryKey: ["/api/notifications"],
     queryFn: async () => {
       const res = await fetch("/api/notifications?limit=20", { credentials: "include" });
+      if (res.status === 401) {
+        return [];
+      }
       if (!res.ok) throw new Error("Failed to fetch notifications");
       return res.json();
     },
     enabled: isOpen,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const { 
