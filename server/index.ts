@@ -69,6 +69,11 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
+// Health check endpoint for deployment - responds immediately
+app.get('/health', (_req, res) => {
+  res.status(200).send('OK');
+});
+
 // Redirect non-www to www in production
 app.use((req, res, next) => {
   const host = req.hostname || req.headers.host || "";
