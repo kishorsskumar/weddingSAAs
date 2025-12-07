@@ -920,6 +920,24 @@ export type InsertProductionTask = z.infer<typeof insertProductionTaskSchema>;
 export type ProductionTask = typeof productionTasks.$inferSelect;
 
 // Production Décor Items - Pastel cards for each décor area (Stage, Entrance Arch, etc.)
+export const productionDecorImports = pgTable("production_decor_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id),
+  sourceType: text("source_type").notNull(), // 'estimate', 'invoice'
+  sourceId: varchar("source_id"), // Links to estimates/invoices if available
+  filename: text("filename").notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  itemsCreated: integer("items_created").default(0),
+  elementsCreated: integer("elements_created").default(0),
+  errorLog: jsonb("error_log"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProductionDecorImportSchema = createInsertSchema(productionDecorImports).omit({ id: true, createdAt: true });
+export type InsertProductionDecorImport = z.infer<typeof insertProductionDecorImportSchema>;
+export type ProductionDecorImport = typeof productionDecorImports.$inferSelect;
+
 export const productionDecorItems = pgTable("production_decor_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventId: varchar("event_id").references(() => events.id),
@@ -929,6 +947,7 @@ export const productionDecorItems = pgTable("production_decor_items", {
   decorType: text("decor_type").notNull(), // 'Stage', 'Entrance Arch', 'Backdrop', 'Photo Booth', etc.
   setupDate: date("setup_date"),
   setupTime: text("setup_time"),
+  endTime: text("end_time"), // End time for scheduled activities
   estimatedDuration: text("estimated_duration"), // e.g., '4 hours', '2 days'
   priority: text("priority").default('medium'), // 'low', 'medium', 'high', 'urgent'
   manpowerRequired: integer("manpower_required").default(0),
@@ -936,6 +955,9 @@ export const productionDecorItems = pgTable("production_decor_items", {
   status: text("status").notNull().default('pending'), // 'pending', 'in_progress', 'completed', 'on_hold'
   pastelColor: text("pastel_color").default('blue'), // For UI card background
   notes: text("notes"),
+  importBatchId: varchar("import_batch_id").references(() => productionDecorImports.id, { onDelete: 'cascade' }),
+  sectionLabel: text("section_label"), // Original section label from imported document
+  sequence: integer("sequence").default(0), // Order within import batch
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
