@@ -137,25 +137,16 @@ function ImageUpload({
 
     for (const file of Array.from(files)) {
       try {
-        const response = await fetch('/api/objects/upload', { method: 'POST' });
-        const { uploadURL } = await response.json();
-        
-        await fetch(uploadURL, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
-
-        const finalizeRes = await fetch('/api/objects/finalize', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uploadURL }),
-        });
-        const { objectPath } = await finalizeRes.json();
-        newPhotos.push(objectPath);
+        newPhotos.push(dataUrl);
       } catch (error) {
         console.error('Upload error:', error);
-        toast({ title: 'Failed to upload image', variant: 'destructive' });
+        toast({ title: 'Failed to process image', variant: 'destructive' });
       }
     }
 
@@ -218,8 +209,10 @@ function ImageUpload({
 
 function ImageGallery({ photos }: { photos: string[] }) {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  
+  const validPhotos = (photos || []).filter(p => p && p.trim() !== '' && p !== 'null');
 
-  if (!photos || photos.length === 0) {
+  if (validPhotos.length === 0) {
     return (
       <div className="flex items-center justify-center h-32 bg-gray-100 rounded-lg">
         <div className="text-center text-gray-400">
@@ -233,7 +226,7 @@ function ImageGallery({ photos }: { photos: string[] }) {
   return (
     <div>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-        {photos.map((photo, index) => (
+        {validPhotos.map((photo, index) => (
           <img
             key={index}
             src={photo}
@@ -246,9 +239,12 @@ function ImageGallery({ photos }: { photos: string[] }) {
 
       <Dialog open={selectedIndex !== null} onOpenChange={() => setSelectedIndex(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl p-2">
-          {selectedIndex !== null && (
+          <DialogHeader>
+            <DialogTitle>Image Preview</DialogTitle>
+          </DialogHeader>
+          {selectedIndex !== null && validPhotos[selectedIndex] && (
             <img
-              src={photos[selectedIndex]}
+              src={validPhotos[selectedIndex]}
               alt={`Photo ${selectedIndex + 1}`}
               className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
             />
