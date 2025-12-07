@@ -3287,7 +3287,8 @@ function ProductionPlansSection({
   const [selectedPlan, setSelectedPlan] = useState<ProductionPlan | null>(null);
 
   const [formData, setFormData] = useState({ name: '', eventId: '', status: 'draft' });
-  const [taskFormData, setTaskFormData] = useState({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' });
+  const [taskFormData, setTaskFormData] = useState({ activity: '', taskDate: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' });
+  const [editingTask, setEditingTask] = useState<ProductionTask | null>(null);
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchValue, setEventSearchValue] = useState('');
   
@@ -3387,18 +3388,52 @@ function ProductionPlansSection({
       setLocalPersons(prev => [...prev, taskFormData.responsiblePersonName]);
     }
     
-    addTaskMutation.mutate({
-      planId: selectedPlan.id,
-      activity: taskFormData.activity,
-      startTime: taskFormData.startTime || null,
-      endTime: taskFormData.endTime || null,
-      vendorId: null,
-      vendorName: taskFormData.vendorName || null,
-      responsiblePersonId: null,
-      responsiblePersonName: taskFormData.responsiblePersonName || null,
-      status: taskFormData.status,
-      notes: taskFormData.notes || null,
+    if (editingTask) {
+      updateTaskMutation.mutate({
+        id: editingTask.id,
+        data: {
+          activity: taskFormData.activity,
+          taskDate: taskFormData.taskDate || null,
+          startTime: taskFormData.startTime || null,
+          endTime: taskFormData.endTime || null,
+          vendorName: taskFormData.vendorName || null,
+          responsiblePersonName: taskFormData.responsiblePersonName || null,
+          status: taskFormData.status,
+          notes: taskFormData.notes || null,
+        }
+      });
+      setEditingTask(null);
+      setIsTaskModalOpen(false);
+    } else {
+      addTaskMutation.mutate({
+        planId: selectedPlan.id,
+        activity: taskFormData.activity,
+        taskDate: taskFormData.taskDate || null,
+        startTime: taskFormData.startTime || null,
+        endTime: taskFormData.endTime || null,
+        vendorId: null,
+        vendorName: taskFormData.vendorName || null,
+        responsiblePersonId: null,
+        responsiblePersonName: taskFormData.responsiblePersonName || null,
+        status: taskFormData.status,
+        notes: taskFormData.notes || null,
+      });
+    }
+  };
+
+  const handleEditTask = (task: ProductionTask) => {
+    setEditingTask(task);
+    setTaskFormData({
+      activity: task.activity,
+      taskDate: task.taskDate || '',
+      startTime: task.startTime || '',
+      endTime: task.endTime || '',
+      vendorName: task.vendorName || '',
+      responsiblePersonName: task.responsiblePersonName || '',
+      status: task.status,
+      notes: task.notes || '',
     });
+    setIsTaskModalOpen(true);
   };
 
   const getEventName = (eventId: string | null) => events.find(e => e.id === eventId)?.title || 'N/A';
@@ -3408,7 +3443,14 @@ function ProductionPlansSection({
     return <Badge variant="default" className={colors[status] || 'bg-gray-500'}>{status.replace('_', ' ')}</Badge>;
   };
 
-  const tasksForSelected = selectedPlan ? tasks.filter(t => t.planId === selectedPlan.id).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) : [];
+  const tasksForSelected = selectedPlan ? tasks.filter(t => t.planId === selectedPlan.id).sort((a, b) => {
+    const dateA = a.taskDate || '9999-12-31';
+    const dateB = b.taskDate || '9999-12-31';
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    const timeA = a.startTime || '99:99';
+    const timeB = b.startTime || '99:99';
+    return timeA.localeCompare(timeB);
+  }) : [];
 
   const handleDownloadProductionPlanPDF = async () => {
     if (!selectedPlan) return;
@@ -3522,12 +3564,13 @@ function ProductionPlansSection({
       
       doc.setFillColor(253, 246, 227);
       doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('#', 18, y);
-      doc.text('Activity', 26, y);
-      doc.text('Time', 90, y);
-      doc.text('Vendor', 120, y);
+      doc.text('#', 17, y);
+      doc.text('Activity', 24, y);
+      doc.text('Date', 70, y);
+      doc.text('Time', 95, y);
+      doc.text('Vendor', 125, y);
       doc.text('Person', 155, y);
       doc.text('Status', 185, y);
       y += 8;
@@ -3540,26 +3583,29 @@ function ProductionPlansSection({
           doc.setFillColor(253, 246, 227);
           doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
           doc.setFont('helvetica', 'bold');
-          doc.text('#', 18, y);
-          doc.text('Activity', 26, y);
-          doc.text('Time', 90, y);
-          doc.text('Vendor', 120, y);
+          doc.text('#', 17, y);
+          doc.text('Activity', 24, y);
+          doc.text('Date', 70, y);
+          doc.text('Time', 95, y);
+          doc.text('Vendor', 125, y);
           doc.text('Person', 155, y);
           doc.text('Status', 185, y);
           y += 8;
           doc.setFont('helvetica', 'normal');
         }
         
+        const dateStr = task.taskDate ? format(new Date(task.taskDate), 'dd/MM/yy') : '-';
         const timeStr = task.startTime && task.endTime 
           ? `${task.startTime}-${task.endTime}` 
           : task.startTime || task.endTime || '-';
         
-        doc.text(String(index + 1), 18, y);
-        const activityText = doc.splitTextToSize(task.activity, 60);
-        doc.text(activityText[0].substring(0, 30), 26, y);
-        doc.text(timeStr.substring(0, 12), 90, y);
-        doc.text((task.vendorName || '-').substring(0, 15), 120, y);
-        doc.text((task.responsiblePersonName || '-').substring(0, 15), 155, y);
+        doc.text(String(index + 1), 17, y);
+        const activityText = doc.splitTextToSize(task.activity, 42);
+        doc.text(activityText[0].substring(0, 22), 24, y);
+        doc.text(dateStr, 70, y);
+        doc.text(timeStr.substring(0, 11), 95, y);
+        doc.text((task.vendorName || '-').substring(0, 12), 125, y);
+        doc.text((task.responsiblePersonName || '-').substring(0, 12), 155, y);
         doc.text(task.status.replace('_', ' '), 185, y);
         
         y += activityText.length > 1 ? 8 : 6;
@@ -3658,7 +3704,7 @@ function ProductionPlansSection({
                     <Download className="w-4 h-4 mr-2" />
                     Download PDF
                   </Button>
-                  <Button size="sm" onClick={() => { setTaskFormData({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
+                  <Button size="sm" onClick={() => { setEditingTask(null); setTaskFormData({ activity: '', taskDate: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Task
                   </Button>
@@ -3677,6 +3723,7 @@ function ProductionPlansSection({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Activity</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Time</TableHead>
                     <TableHead>Vendor</TableHead>
                     <TableHead>Responsible</TableHead>
@@ -3688,6 +3735,9 @@ function ProductionPlansSection({
                   {tasksForSelected.map(task => (
                     <TableRow key={task.id} data-testid={`task-${task.id}`}>
                       <TableCell className="font-medium">{task.activity}</TableCell>
+                      <TableCell className="text-sm">
+                        {task.taskDate ? format(new Date(task.taskDate), 'dd/MM/yyyy') : '-'}
+                      </TableCell>
                       <TableCell className="text-sm">
                         {task.startTime && task.endTime ? `${task.startTime} - ${task.endTime}` : task.startTime || task.endTime || '-'}
                       </TableCell>
@@ -3707,9 +3757,14 @@ function ProductionPlansSection({
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => deleteTaskMutation.mutate(task.id)} data-testid={`button-delete-task-${task.id}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditTask(task)} data-testid={`button-edit-task-${task.id}`}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => deleteTaskMutation.mutate(task.id)} data-testid={`button-delete-task-${task.id}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -3807,15 +3862,19 @@ function ProductionPlansSection({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
+      <Dialog open={isTaskModalOpen} onOpenChange={(open) => { setIsTaskModalOpen(open); if (!open) setEditingTask(null); }}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Task to Plan</DialogTitle>
+            <DialogTitle>{editingTask ? 'Edit Task' : 'Add Task to Plan'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleAddTask} className="space-y-4">
             <div className="space-y-2">
               <Label>Activity *</Label>
               <Input value={taskFormData.activity} onChange={(e) => setTaskFormData({ ...taskFormData, activity: e.target.value })} required data-testid="input-task-activity" />
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Input type="date" value={taskFormData.taskDate} onChange={(e) => setTaskFormData({ ...taskFormData, taskDate: e.target.value })} data-testid="input-task-date" />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -3935,8 +3994,8 @@ function ProductionPlansSection({
               <Textarea value={taskFormData.notes} onChange={(e) => setTaskFormData({ ...taskFormData, notes: e.target.value })} data-testid="input-task-notes" />
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsTaskModalOpen(false)}>Cancel</Button>
-              <Button type="submit" data-testid="button-submit-task">Add Task</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsTaskModalOpen(false); setEditingTask(null); }}>Cancel</Button>
+              <Button type="submit" data-testid="button-submit-task">{editingTask ? 'Update Task' : 'Add Task'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>

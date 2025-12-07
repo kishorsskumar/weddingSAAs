@@ -902,6 +902,7 @@ export const productionTasks = pgTable("production_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   planId: varchar("plan_id").notNull().references(() => productionPlans.id, { onDelete: 'cascade' }),
   activity: text("activity").notNull(),
+  taskDate: text("task_date"), // Date for the task (YYYY-MM-DD format)
   startTime: text("start_time"),
   endTime: text("end_time"),
   vendorId: varchar("vendor_id").references(() => vendors.id),
