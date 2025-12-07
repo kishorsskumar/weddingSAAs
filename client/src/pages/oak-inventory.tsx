@@ -69,6 +69,8 @@ import type {
   PurchaseOrderItem,
   ProductionPlan,
   ProductionTask,
+  ProductionDecorItem,
+  ProductionDecorElement,
   Event,
   Vendor,
   User,
@@ -83,7 +85,7 @@ const COMPANY_DEFAULTS = {
   gstNumber: '',
 };
 
-type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans';
+type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans' | 'decor-planning';
 
 const DEFAULT_CATEGORIES = ["Décor", "Furniture", "Lighting", "Linens", "Props", "Florals", "Electronics", "Other"];
 const EVENT_TYPES = ["Wedding Stage Décor", "Reception Setup", "Corporate Event", "Birthday Party", "Other"];
@@ -113,6 +115,7 @@ const sidebarItems = [
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
   { id: 'production-plans', label: 'Execution Plans', icon: Factory },
+  { id: 'decor-planning', label: 'Production Planning', icon: ClipboardList },
 ];
 
 function ImageUpload({ 
@@ -315,6 +318,14 @@ export default function OakInventory() {
     queryKey: ['/api/inventory/production-tasks'],
   });
 
+  const { data: decorItems = [] } = useQuery<ProductionDecorItem[]>({
+    queryKey: ['/api/inventory/production-decor-items'],
+  });
+
+  const { data: decorElements = [] } = useQuery<ProductionDecorElement[]>({
+    queryKey: ['/api/inventory/production-decor-elements'],
+  });
+
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
   });
@@ -460,6 +471,15 @@ export default function OakInventory() {
               tasks={productionTasks}
               events={events}
               vendors={vendors}
+              users={users}
+            />
+          )}
+          {activeSection === 'decor-planning' && (
+            <DecorPlanningSection
+              decorItems={decorItems}
+              decorElements={decorElements}
+              events={events}
+              inventoryItems={inventoryItems}
               users={users}
             />
           )}
@@ -4907,6 +4927,1108 @@ function ProductionPlansSection({
               <Button type="submit" data-testid="button-submit-task">{editingTask ? 'Update Task' : 'Add Task'}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const DECOR_TYPES = ['Stage', 'Entrance Arch', 'Backdrop', 'Photo Booth', 'Mandap', 'Aisle', 'Reception', 'Table Setup', 'Ceiling Decor', 'Other'];
+const DECOR_STATUSES = ['pending', 'in_progress', 'completed', 'on_hold'];
+const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'urgent'];
+const ELEMENT_CATEGORIES = ['Flowers', 'Fabric', 'Props', 'Lighting', 'Furniture', 'Greenery', 'Accessories', 'Electronics', 'Other'];
+const SOURCE_OPTIONS = ['in_stock', 'to_buy', 'to_rent'];
+
+const PASTEL_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
+  blue: { bg: 'bg-blue-50', border: 'border-blue-200', badge: 'bg-blue-100 text-blue-700' },
+  pink: { bg: 'bg-pink-50', border: 'border-pink-200', badge: 'bg-pink-100 text-pink-700' },
+  green: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700' },
+  yellow: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
+  purple: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
+  orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-700' },
+  teal: { bg: 'bg-teal-50', border: 'border-teal-200', badge: 'bg-teal-100 text-teal-700' },
+  rose: { bg: 'bg-rose-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700' },
+};
+
+function DecorPlanningSection({
+  decorItems,
+  decorElements,
+  events,
+  inventoryItems,
+  users,
+}: {
+  decorItems: ProductionDecorItem[];
+  decorElements: ProductionDecorElement[];
+  events: Event[];
+  inventoryItems: InventoryItem[];
+  users: User[];
+}) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [isElementModalOpen, setIsElementModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ProductionDecorItem | null>(null);
+  const [editingElement, setEditingElement] = useState<ProductionDecorElement | null>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [viewingItem, setViewingItem] = useState<ProductionDecorItem | null>(null);
+  
+  const [filters, setFilters] = useState({
+    eventDate: '',
+    venue: '',
+    decorType: 'all',
+    status: 'all',
+  });
+
+  const [itemFormData, setItemFormData] = useState({
+    eventId: '',
+    eventName: '',
+    eventDate: '',
+    venue: '',
+    decorType: 'Stage',
+    setupDate: '',
+    setupTime: '',
+    estimatedDuration: '',
+    priority: 'medium',
+    manpowerRequired: '',
+    teamLead: '',
+    status: 'pending',
+    pastelColor: 'blue',
+    notes: '',
+  });
+
+  const [elementFormData, setElementFormData] = useState({
+    decorItemId: '',
+    elementName: '',
+    categoryType: 'Other',
+    quantity: '1',
+    unit: 'Nos',
+    linkedInventoryItemId: '',
+    externalItemName: '',
+    source: 'in_stock',
+    assignedPersonVendor: '',
+    notes: '',
+  });
+
+  const resetItemForm = () => {
+    setItemFormData({
+      eventId: '',
+      eventName: '',
+      eventDate: '',
+      venue: '',
+      decorType: 'Stage',
+      setupDate: '',
+      setupTime: '',
+      estimatedDuration: '',
+      priority: 'medium',
+      manpowerRequired: '',
+      teamLead: '',
+      status: 'pending',
+      pastelColor: 'blue',
+      notes: '',
+    });
+    setEditingItem(null);
+  };
+
+  const resetElementForm = () => {
+    setElementFormData({
+      decorItemId: '',
+      elementName: '',
+      categoryType: 'Other',
+      quantity: '1',
+      unit: 'Nos',
+      linkedInventoryItemId: '',
+      externalItemName: '',
+      source: 'in_stock',
+      assignedPersonVendor: '',
+      notes: '',
+    });
+    setEditingElement(null);
+  };
+
+  const filteredItems = useMemo(() => {
+    return decorItems.filter(item => {
+      const matchesEventDate = !filters.eventDate || item.eventDate === filters.eventDate;
+      const matchesVenue = !filters.venue || (item.venue && item.venue.toLowerCase().includes(filters.venue.toLowerCase()));
+      const matchesDecorType = filters.decorType === 'all' || item.decorType === filters.decorType;
+      const matchesStatus = filters.status === 'all' || item.status === filters.status;
+      return matchesEventDate && matchesVenue && matchesDecorType && matchesStatus;
+    });
+  }, [decorItems, filters]);
+
+  const toggleCardExpand = (itemId: string) => {
+    const newSet = new Set(expandedCards);
+    if (newSet.has(itemId)) {
+      newSet.delete(itemId);
+    } else {
+      newSet.add(itemId);
+    }
+    setExpandedCards(newSet);
+  };
+
+  const createItemMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/production-decor-items', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-items'] });
+      setIsItemModalOpen(false);
+      resetItemForm();
+      toast({ title: 'Décor item created' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to create item', description: error.message, variant: 'destructive' }),
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest('PATCH', `/api/inventory/production-decor-items/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-items'] });
+      setIsItemModalOpen(false);
+      resetItemForm();
+      toast({ title: 'Décor item updated' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to update item', description: error.message, variant: 'destructive' }),
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/inventory/production-decor-items/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-elements'] });
+      toast({ title: 'Décor item deleted' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to delete item', description: error.message, variant: 'destructive' }),
+  });
+
+  const createElementMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/production-decor-elements', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-elements'] });
+      setIsElementModalOpen(false);
+      resetElementForm();
+      toast({ title: 'Element added' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to add element', description: error.message, variant: 'destructive' }),
+  });
+
+  const updateElementMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest('PATCH', `/api/inventory/production-decor-elements/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-elements'] });
+      setIsElementModalOpen(false);
+      resetElementForm();
+      toast({ title: 'Element updated' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to update element', description: error.message, variant: 'destructive' }),
+  });
+
+  const deleteElementMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/inventory/production-decor-elements/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-elements'] });
+      toast({ title: 'Element deleted' });
+    },
+    onError: (error: any) => toast({ title: 'Failed to delete element', description: error.message, variant: 'destructive' }),
+  });
+
+  const handleItemSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      ...itemFormData,
+      eventId: itemFormData.eventId || null,
+      manpowerRequired: itemFormData.manpowerRequired ? parseInt(itemFormData.manpowerRequired) : 0,
+    };
+    if (editingItem) {
+      updateItemMutation.mutate({ id: editingItem.id, data });
+    } else {
+      createItemMutation.mutate(data);
+    }
+  };
+
+  const handleElementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      ...elementFormData,
+      decorItemId: selectedItemId || elementFormData.decorItemId,
+      quantity: parseInt(elementFormData.quantity) || 1,
+      linkedInventoryItemId: elementFormData.linkedInventoryItemId || null,
+    };
+    if (editingElement) {
+      updateElementMutation.mutate({ id: editingElement.id, data });
+    } else {
+      createElementMutation.mutate(data);
+    }
+  };
+
+  const handleEditItem = (item: ProductionDecorItem) => {
+    setEditingItem(item);
+    setItemFormData({
+      eventId: item.eventId || '',
+      eventName: item.eventName || '',
+      eventDate: item.eventDate || '',
+      venue: item.venue || '',
+      decorType: item.decorType,
+      setupDate: item.setupDate || '',
+      setupTime: item.setupTime || '',
+      estimatedDuration: item.estimatedDuration || '',
+      priority: item.priority || 'medium',
+      manpowerRequired: item.manpowerRequired?.toString() || '',
+      teamLead: item.teamLead || '',
+      status: item.status,
+      pastelColor: item.pastelColor || 'blue',
+      notes: item.notes || '',
+    });
+    setIsItemModalOpen(true);
+  };
+
+  const handleEditElement = (element: ProductionDecorElement) => {
+    setEditingElement(element);
+    setElementFormData({
+      decorItemId: element.decorItemId,
+      elementName: element.elementName,
+      categoryType: element.categoryType || 'Other',
+      quantity: element.quantity.toString(),
+      unit: element.unit || 'Nos',
+      linkedInventoryItemId: element.linkedInventoryItemId || '',
+      externalItemName: element.externalItemName || '',
+      source: element.source,
+      assignedPersonVendor: element.assignedPersonVendor || '',
+      notes: element.notes || '',
+    });
+    setIsElementModalOpen(true);
+  };
+
+  const handleAddElement = (itemId: string) => {
+    setSelectedItemId(itemId);
+    resetElementForm();
+    setIsElementModalOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-gray-100 text-gray-700',
+      in_progress: 'bg-blue-100 text-blue-700',
+      completed: 'bg-green-100 text-green-700',
+      on_hold: 'bg-amber-100 text-amber-700',
+    };
+    return <Badge className={colors[status] || 'bg-gray-100 text-gray-700'}>{status.replace('_', ' ')}</Badge>;
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const colors: Record<string, string> = {
+      low: 'bg-green-100 text-green-700',
+      medium: 'bg-amber-100 text-amber-700',
+      high: 'bg-orange-100 text-orange-700',
+      urgent: 'bg-red-100 text-red-700',
+    };
+    return <Badge className={colors[priority] || 'bg-gray-100 text-gray-700'}>{priority}</Badge>;
+  };
+
+  const getSourceBadge = (source: string) => {
+    const colors: Record<string, string> = {
+      in_stock: 'bg-green-100 text-green-700',
+      to_buy: 'bg-blue-100 text-blue-700',
+      to_rent: 'bg-purple-100 text-purple-700',
+    };
+    const labels: Record<string, string> = { in_stock: 'In Stock', to_buy: 'To Buy', to_rent: 'To Rent' };
+    return <Badge className={colors[source] || 'bg-gray-100 text-gray-700'}>{labels[source] || source}</Badge>;
+  };
+
+  const handleDownloadPDF = async (item: ProductionDecorItem) => {
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const elements = decorElements.filter(e => e.decorItemId === item.id);
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 20;
+
+      doc.setFontSize(18);
+      doc.setTextColor(139, 115, 85);
+      doc.text('DÉCOR PRODUCTION PLAN', pageWidth / 2, y, { align: 'center' });
+      y += 15;
+
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text(item.decorType, pageWidth / 2, y, { align: 'center' });
+      y += 15;
+
+      doc.setFontSize(10);
+      doc.setTextColor(80);
+      
+      const leftCol = 20;
+      const rightCol = pageWidth / 2 + 10;
+      
+      doc.text(`Event: ${item.eventName || 'N/A'}`, leftCol, y);
+      doc.text(`Event Date: ${item.eventDate ? format(new Date(item.eventDate), 'dd MMM yyyy') : 'N/A'}`, rightCol, y);
+      y += 7;
+      
+      doc.text(`Venue: ${item.venue || 'N/A'}`, leftCol, y);
+      doc.text(`Status: ${item.status.replace('_', ' ')}`, rightCol, y);
+      y += 7;
+      
+      doc.text(`Setup Date: ${item.setupDate ? format(new Date(item.setupDate), 'dd MMM yyyy') : 'N/A'}`, leftCol, y);
+      doc.text(`Setup Time: ${item.setupTime || 'N/A'}`, rightCol, y);
+      y += 7;
+      
+      doc.text(`Estimated Duration: ${item.estimatedDuration || 'N/A'}`, leftCol, y);
+      doc.text(`Priority: ${item.priority || 'N/A'}`, rightCol, y);
+      y += 7;
+      
+      doc.text(`Manpower Required: ${item.manpowerRequired || 0}`, leftCol, y);
+      doc.text(`Team Lead: ${item.teamLead || 'N/A'}`, rightCol, y);
+      y += 15;
+
+      if (item.notes) {
+        doc.text(`Notes: ${item.notes}`, leftCol, y);
+        y += 10;
+      }
+
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.text('Elements / Materials', leftCol, y);
+      y += 8;
+
+      doc.setFontSize(9);
+      doc.setTextColor(80);
+      
+      const headers = ['Element', 'Category', 'Qty', 'Source', 'Assigned To'];
+      const colWidths = [50, 30, 20, 25, 45];
+      let x = leftCol;
+      
+      doc.setFillColor(245, 245, 245);
+      doc.rect(leftCol, y - 4, pageWidth - 40, 8, 'F');
+      
+      headers.forEach((header, i) => {
+        doc.text(header, x, y);
+        x += colWidths[i];
+      });
+      y += 8;
+
+      elements.forEach((el) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+        }
+        
+        x = leftCol;
+        const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
+        const itemName = invItem?.name || el.externalItemName || el.elementName;
+        
+        doc.text(itemName.substring(0, 25), x, y);
+        x += colWidths[0];
+        doc.text(el.categoryType || '-', x, y);
+        x += colWidths[1];
+        doc.text(`${el.quantity} ${el.unit || ''}`, x, y);
+        x += colWidths[2];
+        doc.text(el.source.replace('_', ' '), x, y);
+        x += colWidths[3];
+        doc.text(el.assignedPersonVendor || '-', x, y);
+        y += 6;
+      });
+
+      doc.save(`Decor-${item.decorType}-${item.eventName || 'Plan'}.pdf`);
+      toast({ title: 'PDF downloaded' });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({ title: 'Failed to generate PDF', variant: 'destructive' });
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({ eventDate: '', venue: '', decorType: 'all', status: 'all' });
+  };
+
+  const getLinkedEvent = (eventId: string | null) => events.find(e => e.id === eventId);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Production Planning</h2>
+          <p className="text-sm text-gray-500">Manage décor items and materials for events</p>
+        </div>
+        <Button 
+          onClick={() => { resetItemForm(); setIsItemModalOpen(true); }} 
+          className="bg-amber-600 hover:bg-amber-700"
+          data-testid="button-add-decor-item"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Add Décor Item
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Search className="w-4 h-4" /> Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Event Date</Label>
+              <Input 
+                type="date" 
+                value={filters.eventDate} 
+                onChange={(e) => setFilters({ ...filters, eventDate: e.target.value })}
+                data-testid="filter-event-date"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Venue</Label>
+              <Input 
+                placeholder="Search venue..." 
+                value={filters.venue} 
+                onChange={(e) => setFilters({ ...filters, venue: e.target.value })}
+                data-testid="filter-venue"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Décor Type</Label>
+              <Select value={filters.decorType} onValueChange={(v) => setFilters({ ...filters, decorType: v })}>
+                <SelectTrigger data-testid="filter-decor-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {DECOR_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
+              <Select value={filters.status} onValueChange={(v) => setFilters({ ...filters, status: v })}>
+                <SelectTrigger data-testid="filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  {DECOR_STATUSES.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button variant="outline" size="sm" onClick={clearFilters} className="w-full">
+                <RotateCcw className="w-3 h-3 mr-1" /> Clear
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {filteredItems.length === 0 ? (
+        <Card className="p-8 text-center">
+          <ClipboardList className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+          <p className="text-gray-500">No décor items found</p>
+          <Button 
+            variant="outline" 
+            className="mt-4" 
+            onClick={() => { resetItemForm(); setIsItemModalOpen(true); }}
+          >
+            <Plus className="w-4 h-4 mr-2" /> Create Your First Décor Item
+          </Button>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filteredItems.map((item) => {
+            const colorScheme = PASTEL_COLORS[item.pastelColor || 'blue'];
+            const elements = decorElements.filter(e => e.decorItemId === item.id);
+            const isExpanded = expandedCards.has(item.id);
+            const linkedEvent = getLinkedEvent(item.eventId);
+
+            return (
+              <Card 
+                key={item.id} 
+                className={cn(
+                  "border-2 transition-all hover:shadow-md",
+                  colorScheme.bg,
+                  colorScheme.border
+                )}
+                data-testid={`card-decor-item-${item.id}`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={colorScheme.badge}>{item.decorType}</Badge>
+                        {getStatusBadge(item.status)}
+                        {getPriorityBadge(item.priority || 'medium')}
+                      </div>
+                      <CardTitle className="text-lg mt-2 truncate">{item.eventName || 'Untitled Event'}</CardTitle>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => setViewingItem(item)}
+                        data-testid={`button-view-decor-${item.id}`}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => handleEditItem(item)}
+                        data-testid={`button-edit-decor-${item.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 text-red-500 hover:text-red-700"
+                        onClick={() => {
+                          if (confirm('Delete this décor item and all its elements?')) {
+                            deleteItemMutation.mutate(item.id);
+                          }
+                        }}
+                        data-testid={`button-delete-decor-${item.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 pt-0">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Calendar className="w-3 h-3" />
+                      <span>{item.eventDate ? format(new Date(item.eventDate), 'dd MMM yyyy') : 'No date'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Building2 className="w-3 h-3" />
+                      <span className="truncate">{item.venue || 'No venue'}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Clock className="w-3 h-3" />
+                      <span>{item.setupDate ? format(new Date(item.setupDate), 'dd MMM') : 'N/A'} {item.setupTime || ''}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-gray-600">
+                      <Users className="w-3 h-3" />
+                      <span>{item.manpowerRequired || 0} people</span>
+                    </div>
+                  </div>
+                  
+                  {item.teamLead && (
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium">Team Lead:</span> {item.teamLead}
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-xs h-7"
+                      onClick={() => toggleCardExpand(item.id)}
+                      data-testid={`button-expand-${item.id}`}
+                    >
+                      <Package className="w-3 h-3 mr-1" />
+                      {elements.length} Elements
+                      <ChevronRight className={cn("w-3 h-3 ml-1 transition-transform", isExpanded && "rotate-90")} />
+                    </Button>
+                    <div className="flex gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={() => handleDownloadPDF(item)}
+                        data-testid={`button-download-pdf-${item.id}`}
+                      >
+                        <Download className="w-3 h-3 mr-1" /> PDF
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-7 text-xs"
+                        onClick={() => handleAddElement(item.id)}
+                        data-testid={`button-add-element-${item.id}`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" /> Add
+                      </Button>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="pt-2 border-t">
+                      {elements.length === 0 ? (
+                        <p className="text-xs text-gray-500 text-center py-2">No elements added yet</p>
+                      ) : (
+                        <div className="overflow-x-auto -mx-4 px-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="text-xs">
+                                <TableHead className="py-2">Element</TableHead>
+                                <TableHead className="py-2">Qty</TableHead>
+                                <TableHead className="py-2">Source</TableHead>
+                                <TableHead className="py-2 text-right">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {elements.map((el) => {
+                                const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
+                                return (
+                                  <TableRow key={el.id} className="text-xs">
+                                    <TableCell className="py-2">
+                                      <div>
+                                        <p className="font-medium">{invItem?.name || el.externalItemName || el.elementName}</p>
+                                        <p className="text-gray-500">{el.categoryType}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-2">{el.quantity} {el.unit}</TableCell>
+                                    <TableCell className="py-2">{getSourceBadge(el.source)}</TableCell>
+                                    <TableCell className="py-2 text-right">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6"
+                                        onClick={() => handleEditElement(el)}
+                                        data-testid={`button-edit-element-${el.id}`}
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </Button>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6 text-red-500"
+                                        onClick={() => {
+                                          if (confirm('Delete this element?')) {
+                                            deleteElementMutation.mutate(el.id);
+                                          }
+                                        }}
+                                        data-testid={`button-delete-element-${el.id}`}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={isItemModalOpen} onOpenChange={(open) => { setIsItemModalOpen(open); if (!open) resetItemForm(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? 'Edit Décor Item' : 'Add Décor Item'}</DialogTitle>
+            <DialogDescription>Configure the décor item details for production planning</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleItemSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Event Name</Label>
+                <Input 
+                  value={itemFormData.eventName} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, eventName: e.target.value })}
+                  placeholder="e.g., Sharma Wedding"
+                  data-testid="input-event-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Linked Event</Label>
+                <Select value={itemFormData.eventId} onValueChange={(v) => {
+                  const event = events.find(e => e.id === v);
+                  setItemFormData({ 
+                    ...itemFormData, 
+                    eventId: v,
+                    eventName: event?.title || itemFormData.eventName,
+                    eventDate: event?.date || itemFormData.eventDate,
+                    venue: event?.location || itemFormData.venue,
+                  });
+                }}>
+                  <SelectTrigger data-testid="select-linked-event">
+                    <SelectValue placeholder="Optional - link to event" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {events.map(e => (
+                      <SelectItem key={e.id} value={e.id}>{e.title} - {e.date ? format(new Date(e.date), 'dd MMM yyyy') : 'No date'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Event Date</Label>
+                <Input 
+                  type="date" 
+                  value={itemFormData.eventDate} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, eventDate: e.target.value })}
+                  data-testid="input-event-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Venue</Label>
+                <Input 
+                  value={itemFormData.venue} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, venue: e.target.value })}
+                  placeholder="Event venue"
+                  data-testid="input-venue"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Décor Type *</Label>
+                <Select value={itemFormData.decorType} onValueChange={(v) => setItemFormData({ ...itemFormData, decorType: v })}>
+                  <SelectTrigger data-testid="select-decor-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DECOR_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Card Color</Label>
+                <Select value={itemFormData.pastelColor} onValueChange={(v) => setItemFormData({ ...itemFormData, pastelColor: v })}>
+                  <SelectTrigger data-testid="select-card-color">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(PASTEL_COLORS).map(c => (
+                      <SelectItem key={c} value={c}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("w-3 h-3 rounded-full", PASTEL_COLORS[c].bg, PASTEL_COLORS[c].border, "border")} />
+                          {c.charAt(0).toUpperCase() + c.slice(1)}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Setup Date</Label>
+                <Input 
+                  type="date" 
+                  value={itemFormData.setupDate} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, setupDate: e.target.value })}
+                  data-testid="input-setup-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Setup Time</Label>
+                <Input 
+                  type="time" 
+                  value={itemFormData.setupTime} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, setupTime: e.target.value })}
+                  data-testid="input-setup-time"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Estimated Duration</Label>
+                <Input 
+                  value={itemFormData.estimatedDuration} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, estimatedDuration: e.target.value })}
+                  placeholder="e.g., 4 hours"
+                  data-testid="input-duration"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={itemFormData.priority} onValueChange={(v) => setItemFormData({ ...itemFormData, priority: v })}>
+                  <SelectTrigger data-testid="select-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRIORITY_OPTIONS.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Manpower Required</Label>
+                <Input 
+                  type="number" 
+                  value={itemFormData.manpowerRequired} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, manpowerRequired: e.target.value })}
+                  placeholder="0"
+                  data-testid="input-manpower"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Team Lead</Label>
+                <Input 
+                  value={itemFormData.teamLead} 
+                  onChange={(e) => setItemFormData({ ...itemFormData, teamLead: e.target.value })}
+                  placeholder="Team lead name"
+                  data-testid="input-team-lead"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={itemFormData.status} onValueChange={(v) => setItemFormData({ ...itemFormData, status: v })}>
+                <SelectTrigger data-testid="select-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DECOR_STATUSES.map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea 
+                value={itemFormData.notes} 
+                onChange={(e) => setItemFormData({ ...itemFormData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                data-testid="input-notes"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsItemModalOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-amber-600 hover:bg-amber-700" data-testid="button-submit-decor-item">
+                {editingItem ? 'Update Item' : 'Create Item'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isElementModalOpen} onOpenChange={(open) => { setIsElementModalOpen(open); if (!open) resetElementForm(); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingElement ? 'Edit Element' : 'Add Element'}</DialogTitle>
+            <DialogDescription>Add materials or items needed for this décor</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleElementSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Element Name *</Label>
+              <Input 
+                value={elementFormData.elementName} 
+                onChange={(e) => setElementFormData({ ...elementFormData, elementName: e.target.value })}
+                placeholder="e.g., Rose Fresh Flowers"
+                required
+                data-testid="input-element-name"
+              />
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Category/Type</Label>
+                <Select value={elementFormData.categoryType} onValueChange={(v) => setElementFormData({ ...elementFormData, categoryType: v })}>
+                  <SelectTrigger data-testid="select-element-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ELEMENT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Source *</Label>
+                <Select value={elementFormData.source} onValueChange={(v) => setElementFormData({ ...elementFormData, source: v })}>
+                  <SelectTrigger data-testid="select-element-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="in_stock">In Stock</SelectItem>
+                    <SelectItem value="to_buy">To Buy</SelectItem>
+                    <SelectItem value="to_rent">To Rent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Quantity *</Label>
+                <Input 
+                  type="number" 
+                  value={elementFormData.quantity} 
+                  onChange={(e) => setElementFormData({ ...elementFormData, quantity: e.target.value })}
+                  min="1"
+                  required
+                  data-testid="input-element-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit</Label>
+                <Input 
+                  value={elementFormData.unit} 
+                  onChange={(e) => setElementFormData({ ...elementFormData, unit: e.target.value })}
+                  placeholder="Nos, bunches, meters..."
+                  data-testid="input-element-unit"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Link to Inventory Item</Label>
+              <Select 
+                value={elementFormData.linkedInventoryItemId} 
+                onValueChange={(v) => setElementFormData({ ...elementFormData, linkedInventoryItemId: v })}
+              >
+                <SelectTrigger data-testid="select-linked-inventory">
+                  <SelectValue placeholder="Optional - link to inventory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {inventoryItems.map(inv => (
+                    <SelectItem key={inv.id} value={inv.id}>
+                      {inv.name} ({inv.stockQuantity} in stock)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Or External Item Name</Label>
+              <Input 
+                value={elementFormData.externalItemName} 
+                onChange={(e) => setElementFormData({ ...elementFormData, externalItemName: e.target.value })}
+                placeholder="For items not in inventory"
+                data-testid="input-external-item"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Assigned Person/Vendor</Label>
+              <Input 
+                value={elementFormData.assignedPersonVendor} 
+                onChange={(e) => setElementFormData({ ...elementFormData, assignedPersonVendor: e.target.value })}
+                placeholder="Who will handle this?"
+                data-testid="input-assigned-person"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea 
+                value={elementFormData.notes} 
+                onChange={(e) => setElementFormData({ ...elementFormData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                data-testid="input-element-notes"
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsElementModalOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-amber-600 hover:bg-amber-700" data-testid="button-submit-element">
+                {editingElement ? 'Update Element' : 'Add Element'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingItem} onOpenChange={(open) => { if (!open) setViewingItem(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Décor Item Details</DialogTitle>
+          </DialogHeader>
+          {viewingItem && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={PASTEL_COLORS[viewingItem.pastelColor || 'blue'].badge}>{viewingItem.decorType}</Badge>
+                {getStatusBadge(viewingItem.status)}
+                {getPriorityBadge(viewingItem.priority || 'medium')}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Event Name</p>
+                  <p>{viewingItem.eventName || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Event Date</p>
+                  <p>{viewingItem.eventDate ? format(new Date(viewingItem.eventDate), 'dd MMM yyyy') : 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Venue</p>
+                  <p>{viewingItem.venue || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Setup Date & Time</p>
+                  <p>{viewingItem.setupDate ? format(new Date(viewingItem.setupDate), 'dd MMM yyyy') : 'N/A'} {viewingItem.setupTime || ''}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Estimated Duration</p>
+                  <p>{viewingItem.estimatedDuration || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Manpower Required</p>
+                  <p>{viewingItem.manpowerRequired || 0} people</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Team Lead</p>
+                  <p>{viewingItem.teamLead || 'N/A'}</p>
+                </div>
+              </div>
+
+              {viewingItem.notes && (
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Notes</p>
+                  <p className="text-sm">{viewingItem.notes}</p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-3">Elements ({decorElements.filter(e => e.decorItemId === viewingItem.id).length})</h4>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Element</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Quantity</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {decorElements.filter(e => e.decorItemId === viewingItem.id).map((el) => {
+                        const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
+                        return (
+                          <TableRow key={el.id}>
+                            <TableCell>{invItem?.name || el.externalItemName || el.elementName}</TableCell>
+                            <TableCell>{el.categoryType || '-'}</TableCell>
+                            <TableCell>{el.quantity} {el.unit}</TableCell>
+                            <TableCell>{getSourceBadge(el.source)}</TableCell>
+                            <TableCell>{el.assignedPersonVendor || '-'}</TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => handleDownloadPDF(viewingItem)}>
+                  <Download className="w-4 h-4 mr-2" /> Download PDF
+                </Button>
+                <Button onClick={() => { setViewingItem(null); handleEditItem(viewingItem); }}>
+                  <Edit className="w-4 h-4 mr-2" /> Edit
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
