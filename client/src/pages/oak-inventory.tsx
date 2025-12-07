@@ -951,6 +951,9 @@ function EventInventorySection({
 
   const [editingItem, setEditingItem] = useState<EventInventoryItem | null>(null);
   const [isDeliveryNoteOpen, setIsDeliveryNoteOpen] = useState(false);
+  const [deliveryLocation, setDeliveryLocation] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchValue, setEventSearchValue] = useState('');
   const [itemSearchOpen, setItemSearchOpen] = useState(false);
@@ -1137,7 +1140,178 @@ function EventInventorySection({
     return inventoryItems.find(i => i.id === itemId);
   };
 
-  const handleDownloadDeliveryNote = async () => {
+  const handleDownloadDeliveryNotePDF = async () => {
+    if (!selectedSession) return;
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const eventName = getEventName(selectedSession.eventId);
+      const event = events.find(e => e.id === selectedSession.eventId);
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+      
+      doc.setFontSize(20);
+      doc.setTextColor(180, 120, 60);
+      doc.text(COMPANY_DEFAULTS.companyName, pageWidth / 2, y, { align: 'center' });
+      y += 8;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth / 2, y, { align: 'center' });
+        y += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone} | Email: ${COMPANY_DEFAULTS.email}`, pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      if (COMPANY_DEFAULTS.gstNumber) {
+        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth / 2, y, { align: 'center' });
+        y += 6;
+      }
+      
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0);
+      doc.text('DELIVERY NOTE', pageWidth / 2, y, { align: 'center' });
+      y += 12;
+      
+      doc.setFontSize(10);
+      doc.setTextColor(0);
+      const leftCol = 15;
+      const rightCol = pageWidth / 2 + 10;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Event:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(eventName, leftCol + 25, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Note #:', rightCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`DN-${selectedSession.id.slice(0, 8).toUpperCase()}`, rightCol + 25, y);
+      y += 6;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Date:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(selectedSession.issuedAt ? format(new Date(selectedSession.issuedAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy'), leftCol + 25, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Status:', rightCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(selectedSession.status.replace('_', ' ').toUpperCase(), rightCol + 25, y);
+      y += 6;
+      
+      if (event?.venue) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Venue:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(event.venue, leftCol + 25, y);
+        y += 6;
+      }
+      
+      if (deliveryLocation) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Delivery To:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const locLines = doc.splitTextToSize(deliveryLocation, 80);
+        doc.text(locLines, leftCol + 30, y);
+        y += locLines.length * 5;
+      }
+      
+      if (contactPerson) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Contact:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${contactPerson}${contactPhone ? ' - ' + contactPhone : ''}`, leftCol + 25, y);
+        y += 6;
+      }
+      
+      y += 8;
+      
+      doc.setFillColor(253, 246, 227);
+      doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SL', 18, y);
+      doc.text('Item Description', 30, y);
+      doc.text('Category', 100, y);
+      doc.text('Qty', 140, y);
+      doc.text('Returned', 158, y);
+      doc.text('Status', 180, y);
+      y += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      sessionItemsForSelected.forEach((si, index) => {
+        const item = inventoryItems.find(i => i.id === si.itemId);
+        const status = si.quantityReturned === si.quantityIssued ? 'Returned' : 
+                      (si.quantityDamaged || si.quantityLost) ? 'Damaged' : 'Issued';
+        
+        if (y > 260) {
+          doc.addPage();
+          y = 20;
+        }
+        
+        doc.text(String(index + 1), 18, y);
+        doc.text((item?.name || 'Unknown').substring(0, 35), 30, y);
+        doc.text((item?.category || '-').substring(0, 15), 100, y);
+        doc.text(String(si.quantityIssued), 140, y);
+        doc.text(String(si.quantityReturned || 0), 158, y);
+        doc.text(status, 180, y);
+        y += 6;
+      });
+      
+      y += 5;
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 8;
+      
+      doc.setFontSize(9);
+      doc.text(`Total Items: ${sessionItemsForSelected.length}`, 15, y);
+      const totalQty = sessionItemsForSelected.reduce((sum, si) => sum + (si.quantityIssued || 0), 0);
+      doc.text(`Total Quantity: ${totalQty}`, 80, y);
+      y += 15;
+      
+      if (y > 240) {
+        doc.addPage();
+        y = 30;
+      }
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Issued By:', leftCol, y);
+      doc.text('Received By:', rightCol, y);
+      y += 20;
+      doc.line(leftCol, y, leftCol + 60, y);
+      doc.line(rightCol, y, rightCol + 60, y);
+      y += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('Signature & Date', leftCol, y);
+      doc.text('Signature & Date', rightCol, y);
+      
+      if (selectedSession.notes) {
+        y += 15;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Notes:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const noteLines = doc.splitTextToSize(selectedSession.notes, pageWidth - 40);
+        doc.text(noteLines, leftCol, y + 5);
+      }
+      
+      doc.save(`Delivery_Note_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast({ title: 'PDF downloaded successfully' });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({ title: 'Failed to generate PDF', variant: 'destructive' });
+    }
+  };
+
+  const handleDownloadDeliveryNoteExcel = async () => {
     if (!selectedSession) return;
     try {
       const XLSX = await import('xlsx');
@@ -1162,7 +1336,7 @@ function EventInventorySection({
       XLSX.utils.book_append_sheet(wb, ws, 'Delivery Note');
       ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 25 }];
       XLSX.writeFile(wb, `Delivery_Note_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-      toast({ title: 'Delivery note downloaded' });
+      toast({ title: 'Excel file downloaded' });
     } catch (error) {
       toast({ title: 'Failed to download', variant: 'destructive' });
     }
@@ -1199,13 +1373,9 @@ function EventInventorySection({
         <div className="flex gap-2 flex-wrap">
           {selectedSession && (
             <>
-              <Button variant="outline" size="sm" onClick={handleDownloadDeliveryNote} data-testid="button-download-delivery-note">
-                <Download className="w-4 h-4 mr-2" />
-                Download
-              </Button>
               <Button variant="outline" size="sm" onClick={() => setIsDeliveryNoteOpen(true)} data-testid="button-print-delivery-note">
-                <Printer className="w-4 h-4 mr-2" />
-                Print Note
+                <FileText className="w-4 h-4 mr-2" />
+                Delivery Note
               </Button>
               <Button variant="outline" size="sm" onClick={() => setIsCloneModalOpen(true)} data-testid="button-clone-session">
                 <Copy className="w-4 h-4 mr-2" />
@@ -1652,84 +1822,140 @@ function EventInventorySection({
       <Dialog open={isDeliveryNoteOpen} onOpenChange={setIsDeliveryNoteOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Delivery Out Note</DialogTitle>
+            <DialogTitle>Delivery Note</DialogTitle>
+            <DialogDescription>Generate a professional delivery note with company details</DialogDescription>
           </DialogHeader>
           {selectedSession && (
-            <div className="space-y-6 p-6 bg-white" id="delivery-note-print">
-              <div className="text-center border-b pb-4">
-                <h1 className="text-2xl font-bold text-amber-700">{COMPANY_DEFAULTS.companyName}</h1>
-                <p className="text-sm text-muted-foreground whitespace-pre-line">{COMPANY_DEFAULTS.address}</p>
-                <p className="text-sm">Phone: {COMPANY_DEFAULTS.phone} | Email: {COMPANY_DEFAULTS.email}</p>
-                {COMPANY_DEFAULTS.gstNumber && <p className="text-sm">GSTIN: {COMPANY_DEFAULTS.gstNumber}</p>}
-              </div>
-              <div className="text-center">
-                <h2 className="text-xl font-bold">DELIVERY OUT NOTE</h2>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 text-sm">
-                <div>
-                  <p><strong>Event:</strong> {getEventName(selectedSession.eventId)}</p>
-                  <p><strong>Issue Date:</strong> {selectedSession.issuedAt ? format(new Date(selectedSession.issuedAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2 p-4 bg-muted/30 rounded-lg">
+                <div className="space-y-2">
+                  <Label>Delivery Location *</Label>
+                  <Textarea
+                    placeholder="Enter delivery address..."
+                    value={deliveryLocation}
+                    onChange={(e) => setDeliveryLocation(e.target.value)}
+                    rows={3}
+                    data-testid="input-delivery-location"
+                  />
                 </div>
-                <div className="sm:text-right">
-                  <p><strong>Status:</strong> {selectedSession.status}</p>
-                  <p><strong>Note #:</strong> DN-{selectedSession.id.slice(0, 8).toUpperCase()}</p>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-amber-50">
-                    <TableHead className="font-bold">SL No</TableHead>
-                    <TableHead className="font-bold">Item Description</TableHead>
-                    <TableHead className="font-bold">Category</TableHead>
-                    <TableHead className="text-right font-bold">Qty</TableHead>
-                    <TableHead className="text-right font-bold">Returned</TableHead>
-                    <TableHead className="font-bold">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sessionItemsForSelected.map((si, index) => {
-                    const item = inventoryItems.find(i => i.id === si.itemId);
-                    return (
-                      <TableRow key={si.id}>
-                        <TableCell>{index + 1}</TableCell>
-                        <TableCell className="font-medium">{item?.name || 'Unknown'}</TableCell>
-                        <TableCell>{item?.category || '-'}</TableCell>
-                        <TableCell className="text-right">{si.quantityIssued}</TableCell>
-                        <TableCell className="text-right">{si.quantityReturned || 0}</TableCell>
-                        <TableCell>
-                          {si.quantityReturned === si.quantityIssued ? 'Returned' : 
-                           (si.quantityDamaged || si.quantityLost) ? 'Damaged/Lost' : 'Issued'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 sm:gap-8 pt-8 border-t">
-                <div>
-                  <p className="font-bold mb-8">Issued By:</p>
-                  <div className="border-t border-black pt-2">Signature & Date</div>
-                </div>
-                <div>
-                  <p className="font-bold mb-8">Received By:</p>
-                  <div className="border-t border-black pt-2">Signature & Date</div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Contact Person</Label>
+                    <Input
+                      placeholder="Contact name"
+                      value={contactPerson}
+                      onChange={(e) => setContactPerson(e.target.value)}
+                      data-testid="input-contact-person"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Phone</Label>
+                    <Input
+                      placeholder="Phone number"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      data-testid="input-contact-phone"
+                    />
+                  </div>
                 </div>
               </div>
-              {selectedSession.notes && (
-                <div className="pt-4 border-t">
-                  <p className="font-bold">Notes:</p>
-                  <p className="text-sm">{selectedSession.notes}</p>
+
+              <div className="p-6 bg-white border rounded-lg" id="delivery-note-print">
+                <div className="text-center border-b pb-4 mb-4">
+                  <h1 className="text-2xl font-bold text-amber-700">{COMPANY_DEFAULTS.companyName}</h1>
+                  <p className="text-sm text-muted-foreground whitespace-pre-line">{COMPANY_DEFAULTS.address}</p>
+                  <p className="text-sm">Phone: {COMPANY_DEFAULTS.phone} | Email: {COMPANY_DEFAULTS.email}</p>
+                  {COMPANY_DEFAULTS.gstNumber && <p className="text-sm">GSTIN: {COMPANY_DEFAULTS.gstNumber}</p>}
                 </div>
-              )}
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-bold border-b-2 border-amber-500 inline-block pb-1">DELIVERY NOTE</h2>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 text-sm mb-4">
+                  <div className="space-y-1">
+                    <p><strong>Event:</strong> {getEventName(selectedSession.eventId)}</p>
+                    <p><strong>Date:</strong> {selectedSession.issuedAt ? format(new Date(selectedSession.issuedAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
+                    {(() => {
+                      const event = events.find(e => e.id === selectedSession.eventId);
+                      return event?.venue ? <p><strong>Venue:</strong> {event.venue}</p> : null;
+                    })()}
+                    {deliveryLocation && (
+                      <p><strong>Deliver To:</strong> {deliveryLocation}</p>
+                    )}
+                    {contactPerson && (
+                      <p><strong>Contact:</strong> {contactPerson}{contactPhone ? ` - ${contactPhone}` : ''}</p>
+                    )}
+                  </div>
+                  <div className="sm:text-right space-y-1">
+                    <p><strong>Note #:</strong> DN-{selectedSession.id.slice(0, 8).toUpperCase()}</p>
+                    <p><strong>Status:</strong> {selectedSession.status.replace('_', ' ').toUpperCase()}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-amber-50">
+                      <TableHead className="font-bold w-12">SL</TableHead>
+                      <TableHead className="font-bold">Item Description</TableHead>
+                      <TableHead className="font-bold">Category</TableHead>
+                      <TableHead className="text-right font-bold">Qty</TableHead>
+                      <TableHead className="text-right font-bold">Returned</TableHead>
+                      <TableHead className="font-bold">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessionItemsForSelected.map((si, index) => {
+                      const item = inventoryItems.find(i => i.id === si.itemId);
+                      return (
+                        <TableRow key={si.id}>
+                          <TableCell>{index + 1}</TableCell>
+                          <TableCell className="font-medium">{item?.name || 'Unknown'}</TableCell>
+                          <TableCell>{item?.category || '-'}</TableCell>
+                          <TableCell className="text-right">{si.quantityIssued}</TableCell>
+                          <TableCell className="text-right">{si.quantityReturned || 0}</TableCell>
+                          <TableCell>
+                            <Badge variant={si.quantityReturned === si.quantityIssued ? 'default' : 'secondary'} className={si.quantityReturned === si.quantityIssued ? 'bg-green-500' : ''}>
+                              {si.quantityReturned === si.quantityIssued ? 'Returned' : 
+                               (si.quantityDamaged || si.quantityLost) ? 'Damaged' : 'Issued'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                </div>
+                <div className="flex justify-between text-sm mt-4 pt-4 border-t">
+                  <p><strong>Total Items:</strong> {sessionItemsForSelected.length}</p>
+                  <p><strong>Total Quantity:</strong> {sessionItemsForSelected.reduce((sum, si) => sum + (si.quantityIssued || 0), 0)}</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 sm:gap-8 pt-8 mt-4 border-t">
+                  <div>
+                    <p className="font-bold mb-12">Issued By:</p>
+                    <div className="border-t border-black pt-2 text-sm">Signature & Date</div>
+                  </div>
+                  <div>
+                    <p className="font-bold mb-12">Received By:</p>
+                    <div className="border-t border-black pt-2 text-sm">Signature & Date</div>
+                  </div>
+                </div>
+                {selectedSession.notes && (
+                  <div className="pt-4 mt-4 border-t">
+                    <p className="font-bold">Notes:</p>
+                    <p className="text-sm text-muted-foreground">{selectedSession.notes}</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => setIsDeliveryNoteOpen(false)}>Close</Button>
-            <Button onClick={() => window.print()} data-testid="button-print">
-              <Printer className="w-4 h-4 mr-2" />
-              Print
+            <Button variant="outline" onClick={handleDownloadDeliveryNoteExcel} data-testid="button-download-excel">
+              <Download className="w-4 h-4 mr-2" />
+              Excel
+            </Button>
+            <Button onClick={handleDownloadDeliveryNotePDF} data-testid="button-download-pdf">
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
             </Button>
           </DialogFooter>
         </DialogContent>
