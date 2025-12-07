@@ -25,7 +25,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
-import * as pdfParseModule from "pdf-parse";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PgSession = connectPgSimple(session);
 
@@ -2880,48 +2880,44 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Invalid PDF data format - could not decode base64' });
       }
       
-      let pdfData;
+      let pdfText = '';
       try {
-        console.log(`[PDF Parse] Module type: ${typeof pdfParseModule}`);
-        console.log(`[PDF Parse] Module keys: ${Object.keys(pdfParseModule as any)}`);
+        console.log(`[PDF Parse] Using pdfjs-dist library`);
         
-        let pdfParseFn: any = null;
-        if (typeof (pdfParseModule as any).default === 'function') {
-          pdfParseFn = (pdfParseModule as any).default;
-        } else if (typeof pdfParseModule === 'function') {
-          pdfParseFn = pdfParseModule;
-        } else if ((pdfParseModule as any).default && typeof (pdfParseModule as any).default.default === 'function') {
-          pdfParseFn = (pdfParseModule as any).default.default;
+        const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer });
+        const pdfDoc = await loadingTask.promise;
+        console.log(`[PDF Parse] PDF loaded, pages: ${pdfDoc.numPages}`);
+        
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+          const page = await pdfDoc.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          pdfText += pageText + '\n';
         }
-        
-        if (!pdfParseFn) {
-          console.error('[PDF Parse] Could not find parse function in module');
-          throw new Error('PDF parse function not available');
-        }
-        
-        pdfData = await pdfParseFn(pdfBuffer);
-        console.log(`[PDF Parse] PDF parsed successfully, text length: ${pdfData.text?.length || 0}`);
+        console.log(`[PDF Parse] PDF parsed successfully, text length: ${pdfText.length}`);
       } catch (parseError: any) {
-        console.error('[PDF Parse] pdf-parse library error:', parseError);
+        console.error('[PDF Parse] pdfjs-dist library error:', parseError);
         return res.status(400).json({ 
           error: 'Could not read PDF file. The file may be corrupted, password-protected, or in an unsupported format.' 
         });
       }
       
-      if (!pdfData.text || pdfData.text.trim().length === 0) {
+      if (!pdfText || pdfText.trim().length === 0) {
         return res.status(400).json({ 
           error: 'The PDF appears to be empty or contains only images. Please use a text-based PDF estimate.' 
         });
       }
       
-      const parsedData = parseEstimatePDF(pdfData.text);
+      const parsedData = parseEstimatePDF(pdfText);
       console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections`);
       
       res.json({ 
         success: true, 
         parsedData,
         filename,
-        rawText: pdfData.text 
+        rawText: pdfText 
       });
     } catch (error: any) {
       console.error('[PDF Parse] Unexpected error:', error);
