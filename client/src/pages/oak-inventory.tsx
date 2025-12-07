@@ -506,6 +506,7 @@ function InventoryItemsSection({
     isActive: true,
   });
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   const resetForm = () => {
     setFormData({
@@ -914,19 +915,43 @@ function InventoryItemsSection({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                >
-                  <SelectTrigger data-testid="select-item-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allCategories.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={categoryPopoverOpen}
+                      className="w-full justify-between"
+                      data-testid="select-item-category"
+                    >
+                      {formData.category || "Select category..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0">
+                    <Command>
+                      <CommandInput placeholder="Search category..." />
+                      <CommandList>
+                        <CommandEmpty>No category found.</CommandEmpty>
+                        <CommandGroup>
+                          {allCategories.map(cat => (
+                            <CommandItem
+                              key={cat}
+                              value={cat}
+                              onSelect={() => {
+                                setFormData({ ...formData, category: cat });
+                                setCategoryPopoverOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", formData.category === cat ? "opacity-100" : "opacity-0")} />
+                              {cat}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
