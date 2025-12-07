@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/context/auth-context";
@@ -40,6 +42,7 @@ import {
   Trash2,
   X,
   MoreHorizontal,
+  Menu,
 } from "lucide-react";
 import type { 
   SalesPipeline, 
@@ -73,11 +76,13 @@ const getIndianFiscalYear = (date: Date = new Date()): string => {
 export default function OakSales() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
 
   const { data: pipelines = [] } = useQuery<SalesPipeline[]>({
     queryKey: ['/api/sales/pipelines'],
@@ -136,63 +141,129 @@ export default function OakSales() {
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const weddingPlanners = users.filter(u => u.role === 'wedding_planner');
 
-  return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
-      <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card border-r transition-all duration-300 flex flex-col`}>
-        <div className="p-4 border-b">
-          <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3">
-            <LayoutDashboard className="w-4 h-4" />
-            {!sidebarCollapsed && <span className="text-sm font-medium">Dashboard</span>}
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-              <Target className="w-5 h-5 text-white" />
-            </div>
-            {!sidebarCollapsed && (
-              <div>
-                <h1 className="font-semibold text-lg">Oak Sales</h1>
-                <p className="text-xs text-muted-foreground">CRM</p>
-              </div>
-            )}
+  const SidebarContent = ({ onNavClick }: { onNavClick?: () => void }) => (
+    <>
+      <div className="p-4 border-b">
+        <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3">
+          <LayoutDashboard className="w-4 h-4" />
+          <span className="text-sm font-medium">Dashboard</span>
+        </Link>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
+            <Target className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="font-semibold text-lg">Oak Sales</h1>
+            <p className="text-xs text-muted-foreground">CRM</p>
           </div>
         </div>
-        
-        <ScrollArea className="flex-1">
-          <nav className="p-2 space-y-1">
-            {sidebarItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id as Section)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                  activeSection === item.id
-                    ? 'bg-amber-500/10 text-amber-600 font-medium'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-                data-testid={`nav-${item.id}`}
-              >
-                <item.icon className="w-5 h-5 shrink-0" />
-                {!sidebarCollapsed && <span>{item.label}</span>}
-              </button>
-            ))}
-          </nav>
-        </ScrollArea>
+      </div>
+      
+      <ScrollArea className="flex-1">
+        <nav className="p-2 space-y-1">
+          {sidebarItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveSection(item.id as Section);
+                onNavClick?.();
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                activeSection === item.id
+                  ? 'bg-amber-500/10 text-amber-600 font-medium'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+              data-testid={`nav-${item.id}`}
+            >
+              <item.icon className="w-5 h-5 shrink-0" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+      </ScrollArea>
+    </>
+  );
 
-        <div className="p-4 border-t">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="w-full justify-center"
-          >
-            <ChevronRight className={`w-4 h-4 transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-          </Button>
-        </div>
-      </aside>
+  return (
+    <div className="flex h-screen bg-background">
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card border-r transition-all duration-300 flex flex-col`}>
+          <div className="p-4 border-b">
+            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3">
+              <LayoutDashboard className="w-4 h-4" />
+              {!sidebarCollapsed && <span className="text-sm font-medium">Dashboard</span>}
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
+                <Target className="w-5 h-5 text-white" />
+              </div>
+              {!sidebarCollapsed && (
+                <div>
+                  <h1 className="font-semibold text-lg">Oak Sales</h1>
+                  <p className="text-xs text-muted-foreground">CRM</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <ScrollArea className="flex-1">
+            <nav className="p-2 space-y-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id as Section)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                    activeSection === item.id
+                      ? 'bg-amber-500/10 text-amber-600 font-medium'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                  data-testid={`nav-${item.id}`}
+                >
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                </button>
+              ))}
+            </nav>
+          </ScrollArea>
+
+          <div className="p-4 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="w-full justify-center"
+            >
+              <ChevronRight className={`w-4 h-4 transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
+            </Button>
+          </div>
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto">
-        <div className="p-6">
+        {/* Mobile Header */}
+        {isMobile && (
+          <div className="sticky top-0 z-40 bg-card border-b p-3 flex items-center gap-3">
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-mobile-menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0 flex flex-col">
+                <SidebarContent onNavClick={() => setMobileMenuOpen(false)} />
+              </SheetContent>
+            </Sheet>
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center">
+                <Target className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-semibold">Oak Sales</span>
+            </div>
+          </div>
+        )}
+        <div className="p-4 sm:p-6">
           {activeSection === 'dashboard' && (
             <DashboardSection
               deals={deals}

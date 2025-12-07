@@ -1185,7 +1185,7 @@ export default function Daybook() {
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="min-w-[300px] px-4 sm:px-0">
+                  <div className="px-4 sm:px-0">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -1275,7 +1275,7 @@ export default function Daybook() {
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
                 <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="min-w-[300px] px-4 sm:px-0">
+                  <div className="px-4 sm:px-0">
                     <Table>
                       <TableHeader>
                         <TableRow>

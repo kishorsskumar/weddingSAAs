@@ -251,7 +251,7 @@ export default function HR() {
 
   const EmployeeTable = ({ employeeList, isPast = false }: { employeeList: Employee[]; isPast?: boolean }) => (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
-      <div className="min-w-[600px] px-4 sm:px-0">
+      <div className="px-4 sm:px-0">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-800/50">
@@ -789,7 +789,7 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
               </div>
 
               <div className="overflow-x-auto -mx-4 sm:mx-0">
-                <div className="min-w-[500px] px-4 sm:px-0">
+                <div className="px-4 sm:px-0">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -882,7 +882,7 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
         </CardHeader>
         <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
           <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <div className="min-w-[400px] px-4 sm:px-0">
+            <div className="px-4 sm:px-0">
               <Table>
                 <TableHeader>
                   <TableRow>
