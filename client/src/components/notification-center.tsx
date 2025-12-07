@@ -267,10 +267,17 @@ export function NotificationBell() {
         credentials: "include",
         body: JSON.stringify(data),
       });
+      if (res.status === 401) {
+        return { authRequired: true };
+      }
       if (!res.ok) throw new Error("Failed to update preferences");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data?.authRequired) {
+        toast({ title: "Sign in required", description: "Please sign in to save preferences" });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
       toast({ title: "Saved", description: "Notification preferences updated" });
     },
