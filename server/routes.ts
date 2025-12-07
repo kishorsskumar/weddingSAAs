@@ -2939,9 +2939,9 @@ export async function registerRoutes(
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
       
       // Dynamic import to avoid bundling issues
-      let pdfParse;
+      let pdfParse: any;
       try {
-        const pdfParseModule = await import('pdf-parse');
+        const pdfParseModule: any = await import('pdf-parse');
         pdfParse = pdfParseModule.default || pdfParseModule;
       } catch (importError) {
         console.error('Failed to import pdf-parse:', importError);
