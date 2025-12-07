@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -1987,6 +1988,23 @@ function EventInventorySection({
   );
 }
 
+const VENDOR_CATEGORIES = [
+  'Catering',
+  'Decoration',
+  'Photography',
+  'Videography',
+  'Venue',
+  'Lighting',
+  'Sound',
+  'Florist',
+  'Entertainment',
+  'Rental Equipment',
+  'Transportation',
+  'Makeup & Hair',
+  'Invitation & Printing',
+  'Other',
+];
+
 function RentalsSection({
   rentals,
   rentalItems,
@@ -2000,10 +2018,27 @@ function RentalsSection({
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeSubTab, setActiveSubTab] = useState('rentals');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [editingRental, setEditingRental] = useState<RentalRecord | null>(null);
   const [selectedRental, setSelectedRental] = useState<RentalRecord | null>(null);
+
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [vendorFormData, setVendorFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    gstNumber: '',
+    category: '',
+    billingAddress: '',
+    contactPerson: '',
+    bankName: '',
+    bankAccountNumber: '',
+    bankIfsc: '',
+    notes: '',
+  });
 
   const [formData, setFormData] = useState({
     vendorId: '',
@@ -2015,6 +2050,72 @@ function RentalsSection({
     depositPaid: '',
     notes: '',
   });
+
+  const createVendorMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/vendors', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      setIsVendorModalOpen(false);
+      toast({ title: 'Vendor created successfully' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to create vendor', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateVendorMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest('PATCH', `/api/vendors/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      setIsVendorModalOpen(false);
+      toast({ title: 'Vendor updated successfully' });
+    },
+  });
+
+  const deleteVendorMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/vendors/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vendors'] });
+      toast({ title: 'Vendor deleted' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Cannot delete vendor', description: 'Vendor may be linked to rentals or bills', variant: 'destructive' });
+    },
+  });
+
+  const handleVendorSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      name: vendorFormData.name,
+      email: vendorFormData.email || null,
+      phone: vendorFormData.phone || null,
+      gstNumber: vendorFormData.gstNumber || null,
+      category: vendorFormData.category || null,
+      billingAddress: vendorFormData.billingAddress || null,
+    };
+    if (editingVendor) {
+      updateVendorMutation.mutate({ id: editingVendor.id, data });
+    } else {
+      createVendorMutation.mutate(data);
+    }
+  };
+
+  const resetVendorForm = () => {
+    setVendorFormData({
+      name: '',
+      email: '',
+      phone: '',
+      gstNumber: '',
+      category: '',
+      billingAddress: '',
+      contactPerson: '',
+      bankName: '',
+      bankAccountNumber: '',
+      bankIfsc: '',
+      notes: '',
+    });
+    setEditingVendor(null);
+  };
 
   const [itemFormData, setItemFormData] = useState({
     itemName: '',
@@ -2230,14 +2331,24 @@ function RentalsSection({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Rentals</h1>
-          <p className="text-muted-foreground">Track external equipment rentals</p>
+          <h1 className="text-2xl font-bold">Rentals & Vendors</h1>
+          <p className="text-muted-foreground">Manage rentals and global vendors</p>
         </div>
-        <Button onClick={() => { setEditingRental(null); setFormData({ vendorId: '', eventId: '', rentalDate: format(new Date(), 'yyyy-MM-dd'), expectedReturnDate: '', status: 'active', totalCost: '', depositPaid: '', notes: '' }); setIsModalOpen(true); }} data-testid="button-add-rental">
-          <Plus className="w-4 h-4 mr-2" />
-          New Rental
-        </Button>
       </div>
+
+      <Tabs value={activeSubTab} onValueChange={setActiveSubTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="rentals" data-testid="tab-rentals">Rentals</TabsTrigger>
+          <TabsTrigger value="vendors" data-testid="tab-vendors">Global Vendors</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rentals" className="space-y-6 mt-6">
+          <div className="flex justify-end">
+            <Button onClick={() => { setEditingRental(null); setFormData({ vendorId: '', eventId: '', rentalDate: format(new Date(), 'yyyy-MM-dd'), expectedReturnDate: '', status: 'active', totalCost: '', depositPaid: '', notes: '' }); setIsModalOpen(true); }} data-testid="button-add-rental">
+              <Plus className="w-4 h-4 mr-2" />
+              New Rental
+            </Button>
+          </div>
 
       <Card>
         <CardContent className="pt-6">
@@ -2668,6 +2779,187 @@ function RentalsSection({
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="vendors" className="space-y-6 mt-6">
+          <div className="flex justify-end">
+            <Button onClick={() => { resetVendorForm(); setIsVendorModalOpen(true); }} data-testid="button-add-vendor">
+              <Plus className="w-4 h-4 mr-2" />
+              New Vendor
+            </Button>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Global Vendors ({vendors.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>GST Number</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {vendors.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          No vendors found. Add your first vendor to get started.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      vendors.map(vendor => (
+                        <TableRow key={vendor.id} data-testid={`row-vendor-${vendor.id}`}>
+                          <TableCell className="font-medium">{vendor.name}</TableCell>
+                          <TableCell>
+                            {vendor.category && (
+                              <Badge variant="outline">{vendor.category}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell>{vendor.phone || '-'}</TableCell>
+                          <TableCell>{vendor.email || '-'}</TableCell>
+                          <TableCell>{vendor.gstNumber || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingVendor(vendor);
+                                  setVendorFormData({
+                                    name: vendor.name,
+                                    email: vendor.email || '',
+                                    phone: vendor.phone || '',
+                                    gstNumber: vendor.gstNumber || '',
+                                    category: vendor.category || '',
+                                    billingAddress: vendor.billingAddress || '',
+                                    contactPerson: '',
+                                    bankName: '',
+                                    bankAccountNumber: '',
+                                    bankIfsc: '',
+                                    notes: '',
+                                  });
+                                  setIsVendorModalOpen(true);
+                                }}
+                                data-testid={`button-edit-vendor-${vendor.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => deleteVendorMutation.mutate(vendor.id)}
+                                data-testid={`button-delete-vendor-${vendor.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Dialog open={isVendorModalOpen} onOpenChange={(open) => { setIsVendorModalOpen(open); if (!open) resetVendorForm(); }}>
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingVendor ? 'Edit Vendor' : 'Add New Vendor'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleVendorSubmit} className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Vendor Name *</Label>
+                    <Input
+                      value={vendorFormData.name}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, name: e.target.value })}
+                      required
+                      placeholder="Enter vendor name"
+                      data-testid="input-vendor-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={vendorFormData.category} onValueChange={(v) => setVendorFormData({ ...vendorFormData, category: v })}>
+                      <SelectTrigger data-testid="select-vendor-category">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VENDOR_CATEGORIES.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input
+                      value={vendorFormData.phone}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, phone: e.target.value })}
+                      placeholder="Enter phone number"
+                      data-testid="input-vendor-phone"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={vendorFormData.email}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, email: e.target.value })}
+                      placeholder="Enter email address"
+                      data-testid="input-vendor-email"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>GST Number</Label>
+                    <Input
+                      value={vendorFormData.gstNumber}
+                      onChange={(e) => setVendorFormData({ ...vendorFormData, gstNumber: e.target.value.toUpperCase() })}
+                      placeholder="e.g., 22AAAAA0000A1Z5"
+                      data-testid="input-vendor-gst"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Billing Address</Label>
+                  <Textarea
+                    value={vendorFormData.billingAddress}
+                    onChange={(e) => setVendorFormData({ ...vendorFormData, billingAddress: e.target.value })}
+                    placeholder="Enter complete billing address"
+                    rows={3}
+                    data-testid="input-vendor-address"
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => { setIsVendorModalOpen(false); resetVendorForm(); }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={createVendorMutation.isPending || updateVendorMutation.isPending} data-testid="button-submit-vendor">
+                    {editingVendor ? 'Update Vendor' : 'Add Vendor'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
