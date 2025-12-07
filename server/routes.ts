@@ -2982,6 +2982,256 @@ export async function registerRoutes(
     }
   });
 
+  // Notifications API
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const unreadOnly = req.query.unreadOnly === 'true';
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const notifications = await storage.getUserNotifications(userId, { unreadOnly, limit });
+      res.json(notifications);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get('/api/notifications/unread-count', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to get unread count' });
+    }
+  });
+
+  app.patch('/api/notifications/:id/read', async (req, res) => {
+    try {
+      const notification = await storage.markNotificationAsRead(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: 'Notification not found' });
+      }
+      res.json(notification);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to mark notification as read' });
+    }
+  });
+
+  app.post('/api/notifications/mark-all-read', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to mark all as read' });
+    }
+  });
+
+  app.delete('/api/notifications/:id', async (req, res) => {
+    try {
+      await storage.dismissNotification(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to dismiss notification' });
+    }
+  });
+
+  app.post('/api/notifications/dismiss-all', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      await storage.dismissAllNotifications(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to dismiss all' });
+    }
+  });
+
+  // Notification Preferences API
+  app.get('/api/notification-preferences', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      let preferences = await storage.getNotificationPreferences(userId);
+      if (!preferences) {
+        preferences = await storage.createNotificationPreferences({ userId });
+      }
+      res.json(preferences);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to get preferences' });
+    }
+  });
+
+  app.put('/api/notification-preferences', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      let preferences = await storage.getNotificationPreferences(userId);
+      if (!preferences) {
+        preferences = await storage.createNotificationPreferences({ userId, ...req.body });
+      } else {
+        preferences = await storage.updateNotificationPreferences(userId, req.body);
+      }
+      res.json(preferences);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to update preferences' });
+    }
+  });
+
+  // Notification Generation - Generate notifications based on upcoming deadlines
+  app.post('/api/notifications/generate', async (req, res) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const preferences = await storage.getNotificationPreferences(userId) || 
+        await storage.createNotificationPreferences({ userId });
+      
+      const today = new Date();
+      const notifications: any[] = [];
+
+      // Generate event reminders
+      if (preferences.eventRemindersEnabled) {
+        const futureDate = new Date(today);
+        futureDate.setDate(futureDate.getDate() + preferences.eventReminderDays);
+        const allEvents = await storage.getAllEvents();
+        
+        for (const event of allEvents) {
+          const eventDate = new Date(event.date);
+          const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntil > 0 && daysUntil <= preferences.eventReminderDays) {
+            notifications.push({
+              userId,
+              type: 'event_reminder',
+              title: `Upcoming Event: ${event.title}`,
+              message: `${event.title} is scheduled in ${daysUntil} day${daysUntil > 1 ? 's' : ''} at ${event.venue}`,
+              priority: daysUntil <= 1 ? 'high' : 'normal',
+              relatedEntityType: 'event',
+              relatedEntityId: event.id,
+              actionUrl: '/events',
+              sentAt: new Date()
+            });
+          }
+        }
+      }
+
+      // Generate invoice due reminders
+      if (preferences.invoiceDueRemindersEnabled) {
+        const allInvoices = await storage.getAllInvoices();
+        
+        for (const invoice of allInvoices) {
+          if (invoice.dueDate && invoice.status !== 'paid') {
+            const dueDate = new Date(invoice.dueDate);
+            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntil >= 0 && daysUntil <= preferences.invoiceReminderDays) {
+              notifications.push({
+                userId,
+                type: 'invoice_due',
+                title: `Invoice Due: ${invoice.number}`,
+                message: daysUntil === 0 
+                  ? `Invoice ${invoice.number} is due today` 
+                  : `Invoice ${invoice.number} is due in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
+                priority: daysUntil <= 1 ? 'high' : 'normal',
+                relatedEntityType: 'invoice',
+                relatedEntityId: invoice.id,
+                actionUrl: '/oak-book',
+                sentAt: new Date()
+              });
+            }
+          }
+        }
+      }
+
+      // Generate estimate due reminders
+      if (preferences.estimateDueRemindersEnabled) {
+        const allEstimates = await storage.getAllEstimates();
+        
+        for (const estimate of allEstimates) {
+          if (estimate.dueDate && estimate.status === 'sent') {
+            const dueDate = new Date(estimate.dueDate);
+            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntil >= 0 && daysUntil <= preferences.estimateReminderDays) {
+              notifications.push({
+                userId,
+                type: 'estimate_due',
+                title: `Estimate Expires: ${estimate.number}`,
+                message: daysUntil === 0 
+                  ? `Estimate ${estimate.number} expires today` 
+                  : `Estimate ${estimate.number} expires in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
+                priority: daysUntil <= 1 ? 'high' : 'normal',
+                relatedEntityType: 'estimate',
+                relatedEntityId: estimate.id,
+                actionUrl: '/oak-book',
+                sentAt: new Date()
+              });
+            }
+          }
+        }
+      }
+
+      // Generate production deadline reminders
+      if (preferences.productionDeadlineRemindersEnabled) {
+        const allDecorItems = await storage.getAllProductionDecorItems();
+        
+        for (const item of allDecorItems) {
+          if (item.setupDate && item.status === 'pending') {
+            const setupDate = new Date(item.setupDate);
+            const daysUntil = Math.ceil((setupDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (daysUntil >= 0 && daysUntil <= preferences.productionReminderDays) {
+              notifications.push({
+                userId,
+                type: 'production_deadline',
+                title: `Production Setup: ${item.decorType}`,
+                message: daysUntil === 0 
+                  ? `${item.decorType} setup is scheduled for today` 
+                  : `${item.decorType} setup in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
+                priority: item.priority === 'urgent' || daysUntil <= 1 ? 'high' : 'normal',
+                relatedEntityType: 'production_task',
+                relatedEntityId: item.id,
+                actionUrl: '/oak-inventory',
+                sentAt: new Date()
+              });
+            }
+          }
+        }
+      }
+
+      // Create notifications if any were generated
+      if (notifications.length > 0) {
+        await storage.createManyNotifications(notifications);
+      }
+
+      res.json({ 
+        success: true, 
+        notificationsGenerated: notifications.length 
+      });
+    } catch (error: any) {
+      console.error('Notification generation error:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate notifications' });
+    }
+  });
+
   // Object Storage - Image Upload Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
