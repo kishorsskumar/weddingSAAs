@@ -2263,10 +2263,16 @@ export async function registerRoutes(
 
   app.post('/api/inventory/rentals', async (req, res) => {
     try {
-      const rental = await storage.createRentalRecord(req.body);
+      const data = {
+        ...req.body,
+        vendorId: req.body.vendorId || null,
+        eventId: req.body.eventId || null,
+      };
+      const rental = await storage.createRentalRecord(data);
       res.json(rental);
-    } catch (error) {
-      res.status(400).json({ error: 'Failed to create rental' });
+    } catch (error: any) {
+      log(`Failed to create rental: ${error.message}`);
+      res.status(400).json({ error: error.message || 'Failed to create rental' });
     }
   });
 
