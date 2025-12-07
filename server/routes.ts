@@ -2487,7 +2487,8 @@ export async function registerRoutes(
       const tasks = await storage.getProductionTasksByPlanId(planId as string);
       res.json(tasks);
     } else {
-      res.json([]);
+      const tasks = await storage.getAllProductionTasks();
+      res.json(tasks);
     }
   });
 

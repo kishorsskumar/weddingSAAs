@@ -477,6 +477,7 @@ export interface IStorage {
   deleteProductionPlan(id: string): Promise<void>;
 
   // Oak Inventory - Production Tasks
+  getAllProductionTasks(): Promise<ProductionTask[]>;
   getProductionTasksByPlanId(planId: string): Promise<ProductionTask[]>;
   createProductionTask(task: InsertProductionTask): Promise<ProductionTask>;
   updateProductionTask(id: string, task: Partial<InsertProductionTask>): Promise<ProductionTask | undefined>;
@@ -1991,6 +1992,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Oak Inventory - Production Tasks
+  async getAllProductionTasks(): Promise<ProductionTask[]> {
+    return await db.select().from(productionTasks).orderBy(productionTasks.sortOrder);
+  }
+
   async getProductionTasksByPlanId(planId: string): Promise<ProductionTask[]> {
     return await db.select().from(productionTasks)
       .where(eq(productionTasks.planId, planId))
