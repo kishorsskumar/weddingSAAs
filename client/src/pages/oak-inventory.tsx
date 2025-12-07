@@ -102,7 +102,7 @@ const sidebarItems = [
   { id: 'rentals', label: 'Rentals', icon: Truck },
   { id: 'templates', label: 'Templates', icon: FileText },
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
-  { id: 'execution-plans', label: 'Execution Plans', icon: Factory },
+  { id: 'production-plans', label: 'Execution Plans', icon: Factory },
 ];
 
 export default function OakInventory() {
