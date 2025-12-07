@@ -4,13 +4,6 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
-import { waitForDatabase, isDatabaseReady } from "./db";
-
-console.log('=== SERVER STARTUP ===');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('PORT:', process.env.PORT || '5000');
-console.log('DATABASE_URL configured:', !!process.env.DATABASE_URL);
-console.log('SESSION_SECRET configured:', !!process.env.SESSION_SECRET);
 
 const DEFAULT_ROLES = [
   { name: 'superadmin', label: 'Super Admin', description: 'Full system access with role management', isSystem: true },
@@ -76,11 +69,6 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Health check endpoint for deployment - responds immediately
-app.get('/health', (_req, res) => {
-  res.status(200).send('OK');
-});
-
 // Redirect non-www to www in production
 app.use((req, res, next) => {
   const host = req.hostname || req.headers.host || "";
@@ -128,80 +116,44 @@ app.use((req, res, next) => {
   next();
 });
 
-// Handle uncaught exceptions to prevent server crashes
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
 (async () => {
-  try {
-    // Warm up database connection with retry logic
-    console.log('Warming up database connection...');
-    await waitForDatabase(5);
-    
-    console.log('Registering routes...');
-    await registerRoutes(httpServer, app);
-    console.log('Routes registered successfully');
+  // Seed default roles and superadmin on startup
+  await ensureDefaultRoles();
+  await ensureDefaultSuperAdmin();
+  
+  await registerRoutes(httpServer, app);
 
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
 
-      console.error('Express error handler:', err);
-      res.status(status).json({ message });
-    });
+    res.status(status).json({ message });
+    throw err;
+  });
 
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
-    if (process.env.NODE_ENV === "production") {
-      console.log('Setting up static file serving for production...');
-      serveStatic(app);
-    } else {
-      console.log('Setting up Vite for development...');
-      const { setupVite } = await import("./vite");
-      await setupVite(httpServer, app);
-    }
-
-    // ALWAYS serve the app on the port specified in the environment variable PORT
-    // Other ports are firewalled. Default to 5000 if not specified.
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = parseInt(process.env.PORT || "5000", 10);
-    httpServer.listen(
-      {
-        port,
-        host: "0.0.0.0",
-        reusePort: true,
-      },
-      () => {
-        log(`serving on port ${port}`);
-        console.log(`Server is ready and listening on port ${port}`);
-        
-        // Seed default roles and superadmin in background after server starts
-        // This ensures health checks pass quickly
-        // Only run if database is ready
-        if (isDatabaseReady) {
-          (async () => {
-            try {
-              await ensureDefaultRoles();
-              await ensureDefaultSuperAdmin();
-              log('Database seeding completed');
-            } catch (error) {
-              console.error('Error during database seeding:', error);
-            }
-          })();
-        } else {
-          console.log('Database not ready, skipping seeding');
-        }
-      },
-    );
-  } catch (error) {
-    console.error('Fatal error during server startup:', error);
-    process.exit(1);
+  // importantly only setup vite in development and after
+  // setting up all the other routes so the catch-all route
+  // doesn't interfere with the other routes
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  } else {
+    const { setupVite } = await import("./vite");
+    await setupVite(httpServer, app);
   }
+
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || "5000", 10);
+  httpServer.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    },
+  );
 })();

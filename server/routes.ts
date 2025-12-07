@@ -24,11 +24,10 @@ import {
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import MemoryStore from "memorystore";
-import { pool, isDatabaseConfigured, isDatabaseReady } from "./db";
+import { pool } from "./db";
+import * as pdfParseModule from "pdf-parse";
 
 const PgSession = connectPgSimple(session);
-const MemoryStoreSession = MemoryStore(session);
 
 interface ParsedLineItem {
   slNo: number;
@@ -291,43 +290,14 @@ export async function registerRoutes(
     app.set('trust proxy', 1);
   }
   
-  // Session middleware - use PostgreSQL store if database is ready, memory store as fallback
-  let sessionStore: any;
-  let useMemoryStore = false;
-  
-  if (isDatabaseConfigured && isDatabaseReady) {
-    try {
-      sessionStore = new PgSession({
+  // Session middleware
+  app.use(
+    session({
+      store: new PgSession({
         pool,
         tableName: 'session',
         createTableIfMissing: true,
-        errorLog: (err: any) => {
-          if (err.code === '57P01') {
-            console.log('Session store: Neon connection terminated, will reconnect');
-          } else {
-            console.error('Session store error:', err);
-          }
-        },
-      });
-      console.log('Using PostgreSQL session store');
-    } catch (err) {
-      console.warn('Failed to create PostgreSQL session store, falling back to memory:', err);
-      useMemoryStore = true;
-    }
-  } else {
-    useMemoryStore = true;
-  }
-  
-  if (useMemoryStore) {
-    sessionStore = new MemoryStoreSession({
-      checkPeriod: 86400000, // prune expired entries every 24h
-    });
-    console.warn('WARNING: Using in-memory session store. Sessions will not persist across restarts.');
-  }
-  
-  app.use(
-    session({
-      store: sessionStore,
+      }),
       secret: process.env.SESSION_SECRET || 'oak-event-secret-key-change-in-production',
       resave: false,
       saveUninitialized: false,
@@ -1790,56 +1760,19 @@ export async function registerRoutes(
   });
 
   // PDF Generation endpoint
-  // Note: This feature requires Chromium and is disabled in autoscale deployments
-  // Set ENABLE_PDF_RENDER=true to enable (requires Reserved VM deployment)
   app.get('/api/pdf/:type/:id', async (req, res) => {
     try {
       const { type, id } = req.params;
-      
-      // Feature flag - disabled by default in production autoscale
-      const pdfEnabled = process.env.ENABLE_PDF_RENDER === 'true';
-      if (!pdfEnabled && process.env.NODE_ENV === 'production') {
-        return res.status(503).json({ 
-          error: 'Server-side PDF generation is not available. Please use browser print (Ctrl+P or Cmd+P) instead.',
-          suggestion: 'Use browser print on the document page for PDF export'
-        });
-      }
       
       if (!['quote', 'invoice', 'receipt'].includes(type)) {
         return res.status(400).json({ error: 'Invalid document type' });
       }
 
-      let puppeteer;
-      try {
-        puppeteer = await import('puppeteer');
-      } catch (importError) {
-        console.error('Puppeteer not available:', importError);
-        return res.status(503).json({ 
-          error: 'PDF generation is not available in this environment. Please use the browser print function instead.',
-          suggestion: 'Use browser print (Ctrl+P or Cmd+P) on the document page'
-        });
-      }
-
-      let browser;
-      try {
-        browser = await puppeteer.default.launch({
-          headless: true,
-          args: [
-            '--no-sandbox', 
-            '--disable-setuid-sandbox', 
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--single-process',
-            '--no-zygote'
-          ],
-        });
-      } catch (launchError) {
-        console.error('Failed to launch browser:', launchError);
-        return res.status(503).json({ 
-          error: 'PDF generation service is temporarily unavailable. Please use the browser print function instead.',
-          suggestion: 'Use browser print (Ctrl+P or Cmd+P) on the document page'
-        });
-      }
+      const puppeteer = await import('puppeteer');
+      const browser = await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
 
       try {
         const page = await browser.newPage();
@@ -1870,13 +1803,11 @@ export async function registerRoutes(
         res.setHeader('Content-Disposition', `attachment; filename="${type}-${id}.pdf"`);
         res.send(pdf);
       } finally {
-        if (browser) {
-          await browser.close();
-        }
+        await browser.close();
       }
     } catch (error) {
       console.error('PDF generation error:', error);
-      res.status(500).json({ error: 'Failed to generate PDF. Please use the browser print function instead.' });
+      res.status(500).json({ error: 'Failed to generate PDF' });
     }
   });
 
@@ -2937,18 +2868,8 @@ export async function registerRoutes(
       }
 
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-      
-      // Dynamic import to avoid bundling issues
-      let pdfParse: any;
-      try {
-        const pdfParseModule: any = await import('pdf-parse');
-        pdfParse = pdfParseModule.default || pdfParseModule;
-      } catch (importError) {
-        console.error('Failed to import pdf-parse:', importError);
-        return res.status(503).json({ error: 'PDF parsing service is not available' });
-      }
-      
-      const pdfData = await pdfParse(pdfBuffer);
+      const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+      const pdfData = await pdfParseFn(pdfBuffer);
       
       const parsedData = parseEstimatePDF(pdfData.text);
       
@@ -3058,389 +2979,6 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: 'Failed to delete import' });
-    }
-  });
-
-  // Notifications API
-  app.get('/api/notifications', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      const unreadOnly = req.query.unreadOnly === 'true';
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const notifications = await storage.getUserNotifications(userId, { unreadOnly, limit });
-      res.json(notifications);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to fetch notifications' });
-    }
-  });
-
-  app.get('/api/notifications/unread-count', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      const count = await storage.getUnreadNotificationCount(userId);
-      res.json({ count });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to get unread count' });
-    }
-  });
-
-  app.patch('/api/notifications/:id/read', async (req, res) => {
-    try {
-      const notification = await storage.markNotificationAsRead(req.params.id);
-      if (!notification) {
-        return res.status(404).json({ error: 'Notification not found' });
-      }
-      res.json(notification);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to mark notification as read' });
-    }
-  });
-
-  app.post('/api/notifications/mark-all-read', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      await storage.markAllNotificationsAsRead(userId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to mark all as read' });
-    }
-  });
-
-  app.delete('/api/notifications/:id', async (req, res) => {
-    try {
-      await storage.dismissNotification(req.params.id);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to dismiss notification' });
-    }
-  });
-
-  app.post('/api/notifications/dismiss-all', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      await storage.dismissAllNotifications(userId);
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to dismiss all' });
-    }
-  });
-
-  // Notification Preferences API
-  app.get('/api/notification-preferences', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      let preferences = await storage.getNotificationPreferences(userId);
-      if (!preferences) {
-        preferences = await storage.createNotificationPreferences({ userId });
-      }
-      res.json(preferences);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to get preferences' });
-    }
-  });
-
-  app.put('/api/notification-preferences', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-      let preferences = await storage.getNotificationPreferences(userId);
-      if (!preferences) {
-        preferences = await storage.createNotificationPreferences({ userId, ...req.body });
-      } else {
-        preferences = await storage.updateNotificationPreferences(userId, req.body);
-      }
-      res.json(preferences);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to update preferences' });
-    }
-  });
-
-  // Notification Generation - Generate notifications based on upcoming deadlines
-  app.post('/api/notifications/generate', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const preferences = await storage.getNotificationPreferences(userId) || 
-        await storage.createNotificationPreferences({ userId });
-      
-      const today = new Date();
-      const notifications: any[] = [];
-
-      // Generate event reminders
-      if (preferences.eventRemindersEnabled) {
-        const futureDate = new Date(today);
-        futureDate.setDate(futureDate.getDate() + preferences.eventReminderDays);
-        const allEvents = await storage.getAllEvents();
-        
-        for (const event of allEvents) {
-          const eventDate = new Date(event.date);
-          const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (daysUntil > 0 && daysUntil <= preferences.eventReminderDays) {
-            notifications.push({
-              userId,
-              type: 'event_reminder',
-              title: `Upcoming Event: ${event.title}`,
-              message: `${event.title} is scheduled in ${daysUntil} day${daysUntil > 1 ? 's' : ''} at ${event.venue}`,
-              priority: daysUntil <= 1 ? 'high' : 'normal',
-              relatedEntityType: 'event',
-              relatedEntityId: event.id,
-              actionUrl: '/events',
-              sentAt: new Date()
-            });
-          }
-        }
-      }
-
-      // Generate invoice due reminders
-      if (preferences.invoiceDueRemindersEnabled) {
-        const allInvoices = await storage.getAllInvoices();
-        
-        for (const invoice of allInvoices) {
-          if (invoice.dueDate && invoice.status !== 'paid') {
-            const dueDate = new Date(invoice.dueDate);
-            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            
-            if (daysUntil >= 0 && daysUntil <= preferences.invoiceReminderDays) {
-              notifications.push({
-                userId,
-                type: 'invoice_due',
-                title: `Invoice Due: ${invoice.number}`,
-                message: daysUntil === 0 
-                  ? `Invoice ${invoice.number} is due today` 
-                  : `Invoice ${invoice.number} is due in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
-                priority: daysUntil <= 1 ? 'high' : 'normal',
-                relatedEntityType: 'invoice',
-                relatedEntityId: invoice.id,
-                actionUrl: '/oak-book',
-                sentAt: new Date()
-              });
-            }
-          }
-        }
-      }
-
-      // Generate estimate due reminders
-      if (preferences.estimateDueRemindersEnabled) {
-        const allEstimates = await storage.getAllEstimates();
-        
-        for (const estimate of allEstimates) {
-          if (estimate.dueDate && estimate.status === 'sent') {
-            const dueDate = new Date(estimate.dueDate);
-            const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            
-            if (daysUntil >= 0 && daysUntil <= preferences.estimateReminderDays) {
-              notifications.push({
-                userId,
-                type: 'estimate_due',
-                title: `Estimate Expires: ${estimate.number}`,
-                message: daysUntil === 0 
-                  ? `Estimate ${estimate.number} expires today` 
-                  : `Estimate ${estimate.number} expires in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
-                priority: daysUntil <= 1 ? 'high' : 'normal',
-                relatedEntityType: 'estimate',
-                relatedEntityId: estimate.id,
-                actionUrl: '/oak-book',
-                sentAt: new Date()
-              });
-            }
-          }
-        }
-      }
-
-      // Generate production deadline reminders
-      if (preferences.productionDeadlineRemindersEnabled) {
-        const allDecorItems = await storage.getAllProductionDecorItems();
-        
-        for (const item of allDecorItems) {
-          if (item.setupDate && item.status === 'pending') {
-            const setupDate = new Date(item.setupDate);
-            const daysUntil = Math.ceil((setupDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-            
-            if (daysUntil >= 0 && daysUntil <= preferences.productionReminderDays) {
-              notifications.push({
-                userId,
-                type: 'production_deadline',
-                title: `Production Setup: ${item.decorType}`,
-                message: daysUntil === 0 
-                  ? `${item.decorType} setup is scheduled for today` 
-                  : `${item.decorType} setup in ${daysUntil} day${daysUntil > 1 ? 's' : ''}`,
-                priority: item.priority === 'urgent' || daysUntil <= 1 ? 'high' : 'normal',
-                relatedEntityType: 'production_task',
-                relatedEntityId: item.id,
-                actionUrl: '/oak-inventory',
-                sentAt: new Date()
-              });
-            }
-          }
-        }
-      }
-
-      // Create notifications if any were generated
-      if (notifications.length > 0) {
-        await storage.createManyNotifications(notifications);
-
-        // Send WhatsApp notifications for high-priority items if enabled
-        if (preferences.whatsappEnabled && preferences.whatsappPhoneNumber) {
-          const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
-          
-          if (isWhatsAppConfigured()) {
-            // Only send WhatsApp for high/urgent priority notifications
-            const priorityNotifications = notifications.filter(n => 
-              n.priority === 'high' || n.priority === 'urgent'
-            );
-            
-            // Limit to max 5 WhatsApp messages per batch to avoid spam
-            const toSend = priorityNotifications.slice(0, 5);
-            
-            for (const notification of toSend) {
-              try {
-                await sendNotificationViaWhatsApp(
-                  preferences.whatsappPhoneNumber,
-                  notification.title,
-                  notification.message,
-                  notification.priority
-                );
-                console.log(`[WhatsApp] Sent notification: ${notification.title}`);
-              } catch (error) {
-                console.error(`[WhatsApp] Failed to send: ${notification.title}`, error);
-              }
-            }
-          }
-        }
-      }
-
-      res.json({ 
-        success: true, 
-        notificationsGenerated: notifications.length 
-      });
-    } catch (error: any) {
-      console.error('Notification generation error:', error);
-      res.status(500).json({ error: error.message || 'Failed to generate notifications' });
-    }
-  });
-
-  // WhatsApp API Routes
-  app.get('/api/whatsapp/status', async (req, res) => {
-    try {
-      const { isWhatsAppConfigured } = await import('./whatsapp-service');
-      res.json({ 
-        configured: isWhatsAppConfigured(),
-        message: isWhatsAppConfigured() 
-          ? 'WhatsApp is configured and ready' 
-          : 'WhatsApp is not configured. Please set Twilio credentials.'
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || 'Failed to check WhatsApp status' });
-    }
-  });
-
-  app.post('/api/whatsapp/send-test', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { phoneNumber } = req.body;
-      if (!phoneNumber) {
-        return res.status(400).json({ error: 'Phone number is required' });
-      }
-
-      // Basic phone number validation
-      const phoneRegex = /^\+?[1-9]\d{6,14}$/;
-      const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
-      if (!phoneRegex.test(cleanPhone)) {
-        return res.status(400).json({ error: 'Invalid phone number format. Please include country code (e.g., +91 98765 43210)' });
-      }
-
-      const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
-      
-      if (!isWhatsAppConfigured()) {
-        return res.status(400).json({ error: 'WhatsApp is not configured. Please set Twilio credentials.' });
-      }
-
-      const result = await sendNotificationViaWhatsApp(
-        phoneNumber,
-        'Test Notification',
-        'This is a test message from Oak Event Management. If you received this, WhatsApp notifications are working correctly!',
-        'normal'
-      );
-
-      if (result.success) {
-        res.json({ success: true, messageId: result.messageId });
-      } else {
-        res.status(400).json({ error: result.error || 'Failed to send test message' });
-      }
-    } catch (error: any) {
-      console.error('WhatsApp test error:', error);
-      res.status(500).json({ error: error.message || 'Failed to send test message' });
-    }
-  });
-
-  app.post('/api/whatsapp/send-notification', async (req, res) => {
-    try {
-      const userId = (req.session as any)?.userId;
-      if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { notificationId } = req.body;
-      if (!notificationId) {
-        return res.status(400).json({ error: 'Notification ID is required' });
-      }
-
-      const preferences = await storage.getNotificationPreferences(userId);
-      if (!preferences?.whatsappEnabled || !preferences?.whatsappPhoneNumber) {
-        return res.status(400).json({ error: 'WhatsApp notifications not enabled or phone number not set' });
-      }
-
-      const notification = await storage.getNotification(notificationId);
-      if (!notification) {
-        return res.status(404).json({ error: 'Notification not found' });
-      }
-
-      const { sendNotificationViaWhatsApp, isWhatsAppConfigured } = await import('./whatsapp-service');
-      
-      if (!isWhatsAppConfigured()) {
-        return res.status(400).json({ error: 'WhatsApp is not configured' });
-      }
-
-      const result = await sendNotificationViaWhatsApp(
-        preferences.whatsappPhoneNumber,
-        notification.title,
-        notification.message,
-        notification.priority
-      );
-
-      if (result.success) {
-        res.json({ success: true, messageId: result.messageId });
-      } else {
-        res.status(400).json({ error: result.error || 'Failed to send notification' });
-      }
-    } catch (error: any) {
-      console.error('WhatsApp notification error:', error);
-      res.status(500).json({ error: error.message || 'Failed to send notification' });
     }
   });
 
