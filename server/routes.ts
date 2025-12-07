@@ -24,10 +24,12 @@ import {
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "./db";
+import MemoryStore from "memorystore";
+import { pool, isDatabaseConfigured } from "./db";
 import * as pdfParseModule from "pdf-parse";
 
 const PgSession = connectPgSimple(session);
+const MemoryStoreSession = MemoryStore(session);
 
 interface ParsedLineItem {
   slNo: number;
@@ -290,14 +292,25 @@ export async function registerRoutes(
     app.set('trust proxy', 1);
   }
   
-  // Session middleware
-  app.use(
-    session({
-      store: new PgSession({
+  // Session middleware - use PostgreSQL store if available, memory store as fallback
+  const sessionStore = isDatabaseConfigured 
+    ? new PgSession({
         pool,
         tableName: 'session',
         createTableIfMissing: true,
-      }),
+        errorLog: (err) => console.error('Session store error:', err),
+      })
+    : new MemoryStoreSession({
+        checkPeriod: 86400000, // prune expired entries every 24h
+      });
+  
+  if (!isDatabaseConfigured) {
+    console.warn('WARNING: Using in-memory session store. Sessions will not persist across restarts.');
+  }
+  
+  app.use(
+    session({
+      store: sessionStore,
       secret: process.env.SESSION_SECRET || 'oak-event-secret-key-change-in-production',
       resave: false,
       saveUninitialized: false,
