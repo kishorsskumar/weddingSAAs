@@ -2271,7 +2271,7 @@ export async function registerRoutes(
       const rental = await storage.createRentalRecord(data);
       res.json(rental);
     } catch (error: any) {
-      log(`Failed to create rental: ${error.message}`);
+      console.error(`Failed to create rental: ${error.message}`);
       res.status(400).json({ error: error.message || 'Failed to create rental' });
     }
   });
