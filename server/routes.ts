@@ -25,8 +25,260 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
+import * as pdfParseModule from "pdf-parse";
 
 const PgSession = connectPgSimple(session);
+
+interface ParsedLineItem {
+  slNo: number;
+  description: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+  notes?: string;
+}
+
+interface ParsedSection {
+  originalHeading: string;
+  eventName: string;
+  category: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  items: ParsedLineItem[];
+}
+
+interface ParsedEstimateData {
+  sections: ParsedSection[];
+  rawLines: string[];
+}
+
+function cleanNumber(str: string): number {
+  if (!str) return 0;
+  const cleaned = str.replace(/[₹,\s]/g, '').replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
+function parseEstimatePDF(text: string): ParsedEstimateData {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const sections: ParsedSection[] = [];
+  let currentSection: ParsedSection | null = null;
+  
+  const dayHeaderRegex = /^(?:DAY\s*\d+\s*:\s*)?(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})\s*[-–]\s*(.+?)(?:\s*\(([^)]+)\))?$/i;
+  const categoryHeaderRegex = /^([A-Z][A-Z\s&]+(?:\s+FOR\s+[A-Z\s]+)?)$/;
+  const lineItemRegex = /^(\d+)\s+(.+?)\s+([\d,.]+)\s+([\d,.₹]+)\s+([\d,.₹]+)$/;
+  const altLineItemRegex = /^(\d+)\s+(.+?)$/;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    const dayMatch = line.match(dayHeaderRegex);
+    if (dayMatch) {
+      const day = dayMatch[1];
+      const month = dayMatch[2];
+      const year = dayMatch[3];
+      const eventName = dayMatch[4]?.trim() || 'Event';
+      const timeRange = dayMatch[5]?.trim() || '';
+      
+      const months: { [key: string]: string } = {
+        'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+        'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+      };
+      const monthNum = months[month.toLowerCase().substring(0, 3)];
+      const dateStr = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+      
+      let startTime: string | null = null;
+      let endTime: string | null = null;
+      if (timeRange) {
+        const timeMatch = timeRange.match(/(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)\s*(?:to|-)\s*(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)/i);
+        if (timeMatch) {
+          startTime = normalizeTime(timeMatch[1]);
+          endTime = normalizeTime(timeMatch[2]);
+        }
+      }
+      
+      currentSection = {
+        originalHeading: line,
+        eventName,
+        category: eventName,
+        date: dateStr,
+        startTime,
+        endTime,
+        items: []
+      };
+      sections.push(currentSection);
+      continue;
+    }
+    
+    const catMatch = line.match(categoryHeaderRegex);
+    if (catMatch && currentSection && !line.match(/^\d+\s/) && line.length >= 5) {
+      const categoryName = catMatch[1].trim();
+      const skipKeywords = ['SL', 'NO', 'ITEM', 'DESCRIPTION', 'QTY', 'RATE', 'AMOUNT', 'TOTAL', 'SUB'];
+      if (!skipKeywords.some(k => categoryName.toUpperCase().startsWith(k))) {
+        if (currentSection.items.length > 0) {
+          currentSection = {
+            originalHeading: line,
+            eventName: currentSection.eventName,
+            category: categoryName,
+            date: currentSection.date,
+            startTime: currentSection.startTime,
+            endTime: currentSection.endTime,
+            items: []
+          };
+          sections.push(currentSection);
+        } else {
+          currentSection.category = categoryName;
+          currentSection.originalHeading = line;
+        }
+      }
+      continue;
+    }
+    
+    if (!currentSection) continue;
+    
+    const itemMatch = line.match(lineItemRegex);
+    if (itemMatch) {
+      const quantity = cleanNumber(itemMatch[3]);
+      if (quantity > 0) {
+        currentSection.items.push({
+          slNo: parseInt(itemMatch[1]) || currentSection.items.length + 1,
+          description: itemMatch[2].trim(),
+          quantity,
+          rate: cleanNumber(itemMatch[4]),
+          amount: cleanNumber(itemMatch[5]),
+        });
+        continue;
+      }
+    }
+    
+    const parts = line.split(/\s{2,}|\t+/);
+    if (parts.length >= 4 && /^\d+$/.test(parts[0].trim())) {
+      const slNo = parseInt(parts[0].trim());
+      let desc = '';
+      let qty = 0;
+      let rate = 0;
+      let amount = 0;
+      
+      for (let j = parts.length - 1; j >= 1; j--) {
+        const val = cleanNumber(parts[j]);
+        if (val > 0) {
+          if (!amount) amount = val;
+          else if (!rate) rate = val;
+          else if (!qty) { qty = val; break; }
+        }
+      }
+      
+      const descParts = [];
+      for (let j = 1; j < parts.length; j++) {
+        if (cleanNumber(parts[j]) === 0 || descParts.length === 0) {
+          const cleaned = parts[j].replace(/^[\d,.]+$/, '').trim();
+          if (cleaned) descParts.push(cleaned);
+        } else break;
+      }
+      desc = descParts.join(' ').trim();
+      
+      if (desc && qty > 0) {
+        currentSection.items.push({
+          slNo,
+          description: desc,
+          quantity: qty,
+          rate,
+          amount,
+        });
+        continue;
+      }
+    }
+    
+    const altMatch = line.match(altLineItemRegex);
+    if (altMatch) {
+      const slNo = parseInt(altMatch[1]);
+      const rest = altMatch[2];
+      const numbers = rest.match(/[\d,.]+/g) || [];
+      if (numbers.length >= 3) {
+        const qty = cleanNumber(numbers[numbers.length - 3]);
+        const rate = cleanNumber(numbers[numbers.length - 2]);
+        const amount = cleanNumber(numbers[numbers.length - 1]);
+        let desc = rest;
+        for (const num of numbers.slice(-3)) {
+          desc = desc.replace(num, '').trim();
+        }
+        desc = desc.replace(/\s+/g, ' ').trim();
+        
+        if (desc && qty > 0) {
+          currentSection.items.push({
+            slNo,
+            description: desc,
+            quantity: qty,
+            rate,
+            amount,
+          });
+        }
+      }
+    }
+  }
+  
+  const result = sections.filter(s => s.items.length > 0);
+  
+  if (result.length === 0 && lines.length > 0) {
+    const fallbackSection: ParsedSection = {
+      originalHeading: 'Imported Items',
+      eventName: 'Imported Event',
+      category: 'General',
+      date: null,
+      startTime: null,
+      endTime: null,
+      items: []
+    };
+    
+    for (const line of lines) {
+      if (line.match(/^\d+\s+\w/)) {
+        const numbers = line.match(/[\d,.]+/g) || [];
+        if (numbers.length >= 3) {
+          const qty = cleanNumber(numbers[numbers.length - 3]);
+          const rate = cleanNumber(numbers[numbers.length - 2]);
+          const amount = cleanNumber(numbers[numbers.length - 1]);
+          let desc = line.replace(/^\d+\s*/, '');
+          for (const num of numbers.slice(-3)) {
+            desc = desc.replace(num, '').trim();
+          }
+          desc = desc.replace(/\s+/g, ' ').trim();
+          
+          if (desc && qty > 0) {
+            fallbackSection.items.push({
+              slNo: fallbackSection.items.length + 1,
+              description: desc,
+              quantity: qty,
+              rate,
+              amount,
+            });
+          }
+        }
+      }
+    }
+    
+    if (fallbackSection.items.length > 0) {
+      result.push(fallbackSection);
+    }
+  }
+  
+  return { sections: result, rawLines: lines };
+}
+
+function normalizeTime(time: string): string {
+  time = time.replace('.', ':').trim();
+  const match = time.match(/(\d{1,2}):?(\d{2})?\s*(AM|PM)?/i);
+  if (!match) return time;
+  
+  let hours = parseInt(match[1]);
+  const minutes = match[2] || '00';
+  const period = match[3]?.toUpperCase();
+  
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes}`;
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -2595,6 +2847,139 @@ export async function registerRoutes(
   app.delete('/api/inventory/production-decor-elements/:id', async (req, res) => {
     await storage.deleteProductionDecorElement(req.params.id);
     res.json({ success: true });
+  });
+
+  // Production Décor Imports
+  app.get('/api/inventory/production-decor-imports', async (req, res) => {
+    try {
+      const imports = await storage.getAllProductionDecorImports();
+      res.json(imports);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch production décor imports' });
+    }
+  });
+
+  app.post('/api/inventory/production-decor-imports/parse', async (req, res) => {
+    try {
+      const { pdfBase64, filename, eventId, sourceType } = req.body;
+      
+      if (!pdfBase64) {
+        return res.status(400).json({ error: 'PDF data is required' });
+      }
+
+      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+      const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+      const pdfData = await pdfParseFn(pdfBuffer);
+      
+      const parsedData = parseEstimatePDF(pdfData.text);
+      
+      res.json({ 
+        success: true, 
+        parsedData,
+        filename,
+        rawText: pdfData.text 
+      });
+    } catch (error: any) {
+      console.error('PDF parse error:', error);
+      res.status(400).json({ error: error.message || 'Failed to parse PDF' });
+    }
+  });
+
+  app.post('/api/inventory/production-decor-imports/confirm', async (req, res) => {
+    try {
+      const { parsedData, eventId, eventName, filename, sourceType } = req.body;
+      const userId = (req as any).user?.id;
+
+      if (!parsedData || !parsedData.sections || !Array.isArray(parsedData.sections)) {
+        return res.status(400).json({ error: 'Invalid parsed data: sections array required' });
+      }
+
+      if (parsedData.sections.length === 0) {
+        return res.status(400).json({ error: 'No sections found in parsed data' });
+      }
+
+      const validSections = parsedData.sections.filter((s: any) => 
+        s && Array.isArray(s.items) && s.items.length > 0
+      );
+
+      if (validSections.length === 0) {
+        return res.status(400).json({ error: 'No valid sections with items found' });
+      }
+
+      const importRecord = await storage.createProductionDecorImport({
+        eventId: eventId || null,
+        sourceType: sourceType || 'estimate',
+        filename: filename || 'uploaded.pdf',
+        status: 'processing',
+        createdBy: userId
+      });
+
+      const items: any[] = [];
+      const elements: { itemIndex: number; element: any }[] = [];
+      const pastelColors = ['blue', 'green', 'yellow', 'pink', 'purple', 'orange'];
+
+      for (let i = 0; i < validSections.length; i++) {
+        const section = validSections[i];
+        
+        const isValidDate = section.date && /^\d{4}-\d{2}-\d{2}$/.test(section.date);
+        
+        items.push({
+          eventId: eventId || null,
+          eventName: eventName || section.eventName || 'Imported',
+          eventDate: isValidDate ? section.date : null,
+          decorType: (section.category || section.eventName || 'Imported Section').substring(0, 100),
+          setupDate: isValidDate ? section.date : null,
+          setupTime: section.startTime || null,
+          endTime: section.endTime || null,
+          priority: 'medium',
+          status: 'pending',
+          pastelColor: pastelColors[i % pastelColors.length],
+          sectionLabel: (section.originalHeading || '').substring(0, 255)
+        });
+
+        for (const item of section.items) {
+          if (!item || !item.description) continue;
+          
+          const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1;
+          
+          elements.push({
+            itemIndex: i,
+            element: {
+              elementName: String(item.description).substring(0, 255),
+              quantity: Math.max(1, qty),
+              unit: 'Nos',
+              source: 'to_buy',
+              notes: item.notes ? String(item.notes).substring(0, 500) : ''
+            }
+          });
+        }
+      }
+
+      const result = await storage.createProductionDecorItemsFromImport(
+        importRecord.id,
+        items,
+        elements
+      );
+
+      res.json({ 
+        success: true, 
+        importId: importRecord.id,
+        itemsCreated: result.items.length,
+        elementsCreated: result.elements.length
+      });
+    } catch (error: any) {
+      console.error('Import confirm error:', error);
+      res.status(400).json({ error: error.message || 'Failed to confirm import' });
+    }
+  });
+
+  app.delete('/api/inventory/production-decor-imports/:id', async (req, res) => {
+    try {
+      await storage.deleteProductionDecorImport(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete import' });
+    }
   });
 
   // Object Storage - Image Upload Routes

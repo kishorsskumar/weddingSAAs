@@ -4983,6 +4983,13 @@ function DecorPlanningSection({
   const [showNewTypeInput, setShowNewTypeInput] = useState(false);
   const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
   const [inventoryPopoverOpen, setInventoryPopoverOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'confirm'>('upload');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [parsedImportData, setParsedImportData] = useState<any>(null);
+  const [importEventId, setImportEventId] = useState<string>('');
+  const [importEventName, setImportEventName] = useState<string>('');
+  const [isImporting, setIsImporting] = useState(false);
   
   const allDecorTypes = useMemo(() => {
     const combinedTypes = [...DECOR_TYPES, ...customDecorTypes];
@@ -5365,6 +5372,95 @@ function DecorPlanningSection({
 
   const getLinkedEvent = (eventId: string | null) => events.find(e => e.id === eventId);
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast({ title: 'Please upload a PDF file', variant: 'destructive' });
+      return;
+    }
+    
+    setImportFile(file);
+    setIsImporting(true);
+    
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const response = await fetch('/api/inventory/production-decor-imports/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdfBase64: base64, filename: file.name }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error('Failed to parse PDF');
+      
+      const data = await response.json();
+      setParsedImportData(data.parsedData);
+      setImportStep('preview');
+      toast({ title: 'PDF parsed successfully', description: `Found ${data.parsedData.sections.length} sections` });
+    } catch (error: any) {
+      toast({ title: 'Failed to parse PDF', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const confirmImport = async () => {
+    if (!parsedImportData) return;
+    
+    setIsImporting(true);
+    try {
+      const response = await fetch('/api/inventory/production-decor-imports/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          parsedData: parsedImportData,
+          eventId: importEventId || null,
+          eventName: importEventName || importFile?.name || 'Imported',
+          filename: importFile?.name || 'uploaded.pdf',
+          sourceType: 'estimate'
+        }),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) throw new Error('Failed to import data');
+      
+      const result = await response.json();
+      toast({ 
+        title: 'Import successful', 
+        description: `Created ${result.itemsCreated} décor items with ${result.elementsCreated} elements` 
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-items'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/production-decor-elements'] });
+      
+      resetImportModal();
+    } catch (error: any) {
+      toast({ title: 'Import failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const resetImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportStep('upload');
+    setImportFile(null);
+    setParsedImportData(null);
+    setImportEventId('');
+    setImportEventName('');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -5372,13 +5468,22 @@ function DecorPlanningSection({
           <h2 className="text-xl sm:text-2xl font-semibold text-gray-900">Production Planning</h2>
           <p className="text-sm text-gray-500">Manage décor items and materials for events</p>
         </div>
-        <Button 
-          onClick={() => { resetItemForm(); setIsItemModalOpen(true); }} 
-          className="bg-amber-600 hover:bg-amber-700"
-          data-testid="button-add-decor-item"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Décor Item
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)} 
+            data-testid="button-import-estimate"
+          >
+            <Upload className="w-4 h-4 mr-2" /> Import Estimate
+          </Button>
+          <Button 
+            onClick={() => { resetItemForm(); setIsItemModalOpen(true); }} 
+            className="bg-amber-600 hover:bg-amber-700"
+            data-testid="button-add-decor-item"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Décor Item
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -6182,6 +6287,150 @@ function DecorPlanningSection({
                 </Button>
                 <Button onClick={() => { setViewingItem(null); handleEditItem(viewingItem); }}>
                   <Edit className="w-4 h-4 mr-2" /> Edit
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportModalOpen} onOpenChange={(open) => { if (!open) resetImportModal(); else setIsImportModalOpen(true); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {importStep === 'upload' && 'Import Estimate/Invoice'}
+              {importStep === 'preview' && 'Preview Import Data'}
+              {importStep === 'confirm' && 'Confirm Import'}
+            </DialogTitle>
+            <DialogDescription>
+              {importStep === 'upload' && 'Upload a PDF estimate or invoice to automatically create production planning items'}
+              {importStep === 'preview' && 'Review the parsed data before importing'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {importStep === 'upload' && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label>Link to Event (Optional)</Label>
+                <Select value={importEventId || 'none'} onValueChange={(v) => {
+                  const eventId = v === 'none' ? '' : v;
+                  setImportEventId(eventId);
+                  const evt = events.find(e => e.id === eventId);
+                  if (evt) setImportEventName(evt.title);
+                }}>
+                  <SelectTrigger data-testid="select-import-event">
+                    <SelectValue placeholder="Select event..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No event selected</SelectItem>
+                    {events.map((evt) => (
+                      <SelectItem key={evt.id} value={evt.id}>{evt.title} - {format(new Date(evt.date), 'dd MMM yyyy')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600 mb-4">Upload your estimate or invoice PDF</p>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="pdf-upload"
+                  data-testid="input-pdf-upload"
+                />
+                <label htmlFor="pdf-upload">
+                  <Button asChild disabled={isImporting}>
+                    <span>
+                      {isImporting ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                      ) : (
+                        <><Upload className="w-4 h-4 mr-2" /> Select PDF File</>
+                      )}
+                    </span>
+                  </Button>
+                </label>
+                {importFile && <p className="text-sm text-gray-500 mt-2">{importFile.name}</p>}
+              </div>
+            </div>
+          )}
+          
+          {importStep === 'preview' && parsedImportData && (
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-green-800 font-medium">
+                  Found {parsedImportData.sections.length} sections with items to import
+                </p>
+              </div>
+              
+              <ScrollArea className="h-[400px] rounded border p-4">
+                {parsedImportData.sections.map((section: any, idx: number) => (
+                  <div 
+                    key={idx} 
+                    className={`mb-4 p-4 rounded-lg ${
+                      ['bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-pink-50', 'bg-purple-50'][idx % 5]
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-semibold text-gray-900">{section.category || section.eventName}</h4>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        {section.date && (
+                          <Badge variant="outline">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {format(new Date(section.date), 'dd MMM yyyy')}
+                          </Badge>
+                        )}
+                        {section.startTime && section.endTime && (
+                          <Badge variant="outline">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {section.startTime} - {section.endTime}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">{section.originalHeading}</p>
+                    
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {section.items.map((item: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm">{item.description}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">₹{item.rate.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">₹{item.amount.toLocaleString()}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))}
+              </ScrollArea>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setImportStep('upload'); setParsedImportData(null); }}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={confirmImport} 
+                  disabled={isImporting}
+                  className="bg-amber-600 hover:bg-amber-700"
+                  data-testid="button-confirm-import"
+                >
+                  {isImporting ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing...</>
+                  ) : (
+                    <><Check className="w-4 h-4 mr-2" /> Confirm Import</>
+                  )}
                 </Button>
               </DialogFooter>
             </div>
