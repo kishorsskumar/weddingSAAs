@@ -2867,11 +2867,39 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'PDF data is required' });
       }
 
-      const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-      const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
-      const pdfData = await pdfParseFn(pdfBuffer);
+      console.log(`[PDF Parse] Starting parse for file: ${filename}`);
+      console.log(`[PDF Parse] Base64 data length: ${pdfBase64.length}`);
+      
+      let pdfBuffer: Buffer;
+      try {
+        const base64Data = pdfBase64.includes(',') ? pdfBase64.split(',')[1] : pdfBase64;
+        pdfBuffer = Buffer.from(base64Data, 'base64');
+        console.log(`[PDF Parse] Buffer created, size: ${pdfBuffer.length} bytes`);
+      } catch (bufferError: any) {
+        console.error('[PDF Parse] Buffer creation failed:', bufferError);
+        return res.status(400).json({ error: 'Invalid PDF data format - could not decode base64' });
+      }
+      
+      let pdfData;
+      try {
+        const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
+        pdfData = await pdfParseFn(pdfBuffer);
+        console.log(`[PDF Parse] PDF parsed successfully, text length: ${pdfData.text?.length || 0}`);
+      } catch (parseError: any) {
+        console.error('[PDF Parse] pdf-parse library error:', parseError);
+        return res.status(400).json({ 
+          error: 'Could not read PDF file. The file may be corrupted, password-protected, or in an unsupported format.' 
+        });
+      }
+      
+      if (!pdfData.text || pdfData.text.trim().length === 0) {
+        return res.status(400).json({ 
+          error: 'The PDF appears to be empty or contains only images. Please use a text-based PDF estimate.' 
+        });
+      }
       
       const parsedData = parseEstimatePDF(pdfData.text);
+      console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections`);
       
       res.json({ 
         success: true, 
@@ -2880,7 +2908,7 @@ export async function registerRoutes(
         rawText: pdfData.text 
       });
     } catch (error: any) {
-      console.error('PDF parse error:', error);
+      console.error('[PDF Parse] Unexpected error:', error);
       res.status(400).json({ error: error.message || 'Failed to parse PDF' });
     }
   });
