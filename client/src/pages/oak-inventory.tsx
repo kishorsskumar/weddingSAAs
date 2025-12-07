@@ -3387,6 +3387,163 @@ function ProductionPlansSection({
 
   const tasksForSelected = selectedPlan ? tasks.filter(t => t.planId === selectedPlan.id).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)) : [];
 
+  const handleDownloadProductionPlanPDF = async () => {
+    if (!selectedPlan) return;
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const event = events.find(e => e.id === selectedPlan.eventId);
+      const eventName = event?.title || 'N/A';
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 15;
+      
+      doc.setFontSize(20);
+      doc.setTextColor(180, 120, 60);
+      doc.text(COMPANY_DEFAULTS.companyName, pageWidth / 2, y, { align: 'center' });
+      y += 8;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(100);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth / 2, y, { align: 'center' });
+        y += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone} | Email: ${COMPANY_DEFAULTS.email}`, pageWidth / 2, y, { align: 'center' });
+      y += 6;
+      if (COMPANY_DEFAULTS.gstNumber) {
+        doc.text(`GSTIN: ${COMPANY_DEFAULTS.gstNumber}`, pageWidth / 2, y, { align: 'center' });
+        y += 6;
+      }
+      
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+      
+      doc.setFontSize(16);
+      doc.setTextColor(0);
+      doc.text('PRODUCTION PLAN', pageWidth / 2, y, { align: 'center' });
+      y += 12;
+      
+      doc.setFontSize(10);
+      const leftCol = 15;
+      const rightCol = pageWidth / 2 + 10;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Plan Name:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(selectedPlan.name, leftCol + 30, y);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Status:', rightCol, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(selectedPlan.status.replace('_', ' ').toUpperCase(), rightCol + 20, y);
+      y += 7;
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('Event:', leftCol, y);
+      doc.setFont('helvetica', 'normal');
+      const eventText = doc.splitTextToSize(eventName, 70);
+      doc.text(eventText, leftCol + 30, y);
+      y += eventText.length > 1 ? eventText.length * 5 : 7;
+      
+      if (event?.date) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Event Date:', rightCol, y - (eventText.length > 1 ? (eventText.length - 1) * 5 : 0));
+        doc.setFont('helvetica', 'normal');
+        doc.text(format(new Date(event.date), 'dd/MM/yyyy'), rightCol + 30, y - (eventText.length > 1 ? (eventText.length - 1) * 5 : 0));
+      }
+      
+      if (event?.venue) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Venue:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        const venueText = doc.splitTextToSize(event.venue, 140);
+        doc.text(venueText, leftCol + 30, y);
+        y += venueText.length * 5 + 2;
+      }
+      
+      if (event?.customer) {
+        doc.setFont('helvetica', 'bold');
+        doc.text('Customer:', leftCol, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(event.customer, leftCol + 30, y);
+        y += 7;
+      }
+      
+      y += 8;
+      
+      doc.setFillColor(253, 246, 227);
+      doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('#', 18, y);
+      doc.text('Activity', 26, y);
+      doc.text('Time', 90, y);
+      doc.text('Vendor', 120, y);
+      doc.text('Person', 155, y);
+      doc.text('Status', 185, y);
+      y += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      tasksForSelected.forEach((task, index) => {
+        if (y > 270) {
+          doc.addPage();
+          y = 20;
+          doc.setFillColor(253, 246, 227);
+          doc.rect(15, y - 5, pageWidth - 30, 8, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.text('#', 18, y);
+          doc.text('Activity', 26, y);
+          doc.text('Time', 90, y);
+          doc.text('Vendor', 120, y);
+          doc.text('Person', 155, y);
+          doc.text('Status', 185, y);
+          y += 8;
+          doc.setFont('helvetica', 'normal');
+        }
+        
+        const timeStr = task.startTime && task.endTime 
+          ? `${task.startTime}-${task.endTime}` 
+          : task.startTime || task.endTime || '-';
+        
+        doc.text(String(index + 1), 18, y);
+        const activityText = doc.splitTextToSize(task.activity, 60);
+        doc.text(activityText[0].substring(0, 30), 26, y);
+        doc.text(timeStr.substring(0, 12), 90, y);
+        doc.text((task.vendorName || '-').substring(0, 15), 120, y);
+        doc.text((task.responsiblePersonName || '-').substring(0, 15), 155, y);
+        doc.text(task.status.replace('_', ' '), 185, y);
+        
+        y += activityText.length > 1 ? 8 : 6;
+      });
+      
+      y += 10;
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+      
+      doc.setFontSize(8);
+      doc.setTextColor(100);
+      doc.text(`Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, pageWidth / 2, y, { align: 'center' });
+      y += 5;
+      doc.text(`Total Tasks: ${tasksForSelected.length}`, pageWidth / 2, y, { align: 'center' });
+      
+      const fileName = `Production_Plan_${selectedPlan.name.replace(/[^a-z0-9]/gi, '_')}_${format(new Date(), 'yyyyMMdd')}.pdf`;
+      doc.save(fileName);
+      toast({ title: 'PDF Downloaded', description: `${fileName} has been downloaded` });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -3447,13 +3604,19 @@ function ProductionPlansSection({
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <CardTitle>{selectedPlan ? `Tasks for ${selectedPlan.name}` : 'Select a Plan'}</CardTitle>
               {selectedPlan && (
-                <Button size="sm" onClick={() => { setTaskFormData({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Task
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={handleDownloadProductionPlanPDF} data-testid="button-download-plan-pdf">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </Button>
+                  <Button size="sm" onClick={() => { setTaskFormData({ activity: '', startTime: '', endTime: '', vendorName: '', responsiblePersonName: '', status: 'pending', notes: '' }); setIsTaskModalOpen(true); }} data-testid="button-add-task">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Task
+                  </Button>
+                </div>
               )}
             </div>
           </CardHeader>
