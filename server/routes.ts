@@ -1790,10 +1790,20 @@ export async function registerRoutes(
   });
 
   // PDF Generation endpoint
-  // Note: This feature requires Chromium and may not work in all deployment environments
+  // Note: This feature requires Chromium and is disabled in autoscale deployments
+  // Set ENABLE_PDF_RENDER=true to enable (requires Reserved VM deployment)
   app.get('/api/pdf/:type/:id', async (req, res) => {
     try {
       const { type, id } = req.params;
+      
+      // Feature flag - disabled by default in production autoscale
+      const pdfEnabled = process.env.ENABLE_PDF_RENDER === 'true';
+      if (!pdfEnabled && process.env.NODE_ENV === 'production') {
+        return res.status(503).json({ 
+          error: 'Server-side PDF generation is not available. Please use browser print (Ctrl+P or Cmd+P) instead.',
+          suggestion: 'Use browser print on the document page for PDF export'
+        });
+      }
       
       if (!['quote', 'invoice', 'receipt'].includes(type)) {
         return res.status(400).json({ error: 'Invalid document type' });
