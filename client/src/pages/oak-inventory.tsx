@@ -4975,6 +4975,28 @@ function DecorPlanningSection({
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [viewingItem, setViewingItem] = useState<ProductionDecorItem | null>(null);
   
+  const [customDecorTypes, setCustomDecorTypes] = useState<string[]>(() => {
+    const saved = localStorage.getItem('customDecorTypes');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [newDecorType, setNewDecorType] = useState('');
+  const [showNewTypeInput, setShowNewTypeInput] = useState(false);
+  
+  const allDecorTypes = useMemo(() => {
+    const combinedTypes = [...DECOR_TYPES, ...customDecorTypes];
+    const existingFromItems = decorItems.map(i => i.decorType).filter(t => t && !combinedTypes.includes(t));
+    return Array.from(new Set([...combinedTypes, ...existingFromItems]));
+  }, [customDecorTypes, decorItems]);
+  
+  const addCustomDecorType = (type: string) => {
+    if (type.trim() && !allDecorTypes.includes(type.trim())) {
+      const updatedTypes = [...customDecorTypes, type.trim()];
+      setCustomDecorTypes(updatedTypes);
+      localStorage.setItem('customDecorTypes', JSON.stringify(updatedTypes));
+      toast({ title: 'Success', description: `Added new décor type: ${type.trim()}` });
+    }
+  };
+  
   const [filters, setFilters] = useState({
     eventDate: '',
     venue: '',
@@ -5391,7 +5413,7 @@ function DecorPlanningSection({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {DECOR_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {allDecorTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -5645,7 +5667,7 @@ function DecorPlanningSection({
                     eventId: v,
                     eventName: event?.title || itemFormData.eventName,
                     eventDate: event?.date || itemFormData.eventDate,
-                    venue: event?.location || itemFormData.venue,
+                    venue: event?.venue || itemFormData.venue,
                   });
                 }}>
                   <SelectTrigger data-testid="select-linked-event">
@@ -5685,14 +5707,65 @@ function DecorPlanningSection({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Décor Type *</Label>
-                <Select value={itemFormData.decorType} onValueChange={(v) => setItemFormData({ ...itemFormData, decorType: v })}>
-                  <SelectTrigger data-testid="select-decor-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DECOR_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {showNewTypeInput ? (
+                  <div className="flex gap-2">
+                    <Input 
+                      value={newDecorType}
+                      onChange={(e) => setNewDecorType(e.target.value)}
+                      placeholder="Enter new type name"
+                      data-testid="input-new-decor-type"
+                      className="flex-1"
+                    />
+                    <Button 
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        if (newDecorType.trim()) {
+                          addCustomDecorType(newDecorType.trim());
+                          setItemFormData({ ...itemFormData, decorType: newDecorType.trim() });
+                          setNewDecorType('');
+                          setShowNewTypeInput(false);
+                        }
+                      }}
+                      data-testid="button-save-new-type"
+                    >
+                      <Check className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setNewDecorType('');
+                        setShowNewTypeInput(false);
+                      }}
+                      data-testid="button-cancel-new-type"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Select value={itemFormData.decorType} onValueChange={(v) => setItemFormData({ ...itemFormData, decorType: v })}>
+                      <SelectTrigger data-testid="select-decor-type" className="flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allDecorTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowNewTypeInput(true)}
+                      title="Add new décor type"
+                      data-testid="button-add-new-type"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Card Color</Label>
