@@ -22,6 +22,7 @@ const ALL_PAGES = [
   { id: "daybook", label: "Daybook" },
   { id: "oak-book", label: "Oak Book" },
   { id: "oak-sales", label: "Oak Sales" },
+  { id: "oak-inventory", label: "Oak Inventory" },
   { id: "hr", label: "HR" },
   { id: "admin", label: "Admin" },
 ];
