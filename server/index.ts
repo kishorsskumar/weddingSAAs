@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
+import { waitForDatabase, isDatabaseReady } from "./db";
 
 console.log('=== SERVER STARTUP ===');
 console.log('NODE_ENV:', process.env.NODE_ENV);
@@ -138,6 +139,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 (async () => {
   try {
+    // Warm up database connection with retry logic
+    console.log('Warming up database connection...');
+    await waitForDatabase(5);
+    
     console.log('Registering routes...');
     await registerRoutes(httpServer, app);
     console.log('Routes registered successfully');
@@ -179,15 +184,20 @@ process.on('unhandledRejection', (reason, promise) => {
         
         // Seed default roles and superadmin in background after server starts
         // This ensures health checks pass quickly
-        (async () => {
-          try {
-            await ensureDefaultRoles();
-            await ensureDefaultSuperAdmin();
-            log('Database seeding completed');
-          } catch (error) {
-            console.error('Error during database seeding:', error);
-          }
-        })();
+        // Only run if database is ready
+        if (isDatabaseReady) {
+          (async () => {
+            try {
+              await ensureDefaultRoles();
+              await ensureDefaultSuperAdmin();
+              log('Database seeding completed');
+            } catch (error) {
+              console.error('Error during database seeding:', error);
+            }
+          })();
+        } else {
+          console.log('Database not ready, skipping seeding');
+        }
       },
     );
   } catch (error) {

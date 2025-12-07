@@ -25,7 +25,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import MemoryStore from "memorystore";
-import { pool, isDatabaseConfigured } from "./db";
+import { pool, isDatabaseConfigured, isDatabaseReady } from "./db";
 
 const PgSession = connectPgSimple(session);
 const MemoryStoreSession = MemoryStore(session);
@@ -291,19 +291,37 @@ export async function registerRoutes(
     app.set('trust proxy', 1);
   }
   
-  // Session middleware - use PostgreSQL store if available, memory store as fallback
-  const sessionStore = isDatabaseConfigured 
-    ? new PgSession({
+  // Session middleware - use PostgreSQL store if database is ready, memory store as fallback
+  let sessionStore: any;
+  let useMemoryStore = false;
+  
+  if (isDatabaseConfigured && isDatabaseReady) {
+    try {
+      sessionStore = new PgSession({
         pool,
         tableName: 'session',
         createTableIfMissing: true,
-        errorLog: (err) => console.error('Session store error:', err),
-      })
-    : new MemoryStoreSession({
-        checkPeriod: 86400000, // prune expired entries every 24h
+        errorLog: (err: any) => {
+          if (err.code === '57P01') {
+            console.log('Session store: Neon connection terminated, will reconnect');
+          } else {
+            console.error('Session store error:', err);
+          }
+        },
       });
+      console.log('Using PostgreSQL session store');
+    } catch (err) {
+      console.warn('Failed to create PostgreSQL session store, falling back to memory:', err);
+      useMemoryStore = true;
+    }
+  } else {
+    useMemoryStore = true;
+  }
   
-  if (!isDatabaseConfigured) {
+  if (useMemoryStore) {
+    sessionStore = new MemoryStoreSession({
+      checkPeriod: 86400000, // prune expired entries every 24h
+    });
     console.warn('WARNING: Using in-memory session store. Sessions will not persist across restarts.');
   }
   
