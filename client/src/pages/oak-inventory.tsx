@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -47,7 +49,8 @@ import {
   RotateCcw,
   Printer,
   Check,
-  XCircle
+  XCircle,
+  ChevronsUpDown
 } from "lucide-react";
 import type {
   InventoryItem,
@@ -948,6 +951,17 @@ function EventInventorySection({
 
   const [editingItem, setEditingItem] = useState<EventInventoryItem | null>(null);
   const [isDeliveryNoteOpen, setIsDeliveryNoteOpen] = useState(false);
+  const [eventSearchOpen, setEventSearchOpen] = useState(false);
+  const [eventSearchValue, setEventSearchValue] = useState('');
+
+  const filteredEvents = useMemo(() => {
+    if (!eventSearchValue) return events;
+    const search = eventSearchValue.toLowerCase();
+    return events.filter(e => 
+      e.title?.toLowerCase().includes(search) || 
+      e.customer?.toLowerCase().includes(search)
+    );
+  }, [events, eventSearchValue]);
 
   const createSessionMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1331,16 +1345,60 @@ function EventInventorySection({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Event *</Label>
-              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
-                <SelectTrigger data-testid="select-session-event">
-                  <SelectValue placeholder="Select event" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map(event => (
-                    <SelectItem key={event.id} value={event.id}>{event.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={eventSearchOpen} onOpenChange={setEventSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={eventSearchOpen}
+                    className="w-full justify-between"
+                    data-testid="select-session-event"
+                  >
+                    {formData.eventId
+                      ? events.find(e => e.id === formData.eventId)?.title || "Select event"
+                      : "Select event"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={eventSearchValue}
+                      onValueChange={setEventSearchValue}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredEvents.map(event => (
+                          <CommandItem
+                            key={event.id}
+                            value={event.title}
+                            onSelect={() => {
+                              setFormData({ ...formData, eventId: event.id });
+                              setEventSearchOpen(false);
+                              setEventSearchValue('');
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.eventId === event.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{event.title}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {event.customer} - {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'No date'}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
@@ -2073,7 +2131,7 @@ function RentalsSection({
                 </SelectTrigger>
                 <SelectContent>
                   {events.filter(e => e.id !== selectedRental?.eventId).map(e => (
-                    <SelectItem key={e.id} value={e.id}>{e.title} - {e.eventDate ? format(new Date(e.eventDate), 'MMM d, yyyy') : 'No date'}</SelectItem>
+                    <SelectItem key={e.id} value={e.id}>{e.title} - {e.date ? format(new Date(e.date), 'MMM d, yyyy') : 'No date'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -2711,6 +2769,17 @@ function ProductionPlansSection({
 
   const [formData, setFormData] = useState({ name: '', eventId: '', status: 'draft' });
   const [taskFormData, setTaskFormData] = useState({ activity: '', startTime: '', endTime: '', vendorId: '', responsiblePersonId: '', responsiblePersonName: '', status: 'pending', notes: '' });
+  const [eventSearchOpen, setEventSearchOpen] = useState(false);
+  const [eventSearchValue, setEventSearchValue] = useState('');
+
+  const filteredEvents = useMemo(() => {
+    if (!eventSearchValue) return events;
+    const search = eventSearchValue.toLowerCase();
+    return events.filter(e => 
+      e.title?.toLowerCase().includes(search) || 
+      e.customer?.toLowerCase().includes(search)
+    );
+  }, [events, eventSearchValue]);
 
   const createPlanMutation = useMutation({
     mutationFn: async (data: any) => apiRequest('POST', '/api/inventory/production-plans', data),
@@ -2935,14 +3004,60 @@ function ProductionPlansSection({
             </div>
             <div className="space-y-2">
               <Label>Event</Label>
-              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
-                <SelectTrigger data-testid="select-plan-event">
-                  <SelectValue placeholder="Select event" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Popover open={eventSearchOpen} onOpenChange={setEventSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={eventSearchOpen}
+                    className="w-full justify-between"
+                    data-testid="select-plan-event"
+                  >
+                    {formData.eventId
+                      ? events.find(e => e.id === formData.eventId)?.title || "Select event"
+                      : "Select event"}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={eventSearchValue}
+                      onValueChange={setEventSearchValue}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredEvents.map(event => (
+                          <CommandItem
+                            key={event.id}
+                            value={event.title}
+                            onSelect={() => {
+                              setFormData({ ...formData, eventId: event.id });
+                              setEventSearchOpen(false);
+                              setEventSearchValue('');
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.eventId === event.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{event.title}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {event.customer} - {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'No date'}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Status</Label>
