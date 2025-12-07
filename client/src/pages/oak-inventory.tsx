@@ -3889,92 +3889,80 @@ function ProductionPlansSection({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Vendor</Label>
-                <Popover open={vendorInputOpen} onOpenChange={setVendorInputOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Input
-                        value={taskFormData.vendorName}
-                        onChange={(e) => {
-                          setTaskFormData({ ...taskFormData, vendorName: e.target.value });
-                          if (e.target.value.length > 0) setVendorInputOpen(true);
-                        }}
-                        onFocus={() => allLocalVendors.length > 0 && setVendorInputOpen(true)}
-                        placeholder="Enter or select vendor"
-                        data-testid="input-task-vendor"
-                      />
+                <div className="relative">
+                  <Input
+                    value={taskFormData.vendorName}
+                    onChange={(e) => {
+                      setTaskFormData({ ...taskFormData, vendorName: e.target.value });
+                    }}
+                    onFocus={() => allLocalVendors.length > 0 && setVendorInputOpen(true)}
+                    onBlur={() => setTimeout(() => setVendorInputOpen(false), 200)}
+                    placeholder="Enter or select vendor"
+                    data-testid="input-task-vendor"
+                  />
+                  {vendorInputOpen && allLocalVendors.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md">
+                      <div className="p-2 text-xs text-muted-foreground font-medium">Previously used vendors</div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {allLocalVendors
+                          .filter(v => v.toLowerCase().includes(taskFormData.vendorName.toLowerCase()))
+                          .map(v => (
+                            <div
+                              key={v}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex items-center"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setTaskFormData({ ...taskFormData, vendorName: v });
+                                setVendorInputOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", taskFormData.vendorName === v ? "opacity-100" : "opacity-0")} />
+                              {v}
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </PopoverTrigger>
-                  {allLocalVendors.length > 0 && (
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandList>
-                          <CommandGroup heading="Previously used vendors">
-                            {allLocalVendors
-                              .filter(v => v.toLowerCase().includes(taskFormData.vendorName.toLowerCase()))
-                              .map(v => (
-                                <CommandItem
-                                  key={v}
-                                  value={v}
-                                  onSelect={() => {
-                                    setTaskFormData({ ...taskFormData, vendorName: v });
-                                    setVendorInputOpen(false);
-                                  }}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", taskFormData.vendorName === v ? "opacity-100" : "opacity-0")} />
-                                  {v}
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
                   )}
-                </Popover>
+                </div>
                 <p className="text-xs text-muted-foreground">Type a new vendor name or select from previously used</p>
               </div>
               <div className="space-y-2">
                 <Label>Responsible Person</Label>
-                <Popover open={personInputOpen} onOpenChange={setPersonInputOpen}>
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Input
-                        value={taskFormData.responsiblePersonName}
-                        onChange={(e) => {
-                          setTaskFormData({ ...taskFormData, responsiblePersonName: e.target.value });
-                          if (e.target.value.length > 0) setPersonInputOpen(true);
-                        }}
-                        onFocus={() => allLocalPersons.length > 0 && setPersonInputOpen(true)}
-                        placeholder="Enter or select person"
-                        data-testid="input-task-person"
-                      />
+                <div className="relative">
+                  <Input
+                    value={taskFormData.responsiblePersonName}
+                    onChange={(e) => {
+                      setTaskFormData({ ...taskFormData, responsiblePersonName: e.target.value });
+                    }}
+                    onFocus={() => allLocalPersons.length > 0 && setPersonInputOpen(true)}
+                    onBlur={() => setTimeout(() => setPersonInputOpen(false), 200)}
+                    placeholder="Enter or select person"
+                    data-testid="input-task-person"
+                  />
+                  {personInputOpen && allLocalPersons.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-md">
+                      <div className="p-2 text-xs text-muted-foreground font-medium">Previously used persons</div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {allLocalPersons
+                          .filter(p => p.toLowerCase().includes(taskFormData.responsiblePersonName.toLowerCase()))
+                          .map(p => (
+                            <div
+                              key={p}
+                              className="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex items-center"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                setTaskFormData({ ...taskFormData, responsiblePersonName: p });
+                                setPersonInputOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", taskFormData.responsiblePersonName === p ? "opacity-100" : "opacity-0")} />
+                              {p}
+                            </div>
+                          ))}
+                      </div>
                     </div>
-                  </PopoverTrigger>
-                  {allLocalPersons.length > 0 && (
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandList>
-                          <CommandGroup heading="Previously used persons">
-                            {allLocalPersons
-                              .filter(p => p.toLowerCase().includes(taskFormData.responsiblePersonName.toLowerCase()))
-                              .map(p => (
-                                <CommandItem
-                                  key={p}
-                                  value={p}
-                                  onSelect={() => {
-                                    setTaskFormData({ ...taskFormData, responsiblePersonName: p });
-                                    setPersonInputOpen(false);
-                                  }}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", taskFormData.responsiblePersonName === p ? "opacity-100" : "opacity-0")} />
-                                  {p}
-                                </CommandItem>
-                              ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
                   )}
-                </Popover>
+                </div>
                 <p className="text-xs text-muted-foreground">Type a new name or select from previously used</p>
               </div>
             </div>
