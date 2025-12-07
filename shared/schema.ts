@@ -918,3 +918,49 @@ export const productionTasks = pgTable("production_tasks", {
 export const insertProductionTaskSchema = createInsertSchema(productionTasks).omit({ id: true, createdAt: true });
 export type InsertProductionTask = z.infer<typeof insertProductionTaskSchema>;
 export type ProductionTask = typeof productionTasks.$inferSelect;
+
+// Production Décor Items - Pastel cards for each décor area (Stage, Entrance Arch, etc.)
+export const productionDecorItems = pgTable("production_decor_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id),
+  eventName: text("event_name"),
+  eventDate: date("event_date"),
+  venue: text("venue"),
+  decorType: text("decor_type").notNull(), // 'Stage', 'Entrance Arch', 'Backdrop', 'Photo Booth', etc.
+  setupDate: date("setup_date"),
+  setupTime: text("setup_time"),
+  estimatedDuration: text("estimated_duration"), // e.g., '4 hours', '2 days'
+  priority: text("priority").default('medium'), // 'low', 'medium', 'high', 'urgent'
+  manpowerRequired: integer("manpower_required").default(0),
+  teamLead: text("team_lead"),
+  status: text("status").notNull().default('pending'), // 'pending', 'in_progress', 'completed', 'on_hold'
+  pastelColor: text("pastel_color").default('blue'), // For UI card background
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProductionDecorItemSchema = createInsertSchema(productionDecorItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProductionDecorItem = z.infer<typeof insertProductionDecorItemSchema>;
+export type ProductionDecorItem = typeof productionDecorItems.$inferSelect;
+
+// Production Décor Elements - Items within a décor item (e.g., Rose Fresh Flowers – 100 bunches)
+export const productionDecorElements = pgTable("production_decor_elements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  decorItemId: varchar("decor_item_id").notNull().references(() => productionDecorItems.id, { onDelete: 'cascade' }),
+  elementName: text("element_name").notNull(), // e.g., 'Rose Fresh Flowers'
+  categoryType: text("category_type"), // e.g., 'Flowers', 'Fabric', 'Props'
+  quantity: integer("quantity").notNull().default(1),
+  unit: text("unit").default('Nos'), // 'Nos', 'bunches', 'meters', 'pcs', etc.
+  linkedInventoryItemId: varchar("linked_inventory_item_id").references(() => inventoryItems.id),
+  externalItemName: text("external_item_name"), // For items not in inventory
+  source: text("source").notNull().default('in_stock'), // 'in_stock', 'to_buy', 'to_rent'
+  assignedPersonVendor: text("assigned_person_vendor"), // Person or vendor name
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProductionDecorElementSchema = createInsertSchema(productionDecorElements).omit({ id: true, createdAt: true });
+export type InsertProductionDecorElement = z.infer<typeof insertProductionDecorElementSchema>;
+export type ProductionDecorElement = typeof productionDecorElements.$inferSelect;

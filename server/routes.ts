@@ -2523,6 +2523,80 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Production Décor Items
+  app.get('/api/inventory/production-decor-items', async (req, res) => {
+    try {
+      const items = await storage.getAllProductionDecorItems();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch production décor items' });
+    }
+  });
+
+  app.post('/api/inventory/production-decor-items', async (req, res) => {
+    try {
+      const item = await storage.createProductionDecorItem(req.body);
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create production décor item' });
+    }
+  });
+
+  app.patch('/api/inventory/production-decor-items/:id', async (req, res) => {
+    try {
+      const item = await storage.updateProductionDecorItem(req.params.id, req.body);
+      if (!item) return res.status(404).json({ error: 'Production décor item not found' });
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update production décor item' });
+    }
+  });
+
+  app.delete('/api/inventory/production-decor-items/:id', async (req, res) => {
+    await storage.deleteProductionDecorItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Production Décor Elements
+  app.get('/api/inventory/production-decor-elements', async (req, res) => {
+    const { decorItemId } = req.query;
+    try {
+      if (decorItemId) {
+        const elements = await storage.getProductionDecorElementsByDecorItem(decorItemId as string);
+        res.json(elements);
+      } else {
+        const elements = await storage.getAllProductionDecorElements();
+        res.json(elements);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch production décor elements' });
+    }
+  });
+
+  app.post('/api/inventory/production-decor-elements', async (req, res) => {
+    try {
+      const element = await storage.createProductionDecorElement(req.body);
+      res.json(element);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create production décor element' });
+    }
+  });
+
+  app.patch('/api/inventory/production-decor-elements/:id', async (req, res) => {
+    try {
+      const element = await storage.updateProductionDecorElement(req.params.id, req.body);
+      if (!element) return res.status(404).json({ error: 'Production décor element not found' });
+      res.json(element);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update production décor element' });
+    }
+  });
+
+  app.delete('/api/inventory/production-decor-elements/:id', async (req, res) => {
+    await storage.deleteProductionDecorElement(req.params.id);
+    res.json({ success: true });
+  });
+
   // Object Storage - Image Upload Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {

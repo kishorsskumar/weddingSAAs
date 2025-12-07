@@ -46,6 +46,8 @@ import {
   purchaseOrderItems,
   productionPlans,
   productionTasks,
+  productionDecorItems,
+  productionDecorElements,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -140,6 +142,10 @@ import {
   type InsertProductionPlan,
   type ProductionTask,
   type InsertProductionTask,
+  type ProductionDecorItem,
+  type InsertProductionDecorItem,
+  type ProductionDecorElement,
+  type InsertProductionDecorElement,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -483,6 +489,20 @@ export interface IStorage {
   createProductionTask(task: InsertProductionTask): Promise<ProductionTask>;
   updateProductionTask(id: string, task: Partial<InsertProductionTask>): Promise<ProductionTask | undefined>;
   deleteProductionTask(id: string): Promise<void>;
+
+  // Oak Inventory - Production Décor Items
+  getAllProductionDecorItems(): Promise<ProductionDecorItem[]>;
+  getProductionDecorItem(id: string): Promise<ProductionDecorItem | undefined>;
+  createProductionDecorItem(item: InsertProductionDecorItem): Promise<ProductionDecorItem>;
+  updateProductionDecorItem(id: string, item: Partial<InsertProductionDecorItem>): Promise<ProductionDecorItem | undefined>;
+  deleteProductionDecorItem(id: string): Promise<void>;
+
+  // Oak Inventory - Production Décor Elements
+  getAllProductionDecorElements(): Promise<ProductionDecorElement[]>;
+  getProductionDecorElementsByDecorItem(decorItemId: string): Promise<ProductionDecorElement[]>;
+  createProductionDecorElement(element: InsertProductionDecorElement): Promise<ProductionDecorElement>;
+  updateProductionDecorElement(id: string, element: Partial<InsertProductionDecorElement>): Promise<ProductionDecorElement | undefined>;
+  deleteProductionDecorElement(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2022,6 +2042,60 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductionTask(id: string): Promise<void> {
     await db.delete(productionTasks).where(eq(productionTasks.id, id));
+  }
+
+  // Oak Inventory - Production Décor Items
+  async getAllProductionDecorItems(): Promise<ProductionDecorItem[]> {
+    return await db.select().from(productionDecorItems).orderBy(desc(productionDecorItems.createdAt));
+  }
+
+  async getProductionDecorItem(id: string): Promise<ProductionDecorItem | undefined> {
+    const [item] = await db.select().from(productionDecorItems).where(eq(productionDecorItems.id, id));
+    return item || undefined;
+  }
+
+  async createProductionDecorItem(item: InsertProductionDecorItem): Promise<ProductionDecorItem> {
+    const [created] = await db.insert(productionDecorItems).values(item).returning();
+    return created;
+  }
+
+  async updateProductionDecorItem(id: string, item: Partial<InsertProductionDecorItem>): Promise<ProductionDecorItem | undefined> {
+    const [updated] = await db.update(productionDecorItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(productionDecorItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProductionDecorItem(id: string): Promise<void> {
+    await db.delete(productionDecorItems).where(eq(productionDecorItems.id, id));
+  }
+
+  // Oak Inventory - Production Décor Elements
+  async getAllProductionDecorElements(): Promise<ProductionDecorElement[]> {
+    return await db.select().from(productionDecorElements).orderBy(desc(productionDecorElements.createdAt));
+  }
+
+  async getProductionDecorElementsByDecorItem(decorItemId: string): Promise<ProductionDecorElement[]> {
+    return await db.select().from(productionDecorElements)
+      .where(eq(productionDecorElements.decorItemId, decorItemId));
+  }
+
+  async createProductionDecorElement(element: InsertProductionDecorElement): Promise<ProductionDecorElement> {
+    const [created] = await db.insert(productionDecorElements).values(element).returning();
+    return created;
+  }
+
+  async updateProductionDecorElement(id: string, element: Partial<InsertProductionDecorElement>): Promise<ProductionDecorElement | undefined> {
+    const [updated] = await db.update(productionDecorElements)
+      .set(element)
+      .where(eq(productionDecorElements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProductionDecorElement(id: string): Promise<void> {
+    await db.delete(productionDecorElements).where(eq(productionDecorElements.id, id));
   }
 }
 
