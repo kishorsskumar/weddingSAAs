@@ -146,6 +146,9 @@ import {
   type InsertProductionDecorItem,
   type ProductionDecorElement,
   type InsertProductionDecorElement,
+  type ProductionDecorImport,
+  type InsertProductionDecorImport,
+  productionDecorImports,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -503,6 +506,14 @@ export interface IStorage {
   createProductionDecorElement(element: InsertProductionDecorElement): Promise<ProductionDecorElement>;
   updateProductionDecorElement(id: string, element: Partial<InsertProductionDecorElement>): Promise<ProductionDecorElement | undefined>;
   deleteProductionDecorElement(id: string): Promise<void>;
+  
+  // Oak Inventory - Production Décor Imports
+  getAllProductionDecorImports(): Promise<ProductionDecorImport[]>;
+  getProductionDecorImport(id: string): Promise<ProductionDecorImport | undefined>;
+  createProductionDecorImport(importData: InsertProductionDecorImport): Promise<ProductionDecorImport>;
+  updateProductionDecorImport(id: string, importData: Partial<InsertProductionDecorImport>): Promise<ProductionDecorImport | undefined>;
+  deleteProductionDecorImport(id: string): Promise<void>;
+  createProductionDecorItemsFromImport(importBatchId: string, items: InsertProductionDecorItem[], elements: { itemIndex: number; element: InsertProductionDecorElement }[]): Promise<{ items: ProductionDecorItem[]; elements: ProductionDecorElement[] }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2096,6 +2107,68 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductionDecorElement(id: string): Promise<void> {
     await db.delete(productionDecorElements).where(eq(productionDecorElements.id, id));
+  }
+
+  // Oak Inventory - Production Décor Imports
+  async getAllProductionDecorImports(): Promise<ProductionDecorImport[]> {
+    return await db.select().from(productionDecorImports).orderBy(desc(productionDecorImports.createdAt));
+  }
+
+  async getProductionDecorImport(id: string): Promise<ProductionDecorImport | undefined> {
+    const [importRecord] = await db.select().from(productionDecorImports).where(eq(productionDecorImports.id, id));
+    return importRecord || undefined;
+  }
+
+  async createProductionDecorImport(importData: InsertProductionDecorImport): Promise<ProductionDecorImport> {
+    const [created] = await db.insert(productionDecorImports).values(importData).returning();
+    return created;
+  }
+
+  async updateProductionDecorImport(id: string, importData: Partial<InsertProductionDecorImport>): Promise<ProductionDecorImport | undefined> {
+    const [updated] = await db.update(productionDecorImports)
+      .set(importData)
+      .where(eq(productionDecorImports.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteProductionDecorImport(id: string): Promise<void> {
+    await db.delete(productionDecorImports).where(eq(productionDecorImports.id, id));
+  }
+
+  async createProductionDecorItemsFromImport(
+    importBatchId: string, 
+    items: InsertProductionDecorItem[], 
+    elements: { itemIndex: number; element: InsertProductionDecorElement }[]
+  ): Promise<{ items: ProductionDecorItem[]; elements: ProductionDecorElement[] }> {
+    const createdItems: ProductionDecorItem[] = [];
+    const createdElements: ProductionDecorElement[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const [createdItem] = await db.insert(productionDecorItems)
+        .values({ ...item, importBatchId, sequence: i })
+        .returning();
+      createdItems.push(createdItem);
+
+      const itemElements = elements.filter(e => e.itemIndex === i);
+      for (const { element } of itemElements) {
+        const [createdElement] = await db.insert(productionDecorElements)
+          .values({ ...element, decorItemId: createdItem.id })
+          .returning();
+        createdElements.push(createdElement);
+      }
+    }
+
+    await db.update(productionDecorImports)
+      .set({ 
+        status: 'completed', 
+        itemsCreated: createdItems.length, 
+        elementsCreated: createdElements.length 
+      })
+      .where(eq(productionDecorImports.id, importBatchId));
+
+    return { items: createdItems, elements: createdElements };
   }
 }
 
