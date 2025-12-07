@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { 
   insertUserSchema,
   insertRoleSchema,
@@ -2520,6 +2521,46 @@ export async function registerRoutes(
   app.delete('/api/inventory/production-tasks/:id', async (req, res) => {
     await storage.deleteProductionTask(req.params.id);
     res.json({ success: true });
+  });
+
+  // Object Storage - Image Upload Routes
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error fetching object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error: any) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: error.message || "Failed to get upload URL" });
+    }
+  });
+
+  app.put("/api/objects/finalize", async (req, res) => {
+    if (!req.body.uploadURL) {
+      return res.status(400).json({ error: "uploadURL is required" });
+    }
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(req.body.uploadURL);
+      res.status(200).json({ objectPath });
+    } catch (error: any) {
+      console.error("Error finalizing upload:", error);
+      res.status(500).json({ error: error.message || "Failed to finalize upload" });
+    }
   });
 
   return httpServer;

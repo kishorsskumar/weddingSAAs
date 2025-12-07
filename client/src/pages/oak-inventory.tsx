@@ -51,7 +51,10 @@ import {
   Printer,
   Check,
   XCircle,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Upload,
+  Image as ImageIcon,
+  Loader2
 } from "lucide-react";
 import type {
   InventoryItem,
@@ -104,6 +107,157 @@ const sidebarItems = [
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
   { id: 'production-plans', label: 'Execution Plans', icon: Factory },
 ];
+
+function ImageUpload({ 
+  photos, 
+  onPhotosChange, 
+  maxFiles = 5 
+}: { 
+  photos: string[]; 
+  onPhotosChange: (photos: string[]) => void; 
+  maxFiles?: number;
+}) {
+  const [isUploading, setIsUploading] = useState(false);
+  const { toast } = useToast();
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (photos.length + files.length > maxFiles) {
+      toast({ 
+        title: `Maximum ${maxFiles} images allowed`, 
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    const newPhotos: string[] = [];
+
+    for (const file of Array.from(files)) {
+      try {
+        const response = await fetch('/api/objects/upload', { method: 'POST' });
+        const { uploadURL } = await response.json();
+        
+        await fetch(uploadURL, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        });
+
+        const finalizeRes = await fetch('/api/objects/finalize', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uploadURL }),
+        });
+        const { objectPath } = await finalizeRes.json();
+        newPhotos.push(objectPath);
+      } catch (error) {
+        console.error('Upload error:', error);
+        toast({ title: 'Failed to upload image', variant: 'destructive' });
+      }
+    }
+
+    setIsUploading(false);
+    onPhotosChange([...photos, ...newPhotos]);
+    e.target.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    const newPhotos = [...photos];
+    newPhotos.splice(index, 1);
+    onPhotosChange(newPhotos);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label>Item Photos</Label>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((photo, index) => (
+          <div key={index} className="relative group">
+            <img
+              src={photo}
+              alt={`Item photo ${index + 1}`}
+              className="w-20 h-20 object-cover rounded-lg border"
+            />
+            <button
+              type="button"
+              onClick={() => removePhoto(index)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        {photos.length < maxFiles && (
+          <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#8B7355] transition-colors">
+            {isUploading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+            ) : (
+              <>
+                <Upload className="w-6 h-6 text-gray-400" />
+                <span className="text-xs text-gray-400 mt-1">Add</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={isUploading}
+            />
+          </label>
+        )}
+      </div>
+      <p className="text-xs text-gray-500">Max {maxFiles} images. Click to upload.</p>
+    </div>
+  );
+}
+
+function ImageGallery({ photos }: { photos: string[] }) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+  if (!photos || photos.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32 bg-gray-100 rounded-lg">
+        <div className="text-center text-gray-400">
+          <ImageIcon className="w-8 h-8 mx-auto mb-2" />
+          <p className="text-sm">No images</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {photos.map((photo, index) => (
+          <img
+            key={index}
+            src={photo}
+            alt={`Photo ${index + 1}`}
+            className="w-full aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setSelectedIndex(index)}
+          />
+        ))}
+      </div>
+
+      <Dialog open={selectedIndex !== null} onOpenChange={() => setSelectedIndex(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl p-2">
+          {selectedIndex !== null && (
+            <img
+              src={photos[selectedIndex]}
+              alt={`Photo ${selectedIndex + 1}`}
+              className="w-full h-auto max-h-[80vh] object-contain rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 export default function OakInventory() {
   const { toast } = useToast();
@@ -348,9 +502,10 @@ function InventoryItemsSection({
     stockQuantity: '',
     minStockLevel: '',
     location: '',
-    photos: '',
+    photos: [] as string[],
     isActive: true,
   });
+  const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
 
   const resetForm = () => {
     setFormData({
@@ -362,7 +517,7 @@ function InventoryItemsSection({
       stockQuantity: '',
       minStockLevel: '',
       location: '',
-      photos: '',
+      photos: [],
       isActive: true,
     });
     setEditingItem(null);
@@ -473,7 +628,7 @@ function InventoryItemsSection({
       stockQuantity: parseInt(formData.stockQuantity) || 0,
       minStockLevel: parseInt(formData.minStockLevel) || 0,
       location: formData.location || null,
-      photos: formData.photos ? formData.photos.split(',').map(p => p.trim()).filter(Boolean) : [],
+      photos: formData.photos,
       isActive: formData.isActive,
     };
 
@@ -495,7 +650,7 @@ function InventoryItemsSection({
       stockQuantity: String(item.stockQuantity || 0),
       minStockLevel: String(item.minStockLevel || 0),
       location: item.location || '',
-      photos: item.photos?.join(', ') || '',
+      photos: item.photos || [],
       isActive: item.isActive !== false,
     });
     setIsModalOpen(true);
@@ -707,6 +862,14 @@ function InventoryItemsSection({
                             <Button
                               variant="ghost"
                               size="icon"
+                              onClick={() => setViewingItem(item)}
+                              data-testid={`button-view-item-${item.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               onClick={() => handleEdit(item)}
                               data-testid={`button-edit-item-${item.id}`}
                             >
@@ -836,16 +999,11 @@ function InventoryItemsSection({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="photos">Photo URLs (comma-separated)</Label>
-              <Input
-                id="photos"
-                value={formData.photos}
-                onChange={(e) => setFormData({ ...formData, photos: e.target.value })}
-                placeholder="https://example.com/photo1.jpg, https://example.com/photo2.jpg"
-                data-testid="input-item-photos"
-              />
-            </div>
+            <ImageUpload 
+              photos={formData.photos}
+              onPhotosChange={(photos) => setFormData({ ...formData, photos })}
+              maxFiles={5}
+            />
 
             <div className="flex items-center gap-2">
               <input
@@ -910,6 +1068,66 @@ function InventoryItemsSection({
           </div>
           <DialogFooter>
             <Button onClick={() => setIsCategoryModalOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingItem} onOpenChange={() => setViewingItem(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingItem?.name}</DialogTitle>
+          </DialogHeader>
+          {viewingItem && (
+            <div className="space-y-4">
+              <ImageGallery photos={viewingItem.photos || []} />
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Category</p>
+                  <p className="font-medium">{viewingItem.category}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">SKU</p>
+                  <p className="font-medium">{viewingItem.sku || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Stock Quantity</p>
+                  <p className="font-medium">{viewingItem.stockQuantity}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Min Stock Level</p>
+                  <p className="font-medium">{viewingItem.minStockLevel || 0}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Unit Cost</p>
+                  <p className="font-medium">{formatCurrency(viewingItem.unitCost)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Location</p>
+                  <p className="font-medium">{viewingItem.location || '-'}</p>
+                </div>
+              </div>
+              
+              {viewingItem.description && (
+                <div>
+                  <p className="text-muted-foreground text-sm">Description</p>
+                  <p className="text-sm">{viewingItem.description}</p>
+                </div>
+              )}
+              
+              <div className="flex items-center gap-2">
+                <Badge variant={viewingItem.isActive ? "default" : "secondary"}>
+                  {viewingItem.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+                {viewingItem.stockQuantity < (viewingItem.minStockLevel || 0) && (
+                  <Badge variant="destructive">Low Stock</Badge>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingItem(null)}>Close</Button>
+            <Button onClick={() => { if (viewingItem) handleEdit(viewingItem); setViewingItem(null); }}>Edit</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
