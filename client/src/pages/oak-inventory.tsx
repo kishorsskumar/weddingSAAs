@@ -1169,10 +1169,11 @@ function EventInventorySection({
       };
 
       try {
-        const logoDataUrl = await loadImage('/attached_assets/Oakstreet_1765077046310.png');
+        const logoUrl = `${window.location.origin}/oak-street-logo.png`;
+        const logoDataUrl = await loadImage(logoUrl);
         doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
       } catch (e) {
-        console.log('Logo could not be loaded');
+        console.log('Delivery Note Logo could not be loaded:', e);
       }
       
       doc.setFontSize(11);
@@ -3438,10 +3439,11 @@ function ProductionPlansSection({
       };
 
       try {
-        const logoDataUrl = await loadImage('/attached_assets/Oakstreet_1765077046310.png');
+        const logoUrl = `${window.location.origin}/oak-street-logo.png`;
+        const logoDataUrl = await loadImage(logoUrl);
         doc.addImage(logoDataUrl, 'PNG', 15, 8, 45, 18);
       } catch (e) {
-        console.log('Logo could not be loaded');
+        console.log('Production Plan Logo could not be loaded:', e);
       }
       
       doc.setFontSize(11);
