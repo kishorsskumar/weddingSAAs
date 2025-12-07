@@ -95,7 +95,18 @@ Preferred communication style: Simple, everyday language.
 - Daybook entries for income/expense tracking
 - Banks table for account management
 - Leave requests table for employee leave tracking
+- Notifications table for user-specific alerts and reminders
+- Notification preferences table for customizable reminder settings
 - Session table for authentication persistence
+
+**Notification System**
+- Customizable notifications for events, invoices, estimates, and production deadlines
+- Per-user notification preferences with configurable lead times (1-14 days)
+- Bell icon in sidebar shows unread count with real-time updates
+- Notification types: event reminders, invoice due, estimate expiry, production deadlines, leave requests
+- Priority levels: low, normal, high, urgent (with visual distinction)
+- Actions: mark as read, dismiss individual, mark all read, clear all
+- Deep linking: clicking notification navigates to relevant page
 
 **Data Validation**
 - Drizzle-zod integration for automatic schema validation
