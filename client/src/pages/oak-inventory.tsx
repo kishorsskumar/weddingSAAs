@@ -2617,6 +2617,9 @@ function RentalsSection({
                     <TableCell className="text-right">{formatCurrency(rental.totalCost)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); }} title="View items" data-testid={`button-view-rental-items-${rental.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setSelectedRental(rental); setIsItemModalOpen(true); }} title="Add item" data-testid={`button-add-rental-item-${rental.id}`}>
                           <PackageOpen className="h-4 w-4" />
                         </Button>
@@ -2640,22 +2643,37 @@ function RentalsSection({
         </CardContent>
       </Card>
 
-      {selectedRental && rentalItemsForSelected.length > 0 && (
+      {selectedRental && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Rental Items for {getVendorName(selectedRental.vendorId)}</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleDownloadRentalPDF()} data-testid="button-download-rental-pdf">
-                <FileText className="w-4 h-4 mr-2" />
-                Download PDF
+              <Button size="sm" onClick={() => { setItemFormData({ itemName: '', quantity: '1', unitRate: '', condition: '', quantityReturned: '0', damageNotes: '' }); setIsItemModalOpen(true); }} data-testid="button-add-item-to-rental">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Item
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleDownloadRentalItems()} data-testid="button-download-rental-items">
-                <Download className="w-4 h-4 mr-2" />
-                Download Excel
-              </Button>
+              {rentalItemsForSelected.length > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadRentalPDF()} data-testid="button-download-rental-pdf">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Download PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadRentalItems()} data-testid="button-download-rental-items">
+                    <Download className="w-4 h-4 mr-2" />
+                    Download Excel
+                  </Button>
+                </>
+              )}
             </div>
           </CardHeader>
           <CardContent>
+            {rentalItemsForSelected.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <PackageOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>No items added to this rental yet.</p>
+                <p className="text-sm">Click "Add Item" to add rental items.</p>
+              </div>
+            ) : (
             <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -2757,6 +2775,7 @@ function RentalsSection({
               </TableBody>
             </Table>
             </div>
+            )}
           </CardContent>
         </Card>
       )}
