@@ -93,10 +93,17 @@ const PO_STATUSES = ["draft", "sent", "confirmed", "received", "cancelled"];
 const PLAN_STATUSES = ["draft", "active", "completed"];
 const TASK_STATUSES = ["pending", "in_progress", "completed"];
 
-const formatCurrency = (amount: string | number | null) => {
-  if (!amount) return '₹0';
+const formatCurrency = (amount: string | number | null | undefined) => {
+  if (amount === null || amount === undefined || amount === '') return '₹0';
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '₹0';
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+};
+
+const safeNumber = (value: string | number | null | undefined): number => {
+  if (value === null || value === undefined || value === '') return 0;
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  return isNaN(num) ? 0 : num;
 };
 
 const sidebarItems = [
@@ -672,14 +679,15 @@ function InventoryItemsSection({
         'SKU': item.sku || '',
         'Stock Qty': item.stockQuantity,
         'Min Level': item.minStockLevel || 0,
-        'Unit Cost': item.unitCost || '0',
+        'Unit Cost': safeNumber(item.unitCost),
+        'Total Value': item.stockQuantity * safeNumber(item.unitCost),
         'Location': item.location || '',
         'Status': item.isActive ? 'Active' : 'Inactive',
       }));
       const ws = XLSX.utils.json_to_sheet(data);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 10 }];
+      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 20 }, { wch: 10 }];
       XLSX.writeFile(wb, `Inventory_Items_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast({ title: 'Excel downloaded successfully' });
     } catch (error) {
@@ -793,6 +801,7 @@ function InventoryItemsSection({
                   <TableHead className="text-right">Stock Qty</TableHead>
                   <TableHead className="text-right">Min Stock</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
+                  <TableHead className="text-right">Total Value</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -801,7 +810,7 @@ function InventoryItemsSection({
               <TableBody>
                 {filteredItems.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No inventory items found
                     </TableCell>
                   </TableRow>
@@ -843,6 +852,7 @@ function InventoryItemsSection({
                         </TableCell>
                         <TableCell className="text-right">{item.minStockLevel || 0}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.unitCost)}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(item.stockQuantity * safeNumber(item.unitCost))}</TableCell>
                         <TableCell>{item.location || '-'}</TableCell>
                         <TableCell>
                           {isLowStock && (

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Event } from "@/lib/types";
+import type { InventoryItem } from "@shared/schema";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard, description: "Overview & stats" },
@@ -53,6 +54,16 @@ export default function Dashboard() {
     },
   });
 
+  const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
+    queryKey: ['/api/inventory/items'],
+    queryFn: async () => {
+      const res = await fetch('/api/inventory/items');
+      if (!res.ok) throw new Error('Failed to fetch inventory');
+      return res.json();
+    },
+    enabled: isSuperAdmin,
+  });
+
   const events = useMemo(() => {
     if (isAdmin) return allEvents;
     if (isWeddingPlanner) {
@@ -65,6 +76,13 @@ export default function Dashboard() {
 
   const totalSales = events.reduce((acc, curr) => acc + parseFloat(curr.salesValue || '0'), 0);
   const upcomingEvents = events.filter((e) => new Date(e.date) > new Date()).length;
+  
+  const totalInventoryValue = useMemo(() => {
+    return inventoryItems.reduce((acc, item) => {
+      const unitCost = typeof item.unitCost === 'string' ? parseFloat(item.unitCost) : (item.unitCost || 0);
+      return acc + (item.stockQuantity * (isNaN(unitCost) ? 0 : unitCost));
+    }, 0);
+  }, [inventoryItems]);
 
   return (
     <div className="space-y-6 sm:space-y-8 px-2 sm:px-0">
@@ -78,7 +96,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className={`grid gap-3 sm:gap-4 ${isSuperAdmin ? 'grid-cols-2 lg:grid-cols-4' : isWeddingPlanner ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
+      <div className={`grid gap-3 sm:gap-4 ${isSuperAdmin ? 'grid-cols-2 lg:grid-cols-5' : isWeddingPlanner ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}>
         {(isSuperAdmin || isWeddingPlanner) && (
           <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
@@ -132,6 +150,19 @@ export default function Dashboard() {
               <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                 <div className="text-xl sm:text-2xl font-bold">18%</div>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">+2.5% from target</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-l-4 border-l-chart-5 shadow-sm hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
+                <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
+                  Inventory Value
+                </CardTitle>
+                <Package className="h-4 w-4 text-chart-5 hidden sm:block" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+                <div className="text-xl sm:text-2xl font-bold">₹{(totalInventoryValue / 100000).toFixed(2)}L</div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">{inventoryItems.length} items in stock</p>
               </CardContent>
             </Card>
           </>
