@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { NotificationBell } from "@/components/notification-center";
 import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
@@ -108,6 +109,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               {user.role}
             </p>
           </div>
+          <NotificationBell />
         </div>
         <Button
           variant="outline"

@@ -1,0 +1,546 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Bell, Check, CheckCheck, X, Settings, Calendar, FileText, Receipt, Package, Users, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { useLocation } from "wouter";
+
+interface Notification {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  priority: string;
+  isRead: boolean;
+  isDismissed: boolean;
+  relatedEntityType?: string;
+  relatedEntityId?: string;
+  actionUrl?: string;
+  createdAt: string;
+}
+
+interface NotificationPreference {
+  id: string;
+  userId: string;
+  eventRemindersEnabled: boolean;
+  eventReminderDays: number;
+  invoiceDueRemindersEnabled: boolean;
+  invoiceReminderDays: number;
+  estimateDueRemindersEnabled: boolean;
+  estimateReminderDays: number;
+  leaveRequestNotificationsEnabled: boolean;
+  productionDeadlineRemindersEnabled: boolean;
+  productionReminderDays: number;
+  emailNotificationsEnabled: boolean;
+  dailyDigestEnabled: boolean;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+}
+
+const typeIcons: Record<string, React.ElementType> = {
+  event_reminder: Calendar,
+  invoice_due: Receipt,
+  estimate_due: FileText,
+  leave_request: Users,
+  leave_approved: Check,
+  leave_rejected: X,
+  production_deadline: Package,
+  system: AlertCircle,
+};
+
+const priorityColors: Record<string, string> = {
+  low: "bg-gray-100 text-gray-800",
+  normal: "bg-blue-50 text-blue-800",
+  high: "bg-amber-50 text-amber-800 border-l-4 border-l-amber-500",
+  urgent: "bg-red-50 text-red-800 border-l-4 border-l-red-500",
+};
+
+export function NotificationBell() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+
+  const { data: unreadCount = 0 } = useQuery<number>({
+    queryKey: ["/api/notifications/unread-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.count || 0;
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications?limit=20", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isOpen,
+  });
+
+  const { data: preferences } = useQuery<NotificationPreference>({
+    queryKey: ["/api/notification-preferences"],
+    queryFn: async () => {
+      const res = await fetch("/api/notification-preferences", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch preferences");
+      return res.json();
+    },
+    enabled: settingsOpen,
+  });
+
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}/read`, {
+        method: "PATCH",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to mark as read");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/notifications/mark-all-read", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to mark all as read");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const dismissMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to dismiss");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const dismissAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/notifications/dismiss-all", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to dismiss all");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/notifications/generate", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to generate notifications");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    },
+  });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: async (data: Partial<NotificationPreference>) => {
+      const res = await fetch("/api/notification-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update preferences");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notification-preferences"] });
+    },
+  });
+
+  const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead) {
+      markAsReadMutation.mutate(notification.id);
+    }
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative"
+            data-testid="button-notifications"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-1 h-5 min-w-[20px] px-1 text-xs bg-red-500 hover:bg-red-500"
+                data-testid="notification-count"
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </Badge>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 md:w-96 p-0" align="end">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h3 className="font-semibold text-lg">Notifications</h3>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => generateMutation.mutate()}
+                disabled={generateMutation.isPending}
+                title="Check for new notifications"
+                data-testid="button-refresh-notifications"
+              >
+                {generateMutation.isPending ? "..." : "Refresh"}
+              </Button>
+              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="icon" data-testid="button-notification-settings">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Notification Settings</DialogTitle>
+                    <DialogDescription>
+                      Customize when and how you receive notifications
+                    </DialogDescription>
+                  </DialogHeader>
+                  <NotificationSettings
+                    preferences={preferences}
+                    onUpdate={(data) => updatePreferencesMutation.mutate(data)}
+                    isUpdating={updatePreferencesMutation.isPending}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {notifications.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/50">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
+                data-testid="button-mark-all-read"
+              >
+                <CheckCheck className="h-3 w-3 mr-1" />
+                Mark all read
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground"
+                onClick={() => dismissAllMutation.mutate()}
+                disabled={dismissAllMutation.isPending}
+                data-testid="button-dismiss-all"
+              >
+                Clear all
+              </Button>
+            </div>
+          )}
+
+          <ScrollArea className="max-h-80">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                <Bell className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No notifications yet</p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => generateMutation.mutate()}
+                >
+                  Check for updates
+                </Button>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {notifications.map((notification) => {
+                  const Icon = typeIcons[notification.type] || Bell;
+                  return (
+                    <div
+                      key={notification.id}
+                      className={cn(
+                        "p-4 cursor-pointer hover:bg-muted/50 transition-colors",
+                        priorityColors[notification.priority] || priorityColors.normal,
+                        !notification.isRead && "bg-blue-50/50"
+                      )}
+                      onClick={() => handleNotificationClick(notification)}
+                      data-testid={`notification-${notification.id}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={cn(
+                          "p-2 rounded-full shrink-0",
+                          notification.priority === "high" || notification.priority === "urgent"
+                            ? "bg-amber-100"
+                            : "bg-muted"
+                        )}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={cn(
+                              "text-sm font-medium truncate",
+                              !notification.isRead && "font-semibold"
+                            )}>
+                              {notification.title}
+                            </p>
+                            {!notification.isRead && (
+                              <div className="h-2 w-2 bg-blue-500 rounded-full shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-6 w-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dismissMutation.mutate(notification.id);
+                          }}
+                          data-testid={`dismiss-notification-${notification.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function NotificationSettings({
+  preferences,
+  onUpdate,
+  isUpdating,
+}: {
+  preferences?: NotificationPreference;
+  onUpdate: (data: Partial<NotificationPreference>) => void;
+  isUpdating: boolean;
+}) {
+  if (!preferences) {
+    return <div className="py-4 text-center text-muted-foreground">Loading...</div>;
+  }
+
+  return (
+    <div className="space-y-6 py-4">
+      <div className="space-y-4">
+        <h4 className="font-medium text-sm">Event Reminders</h4>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="event-reminders" className="text-sm">
+            Enable event reminders
+          </Label>
+          <Switch
+            id="event-reminders"
+            checked={preferences.eventRemindersEnabled}
+            onCheckedChange={(checked) => onUpdate({ eventRemindersEnabled: checked })}
+            disabled={isUpdating}
+            data-testid="switch-event-reminders"
+          />
+        </div>
+        {preferences.eventRemindersEnabled && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Remind me {preferences.eventReminderDays} days before
+            </Label>
+            <Slider
+              value={[preferences.eventReminderDays]}
+              onValueChange={([value]) => onUpdate({ eventReminderDays: value })}
+              min={1}
+              max={14}
+              step={1}
+              disabled={isUpdating}
+              data-testid="slider-event-days"
+            />
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h4 className="font-medium text-sm">Invoice & Estimate Reminders</h4>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="invoice-reminders" className="text-sm">
+            Invoice due reminders
+          </Label>
+          <Switch
+            id="invoice-reminders"
+            checked={preferences.invoiceDueRemindersEnabled}
+            onCheckedChange={(checked) => onUpdate({ invoiceDueRemindersEnabled: checked })}
+            disabled={isUpdating}
+            data-testid="switch-invoice-reminders"
+          />
+        </div>
+        {preferences.invoiceDueRemindersEnabled && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Remind {preferences.invoiceReminderDays} days before due
+            </Label>
+            <Slider
+              value={[preferences.invoiceReminderDays]}
+              onValueChange={([value]) => onUpdate({ invoiceReminderDays: value })}
+              min={1}
+              max={14}
+              step={1}
+              disabled={isUpdating}
+              data-testid="slider-invoice-days"
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <Label htmlFor="estimate-reminders" className="text-sm">
+            Estimate expiry reminders
+          </Label>
+          <Switch
+            id="estimate-reminders"
+            checked={preferences.estimateDueRemindersEnabled}
+            onCheckedChange={(checked) => onUpdate({ estimateDueRemindersEnabled: checked })}
+            disabled={isUpdating}
+            data-testid="switch-estimate-reminders"
+          />
+        </div>
+        {preferences.estimateDueRemindersEnabled && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Remind {preferences.estimateReminderDays} days before expiry
+            </Label>
+            <Slider
+              value={[preferences.estimateReminderDays]}
+              onValueChange={([value]) => onUpdate({ estimateReminderDays: value })}
+              min={1}
+              max={14}
+              step={1}
+              disabled={isUpdating}
+              data-testid="slider-estimate-days"
+            />
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h4 className="font-medium text-sm">Production Planning</h4>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="production-reminders" className="text-sm">
+            Production deadline reminders
+          </Label>
+          <Switch
+            id="production-reminders"
+            checked={preferences.productionDeadlineRemindersEnabled}
+            onCheckedChange={(checked) => onUpdate({ productionDeadlineRemindersEnabled: checked })}
+            disabled={isUpdating}
+            data-testid="switch-production-reminders"
+          />
+        </div>
+        {preferences.productionDeadlineRemindersEnabled && (
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">
+              Remind {preferences.productionReminderDays} days before setup
+            </Label>
+            <Slider
+              value={[preferences.productionReminderDays]}
+              onValueChange={([value]) => onUpdate({ productionReminderDays: value })}
+              min={1}
+              max={7}
+              step={1}
+              disabled={isUpdating}
+              data-testid="slider-production-days"
+            />
+          </div>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h4 className="font-medium text-sm">Leave Requests</h4>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="leave-notifications" className="text-sm">
+            Leave request notifications
+          </Label>
+          <Switch
+            id="leave-notifications"
+            checked={preferences.leaveRequestNotificationsEnabled}
+            onCheckedChange={(checked) => onUpdate({ leaveRequestNotificationsEnabled: checked })}
+            disabled={isUpdating}
+            data-testid="switch-leave-notifications"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
