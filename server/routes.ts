@@ -2985,7 +2985,7 @@ export async function registerRoutes(
   // Notifications API
   app.get('/api/notifications', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3000,7 +3000,7 @@ export async function registerRoutes(
 
   app.get('/api/notifications/unread-count', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3025,7 +3025,7 @@ export async function registerRoutes(
 
   app.post('/api/notifications/mark-all-read', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3047,7 +3047,7 @@ export async function registerRoutes(
 
   app.post('/api/notifications/dismiss-all', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3061,7 +3061,7 @@ export async function registerRoutes(
   // Notification Preferences API
   app.get('/api/notification-preferences', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3077,7 +3077,7 @@ export async function registerRoutes(
 
   app.put('/api/notification-preferences', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3096,7 +3096,7 @@ export async function registerRoutes(
   // Notification Generation - Generate notifications based on upcoming deadlines
   app.post('/api/notifications/generate', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3278,7 +3278,7 @@ export async function registerRoutes(
 
   app.post('/api/whatsapp/send-test', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -3321,7 +3321,7 @@ export async function registerRoutes(
 
   app.post('/api/whatsapp/send-notification', async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = (req.session as any)?.userId;
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
