@@ -117,6 +117,24 @@ export function NotificationBell() {
     retryDelay: 1000,
   });
 
+  const defaultPreferences: NotificationPreference = {
+    id: '',
+    userId: '',
+    eventRemindersEnabled: true,
+    eventReminderDays: 3,
+    invoiceDueRemindersEnabled: true,
+    invoiceReminderDays: 7,
+    estimateDueRemindersEnabled: true,
+    estimateReminderDays: 3,
+    leaveRequestNotificationsEnabled: true,
+    productionDeadlineRemindersEnabled: true,
+    productionReminderDays: 2,
+    emailNotificationsEnabled: false,
+    dailyDigestEnabled: false,
+    whatsappEnabled: false,
+    whatsappPhoneNumber: undefined,
+  };
+
   const { 
     data: preferences,
     isLoading: preferencesLoading,
@@ -126,10 +144,15 @@ export function NotificationBell() {
     queryKey: ["/api/notification-preferences"],
     queryFn: async () => {
       const res = await fetch("/api/notification-preferences", { credentials: "include" });
+      if (res.status === 401) {
+        return defaultPreferences;
+      }
       if (!res.ok) throw new Error("Failed to fetch preferences");
       return res.json();
     },
     enabled: settingsOpen,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   const markAsReadMutation = useMutation({
