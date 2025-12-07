@@ -149,6 +149,12 @@ import {
   type ProductionDecorImport,
   type InsertProductionDecorImport,
   productionDecorImports,
+  notifications,
+  notificationPreferences,
+  type Notification,
+  type InsertNotification,
+  type NotificationPreference,
+  type InsertNotificationPreference,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -514,6 +520,23 @@ export interface IStorage {
   updateProductionDecorImport(id: string, importData: Partial<InsertProductionDecorImport>): Promise<ProductionDecorImport | undefined>;
   deleteProductionDecorImport(id: string): Promise<void>;
   createProductionDecorItemsFromImport(importBatchId: string, items: InsertProductionDecorItem[], elements: { itemIndex: number; element: InsertProductionDecorElement }[]): Promise<{ items: ProductionDecorItem[]; elements: ProductionDecorElement[] }>;
+
+  // Notifications
+  getUserNotifications(userId: string, options?: { unreadOnly?: boolean; limit?: number }): Promise<Notification[]>;
+  getNotification(id: string): Promise<Notification | undefined>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  createManyNotifications(notifications: InsertNotification[]): Promise<Notification[]>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
+  dismissNotification(id: string): Promise<void>;
+  dismissAllNotifications(userId: string): Promise<void>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  deleteOldNotifications(beforeDate: Date): Promise<void>;
+
+  // Notification Preferences
+  getNotificationPreferences(userId: string): Promise<NotificationPreference | undefined>;
+  createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference>;
+  updateNotificationPreferences(userId: string, preferences: Partial<InsertNotificationPreference>): Promise<NotificationPreference | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2169,6 +2192,112 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productionDecorImports.id, importBatchId));
 
     return { items: createdItems, elements: createdElements };
+  }
+
+  // Notifications
+  async getUserNotifications(userId: string, options?: { unreadOnly?: boolean; limit?: number }): Promise<Notification[]> {
+    let query = db.select().from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isDismissed, false)
+      ))
+      .orderBy(desc(notifications.createdAt));
+    
+    if (options?.unreadOnly) {
+      query = db.select().from(notifications)
+        .where(and(
+          eq(notifications.userId, userId),
+          eq(notifications.isDismissed, false),
+          eq(notifications.isRead, false)
+        ))
+        .orderBy(desc(notifications.createdAt));
+    }
+    
+    const result = await query;
+    return options?.limit ? result.slice(0, options.limit) : result;
+  }
+
+  async getNotification(id: string): Promise<Notification | undefined> {
+    const [notification] = await db.select().from(notifications).where(eq(notifications.id, id));
+    return notification || undefined;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async createManyNotifications(notificationData: InsertNotification[]): Promise<Notification[]> {
+    if (notificationData.length === 0) return [];
+    const created = await db.insert(notifications).values(notificationData).returning();
+    return created;
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    const [updated] = await db.update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isRead: true })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false)
+      ));
+  }
+
+  async dismissNotification(id: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isDismissed: true })
+      .where(eq(notifications.id, id));
+  }
+
+  async dismissAllNotifications(userId: string): Promise<void> {
+    await db.update(notifications)
+      .set({ isDismissed: true })
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isDismissed, false)
+      ));
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false),
+        eq(notifications.isDismissed, false)
+      ));
+    return Number(result[0]?.count) || 0;
+  }
+
+  async deleteOldNotifications(beforeDate: Date): Promise<void> {
+    await db.delete(notifications).where(lte(notifications.createdAt, beforeDate));
+  }
+
+  // Notification Preferences
+  async getNotificationPreferences(userId: string): Promise<NotificationPreference | undefined> {
+    const [prefs] = await db.select().from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return prefs || undefined;
+  }
+
+  async createNotificationPreferences(preferences: InsertNotificationPreference): Promise<NotificationPreference> {
+    const [created] = await db.insert(notificationPreferences).values(preferences).returning();
+    return created;
+  }
+
+  async updateNotificationPreferences(userId: string, preferences: Partial<InsertNotificationPreference>): Promise<NotificationPreference | undefined> {
+    const [updated] = await db.update(notificationPreferences)
+      .set({ ...preferences, updatedAt: new Date() })
+      .where(eq(notificationPreferences.userId, userId))
+      .returning();
+    return updated || undefined;
   }
 }
 
