@@ -26,7 +26,6 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import MemoryStore from "memorystore";
 import { pool, isDatabaseConfigured } from "./db";
-import * as pdfParseModule from "pdf-parse";
 
 const PgSession = connectPgSimple(session);
 const MemoryStoreSession = MemoryStore(session);
@@ -2910,8 +2909,18 @@ export async function registerRoutes(
       }
 
       const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-      const pdfParseFn = (pdfParseModule as any).default || pdfParseModule;
-      const pdfData = await pdfParseFn(pdfBuffer);
+      
+      // Dynamic import to avoid bundling issues
+      let pdfParse;
+      try {
+        const pdfParseModule = await import('pdf-parse');
+        pdfParse = pdfParseModule.default || pdfParseModule;
+      } catch (importError) {
+        console.error('Failed to import pdf-parse:', importError);
+        return res.status(503).json({ error: 'PDF parsing service is not available' });
+      }
+      
+      const pdfData = await pdfParse(pdfBuffer);
       
       const parsedData = parseEstimatePDF(pdfData.text);
       
