@@ -5402,9 +5402,11 @@ function DecorPlanningSection({
         credentials: 'include',
       });
       
-      if (!response.ok) throw new Error('Failed to parse PDF');
-      
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to parse PDF');
+      }
       setParsedImportData(data.parsedData);
       setImportStep('preview');
       toast({ title: 'PDF parsed successfully', description: `Found ${data.parsedData.sections.length} sections` });
