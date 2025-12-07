@@ -25,9 +25,7 @@ import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import * as pdfParseModule from "pdf-parse";
 
 const PgSession = connectPgSimple(session);
 
@@ -2884,7 +2882,24 @@ export async function registerRoutes(
       
       let pdfData;
       try {
-        pdfData = await pdfParse(pdfBuffer);
+        console.log(`[PDF Parse] Module type: ${typeof pdfParseModule}`);
+        console.log(`[PDF Parse] Module keys: ${Object.keys(pdfParseModule as any)}`);
+        
+        let pdfParseFn: any = null;
+        if (typeof (pdfParseModule as any).default === 'function') {
+          pdfParseFn = (pdfParseModule as any).default;
+        } else if (typeof pdfParseModule === 'function') {
+          pdfParseFn = pdfParseModule;
+        } else if ((pdfParseModule as any).default && typeof (pdfParseModule as any).default.default === 'function') {
+          pdfParseFn = (pdfParseModule as any).default.default;
+        }
+        
+        if (!pdfParseFn) {
+          console.error('[PDF Parse] Could not find parse function in module');
+          throw new Error('PDF parse function not available');
+        }
+        
+        pdfData = await pdfParseFn(pdfBuffer);
         console.log(`[PDF Parse] PDF parsed successfully, text length: ${pdfData.text?.length || 0}`);
       } catch (parseError: any) {
         console.error('[PDF Parse] pdf-parse library error:', parseError);
