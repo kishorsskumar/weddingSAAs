@@ -871,7 +871,7 @@ function InventoryItemsSection({
       </Dialog>
 
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage Categories</DialogTitle>
           </DialogHeader>
@@ -1361,7 +1361,7 @@ function EventInventorySection({
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSession ? 'Edit Session' : 'New Event Inventory Session'}</DialogTitle>
           </DialogHeader>
@@ -1449,7 +1449,7 @@ function EventInventorySection({
       </Dialog>
 
       <Dialog open={isItemModalOpen} onOpenChange={(open) => { setIsItemModalOpen(open); if (!open) setEditingItem(null); }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingItem ? 'Edit Session Item' : 'Add Item to Session'}</DialogTitle>
           </DialogHeader>
@@ -1535,7 +1535,7 @@ function EventInventorySection({
                 <p className="font-medium">{inventoryItems.find(i => i.id === editingItem.itemId)?.name || 'Unknown Item'}</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Qty Issued</Label>
                 <Input type="number" value={itemFormData.quantityIssued} onChange={(e) => setItemFormData({ ...itemFormData, quantityIssued: e.target.value })} data-testid="input-qty-issued" />
@@ -1566,7 +1566,7 @@ function EventInventorySection({
       </Dialog>
 
       <Dialog open={isCloneModalOpen} onOpenChange={setIsCloneModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Clone Session to Another Event</DialogTitle>
           </DialogHeader>
@@ -1648,7 +1648,7 @@ function EventInventorySection({
       </Dialog>
 
       <Dialog open={isDeliveryNoteOpen} onOpenChange={setIsDeliveryNoteOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Delivery Out Note</DialogTitle>
           </DialogHeader>
@@ -1663,16 +1663,17 @@ function EventInventorySection({
               <div className="text-center">
                 <h2 className="text-xl font-bold">DELIVERY OUT NOTE</h2>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid gap-4 sm:grid-cols-2 text-sm">
                 <div>
                   <p><strong>Event:</strong> {getEventName(selectedSession.eventId)}</p>
                   <p><strong>Issue Date:</strong> {selectedSession.issuedAt ? format(new Date(selectedSession.issuedAt), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')}</p>
                 </div>
-                <div className="text-right">
+                <div className="sm:text-right">
                   <p><strong>Status:</strong> {selectedSession.status}</p>
                   <p><strong>Note #:</strong> DN-{selectedSession.id.slice(0, 8).toUpperCase()}</p>
                 </div>
               </div>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-amber-50">
@@ -1703,7 +1704,8 @@ function EventInventorySection({
                   })}
                 </TableBody>
               </Table>
-              <div className="grid grid-cols-2 gap-8 pt-8 border-t">
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-8 pt-8 border-t">
                 <div>
                   <p className="font-bold mb-8">Issued By:</p>
                   <div className="border-t border-black pt-2">Signature & Date</div>
@@ -2152,7 +2154,7 @@ function RentalsSection({
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingRental ? 'Edit Rental' : 'New Rental Record'}</DialogTitle>
           </DialogHeader>
@@ -2302,7 +2304,7 @@ function RentalsSection({
       </Dialog>
 
       <Dialog open={isItemModalOpen} onOpenChange={setIsItemModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Rental Item</DialogTitle>
           </DialogHeader>
@@ -2311,7 +2313,7 @@ function RentalsSection({
               <Label>Item Name *</Label>
               <Input value={itemFormData.itemName} onChange={(e) => setItemFormData({ ...itemFormData, itemName: e.target.value })} required data-testid="input-rental-item-name" />
             </div>
-            <div className="grid gap-4 grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Quantity</Label>
                 <Input type="number" value={itemFormData.quantity} onChange={(e) => setItemFormData({ ...itemFormData, quantity: e.target.value })} data-testid="input-rental-item-qty" />
@@ -2334,7 +2336,7 @@ function RentalsSection({
       </Dialog>
 
       <Dialog open={isCloneModalOpen} onOpenChange={setIsCloneModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Clone Rental to Another Event</DialogTitle>
             <DialogDescription>
@@ -2606,7 +2608,7 @@ function TemplatesSection({
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingTemplate ? 'Edit Template' : 'New Template'}</DialogTitle>
           </DialogHeader>
@@ -2643,7 +2645,7 @@ function TemplatesSection({
       </Dialog>
 
       <Dialog open={isItemModalOpen} onOpenChange={setIsItemModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Item to Template</DialogTitle>
           </DialogHeader>
@@ -2897,7 +2899,7 @@ function PurchaseOrdersSection({
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPO ? 'Edit Purchase Order' : 'New Purchase Order'}</DialogTitle>
           </DialogHeader>
@@ -2964,7 +2966,7 @@ function PurchaseOrdersSection({
       </Dialog>
 
       <Dialog open={isItemModalOpen} onOpenChange={setIsItemModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Item to PO</DialogTitle>
           </DialogHeader>
@@ -2984,7 +2986,7 @@ function PurchaseOrdersSection({
               <Label>Or enter item name</Label>
               <Input value={itemFormData.itemName} onChange={(e) => setItemFormData({ ...itemFormData, itemName: e.target.value })} placeholder="Custom item name" data-testid="input-po-item-name" />
             </div>
-            <div className="grid gap-4 grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Quantity</Label>
                 <Input type="number" value={itemFormData.quantity} onChange={(e) => setItemFormData({ ...itemFormData, quantity: e.target.value })} data-testid="input-po-item-qty" />
@@ -3267,7 +3269,7 @@ function ProductionPlansSection({
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
+        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPlan ? 'Edit Production Plan' : 'New Production Plan'}</DialogTitle>
           </DialogHeader>
@@ -3353,7 +3355,7 @@ function ProductionPlansSection({
       </Dialog>
 
       <Dialog open={isTaskModalOpen} onOpenChange={setIsTaskModalOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Task to Plan</DialogTitle>
           </DialogHeader>
