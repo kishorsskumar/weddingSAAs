@@ -1,0 +1,1068 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  User, 
+  CalendarDays, 
+  DollarSign, 
+  TrendingUp, 
+  Star, 
+  CreditCard, 
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2,
+  Plus,
+  Briefcase,
+  Phone,
+  Mail,
+  MapPin,
+  Building2
+} from "lucide-react";
+import { format, parseISO, differenceInDays } from "date-fns";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { motion } from "framer-motion";
+import { pageTransition, staggerContainer, staggerItem, TIMING } from "@/lib/animations";
+
+interface EmployeeProfile {
+  id: string;
+  name: string;
+  employeeId: string;
+  userId: string | null;
+  joinDate: string;
+  designation: string;
+  department: string | null;
+  salary: string;
+  address: string;
+  emergencyContact: string;
+  phone: string | null;
+  email: string | null;
+  totalLeavesPerYear: number | null;
+  leaveDate: string | null;
+}
+
+interface LeaveBalance {
+  id: string;
+  employeeId: string;
+  fiscalYear: string;
+  totalLeaves: number;
+  leavesUsed: number;
+  leavesRemaining: number;
+  carryForward: number;
+}
+
+interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  startDate: string;
+  endDate: string;
+  leaveType: string;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+}
+
+interface EmployeeIncrement {
+  id: string;
+  employeeId: string;
+  effectiveDate: string;
+  previousSalary: string;
+  newSalary: string;
+  incrementAmount: string;
+  incrementPercent: string | null;
+  reason: string | null;
+  notes: string | null;
+}
+
+interface EmployeeAppraisal {
+  id: string;
+  employeeId: string;
+  reviewPeriodStart: string;
+  reviewPeriodEnd: string;
+  reviewDate: string;
+  rating: number | null;
+  ratingLabel: string | null;
+  strengths: string | null;
+  areasOfImprovement: string | null;
+  goals: string | null;
+  managerComments: string | null;
+  status: string;
+}
+
+interface SalaryAdvanceRequest {
+  id: string;
+  employeeId: string;
+  requestDate: string;
+  amount: string;
+  reason: string | null;
+  repaymentMonths: number;
+  status: string;
+  approvedAmount: string | null;
+  approvedDate: string | null;
+  paidDate: string | null;
+}
+
+interface PayrollHistoryItem {
+  runId: string;
+  month: number;
+  year: number;
+  payDate: string | null;
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  monthlySalary: string;
+  daysWorked: number;
+  dailyRate: string;
+  grossPay: string;
+  deductions: string;
+  netPay: string;
+}
+
+function formatCurrency(amount: string | number): string {
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(num);
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  try {
+    return format(parseISO(dateStr), 'dd MMM yyyy');
+  } catch {
+    return dateStr;
+  }
+}
+
+function getStatusBadge(status: string) {
+  const statusConfig: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: any }> = {
+    pending: { variant: 'secondary', icon: Clock },
+    approved: { variant: 'default', icon: CheckCircle2 },
+    rejected: { variant: 'destructive', icon: XCircle },
+    paid: { variant: 'default', icon: CheckCircle2 },
+    repaid: { variant: 'outline', icon: CheckCircle2 },
+  };
+  const config = statusConfig[status] || { variant: 'secondary' as const, icon: AlertCircle };
+  const Icon = config.icon;
+  
+  return (
+    <Badge variant={config.variant} className="gap-1">
+      <Icon className="h-3 w-3" />
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </Badge>
+  );
+}
+
+function getRatingStars(rating: number | null) {
+  if (!rating) return null;
+  return (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`h-4 w-4 ${star <= rating ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function getMonthName(month: number): string {
+  return new Date(2000, month - 1).toLocaleString('en-IN', { month: 'long' });
+}
+
+export default function EmployeePortal() {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery<EmployeeProfile>({
+    queryKey: ['/api/employee-portal/profile'],
+    queryFn: async () => {
+      const res = await fetch('/api/employee-portal/profile');
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('PROFILE_NOT_FOUND');
+        }
+        throw new Error('Failed to fetch profile');
+      }
+      return res.json();
+    },
+  });
+
+  const { data: leaveBalance } = useQuery<LeaveBalance>({
+    queryKey: ['/api/employee-portal/leave-balance'],
+    enabled: !!profile,
+  });
+
+  const { data: leaveRequests = [] } = useQuery<LeaveRequest[]>({
+    queryKey: ['/api/employee-portal/leave-requests'],
+    enabled: !!profile,
+  });
+
+  const { data: increments = [] } = useQuery<EmployeeIncrement[]>({
+    queryKey: ['/api/employee-portal/increments'],
+    enabled: !!profile,
+  });
+
+  const { data: appraisals = [] } = useQuery<EmployeeAppraisal[]>({
+    queryKey: ['/api/employee-portal/appraisals'],
+    enabled: !!profile,
+  });
+
+  const { data: salaryAdvances = [] } = useQuery<SalaryAdvanceRequest[]>({
+    queryKey: ['/api/employee-portal/salary-advances'],
+    enabled: !!profile,
+  });
+
+  const { data: payrollHistory = [] } = useQuery<PayrollHistoryItem[]>({
+    queryKey: ['/api/employee-portal/payroll-history'],
+    enabled: !!profile,
+  });
+
+  const submitLeaveRequest = useMutation({
+    mutationFn: async (data: { startDate: string; endDate: string; leaveType: string; reason: string }) => {
+      const res = await fetch('/api/employee-portal/leave-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to submit leave request');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/leave-requests'] });
+      setIsLeaveDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Leave request submitted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to submit leave request",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const submitAdvanceRequest = useMutation({
+    mutationFn: async (data: { amount: string; reason: string; repaymentMonths: number }) => {
+      const res = await fetch('/api/employee-portal/salary-advances', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to submit salary advance request');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/salary-advances'] });
+      setIsAdvanceDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Salary advance request submitted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to submit salary advance request",
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (profileLoading) {
+    return (
+      <motion.div 
+        className="flex items-center justify-center min-h-[400px]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </motion.div>
+    );
+  }
+
+  if (profileError) {
+    const errorMessage = (profileError as Error).message;
+    if (errorMessage === 'PROFILE_NOT_FOUND') {
+      return (
+        <motion.div 
+          className="flex flex-col items-center justify-center min-h-[400px] text-center p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: TIMING.fast }}
+        >
+          <User className="h-16 w-16 text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Employee Profile Found</h2>
+          <p className="text-muted-foreground max-w-md">
+            Your user account is not linked to an employee profile. Please contact your administrator to link your account.
+          </p>
+        </motion.div>
+      );
+    }
+    
+    return (
+      <motion.div 
+        className="flex flex-col items-center justify-center min-h-[400px] text-center p-6"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Error Loading Profile</h2>
+        <p className="text-muted-foreground">Please try refreshing the page.</p>
+      </motion.div>
+    );
+  }
+
+  if (!profile) return null;
+
+  const yearsOfService = profile.joinDate 
+    ? Math.floor(differenceInDays(new Date(), parseISO(profile.joinDate)) / 365)
+    : 0;
+
+  const leaveProgress = leaveBalance 
+    ? (leaveBalance.leavesUsed / leaveBalance.totalLeaves) * 100 
+    : 0;
+
+  return (
+    <motion.div 
+      className="space-y-6 p-4 md:p-6"
+      {...pageTransition}
+    >
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-oak-dark">Employee Portal</h1>
+          <p className="text-muted-foreground">Welcome back, {profile.name}</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1">
+          <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
+            <User className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="leaves" className="text-xs md:text-sm" data-testid="tab-leaves">
+            <CalendarDays className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Leaves</span>
+          </TabsTrigger>
+          <TabsTrigger value="payroll" className="text-xs md:text-sm" data-testid="tab-payroll">
+            <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Payroll</span>
+          </TabsTrigger>
+          <TabsTrigger value="increments" className="text-xs md:text-sm" data-testid="tab-increments">
+            <TrendingUp className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Increments</span>
+          </TabsTrigger>
+          <TabsTrigger value="appraisals" className="text-xs md:text-sm" data-testid="tab-appraisals">
+            <Star className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Appraisals</span>
+          </TabsTrigger>
+          <TabsTrigger value="advances" className="text-xs md:text-sm" data-testid="tab-advances">
+            <CreditCard className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Advances</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <motion.div 
+            className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Current Salary</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-salary">
+                    {formatCurrency(profile.salary)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">per month</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Years of Service</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-years-service">
+                    {yearsOfService}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Since {formatDate(profile.joinDate)}
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Leave Balance</CardTitle>
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-leave-balance">
+                    {leaveBalance?.leavesRemaining ?? '-'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    of {leaveBalance?.totalLeaves ?? '-'} days remaining
+                  </p>
+                  <Progress value={leaveProgress} className="mt-2 h-1" />
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">Increments</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-total-increments">
+                    {increments.length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">total received</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+
+          <motion.div 
+            className="grid gap-4 mt-4 md:grid-cols-2"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profile Information</CardTitle>
+                  <CardDescription>Your personal and employment details</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{profile.designation}</p>
+                      <p className="text-xs text-muted-foreground">{profile.department || 'General'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Employee ID</p>
+                      <p className="text-xs text-muted-foreground">{profile.employeeId}</p>
+                    </div>
+                  </div>
+                  {profile.email && (
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Email</p>
+                        <p className="text-xs text-muted-foreground">{profile.email}</p>
+                      </div>
+                    </div>
+                  )}
+                  {profile.phone && (
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Phone</p>
+                        <p className="text-xs text-muted-foreground">{profile.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Address</p>
+                      <p className="text-xs text-muted-foreground">{profile.address}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Your latest requests and updates</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {leaveRequests.slice(0, 3).map((request) => (
+                      <div key={request.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium">Leave Request</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(request.startDate)} - {formatDate(request.endDate)}
+                          </p>
+                        </div>
+                        {getStatusBadge(request.status)}
+                      </div>
+                    ))}
+                    {salaryAdvances.slice(0, 2).map((advance) => (
+                      <div key={advance.id} className="flex items-center justify-between border-b pb-2 last:border-0">
+                        <div>
+                          <p className="text-sm font-medium">Salary Advance</p>
+                          <p className="text-xs text-muted-foreground">{formatCurrency(advance.amount)}</p>
+                        </div>
+                        {getStatusBadge(advance.status)}
+                      </div>
+                    ))}
+                    {leaveRequests.length === 0 && salaryAdvances.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No recent activity
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="leaves">
+          <motion.div 
+            className="space-y-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Leave Balance - {leaveBalance?.fiscalYear}</CardTitle>
+                    <CardDescription>Your annual leave allocation</CardDescription>
+                  </div>
+                  <Button onClick={() => setIsLeaveDialogOpen(true)} data-testid="button-request-leave">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Request Leave
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-primary">
+                        {leaveBalance?.totalLeaves ?? 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Total Leaves</p>
+                    </div>
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-orange-600">
+                        {leaveBalance?.leavesUsed ?? 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Used</p>
+                    </div>
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-green-600">
+                        {leaveBalance?.leavesRemaining ?? 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Remaining</p>
+                    </div>
+                    <div className="text-center p-4 bg-muted/50 rounded-lg">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {leaveBalance?.carryForward ?? 0}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Carry Forward</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Leave History</CardTitle>
+                  <CardDescription>Your leave requests and their status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>From</TableHead>
+                          <TableHead>To</TableHead>
+                          <TableHead>Days</TableHead>
+                          <TableHead>Reason</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaveRequests.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No leave requests found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          leaveRequests.map((request) => {
+                            const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
+                            return (
+                              <TableRow key={request.id} data-testid={`row-leave-${request.id}`}>
+                                <TableCell className="capitalize">{request.leaveType}</TableCell>
+                                <TableCell>{formatDate(request.startDate)}</TableCell>
+                                <TableCell>{formatDate(request.endDate)}</TableCell>
+                                <TableCell>{days}</TableCell>
+                                <TableCell className="max-w-[200px] truncate">{request.reason || '-'}</TableCell>
+                                <TableCell>{getStatusBadge(request.status)}</TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <motion.div variants={staggerItem} initial="initial" animate="animate">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payroll History</CardTitle>
+                <CardDescription>Your salary payments and details</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead>Gross Pay</TableHead>
+                        <TableHead>Deductions</TableHead>
+                        <TableHead>Net Pay</TableHead>
+                        <TableHead>Days Worked</TableHead>
+                        <TableHead>Pay Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payrollHistory.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No payroll history found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        payrollHistory.map((item) => (
+                          <TableRow key={item.id} data-testid={`row-payroll-${item.id}`}>
+                            <TableCell>{getMonthName(item.month)} {item.year}</TableCell>
+                            <TableCell>{formatCurrency(item.grossPay)}</TableCell>
+                            <TableCell className="text-red-600">-{formatCurrency(item.deductions)}</TableCell>
+                            <TableCell className="font-medium">{formatCurrency(item.netPay)}</TableCell>
+                            <TableCell>{item.daysWorked}</TableCell>
+                            <TableCell>{formatDate(item.payDate)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="increments">
+          <motion.div variants={staggerItem} initial="initial" animate="animate">
+            <Card>
+              <CardHeader>
+                <CardTitle>Salary Increments</CardTitle>
+                <CardDescription>Your salary growth over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Effective Date</TableHead>
+                        <TableHead>Previous Salary</TableHead>
+                        <TableHead>New Salary</TableHead>
+                        <TableHead>Increment</TableHead>
+                        <TableHead>Percentage</TableHead>
+                        <TableHead>Reason</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {increments.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No increment records found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        increments.map((increment) => (
+                          <TableRow key={increment.id} data-testid={`row-increment-${increment.id}`}>
+                            <TableCell>{formatDate(increment.effectiveDate)}</TableCell>
+                            <TableCell>{formatCurrency(increment.previousSalary)}</TableCell>
+                            <TableCell className="font-medium text-green-600">
+                              {formatCurrency(increment.newSalary)}
+                            </TableCell>
+                            <TableCell className="text-green-600">
+                              +{formatCurrency(increment.incrementAmount)}
+                            </TableCell>
+                            <TableCell>
+                              {increment.incrementPercent ? `${increment.incrementPercent}%` : '-'}
+                            </TableCell>
+                            <TableCell className="capitalize">{increment.reason || '-'}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="appraisals">
+          <motion.div 
+            className="grid gap-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            {appraisals.length === 0 ? (
+              <motion.div variants={staggerItem}>
+                <Card>
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    No appraisal records found
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ) : (
+              appraisals.map((appraisal) => (
+                <motion.div key={appraisal.id} variants={staggerItem}>
+                  <Card data-testid={`card-appraisal-${appraisal.id}`}>
+                    <CardHeader className="flex flex-row items-start justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          Performance Review
+                          {getStatusBadge(appraisal.status)}
+                        </CardTitle>
+                        <CardDescription>
+                          {formatDate(appraisal.reviewPeriodStart)} - {formatDate(appraisal.reviewPeriodEnd)}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        {getRatingStars(appraisal.rating)}
+                        {appraisal.ratingLabel && (
+                          <p className="text-sm text-muted-foreground mt-1">{appraisal.ratingLabel}</p>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {appraisal.strengths && (
+                        <div>
+                          <h4 className="text-sm font-medium text-green-600 mb-1">Strengths</h4>
+                          <p className="text-sm text-muted-foreground">{appraisal.strengths}</p>
+                        </div>
+                      )}
+                      {appraisal.areasOfImprovement && (
+                        <div>
+                          <h4 className="text-sm font-medium text-orange-600 mb-1">Areas of Improvement</h4>
+                          <p className="text-sm text-muted-foreground">{appraisal.areasOfImprovement}</p>
+                        </div>
+                      )}
+                      {appraisal.goals && (
+                        <div>
+                          <h4 className="text-sm font-medium text-blue-600 mb-1">Goals</h4>
+                          <p className="text-sm text-muted-foreground">{appraisal.goals}</p>
+                        </div>
+                      )}
+                      {appraisal.managerComments && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-1">Manager Comments</h4>
+                          <p className="text-sm text-muted-foreground">{appraisal.managerComments}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))
+            )}
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="advances">
+          <motion.div 
+            className="space-y-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle>Salary Advance Requests</CardTitle>
+                    <CardDescription>Request and track salary advances</CardDescription>
+                  </div>
+                  <Button onClick={() => setIsAdvanceDialogOpen(true)} data-testid="button-request-advance">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Request Advance
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Request Date</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Reason</TableHead>
+                          <TableHead>Repayment Months</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Approved Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {salaryAdvances.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No salary advance requests found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          salaryAdvances.map((advance) => (
+                            <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
+                              <TableCell>{formatDate(advance.requestDate)}</TableCell>
+                              <TableCell>{formatCurrency(advance.amount)}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">{advance.reason || '-'}</TableCell>
+                              <TableCell>{advance.repaymentMonths}</TableCell>
+                              <TableCell>{getStatusBadge(advance.status)}</TableCell>
+                              <TableCell>
+                                {advance.approvedAmount ? formatCurrency(advance.approvedAmount) : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+      </Tabs>
+
+      <LeaveRequestDialog 
+        open={isLeaveDialogOpen} 
+        onOpenChange={setIsLeaveDialogOpen}
+        onSubmit={(data) => submitLeaveRequest.mutate(data)}
+        isLoading={submitLeaveRequest.isPending}
+      />
+
+      <AdvanceRequestDialog 
+        open={isAdvanceDialogOpen} 
+        onOpenChange={setIsAdvanceDialogOpen}
+        onSubmit={(data) => submitAdvanceRequest.mutate(data)}
+        isLoading={submitAdvanceRequest.isPending}
+      />
+    </motion.div>
+  );
+}
+
+function LeaveRequestDialog({ 
+  open, 
+  onOpenChange, 
+  onSubmit, 
+  isLoading 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { startDate: string; endDate: string; leaveType: string; reason: string }) => void;
+  isLoading: boolean;
+}) {
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [leaveType, setLeaveType] = useState('casual');
+  const [reason, setReason] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ startDate, endDate, leaveType, reason });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Request Leave</DialogTitle>
+          <DialogDescription>Submit a new leave request for approval</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <Input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                required
+                data-testid="input-leave-start"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Date</Label>
+              <Input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                required
+                data-testid="input-leave-end"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Leave Type</Label>
+            <Select value={leaveType} onValueChange={setLeaveType}>
+              <SelectTrigger data-testid="select-leave-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="casual">Casual Leave</SelectItem>
+                <SelectItem value="sick">Sick Leave</SelectItem>
+                <SelectItem value="earned">Earned Leave</SelectItem>
+                <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Reason</Label>
+            <Textarea 
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter reason for leave..."
+              data-testid="input-leave-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading} data-testid="button-submit-leave">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AdvanceRequestDialog({ 
+  open, 
+  onOpenChange, 
+  onSubmit, 
+  isLoading 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { amount: string; reason: string; repaymentMonths: number }) => void;
+  isLoading: boolean;
+}) {
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [repaymentMonths, setRepaymentMonths] = useState('1');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ amount, reason, repaymentMonths: parseInt(repaymentMonths) });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Request Salary Advance</DialogTitle>
+          <DialogDescription>Submit a request for salary advance</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Amount (₹)</Label>
+            <Input 
+              type="number" 
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              required
+              data-testid="input-advance-amount"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Repayment Period (Months)</Label>
+            <Select value={repaymentMonths} onValueChange={setRepaymentMonths}>
+              <SelectTrigger data-testid="select-repayment-months">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5, 6].map((m) => (
+                  <SelectItem key={m} value={m.toString()}>{m} Month{m > 1 ? 's' : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Reason</Label>
+            <Textarea 
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter reason for advance..."
+              data-testid="input-advance-reason"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading} data-testid="button-submit-advance">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

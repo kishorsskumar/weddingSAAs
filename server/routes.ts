@@ -681,6 +681,7 @@ export async function registerRoutes(
     'oak-sales',
     'oak-inventory',
     'hr',
+    'employee-portal',
     'admin',
   ];
 
@@ -1399,9 +1400,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Get current user's employee profile
-  app.get('/api/employee-portal/profile', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/profile', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1413,9 +1417,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Increments
-  app.get('/api/employee-portal/increments', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/increments', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1428,9 +1435,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Appraisals
-  app.get('/api/employee-portal/appraisals', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/appraisals', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1443,9 +1453,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Leave Balance
-  app.get('/api/employee-portal/leave-balance', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/leave-balance', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1458,9 +1471,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Leave Requests (employee's own)
-  app.get('/api/employee-portal/leave-requests', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/leave-requests', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1474,9 +1490,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Submit Leave Request
-  app.post('/api/employee-portal/leave-requests', requireAuth, async (req, res) => {
+  app.post('/api/employee-portal/leave-requests', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1494,9 +1513,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Salary Advance Requests (employee's own)
-  app.get('/api/employee-portal/salary-advances', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/salary-advances', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1509,9 +1531,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Submit Salary Advance Request
-  app.post('/api/employee-portal/salary-advances', requireAuth, async (req, res) => {
+  app.post('/api/employee-portal/salary-advances', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1530,9 +1555,12 @@ export async function registerRoutes(
   });
 
   // Employee Portal - Payroll History
-  app.get('/api/employee-portal/payroll-history', requireAuth, async (req, res) => {
+  app.get('/api/employee-portal/payroll-history', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
     try {
-      const userId = req.user!.id;
       const employee = await storage.getEmployeeByUserId(userId);
       if (!employee) {
         return res.status(404).json({ error: 'Employee profile not found' });
@@ -1561,12 +1589,16 @@ export async function registerRoutes(
   });
 
   // Admin Routes - Manage Employee Increments
-  app.get('/api/admin/employee-increments/:employeeId', verifyAdminAccess, async (req, res) => {
+  app.get('/api/admin/employee-increments/:employeeId', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     const increments = await storage.getEmployeeIncrements(req.params.employeeId);
     res.json(increments);
   });
 
-  app.post('/api/admin/employee-increments', verifyAdminAccess, async (req, res) => {
+  app.post('/api/admin/employee-increments', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     try {
       const increment = await storage.createEmployeeIncrement(req.body);
       res.json(increment);
@@ -1575,7 +1607,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/admin/employee-increments/:id', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/admin/employee-increments/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     try {
       const increment = await storage.updateEmployeeIncrement(req.params.id, req.body);
       res.json(increment);
@@ -1584,18 +1618,24 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/admin/employee-increments/:id', verifyAdminAccess, async (req, res) => {
+  app.delete('/api/admin/employee-increments/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     await storage.deleteEmployeeIncrement(req.params.id);
     res.json({ success: true });
   });
 
   // Admin Routes - Manage Employee Appraisals
-  app.get('/api/admin/employee-appraisals/:employeeId', verifyAdminAccess, async (req, res) => {
+  app.get('/api/admin/employee-appraisals/:employeeId', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     const appraisals = await storage.getEmployeeAppraisals(req.params.employeeId);
     res.json(appraisals);
   });
 
-  app.post('/api/admin/employee-appraisals', verifyAdminAccess, async (req, res) => {
+  app.post('/api/admin/employee-appraisals', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     try {
       const appraisal = await storage.createEmployeeAppraisal(req.body);
       res.json(appraisal);
@@ -1604,7 +1644,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/admin/employee-appraisals/:id', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/admin/employee-appraisals/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     try {
       const appraisal = await storage.updateEmployeeAppraisal(req.params.id, req.body);
       res.json(appraisal);
@@ -1613,18 +1655,24 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/admin/employee-appraisals/:id', verifyAdminAccess, async (req, res) => {
+  app.delete('/api/admin/employee-appraisals/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     await storage.deleteEmployeeAppraisal(req.params.id);
     res.json({ success: true });
   });
 
   // Admin Routes - Manage Salary Advance Requests
-  app.get('/api/admin/salary-advances', verifyAdminAccess, async (req, res) => {
+  app.get('/api/admin/salary-advances', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     const advances = await storage.getAllSalaryAdvanceRequests();
     res.json(advances);
   });
 
-  app.patch('/api/admin/salary-advances/:id', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/admin/salary-advances/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
     try {
       const advance = await storage.updateSalaryAdvanceRequest(req.params.id, req.body);
       res.json(advance);

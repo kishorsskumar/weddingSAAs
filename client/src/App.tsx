@@ -19,6 +19,7 @@ import OakSales from "@/pages/oak-sales";
 import OakInventory from "@/pages/oak-inventory";
 import CustomerPortal from "@/pages/customer-portal";
 import PrintDocument from "@/pages/print-document";
+import EmployeePortal from "@/pages/employee-portal";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -74,6 +75,9 @@ function AppRoutes() {
         </Route>
         <Route path="/oak-inventory">
            <PrivateRoute component={OakInventory} path="/oak-inventory" />
+        </Route>
+        <Route path="/employee-portal">
+           <PrivateRoute component={EmployeePortal} path="/employee-portal" />
         </Route>
         <Route component={NotFound} />
       </Switch>

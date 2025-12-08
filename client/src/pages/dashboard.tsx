@@ -16,7 +16,8 @@ import {
   Target,
   Package,
   Briefcase,
-  Shield
+  Shield,
+  UserCircle
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Event } from "@/lib/types";
@@ -33,6 +34,7 @@ const ALL_PAGES = [
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales", icon: Target, description: "CRM & pipeline" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory", icon: Package, description: "Inventory & rentals" },
   { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
+  { id: "employee-portal", label: "Employee Portal", path: "/employee-portal", icon: UserCircle, description: "Your profile & requests" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];
 

@@ -16,7 +16,8 @@ import {
   CheckSquare,
   Receipt,
   Target,
-  Package
+  Package,
+  UserCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +35,7 @@ const ALL_PAGES = [
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "hr", label: "Oak HR", path: "/hr" },
+  { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -48,6 +50,7 @@ const ICONS: Record<string, any> = {
   "oak-sales": Target,
   "oak-inventory": Package,
   hr: Briefcase,
+  "employee-portal": UserCircle,
   admin: Shield,
 };
 
