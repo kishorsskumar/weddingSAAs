@@ -5281,22 +5281,50 @@ function DecorPlanningSection({
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      let y = 20;
+      let y = 10;
 
-      doc.setFontSize(18);
+      const logoImg = new Image();
+      logoImg.src = '/oak-street-logo.png';
+      
+      await new Promise<void>((resolve) => {
+        logoImg.onload = () => {
+          doc.addImage(logoImg, 'PNG', 15, 8, 35, 20);
+          resolve();
+        };
+        logoImg.onerror = () => resolve();
+      });
+
+      doc.setFontSize(8);
+      doc.setTextColor(80);
+      const addressLines = COMPANY_DEFAULTS.address.split('\n');
+      let headerY = 10;
+      addressLines.forEach(line => {
+        doc.text(line, pageWidth - 15, headerY, { align: 'right' });
+        headerY += 4;
+      });
+      doc.text(`Phone: ${COMPANY_DEFAULTS.phone}`, pageWidth - 15, headerY, { align: 'right' });
+      headerY += 4;
+      doc.text(`Email: ${COMPANY_DEFAULTS.email}`, pageWidth - 15, headerY, { align: 'right' });
+      
+      y = 35;
+      doc.setDrawColor(200);
+      doc.line(15, y, pageWidth - 15, y);
+      y += 10;
+
+      doc.setFontSize(16);
       doc.setTextColor(139, 115, 85);
       doc.text('DÉCOR PRODUCTION PLAN', pageWidth / 2, y, { align: 'center' });
-      y += 15;
+      y += 10;
 
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setTextColor(0);
       doc.text(item.decorType, pageWidth / 2, y, { align: 'center' });
-      y += 15;
+      y += 12;
 
       doc.setFontSize(10);
       doc.setTextColor(80);
       
-      const leftCol = 20;
+      const leftCol = 15;
       const rightCol = pageWidth / 2 + 10;
       
       doc.text(`Event: ${item.eventName || 'N/A'}`, leftCol, y);
