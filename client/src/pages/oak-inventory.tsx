@@ -6363,7 +6363,7 @@ function DecorPlanningSection({
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-green-800 font-medium">
-                  Found {parsedImportData.sections.length} sections with items to import
+                  Found {parsedImportData.sections.length} sections with {parsedImportData.sections.reduce((sum: number, s: any) => sum + (s.items?.length || 0), 0)} items to import
                 </p>
               </div>
               
@@ -6376,40 +6376,36 @@ function DecorPlanningSection({
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{section.category || section.eventName}</h4>
+                      <h4 className="font-semibold text-gray-900">{section.heading || section.eventName}</h4>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
-                        {section.date && (
+                        {section.installationDate && (
                           <Badge variant="outline">
                             <Calendar className="w-3 h-3 mr-1" />
-                            {format(new Date(section.date), 'dd MMM yyyy')}
-                          </Badge>
-                        )}
-                        {section.startTime && section.endTime && (
-                          <Badge variant="outline">
-                            <Clock className="w-3 h-3 mr-1" />
-                            {section.startTime} - {section.endTime}
+                            {format(new Date(section.installationDate), 'dd MMM yyyy')}
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">{section.originalHeading}</p>
+                    <p className="text-xs text-gray-500 mb-3">{section.eventName}</p>
                     
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead className="w-[40px]">#</TableHead>
+                          <TableHead>Item Description</TableHead>
+                          <TableHead className="text-center">Start Time</TableHead>
+                          <TableHead className="text-center">End Time</TableHead>
+                          <TableHead className="text-center">Responsible</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {section.items.map((item: any, i: number) => (
                           <TableRow key={i}>
+                            <TableCell className="text-sm font-medium">{item.slNo}</TableCell>
                             <TableCell className="text-sm">{item.description}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">₹{item.rate.toLocaleString()}</TableCell>
-                            <TableCell className="text-right">₹{item.amount.toLocaleString()}</TableCell>
+                            <TableCell className="text-center text-sm">{item.startTime || '-'}</TableCell>
+                            <TableCell className="text-center text-sm">{item.endTime || '-'}</TableCell>
+                            <TableCell className="text-center text-sm">{item.responsible || '-'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

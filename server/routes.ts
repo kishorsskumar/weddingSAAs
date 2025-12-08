@@ -29,6 +29,176 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PgSession = connectPgSimple(session);
 
+interface ParsedScheduleItem {
+  slNo: number;
+  description: string;
+  startTime: string;
+  endTime: string;
+  responsible: string;
+}
+
+interface ParsedScheduleSection {
+  heading: string;
+  installationDate: string | null;
+  eventName: string;
+  items: ParsedScheduleItem[];
+}
+
+interface ParsedScheduleData {
+  sections: ParsedScheduleSection[];
+  rawLines: string[];
+}
+
+function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
+  const sections: ParsedScheduleSection[] = [];
+  let currentSection: ParsedScheduleSection | null = null;
+  let defaultDate: string | null = null;
+  
+  const months: { [key: string]: string } = {
+    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+  };
+  
+  function extractDate(text: string): string | null {
+    const dateMatch = text.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})/i);
+    if (dateMatch) {
+      const day = dateMatch[1].padStart(2, '0');
+      const monthNum = months[dateMatch[2].toLowerCase().substring(0, 3)];
+      const year = dateMatch[3];
+      return `${year}-${monthNum}-${day}`;
+    }
+    return null;
+  }
+  
+  for (const row of rows) {
+    const rowText = row.join(' ').trim();
+    
+    if (rowText.toLowerCase().includes('sl') && 
+        (rowText.toLowerCase().includes('item') || rowText.toLowerCase().includes('description'))) {
+      continue;
+    }
+    
+    if (rowText.toLowerCase().includes('sub total') || 
+        rowText.toLowerCase().includes('subtotal') ||
+        rowText.toLowerCase().includes('grand total') ||
+        rowText.toLowerCase().includes('total ₹') || 
+        rowText.toLowerCase().includes('authorized signature') ||
+        rowText.toLowerCase().includes('terms & conditions') ||
+        rowText.toLowerCase().includes('service charge') ||
+        rowText.toLowerCase().includes('looking forward') ||
+        rowText.toLowerCase().includes('indian rupee')) {
+      continue;
+    }
+    
+    const isDayHeader = /DAY\s*\d+\s*:/i.test(rowText) || 
+                        (/\d{1,2}\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(rowText) && 
+                         rowText.length > 20 && !rowText.match(/^\d+\./));
+    
+    if (isDayHeader) {
+      const date = extractDate(rowText);
+      if (!defaultDate && date) defaultDate = date;
+      
+      let eventName = rowText;
+      const eventMatch = rowText.match(/[-–]\s*(.+?)(?:\s*\(|$)/);
+      if (eventMatch) eventName = eventMatch[1].trim();
+      
+      currentSection = {
+        heading: rowText,
+        installationDate: date,
+        eventName: eventName || 'Event',
+        items: []
+      };
+      sections.push(currentSection);
+      continue;
+    }
+    
+    const isCategoryHeader = /^[A-Z][A-Z\s&]+$/.test(rowText) && 
+                             rowText.length >= 5 && 
+                             rowText.length <= 60 &&
+                             !rowText.match(/[\d₹]/);
+    
+    if (isCategoryHeader) {
+      const skipWords = ['SL', 'NO', 'ITEM', 'QTY', 'RATE', 'AMOUNT', 'TOTAL'];
+      if (!skipWords.some(w => rowText.toUpperCase().startsWith(w))) {
+        if (currentSection && currentSection.items.length > 0) {
+          currentSection = {
+            heading: rowText,
+            installationDate: currentSection.installationDate,
+            eventName: currentSection.eventName,
+            items: []
+          };
+          sections.push(currentSection);
+        } else if (currentSection) {
+          currentSection.heading = rowText;
+        }
+        continue;
+      }
+    }
+    
+    if (!currentSection) {
+      currentSection = {
+        heading: 'Imported Items',
+        installationDate: defaultDate,
+        eventName: 'Production Schedule',
+        items: []
+      };
+      sections.push(currentSection);
+    }
+    
+    const firstCell = row[0]?.trim() || '';
+    const slNoMatch = firstCell.match(/^(\d+)\.?$/);
+    
+    if (slNoMatch && row.length >= 2) {
+      const slNo = parseInt(slNoMatch[1]);
+      
+      const textCells: string[] = [];
+      const numericCells: string[] = [];
+      
+      for (let i = 1; i < row.length; i++) {
+        const cell = row[i]?.trim() || '';
+        if (!cell) continue;
+        
+        if (cell.match(/^[\d,]+(?:\.\d+)?$/) || cell.startsWith('₹')) {
+          numericCells.push(cell);
+        } else {
+          textCells.push(cell);
+        }
+      }
+      
+      const description = textCells.join(' ').trim() || `Item ${slNo}`;
+      const startTime = numericCells[0] || '';
+      const endTime = numericCells[1] || '';
+      const responsible = numericCells[2] || '';
+      
+      currentSection.items.push({
+        slNo,
+        description,
+        startTime,
+        endTime,
+        responsible
+      });
+    }
+  }
+  
+  if (sections.length === 0) {
+    sections.push({
+      heading: 'Imported Items',
+      installationDate: null,
+      eventName: 'Production Schedule',
+      items: []
+    });
+  }
+  
+  return { sections, rawLines: rows.map(r => r.join(' | ')) };
+}
+
+function cleanNumber(str: string): number {
+  if (!str) return 0;
+  const cleaned = str.replace(/[₹,\s]/g, '').replace(/[^\d.-]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+}
+
 interface ParsedLineItem {
   slNo: number;
   description: string;
@@ -49,13 +219,6 @@ interface ParsedSection {
 interface ParsedEstimateData {
   sections: ParsedSection[];
   rawLines: string[];
-}
-
-function cleanNumber(str: string): number {
-  if (!str) return 0;
-  const cleaned = str.replace(/[₹,\s]/g, '').replace(/[^\d.-]/g, '');
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
 }
 
 function parseEstimatePDF(text: string): ParsedEstimateData {
@@ -3142,8 +3305,8 @@ export async function registerRoutes(
         });
       }
       
-      const parsedData = parseEstimateFromRows(tableRows);
-      console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections`);
+      const parsedData = parseScheduleFromRows(tableRows);
+      console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections with ${parsedData.sections.reduce((sum, s) => sum + s.items.length, 0)} total items`);
       
       res.json({ 
         success: true, 
@@ -3192,35 +3355,33 @@ export async function registerRoutes(
       for (let i = 0; i < validSections.length; i++) {
         const section = validSections[i];
         
-        const isValidDate = section.date && /^\d{4}-\d{2}-\d{2}$/.test(section.date);
+        const isValidDate = section.installationDate && /^\d{4}-\d{2}-\d{2}$/.test(section.installationDate);
         
         items.push({
           eventId: eventId || null,
           eventName: eventName || section.eventName || 'Imported',
-          eventDate: isValidDate ? section.date : null,
-          decorType: (section.category || section.eventName || 'Imported Section').substring(0, 100),
-          setupDate: isValidDate ? section.date : null,
-          setupTime: section.startTime || null,
-          endTime: section.endTime || null,
+          eventDate: isValidDate ? section.installationDate : null,
+          decorType: (section.heading || section.eventName || 'Imported Section').substring(0, 100),
+          setupDate: isValidDate ? section.installationDate : null,
+          setupTime: null,
+          endTime: null,
           priority: 'medium',
           status: 'pending',
           pastelColor: pastelColors[i % pastelColors.length],
-          sectionLabel: (section.originalHeading || '').substring(0, 255)
+          sectionLabel: (section.heading || '').substring(0, 255)
         });
 
         for (const item of section.items) {
           if (!item || !item.description) continue;
           
-          const qty = typeof item.quantity === 'number' ? item.quantity : parseInt(item.quantity) || 1;
-          
           elements.push({
             itemIndex: i,
             element: {
               elementName: String(item.description).substring(0, 255),
-              quantity: Math.max(1, qty),
+              quantity: 1,
               unit: 'Nos',
               source: 'to_buy',
-              notes: item.notes ? String(item.notes).substring(0, 500) : ''
+              notes: `Start: ${item.startTime || '-'} | End: ${item.endTime || '-'} | Responsible: ${item.responsible || '-'}`
             }
           });
         }
