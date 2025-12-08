@@ -63,6 +63,7 @@ export const employees = pgTable("employees", {
   employeeId: text("employee_id").notNull().unique(),
   userId: varchar("user_id").references(() => users.id),
   managerUserId: varchar("manager_user_id").references(() => users.id),
+  photoUrl: text("photo_url"),
   dateOfBirth: date("date_of_birth"),
   joinDate: date("join_date").notNull(),
   contractRenewalDate: date("contract_renewal_date"),

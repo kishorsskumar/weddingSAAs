@@ -28,6 +28,7 @@ export interface Employee {
   employeeId: string;
   userId?: string | null;
   managerUserId?: string | null;
+  photoUrl?: string | null;
   dateOfBirth?: string | null;
   joinDate: string;
   contractRenewalDate?: string | null;

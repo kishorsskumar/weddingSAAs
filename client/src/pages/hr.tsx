@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { PhotoUploader } from "@/components/PhotoUploader";
 import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -231,9 +232,12 @@ export default function HR() {
   };
 
   const AddEmployeeForm = () => {
-    const { register, handleSubmit } = useForm<Partial<Employee>>();
+    const { register, handleSubmit, watch, setValue } = useForm<Partial<Employee>>();
+    const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+    const employeeName = watch("name") || "";
+    
     const onSubmit = (data: any) => {
-      const submitData = { ...data };
+      const submitData = { ...data, photoUrl };
       if (!submitData.leaveDate) {
         delete submitData.leaveDate;
       }
@@ -250,6 +254,15 @@ export default function HR() {
             Employee ID and password will be automatically generated. You can share the login credentials with the employee after creation.
           </p>
         </div>
+        
+        <div className="flex justify-center py-2">
+          <PhotoUploader 
+            currentPhotoUrl={photoUrl} 
+            onPhotoChange={setPhotoUrl}
+            name={employeeName}
+          />
+        </div>
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2 sm:col-span-2">
             <Label>Name *</Label>
@@ -300,7 +313,7 @@ export default function HR() {
   };
 
   const EditEmployeeForm = ({ employee }: { employee: Employee }) => {
-    const { register, handleSubmit } = useForm<Partial<Employee>>({
+    const { register, handleSubmit, watch } = useForm<Partial<Employee>>({
       defaultValues: {
         employeeId: employee.employeeId,
         name: employee.name,
@@ -313,9 +326,11 @@ export default function HR() {
         emergencyContact: employee.emergencyContact,
       }
     });
+    const [photoUrl, setPhotoUrl] = useState<string | null>(employee.photoUrl || null);
+    const employeeName = watch("name") || employee.name;
 
     const onSubmit = (data: any) => {
-      const submitData = { ...data };
+      const submitData = { ...data, photoUrl };
       if (!submitData.leaveDate) {
         submitData.leaveDate = null;
       }
@@ -327,6 +342,14 @@ export default function HR() {
 
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="flex justify-center py-2">
+          <PhotoUploader 
+            currentPhotoUrl={photoUrl} 
+            onPhotoChange={setPhotoUrl}
+            name={employeeName}
+          />
+        </div>
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Employee ID</Label>
