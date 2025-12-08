@@ -50,30 +50,26 @@ interface ParsedScheduleData {
 }
 
 function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
-  const sections: ParsedScheduleSection[] = [];
-  let currentSection: ParsedScheduleSection | null = null;
-  let defaultDate: string | null = null;
+  const section: ParsedScheduleSection = {
+    heading: 'Imported Document',
+    installationDate: null,
+    eventName: 'Production Schedule',
+    items: []
+  };
   
   const months: { [key: string]: string } = {
     'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
     'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
   };
   
-  function extractDate(text: string): string | null {
-    const dateMatch = text.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})/i);
-    if (dateMatch) {
-      const day = dateMatch[1].padStart(2, '0');
-      const monthNum = months[dateMatch[2].toLowerCase().substring(0, 3)];
-      const year = dateMatch[3];
-      return `${year}-${monthNum}-${day}`;
-    }
-    return null;
-  }
+  let slNoCounter = 1;
   
   for (const row of rows) {
     const rowText = row.join(' ').trim();
+    if (!rowText || rowText.length < 3) continue;
     
     if (rowText.toLowerCase().includes('sl') && 
+        rowText.toLowerCase().includes('no') &&
         (rowText.toLowerCase().includes('item') || rowText.toLowerCase().includes('description'))) {
       continue;
     }
@@ -81,115 +77,51 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     if (rowText.toLowerCase().includes('sub total') || 
         rowText.toLowerCase().includes('subtotal') ||
         rowText.toLowerCase().includes('grand total') ||
-        rowText.toLowerCase().includes('total ₹') || 
         rowText.toLowerCase().includes('authorized signature') ||
-        rowText.toLowerCase().includes('terms & conditions') ||
-        rowText.toLowerCase().includes('service charge') ||
-        rowText.toLowerCase().includes('looking forward') ||
-        rowText.toLowerCase().includes('indian rupee')) {
+        rowText.toLowerCase().includes('terms & conditions')) {
       continue;
     }
     
-    const isDayHeader = /DAY\s*\d+\s*:/i.test(rowText) || 
-                        (/\d{1,2}\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(rowText) && 
-                         rowText.length > 20 && !rowText.match(/^\d+\./));
-    
-    if (isDayHeader) {
-      const date = extractDate(rowText);
-      if (!defaultDate && date) defaultDate = date;
+    const dateMatch = rowText.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})/i);
+    if (dateMatch && !section.installationDate) {
+      const day = dateMatch[1].padStart(2, '0');
+      const monthNum = months[dateMatch[2].toLowerCase().substring(0, 3)];
+      const year = dateMatch[3];
+      section.installationDate = `${year}-${monthNum}-${day}`;
       
-      let eventName = rowText;
-      const eventMatch = rowText.match(/[-–]\s*(.+?)(?:\s*\(|$)/);
-      if (eventMatch) eventName = eventMatch[1].trim();
-      
-      currentSection = {
-        heading: rowText,
-        installationDate: date,
-        eventName: eventName || 'Event',
-        items: []
-      };
-      sections.push(currentSection);
-      continue;
-    }
-    
-    const isCategoryHeader = /^[A-Z][A-Z\s&]+$/.test(rowText) && 
-                             rowText.length >= 5 && 
-                             rowText.length <= 60 &&
-                             !rowText.match(/[\d₹]/);
-    
-    if (isCategoryHeader) {
-      const skipWords = ['SL', 'NO', 'ITEM', 'QTY', 'RATE', 'AMOUNT', 'TOTAL'];
-      if (!skipWords.some(w => rowText.toUpperCase().startsWith(w))) {
-        if (currentSection && currentSection.items.length > 0) {
-          currentSection = {
-            heading: rowText,
-            installationDate: currentSection.installationDate,
-            eventName: currentSection.eventName,
-            items: []
-          };
-          sections.push(currentSection);
-        } else if (currentSection) {
-          currentSection.heading = rowText;
-        }
-        continue;
+      if (rowText.length > 15) {
+        section.heading = rowText;
       }
     }
     
-    if (!currentSection) {
-      currentSection = {
-        heading: 'Imported Items',
-        installationDate: defaultDate,
-        eventName: 'Production Schedule',
-        items: []
-      };
-      sections.push(currentSection);
+    let description = '';
+    
+    if (row.length >= 4) {
+      const endIdx = Math.max(1, row.length - 3);
+      description = row.slice(0, endIdx).join(' ').trim();
+    } else if (row.length >= 2) {
+      description = row.slice(0, -1).join(' ').trim();
+    } else {
+      description = rowText;
     }
     
-    const firstCell = row[0]?.trim() || '';
-    const slNoMatch = firstCell.match(/^(\d+)\.?$/);
+    description = description.replace(/^\d+\.?\s*/, '').trim();
     
-    if (slNoMatch && row.length >= 2) {
-      const slNo = parseInt(slNoMatch[1]);
+    if (description && description.length >= 2 && 
+        !description.match(/^[\d,₹.\s]+$/) &&
+        description.length <= 500) {
       
-      const textCells: string[] = [];
-      const numericCells: string[] = [];
-      
-      for (let i = 1; i < row.length; i++) {
-        const cell = row[i]?.trim() || '';
-        if (!cell) continue;
-        
-        if (cell.match(/^[\d,]+(?:\.\d+)?$/) || cell.startsWith('₹')) {
-          numericCells.push(cell);
-        } else {
-          textCells.push(cell);
-        }
-      }
-      
-      const description = textCells.join(' ').trim() || `Item ${slNo}`;
-      const startTime = numericCells[0] || '';
-      const endTime = numericCells[1] || '';
-      const responsible = numericCells[2] || '';
-      
-      currentSection.items.push({
-        slNo,
-        description,
-        startTime,
-        endTime,
-        responsible
+      section.items.push({
+        slNo: slNoCounter++,
+        description: description,
+        startTime: '',
+        endTime: '',
+        responsible: ''
       });
     }
   }
   
-  if (sections.length === 0) {
-    sections.push({
-      heading: 'Imported Items',
-      installationDate: null,
-      eventName: 'Production Schedule',
-      items: []
-    });
-  }
-  
-  return { sections, rawLines: rows.map(r => r.join(' | ')) };
+  return { sections: [section], rawLines: rows.map(r => r.join(' | ')) };
 }
 
 function cleanNumber(str: string): number {

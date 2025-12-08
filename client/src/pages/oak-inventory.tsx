@@ -6363,55 +6363,110 @@ function DecorPlanningSection({
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-green-800 font-medium">
-                  Found {parsedImportData.sections.length} sections with {parsedImportData.sections.reduce((sum: number, s: any) => sum + (s.items?.length || 0), 0)} items to import
+                  Found {parsedImportData.sections.reduce((sum: number, s: any) => sum + (s.items?.length || 0), 0)} items to import
                 </p>
+                <p className="text-xs text-green-600 mt-1">You can edit Start Time, End Time, and Responsible. Click the trash icon to delete items.</p>
               </div>
               
-              <ScrollArea className="h-[400px] rounded border p-4">
-                {parsedImportData.sections.map((section: any, idx: number) => (
-                  <div 
-                    key={idx} 
-                    className={`mb-4 p-4 rounded-lg ${
-                      ['bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-pink-50', 'bg-purple-50'][idx % 5]
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-gray-900">{section.heading || section.eventName}</h4>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        {section.installationDate && (
-                          <Badge variant="outline">
-                            <Calendar className="w-3 h-3 mr-1" />
-                            {format(new Date(section.installationDate), 'dd MMM yyyy')}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mb-3">{section.eventName}</p>
-                    
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40px]">#</TableHead>
-                          <TableHead>Item Description</TableHead>
-                          <TableHead className="text-center">Start Time</TableHead>
-                          <TableHead className="text-center">End Time</TableHead>
-                          <TableHead className="text-center">Responsible</TableHead>
+              {parsedImportData.sections[0]?.installationDate && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <Calendar className="w-4 h-4 text-amber-600" />
+                  <span className="font-medium text-amber-800">Installation Date:</span>
+                  <span className="text-amber-700">{format(new Date(parsedImportData.sections[0].installationDate), 'dd MMM yyyy')}</span>
+                </div>
+              )}
+              
+              <ScrollArea className="h-[350px] rounded border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="w-[40px]">#</TableHead>
+                      <TableHead className="min-w-[200px]">Item Description</TableHead>
+                      <TableHead className="w-[100px] text-center">Start Time</TableHead>
+                      <TableHead className="w-[100px] text-center">End Time</TableHead>
+                      <TableHead className="w-[120px] text-center">Responsible</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {parsedImportData.sections.flatMap((section: any, sIdx: number) => 
+                      section.items.map((item: any, iIdx: number) => (
+                        <TableRow key={`${sIdx}-${iIdx}`} className="hover:bg-gray-50">
+                          <TableCell className="text-sm font-medium">{item.slNo}</TableCell>
+                          <TableCell className="text-sm">
+                            <Input
+                              value={item.description}
+                              onChange={(e) => {
+                                const newData = { ...parsedImportData };
+                                newData.sections[sIdx].items[iIdx].description = e.target.value;
+                                setParsedImportData(newData);
+                              }}
+                              className="h-8 text-sm"
+                              data-testid={`input-description-${sIdx}-${iIdx}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={item.startTime || ''}
+                              onChange={(e) => {
+                                const newData = { ...parsedImportData };
+                                newData.sections[sIdx].items[iIdx].startTime = e.target.value;
+                                setParsedImportData(newData);
+                              }}
+                              placeholder="e.g. 09:00"
+                              className="h-8 text-sm text-center"
+                              data-testid={`input-starttime-${sIdx}-${iIdx}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={item.endTime || ''}
+                              onChange={(e) => {
+                                const newData = { ...parsedImportData };
+                                newData.sections[sIdx].items[iIdx].endTime = e.target.value;
+                                setParsedImportData(newData);
+                              }}
+                              placeholder="e.g. 17:00"
+                              className="h-8 text-sm text-center"
+                              data-testid={`input-endtime-${sIdx}-${iIdx}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              value={item.responsible || ''}
+                              onChange={(e) => {
+                                const newData = { ...parsedImportData };
+                                newData.sections[sIdx].items[iIdx].responsible = e.target.value;
+                                setParsedImportData(newData);
+                              }}
+                              placeholder="Name"
+                              className="h-8 text-sm text-center"
+                              data-testid={`input-responsible-${sIdx}-${iIdx}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => {
+                                const newData = { ...parsedImportData };
+                                newData.sections[sIdx].items.splice(iIdx, 1);
+                                newData.sections[sIdx].items.forEach((item: any, idx: number) => {
+                                  item.slNo = idx + 1;
+                                });
+                                setParsedImportData(newData);
+                              }}
+                              data-testid={`button-delete-${sIdx}-${iIdx}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {section.items.map((item: any, i: number) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-sm font-medium">{item.slNo}</TableCell>
-                            <TableCell className="text-sm">{item.description}</TableCell>
-                            <TableCell className="text-center text-sm">{item.startTime || '-'}</TableCell>
-                            <TableCell className="text-center text-sm">{item.endTime || '-'}</TableCell>
-                            <TableCell className="text-center text-sm">{item.responsible || '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ))}
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </ScrollArea>
               
               <DialogFooter>
