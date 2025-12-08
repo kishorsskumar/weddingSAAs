@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function EventCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -162,26 +163,46 @@ export default function EventCalendar() {
 
   return (
     <div className="space-y-4 sm:space-y-6 h-full flex flex-col px-2 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <motion.div 
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Event Calendar</h1>
           <div className="flex items-center gap-2 bg-card border rounded-md p-1 w-fit">
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[120px] text-center">
-              {format(currentDate, "MMMM yyyy")}
-            </span>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </motion.div>
+            <AnimatePresence mode="wait">
+              <motion.span 
+                key={format(currentDate, "MMMM yyyy")}
+                className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[120px] text-center"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                {format(currentDate, "MMMM yyyy")}
+              </motion.span>
+            </AnimatePresence>
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+              <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </motion.div>
           </div>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-event">
-              <Plus className="h-4 w-4" /> New Event
-            </Button>
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-event">
+                <Plus className="h-4 w-4" /> New Event
+              </Button>
+            </motion.div>
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] sm:max-w-lg">
             <DialogHeader>
@@ -190,24 +211,57 @@ export default function EventCalendar() {
             <AddEventForm />
           </DialogContent>
         </Dialog>
-      </div>
+      </motion.div>
 
-      <div className="flex items-center gap-2 text-xs flex-wrap">
+      <motion.div 
+        className="flex items-center gap-2 text-xs flex-wrap"
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.2, duration: 0.3 }}
+      >
         <span className="text-muted-foreground">Legend:</span>
-        <span className="px-2 py-1 rounded bg-green-100 border border-green-200 text-green-800">Booking</span>
-        <span className="px-2 py-1 rounded border border-yellow-400" style={{ backgroundColor: '#FFF5CC' }}>2 Events</span>
-        <span className="px-2 py-1 rounded border border-red-300" style={{ backgroundColor: '#EAC4C4' }}>3+ Events</span>
-      </div>
+        <motion.span 
+          className="px-2 py-1 rounded bg-green-100 border border-green-200 text-green-800"
+          whileHover={{ scale: 1.05 }}
+        >
+          Booking
+        </motion.span>
+        <motion.span 
+          className="px-2 py-1 rounded border border-yellow-400" 
+          style={{ backgroundColor: '#FFF5CC' }}
+          whileHover={{ scale: 1.05 }}
+        >
+          2 Events
+        </motion.span>
+        <motion.span 
+          className="px-2 py-1 rounded border border-red-300" 
+          style={{ backgroundColor: '#EAC4C4' }}
+          whileHover={{ scale: 1.05 }}
+        >
+          3+ Events
+        </motion.span>
+      </motion.div>
 
-      <Card className="flex-1 overflow-hidden flex flex-col shadow-md border-border/50">
-        <div className="grid grid-cols-7 border-b bg-muted/30">
-          {["S", "M", "T", "W", "T", "F", "S"].map((day, idx) => (
-            <div key={idx} className="p-2 sm:p-4 text-center text-xs sm:text-sm font-medium text-muted-foreground">
-              <span className="sm:hidden">{day}</span>
-              <span className="hidden sm:inline">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][idx]}</span>
-            </div>
-          ))}
-        </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.4 }}
+      >
+        <Card className="flex-1 overflow-hidden flex flex-col shadow-md border-border/50">
+          <div className="grid grid-cols-7 border-b bg-muted/30">
+            {["S", "M", "T", "W", "T", "F", "S"].map((day, idx) => (
+              <motion.div 
+                key={idx} 
+                className="p-2 sm:p-4 text-center text-xs sm:text-sm font-medium text-muted-foreground"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + idx * 0.03 }}
+              >
+                <span className="sm:hidden">{day}</span>
+                <span className="hidden sm:inline">{["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][idx]}</span>
+              </motion.div>
+            ))}
+          </div>
         <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-y-auto">
           {calendarDays.map((day) => {
             const dayEvents = events.filter((e) => isSameDay(new Date(e.date), day));
@@ -274,8 +328,9 @@ export default function EventCalendar() {
               </div>
             );
           })}
-        </div>
-      </Card>
+          </div>
+        </Card>
+      </motion.div>
 
       <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">

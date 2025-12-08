@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar,
   Users,
@@ -64,44 +65,93 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="p-6">
+      <motion.div 
+        className="p-6"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
         <img src={logo} alt="Oak Event" className="h-16 w-auto mb-2" />
         <p className="text-xs text-sidebar-foreground/60 mt-1">Crafting your Stories</p>
-      </div>
+      </motion.div>
 
-      <div className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+      <motion.div 
+        className="flex-1 px-4 py-4 space-y-1 overflow-y-auto"
+        initial="initial"
+        animate="animate"
+        variants={{
+          initial: {},
+          animate: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } }
+        }}
+      >
+        {navItems.map((item, index) => {
           const Icon = ICONS[item.id] || LayoutDashboard;
           const isActive = location === item.path;
           return (
-            <Link key={item.id} href={item.path}>
-              <Button
-                variant="ghost"
-                className={cn(
-                  "w-full justify-start gap-3 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                )}
-                onClick={() => setIsMobileOpen(false)}
-                data-testid={`nav-${item.id}`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Button>
-            </Link>
+            <motion.div
+              key={item.id}
+              variants={{
+                initial: { opacity: 0, x: -20 },
+                animate: { opacity: 1, x: 0 }
+              }}
+              transition={{ duration: 0.3 }}
+            >
+              <Link href={item.path}>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start gap-3 text-sm font-medium transition-all duration-200",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    )}
+                    onClick={() => setIsMobileOpen(false)}
+                    data-testid={`nav-${item.id}`}
+                  >
+                    <span className={cn("transition-transform duration-300", isActive && "scale-110")}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    {item.label}
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeIndicator"
+                        className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                      />
+                    )}
+                  </Button>
+                </motion.div>
+              </Link>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <motion.div 
+        className="p-4 border-t border-sidebar-border"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+      >
         <div className="flex items-center gap-3 px-2 py-2 mb-2">
-          <Avatar className="h-8 w-8 border border-sidebar-border">
-            <AvatarImage src={user.avatar || undefined} />
-            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
-              {user.name.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
+          <motion.div
+            whileHover={{ scale: 1.1 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          >
+            <Avatar className="h-8 w-8 border border-sidebar-border">
+              <AvatarImage src={user.avatar || undefined} />
+              <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
+                {user.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+          </motion.div>
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-medium truncate">{user.name}</p>
             <p className="text-xs text-sidebar-foreground/60 truncate capitalize">
@@ -109,17 +159,23 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full justify-start gap-2 text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          onClick={logout}
-          data-testid="button-logout"
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
         >
-          <LogOut className="h-4 w-4" />
-          Log Out
-        </Button>
-      </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 text-sidebar-foreground border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-all duration-200"
+            onClick={logout}
+            data-testid="button-logout"
+          >
+            <LogOut className="h-4 w-4" />
+            Log Out
+          </Button>
+        </motion.div>
+      </motion.div>
     </div>
   );
 
@@ -152,9 +208,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto h-screen">
-        <div className="container mx-auto p-6 md:p-10 max-w-7xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <motion.div 
+          key={location}
+          className="container mx-auto p-6 md:p-10 max-w-7xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
           {children}
-        </div>
+        </motion.div>
       </main>
     </div>
   );

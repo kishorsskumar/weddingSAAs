@@ -1,4 +1,29 @@
-import { Variants } from "framer-motion";
+import { Variants, Transition } from "framer-motion";
+
+export const TIMING = {
+  fast: 0.2,
+  normal: 0.3,
+  slow: 0.5,
+} as const;
+
+export const DELAY = {
+  stagger: 0.05,
+  section: 0.1,
+  content: 0.2,
+  secondary: 0.3,
+} as const;
+
+export const EASING = {
+  easeOut: "easeOut" as const,
+  easeIn: "easeIn" as const,
+  easeInOut: "easeInOut" as const,
+  spring: { type: "spring" as const, stiffness: 400, damping: 30 },
+} as const;
+
+export const defaultTransition: Transition = {
+  duration: TIMING.normal,
+  ease: EASING.easeOut,
+};
 
 export const fadeIn: Variants = {
   initial: { opacity: 0 },
@@ -67,21 +92,21 @@ export const buttonTap = {
 };
 
 export const springTransition = {
-  type: "spring",
+  type: "spring" as const,
   stiffness: 400,
   damping: 30,
 };
 
 export const smoothTransition = {
   duration: 0.3,
-  ease: [0.25, 0.1, 0.25, 1],
+  ease: [0.25, 0.1, 0.25, 1] as const,
 };
 
 export const pageTransition = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, y: -10 },
-  transition: { duration: 0.3, ease: "easeInOut" },
+  transition: { duration: 0.3, ease: "easeInOut" as const },
 };
 
 export const modalOverlay: Variants = {
