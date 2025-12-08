@@ -5698,62 +5698,46 @@ function DecorPlanningSection({
                       {elements.length === 0 ? (
                         <p className="text-xs text-gray-500 text-center py-2">No elements added yet</p>
                       ) : (
-                        <div className="overflow-x-auto -mx-4 px-4">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="text-xs">
-                                <TableHead className="py-2">Element</TableHead>
-                                <TableHead className="py-2">Date</TableHead>
-                                <TableHead className="py-2">Start Time</TableHead>
-                                <TableHead className="py-2">End Time</TableHead>
-                                <TableHead className="py-2">Responsible</TableHead>
-                                <TableHead className="py-2 text-right">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {elements.map((el) => {
-                                const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
-                                return (
-                                  <TableRow key={el.id} className="text-xs">
-                                    <TableCell className="py-2">
-                                      <div>
-                                        <p className="font-medium">{invItem?.name || el.externalItemName || el.elementName}</p>
-                                        <p className="text-gray-500">{el.categoryType}</p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="py-2">{item.setupDate ? format(new Date(item.setupDate), 'dd/MM/yy') : '-'}</TableCell>
-                                    <TableCell className="py-2">{el.startTime || '-'}</TableCell>
-                                    <TableCell className="py-2">{el.endTime || '-'}</TableCell>
-                                    <TableCell className="py-2">{el.responsible || '-'}</TableCell>
-                                    <TableCell className="py-2 text-right">
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-6 w-6"
-                                        onClick={() => handleEditElement(el)}
-                                        data-testid={`button-edit-element-${el.id}`}
-                                      >
-                                        <Edit className="w-3 h-3" />
-                                      </Button>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        className="h-6 w-6 text-red-500"
-                                        onClick={() => {
-                                          if (confirm('Delete this element?')) {
-                                            deleteElementMutation.mutate(el.id);
-                                          }
-                                        }}
-                                        data-testid={`button-delete-element-${el.id}`}
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                        <div className="space-y-2">
+                          {elements.map((el) => {
+                            const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
+                            return (
+                              <div key={el.id} className="flex items-center justify-between p-2 bg-gray-50 rounded border text-xs">
+                                <div className="flex-1 min-w-0 pr-2">
+                                  <p className="font-medium truncate">{invItem?.name || el.externalItemName || el.elementName}</p>
+                                  <div className="flex gap-2 text-gray-500 mt-1 flex-wrap">
+                                    <span>{item.setupDate ? format(new Date(item.setupDate), 'dd/MM') : '-'}</span>
+                                    <span>{el.startTime || '-'} - {el.endTime || '-'}</span>
+                                    {el.responsible && <span className="text-blue-600">{el.responsible}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1 flex-shrink-0">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7"
+                                    onClick={() => handleEditElement(el)}
+                                    data-testid={`button-edit-element-${el.id}`}
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-red-500"
+                                    onClick={() => {
+                                      if (confirm('Delete this element?')) {
+                                        deleteElementMutation.mutate(el.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-element-${el.id}`}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
