@@ -52,6 +52,8 @@ import {
   employeeAppraisals,
   salaryAdvanceRequests,
   employeeLeaveBalances,
+  expenseReimbursements,
+  publicHolidays,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -161,6 +163,10 @@ import {
   type InsertSalaryAdvanceRequest,
   type EmployeeLeaveBalance,
   type InsertEmployeeLeaveBalance,
+  type ExpenseReimbursement,
+  type InsertExpenseReimbursement,
+  type PublicHoliday,
+  type InsertPublicHoliday,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -558,6 +564,30 @@ export interface IStorage {
   createEmployeeLeaveBalance(balance: InsertEmployeeLeaveBalance): Promise<EmployeeLeaveBalance>;
   updateEmployeeLeaveBalance(id: string, balance: Partial<InsertEmployeeLeaveBalance>): Promise<EmployeeLeaveBalance | undefined>;
   getOrCreateCurrentFiscalYearLeaveBalance(employeeId: string): Promise<EmployeeLeaveBalance>;
+
+  // Employee Portal - Leave Requests (employee-scoped)
+  getLeaveRequestsByEmployee(employeeId: string): Promise<LeaveRequest[]>;
+  getPendingLeaveRequestsForManager(managerUserId: string): Promise<LeaveRequest[]>;
+
+  // Employee Portal - Expense Reimbursements
+  getExpenseReimbursements(employeeId: string): Promise<ExpenseReimbursement[]>;
+  getAllExpenseReimbursements(): Promise<ExpenseReimbursement[]>;
+  getExpenseReimbursement(id: string): Promise<ExpenseReimbursement | undefined>;
+  createExpenseReimbursement(reimbursement: InsertExpenseReimbursement): Promise<ExpenseReimbursement>;
+  updateExpenseReimbursement(id: string, reimbursement: Partial<InsertExpenseReimbursement>): Promise<ExpenseReimbursement | undefined>;
+  deleteExpenseReimbursement(id: string): Promise<void>;
+  getPendingExpenseReimbursementsForManager(managerUserId: string): Promise<ExpenseReimbursement[]>;
+
+  // Public Holidays
+  getAllPublicHolidays(): Promise<PublicHoliday[]>;
+  getPublicHolidaysByYear(year: number): Promise<PublicHoliday[]>;
+  getPublicHoliday(id: string): Promise<PublicHoliday | undefined>;
+  createPublicHoliday(holiday: InsertPublicHoliday): Promise<PublicHoliday>;
+  updatePublicHoliday(id: string, holiday: Partial<InsertPublicHoliday>): Promise<PublicHoliday | undefined>;
+  deletePublicHoliday(id: string): Promise<void>;
+
+  // Manager-managed employees
+  getEmployeesByManager(managerUserId: string): Promise<Employee[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2362,6 +2392,111 @@ export class DatabaseStorage implements IStorage {
       leavesRemaining: totalLeaves,
       carryForward: 0,
     });
+  }
+
+  // Employee Portal - Leave Requests (employee-scoped)
+  async getLeaveRequestsByEmployee(employeeId: string): Promise<LeaveRequest[]> {
+    return await db.select().from(leaveRequests)
+      .where(eq(leaveRequests.employeeId, employeeId))
+      .orderBy(desc(leaveRequests.createdAt));
+  }
+
+  async getPendingLeaveRequestsForManager(managerUserId: string): Promise<LeaveRequest[]> {
+    const managedEmployees = await this.getEmployeesByManager(managerUserId);
+    const employeeIds = managedEmployees.map(e => e.id);
+    
+    if (employeeIds.length === 0) return [];
+    
+    const allRequests = await db.select().from(leaveRequests)
+      .where(eq(leaveRequests.status, 'pending'))
+      .orderBy(desc(leaveRequests.createdAt));
+    
+    return allRequests.filter(r => employeeIds.includes(r.employeeId));
+  }
+
+  // Employee Portal - Expense Reimbursements
+  async getExpenseReimbursements(employeeId: string): Promise<ExpenseReimbursement[]> {
+    return await db.select().from(expenseReimbursements)
+      .where(eq(expenseReimbursements.employeeId, employeeId))
+      .orderBy(desc(expenseReimbursements.requestDate));
+  }
+
+  async getAllExpenseReimbursements(): Promise<ExpenseReimbursement[]> {
+    return await db.select().from(expenseReimbursements).orderBy(desc(expenseReimbursements.requestDate));
+  }
+
+  async getExpenseReimbursement(id: string): Promise<ExpenseReimbursement | undefined> {
+    const [reimbursement] = await db.select().from(expenseReimbursements).where(eq(expenseReimbursements.id, id));
+    return reimbursement || undefined;
+  }
+
+  async createExpenseReimbursement(reimbursement: InsertExpenseReimbursement): Promise<ExpenseReimbursement> {
+    const [created] = await db.insert(expenseReimbursements).values(reimbursement).returning();
+    return created;
+  }
+
+  async updateExpenseReimbursement(id: string, reimbursement: Partial<InsertExpenseReimbursement>): Promise<ExpenseReimbursement | undefined> {
+    const [updated] = await db.update(expenseReimbursements)
+      .set(reimbursement)
+      .where(eq(expenseReimbursements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteExpenseReimbursement(id: string): Promise<void> {
+    await db.delete(expenseReimbursements).where(eq(expenseReimbursements.id, id));
+  }
+
+  async getPendingExpenseReimbursementsForManager(managerUserId: string): Promise<ExpenseReimbursement[]> {
+    const managedEmployees = await this.getEmployeesByManager(managerUserId);
+    const employeeIds = managedEmployees.map(e => e.id);
+    
+    if (employeeIds.length === 0) return [];
+    
+    const allRequests = await db.select().from(expenseReimbursements)
+      .where(eq(expenseReimbursements.status, 'pending'))
+      .orderBy(desc(expenseReimbursements.requestDate));
+    
+    return allRequests.filter(r => employeeIds.includes(r.employeeId));
+  }
+
+  // Public Holidays
+  async getAllPublicHolidays(): Promise<PublicHoliday[]> {
+    return await db.select().from(publicHolidays).orderBy(publicHolidays.date);
+  }
+
+  async getPublicHolidaysByYear(year: number): Promise<PublicHoliday[]> {
+    return await db.select().from(publicHolidays)
+      .where(eq(publicHolidays.year, year))
+      .orderBy(publicHolidays.date);
+  }
+
+  async getPublicHoliday(id: string): Promise<PublicHoliday | undefined> {
+    const [holiday] = await db.select().from(publicHolidays).where(eq(publicHolidays.id, id));
+    return holiday || undefined;
+  }
+
+  async createPublicHoliday(holiday: InsertPublicHoliday): Promise<PublicHoliday> {
+    const [created] = await db.insert(publicHolidays).values(holiday).returning();
+    return created;
+  }
+
+  async updatePublicHoliday(id: string, holiday: Partial<InsertPublicHoliday>): Promise<PublicHoliday | undefined> {
+    const [updated] = await db.update(publicHolidays)
+      .set(holiday)
+      .where(eq(publicHolidays.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePublicHoliday(id: string): Promise<void> {
+    await db.delete(publicHolidays).where(eq(publicHolidays.id, id));
+  }
+
+  // Manager-managed employees
+  async getEmployeesByManager(managerUserId: string): Promise<Employee[]> {
+    return await db.select().from(employees)
+      .where(eq(employees.managerUserId, managerUserId));
   }
 }
 
