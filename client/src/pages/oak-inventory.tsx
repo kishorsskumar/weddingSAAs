@@ -2544,6 +2544,8 @@ function RentalsSection({
       vendorId: formData.vendorId || null,
       eventId: formData.eventId || null,
       expectedReturnDate: formData.expectedReturnDate || null,
+      totalCost: formData.totalCost || '0',
+      depositPaid: formData.depositPaid || '0',
     };
     if (editingRental) {
       updateRentalMutation.mutate({ id: editingRental.id, data });
