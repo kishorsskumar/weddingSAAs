@@ -1681,6 +1681,297 @@ export async function registerRoutes(
     }
   });
 
+  // Employee Portal - Expense Reimbursements (employee's own)
+  app.get('/api/employee-portal/expense-reimbursements', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const reimbursements = await storage.getExpenseReimbursements(employee.id);
+      res.json(reimbursements);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get expense reimbursements' });
+    }
+  });
+
+  // Employee Portal - Submit Expense Reimbursement Request
+  app.post('/api/employee-portal/expense-reimbursements', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const data = {
+        ...req.body,
+        employeeId: employee.id,
+        requestDate: new Date().toISOString().split('T')[0],
+        status: 'pending'
+      };
+      const reimbursement = await storage.createExpenseReimbursement(data);
+      res.json(reimbursement);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create expense reimbursement request' });
+    }
+  });
+
+  // Employee Portal - Duties and Responsibilities
+  app.get('/api/employee-portal/duties', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      res.json({
+        duties: employee.duties || '',
+        responsibilities: employee.responsibilities || '',
+        designation: employee.designation,
+        department: employee.department
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get duties' });
+    }
+  });
+
+  // Manager Approval - Get pending requests for manager
+  app.get('/api/manager/pending-requests', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const leaveRequests = await storage.getPendingLeaveRequestsForManager(userId);
+      const expenseReimbursements = await storage.getPendingExpenseReimbursementsForManager(userId);
+      
+      // Get employee info for each request
+      const leaveRequestsWithEmployee = await Promise.all(
+        leaveRequests.map(async (request) => {
+          const employee = await storage.getEmployee(request.employeeId);
+          return { ...request, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      const expenseReimbursementsWithEmployee = await Promise.all(
+        expenseReimbursements.map(async (request) => {
+          const employee = await storage.getEmployee(request.employeeId);
+          return { ...request, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      res.json({
+        leaveRequests: leaveRequestsWithEmployee,
+        expenseReimbursements: expenseReimbursementsWithEmployee
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get pending requests' });
+    }
+  });
+
+  // Manager Approval - Approve/Reject Leave Request
+  app.patch('/api/manager/leave-requests/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { status, managerComments } = req.body;
+      const leaveRequest = await storage.getLeaveRequest(req.params.id);
+      if (!leaveRequest) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+      
+      // Verify manager is assigned to this employee
+      const employee = await storage.getEmployee(leaveRequest.employeeId);
+      if (!employee || employee.managerUserId !== userId) {
+        return res.status(403).json({ error: 'Not authorized to approve this request' });
+      }
+      
+      const updated = await storage.updateLeaveRequest(req.params.id, {
+        status,
+        managerId: userId,
+        managerComments,
+        approvedAt: status === 'approved' || status === 'rejected' ? new Date() : undefined
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update leave request' });
+    }
+  });
+
+  // Manager Approval - Approve/Reject Expense Reimbursement
+  app.patch('/api/manager/expense-reimbursements/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { status, managerComments, approvedAmount } = req.body;
+      const reimbursement = await storage.getExpenseReimbursement(req.params.id);
+      if (!reimbursement) {
+        return res.status(404).json({ error: 'Expense reimbursement not found' });
+      }
+      
+      // Verify manager is assigned to this employee
+      const employee = await storage.getEmployee(reimbursement.employeeId);
+      if (!employee || employee.managerUserId !== userId) {
+        return res.status(403).json({ error: 'Not authorized to approve this request' });
+      }
+      
+      const updated = await storage.updateExpenseReimbursement(req.params.id, {
+        status,
+        approvedBy: userId,
+        approvedAmount: approvedAmount || reimbursement.amount,
+        managerComments,
+        approvedAt: status === 'approved' || status === 'rejected' ? new Date() : undefined
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update expense reimbursement' });
+    }
+  });
+
+  // Manager - Get managed employees
+  app.get('/api/manager/employees', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employees = await storage.getEmployeesByManager(userId);
+      res.json(employees);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get managed employees' });
+    }
+  });
+
+  // Admin Routes - Manage Expense Reimbursements
+  app.get('/api/admin/expense-reimbursements', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    const reimbursements = await storage.getAllExpenseReimbursements();
+    res.json(reimbursements);
+  });
+
+  app.patch('/api/admin/expense-reimbursements/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    try {
+      const reimbursement = await storage.updateExpenseReimbursement(req.params.id, req.body);
+      res.json(reimbursement);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update expense reimbursement' });
+    }
+  });
+
+  // Public Holidays (Superadmin only for management, all users can view)
+  app.get('/api/public-holidays', async (req, res) => {
+    const { year } = req.query;
+    if (year) {
+      const holidays = await storage.getPublicHolidaysByYear(parseInt(year as string));
+      res.json(holidays);
+    } else {
+      const holidays = await storage.getAllPublicHolidays();
+      res.json(holidays);
+    }
+  });
+
+  app.post('/api/public-holidays', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage public holidays' });
+    }
+    
+    try {
+      const data = {
+        ...req.body,
+        createdBy: userId
+      };
+      const holiday = await storage.createPublicHoliday(data);
+      res.json(holiday);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create public holiday' });
+    }
+  });
+
+  app.patch('/api/public-holidays/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage public holidays' });
+    }
+    
+    try {
+      const holiday = await storage.updatePublicHoliday(req.params.id, req.body);
+      res.json(holiday);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update public holiday' });
+    }
+  });
+
+  app.delete('/api/public-holidays/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage public holidays' });
+    }
+    
+    await storage.deletePublicHoliday(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Admin - Assign manager to employee
+  app.patch('/api/admin/employees/:id/manager', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const { managerUserId } = req.body;
+      const employee = await storage.updateEmployee(req.params.id, { managerUserId });
+      res.json(employee);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to assign manager' });
+    }
+  });
+
+  // Admin - Update employee duties and responsibilities
+  app.patch('/api/admin/employees/:id/duties', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const { duties, responsibilities } = req.body;
+      const employee = await storage.updateEmployee(req.params.id, { duties, responsibilities });
+      res.json(employee);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update duties' });
+    }
+  });
+
   // Event Milestones
   app.get('/api/milestones', async (req, res) => {
     const { eventId } = req.query;
