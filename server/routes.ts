@@ -66,7 +66,7 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     /^oakstreet/i, /^2nd floor/i, /devas studio/i, /deshabhimani/i, /press road/i,
     /kochi kerala/i, /kerala 682017/i, /^india$/i, /^7902373354$/i, /oakstreetevents.*@gmail/i,
     /www\.oakstreet/i, /^estimate no/i, /^quote date/i, /^bill to$/i, /^quote$/i,
-    /^qt-\d/i, /^invoice no/i, /^invoice date/i, /^subject\s*:/i,
+    /^qt-\d/i, /^invoice no/i, /^invoice date/i, /^subject\s*:/i, /^subject$/i,
     /^sl\.?\s*no/i, /item.*description/i, /^particulars$/i,
     /sub\s*total/i, /grand\s*total/i, /^total\s*[₹rs]/i, /^total$/i,
     /authorized signature/i, /terms\s*[&and]*\s*conditions/i, /^terms & conditions$/i,
@@ -89,7 +89,13 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     /paid in advance/i, /before the event/i, /on the event day/i,
     /participants.*abide/i, /client to obtain/i, /authorities/i,
     /all items mentioned above/i, /above mentioned rates/i,
-    /will be at actual/i, /may come additional/i, /will be born by/i
+    /will be at actual/i, /may come additional/i, /will be born by/i,
+    /^malavika$/i, /steeles ave/i, /toronto/i, /m2r3w8/i,
+    /welcome party on/i, /haldi on \d+/i, /at baymaas/i, /at baymass/i,
+    /^\d+ december \d{4}$/i, /^\d+ january \d{4}$/i, /^\d+ february \d{4}$/i,
+    /^\d+ march \d{4}$/i, /^\d+ april \d{4}$/i, /^\d+ may \d{4}$/i,
+    /^\d+ june \d{4}$/i, /^\d+ july \d{4}$/i, /^\d+ august \d{4}$/i,
+    /^\d+ september \d{4}$/i, /^\d+ october \d{4}$/i, /^\d+ november \d{4}$/i
   ];
   
   function shouldSkipRow(text: string): boolean {
@@ -3356,8 +3362,11 @@ export async function registerRoutes(
               elementName: String(item.description).substring(0, 255),
               quantity: 1,
               unit: 'Nos',
-              source: 'to_buy',
-              notes: `Start: ${item.startTime || '-'} | End: ${item.endTime || '-'} | Responsible: ${item.responsible || '-'}`
+              source: 'in_stock',
+              startTime: item.startTime || '',
+              endTime: item.endTime || '',
+              responsible: item.responsible || '',
+              notes: ''
             }
           });
         }

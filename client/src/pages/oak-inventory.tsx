@@ -5039,6 +5039,9 @@ function DecorPlanningSection({
     linkedInventoryItemId: '',
     externalItemName: '',
     source: 'in_stock',
+    startTime: '',
+    endTime: '',
+    responsible: '',
     assignedPersonVendor: '',
     notes: '',
   });
@@ -5073,6 +5076,9 @@ function DecorPlanningSection({
       linkedInventoryItemId: '',
       externalItemName: '',
       source: 'in_stock',
+      startTime: '',
+      endTime: '',
+      responsible: '',
       assignedPersonVendor: '',
       notes: '',
     });
@@ -5223,6 +5229,9 @@ function DecorPlanningSection({
       linkedInventoryItemId: element.linkedInventoryItemId || '',
       externalItemName: element.externalItemName || '',
       source: element.source,
+      startTime: element.startTime || '',
+      endTime: element.endTime || '',
+      responsible: element.responsible || '',
       assignedPersonVendor: element.assignedPersonVendor || '',
       notes: element.notes || '',
     });
@@ -5323,8 +5332,8 @@ function DecorPlanningSection({
       doc.setFontSize(9);
       doc.setTextColor(80);
       
-      const headers = ['Element', 'Category', 'Qty', 'Source', 'Assigned To'];
-      const colWidths = [50, 30, 20, 25, 45];
+      const headers = ['Element', 'Start Time', 'End Time', 'Responsible'];
+      const colWidths = [70, 35, 35, 40];
       let x = leftCol;
       
       doc.setFillColor(245, 245, 245);
@@ -5346,15 +5355,13 @@ function DecorPlanningSection({
         const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
         const itemName = invItem?.name || el.externalItemName || el.elementName;
         
-        doc.text(itemName.substring(0, 25), x, y);
+        doc.text(itemName.substring(0, 35), x, y);
         x += colWidths[0];
-        doc.text(el.categoryType || '-', x, y);
+        doc.text(el.startTime || '-', x, y);
         x += colWidths[1];
-        doc.text(`${el.quantity} ${el.unit || ''}`, x, y);
+        doc.text(el.endTime || '-', x, y);
         x += colWidths[2];
-        doc.text(el.source.replace('_', ' '), x, y);
-        x += colWidths[3];
-        doc.text(el.assignedPersonVendor || '-', x, y);
+        doc.text(el.responsible || '-', x, y);
         y += 6;
       });
 
@@ -5692,8 +5699,9 @@ function DecorPlanningSection({
                             <TableHeader>
                               <TableRow className="text-xs">
                                 <TableHead className="py-2">Element</TableHead>
-                                <TableHead className="py-2">Qty</TableHead>
-                                <TableHead className="py-2">Source</TableHead>
+                                <TableHead className="py-2">Start Time</TableHead>
+                                <TableHead className="py-2">End Time</TableHead>
+                                <TableHead className="py-2">Responsible</TableHead>
                                 <TableHead className="py-2 text-right">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -5708,8 +5716,9 @@ function DecorPlanningSection({
                                         <p className="text-gray-500">{el.categoryType}</p>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="py-2">{el.quantity} {el.unit}</TableCell>
-                                    <TableCell className="py-2">{getSourceBadge(el.source)}</TableCell>
+                                    <TableCell className="py-2">{el.startTime || '-'}</TableCell>
+                                    <TableCell className="py-2">{el.endTime || '-'}</TableCell>
+                                    <TableCell className="py-2">{el.responsible || '-'}</TableCell>
                                     <TableCell className="py-2 text-right">
                                       <Button 
                                         variant="ghost" 
@@ -6053,52 +6062,33 @@ function DecorPlanningSection({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label>Category/Type</Label>
-                <Select value={elementFormData.categoryType} onValueChange={(v) => setElementFormData({ ...elementFormData, categoryType: v })}>
-                  <SelectTrigger data-testid="select-element-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ELEMENT_CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label>Start Time</Label>
+                <Input 
+                  value={elementFormData.startTime} 
+                  onChange={(e) => setElementFormData({ ...elementFormData, startTime: e.target.value })}
+                  placeholder="e.g., 09:00"
+                  data-testid="input-element-start-time"
+                />
               </div>
               <div className="space-y-2">
-                <Label>Source *</Label>
-                <Select value={elementFormData.source} onValueChange={(v) => setElementFormData({ ...elementFormData, source: v })}>
-                  <SelectTrigger data-testid="select-element-source">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in_stock">In Stock</SelectItem>
-                    <SelectItem value="to_buy">To Buy</SelectItem>
-                    <SelectItem value="to_rent">To Rent</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>End Time</Label>
+                <Input 
+                  value={elementFormData.endTime} 
+                  onChange={(e) => setElementFormData({ ...elementFormData, endTime: e.target.value })}
+                  placeholder="e.g., 17:00"
+                  data-testid="input-element-end-time"
+                />
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Quantity *</Label>
-                <Input 
-                  type="number" 
-                  value={elementFormData.quantity} 
-                  onChange={(e) => setElementFormData({ ...elementFormData, quantity: e.target.value })}
-                  min="1"
-                  required
-                  data-testid="input-element-quantity"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Unit</Label>
-                <Input 
-                  value={elementFormData.unit} 
-                  onChange={(e) => setElementFormData({ ...elementFormData, unit: e.target.value })}
-                  placeholder="Nos, bunches, meters..."
-                  data-testid="input-element-unit"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Responsible Person</Label>
+              <Input 
+                value={elementFormData.responsible} 
+                onChange={(e) => setElementFormData({ ...elementFormData, responsible: e.target.value })}
+                placeholder="Name of the person responsible"
+                data-testid="input-element-responsible"
+              />
             </div>
 
             <div className="space-y-2">
@@ -6259,10 +6249,9 @@ function DecorPlanningSection({
                     <TableHeader>
                       <TableRow>
                         <TableHead>Element</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Quantity</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Start Time</TableHead>
+                        <TableHead>End Time</TableHead>
+                        <TableHead>Responsible</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -6271,10 +6260,9 @@ function DecorPlanningSection({
                         return (
                           <TableRow key={el.id}>
                             <TableCell>{invItem?.name || el.externalItemName || el.elementName}</TableCell>
-                            <TableCell>{el.categoryType || '-'}</TableCell>
-                            <TableCell>{el.quantity} {el.unit}</TableCell>
-                            <TableCell>{getSourceBadge(el.source)}</TableCell>
-                            <TableCell>{el.assignedPersonVendor || '-'}</TableCell>
+                            <TableCell>{el.startTime || '-'}</TableCell>
+                            <TableCell>{el.endTime || '-'}</TableCell>
+                            <TableCell>{el.responsible || '-'}</TableCell>
                           </TableRow>
                         );
                       })}
