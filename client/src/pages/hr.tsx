@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -354,7 +355,7 @@ export default function HR() {
       </div>
 
       <Tabs defaultValue="current" className="space-y-4">
-        <TabsList className="w-full sm:w-auto flex">
+        <TabsList className="w-full sm:w-auto flex flex-wrap">
           <TabsTrigger value="current" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
             <Users className="h-4 w-4" />
             Current ({currentEmployees.length})
@@ -364,6 +365,12 @@ export default function HR() {
             Past ({pastEmployees.length})
           </TabsTrigger>
           <TabsTrigger value="payroll" className="flex-1 sm:flex-none text-xs sm:text-sm">Payroll</TabsTrigger>
+          {(isAdmin || user?.role === 'manager') && (
+            <TabsTrigger value="approvals" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
+              <ClipboardCheck className="h-4 w-4" />
+              Approvals
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="current" className="space-y-4">
@@ -411,6 +418,12 @@ export default function HR() {
             isAdmin={isAdmin}
           />
         </TabsContent>
+
+        {(isAdmin || user?.role === 'manager') && (
+          <TabsContent value="approvals">
+            <ManagerApprovalsSection isAdmin={isAdmin} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );
@@ -1048,6 +1061,523 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
               data-testid="button-confirm-pay"
             >
               {payPayrollMutation.isPending ? 'Processing...' : 'Confirm Payment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+interface PendingRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  type: 'leave' | 'advance' | 'expense';
+  status: string;
+  createdAt: string;
+  startDate?: string;
+  endDate?: string;
+  leaveType?: string;
+  reason?: string;
+  amount?: string;
+  repaymentMonths?: number;
+  expenseDate?: string;
+  category?: string;
+  description?: string;
+}
+
+function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
+  const [approvalComments, setApprovalComments] = useState('');
+  const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+
+  const { data: pendingLeaves = [] } = useQuery<any[]>({
+    queryKey: ['/api/manager/pending-leaves'],
+    queryFn: async () => {
+      const res = await fetch('/api/manager/pending-leaves');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: pendingAdvances = [] } = useQuery<any[]>({
+    queryKey: ['/api/manager/pending-advances'],
+    queryFn: async () => {
+      const res = await fetch('/api/manager/pending-advances');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: pendingExpenses = [] } = useQuery<any[]>({
+    queryKey: ['/api/manager/pending-expenses'],
+    queryFn: async () => {
+      const res = await fetch('/api/manager/pending-expenses');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const approveLeave = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/leaves/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-leaves'] });
+      toast({ title: 'Leave request approved' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const rejectLeave = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/leaves/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to reject');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-leaves'] });
+      toast({ title: 'Leave request rejected' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const approveAdvance = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/advances/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-advances'] });
+      toast({ title: 'Advance request approved' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const rejectAdvance = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/advances/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to reject');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-advances'] });
+      toast({ title: 'Advance request rejected' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const approveExpense = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/expenses/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to approve');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-expenses'] });
+      toast({ title: 'Expense reimbursement approved' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const rejectExpense = useMutation({
+    mutationFn: async ({ id, comments }: { id: string; comments: string }) => {
+      const res = await fetch(`/api/manager/expenses/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      if (!res.ok) throw new Error('Failed to reject');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-expenses'] });
+      toast({ title: 'Expense reimbursement rejected' });
+      setIsApprovalDialogOpen(false);
+      setSelectedRequest(null);
+      setApprovalComments('');
+    },
+  });
+
+  const handleApprovalAction = (request: any, type: 'leave' | 'advance' | 'expense', action: 'approve' | 'reject') => {
+    setSelectedRequest({ ...request, type });
+    setApprovalAction(action);
+    setApprovalComments('');
+    setIsApprovalDialogOpen(true);
+  };
+
+  const confirmApproval = () => {
+    if (!selectedRequest) return;
+    
+    const { id, type } = selectedRequest;
+    const comments = approvalComments;
+
+    if (type === 'leave') {
+      if (approvalAction === 'approve') {
+        approveLeave.mutate({ id, comments });
+      } else {
+        rejectLeave.mutate({ id, comments });
+      }
+    } else if (type === 'advance') {
+      if (approvalAction === 'approve') {
+        approveAdvance.mutate({ id, comments });
+      } else {
+        rejectAdvance.mutate({ id, comments });
+      }
+    } else if (type === 'expense') {
+      if (approvalAction === 'approve') {
+        approveExpense.mutate({ id, comments });
+      } else {
+        rejectExpense.mutate({ id, comments });
+      }
+    }
+  };
+
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return '-';
+    try {
+      return format(parseISO(dateString), 'dd MMM yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const totalPending = pendingLeaves.length + pendingAdvances.length + pendingExpenses.length;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-blue-500" />
+              Pending Leaves
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingLeaves.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-green-500" />
+              Pending Advances
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingAdvances.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Receipt className="h-4 w-4 text-orange-500" />
+              Pending Expenses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingExpenses.length}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="leaves" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="leaves" className="text-xs sm:text-sm">
+            Leave Requests ({pendingLeaves.length})
+          </TabsTrigger>
+          <TabsTrigger value="advances" className="text-xs sm:text-sm">
+            Salary Advances ({pendingAdvances.length})
+          </TabsTrigger>
+          <TabsTrigger value="expenses" className="text-xs sm:text-sm">
+            Expenses ({pendingExpenses.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="leaves">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Pending Leave Requests
+              </CardTitle>
+              <CardDescription>Review and approve leave requests from your team</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingLeaves.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No pending leave requests
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pendingLeaves.map((leave: any) => (
+                        <TableRow key={leave.id} data-testid={`row-pending-leave-${leave.id}`}>
+                          <TableCell className="font-medium">{leave.employeeName || 'Employee'}</TableCell>
+                          <TableCell className="capitalize">{leave.leaveType}</TableCell>
+                          <TableCell>{formatDate(leave.startDate)}</TableCell>
+                          <TableCell>{formatDate(leave.endDate)}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{leave.reason || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => handleApprovalAction(leave, 'leave', 'approve')}
+                                data-testid={`button-approve-leave-${leave.id}`}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleApprovalAction(leave, 'leave', 'reject')}
+                                data-testid={`button-reject-leave-${leave.id}`}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="advances">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Banknote className="h-5 w-5" />
+                Pending Salary Advance Requests
+              </CardTitle>
+              <CardDescription>Review and approve salary advance requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Repayment</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingAdvances.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No pending advance requests
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pendingAdvances.map((advance: any) => (
+                        <TableRow key={advance.id} data-testid={`row-pending-advance-${advance.id}`}>
+                          <TableCell className="font-medium">{advance.employeeName || 'Employee'}</TableCell>
+                          <TableCell>₹{Number(advance.amount).toLocaleString()}</TableCell>
+                          <TableCell>{advance.repaymentMonths} month{advance.repaymentMonths > 1 ? 's' : ''}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{advance.reason || '-'}</TableCell>
+                          <TableCell>{formatDate(advance.requestDate)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => handleApprovalAction(advance, 'advance', 'approve')}
+                                data-testid={`button-approve-advance-${advance.id}`}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleApprovalAction(advance, 'advance', 'reject')}
+                                data-testid={`button-reject-advance-${advance.id}`}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="expenses">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Pending Expense Reimbursements
+              </CardTitle>
+              <CardDescription>Review and approve expense reimbursement requests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Expense Date</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingExpenses.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No pending expense reimbursements
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      pendingExpenses.map((expense: any) => (
+                        <TableRow key={expense.id} data-testid={`row-pending-expense-${expense.id}`}>
+                          <TableCell className="font-medium">{expense.employeeName || 'Employee'}</TableCell>
+                          <TableCell className="capitalize">{expense.category}</TableCell>
+                          <TableCell>₹{Number(expense.amount).toLocaleString()}</TableCell>
+                          <TableCell className="max-w-[150px] truncate">{expense.description}</TableCell>
+                          <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-green-600 hover:text-green-700"
+                                onClick={() => handleApprovalAction(expense, 'expense', 'approve')}
+                                data-testid={`button-approve-expense-${expense.id}`}
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-red-600 hover:text-red-700"
+                                onClick={() => handleApprovalAction(expense, 'expense', 'reject')}
+                                data-testid={`button-reject-expense-${expense.id}`}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {approvalAction === 'approve' ? 'Approve' : 'Reject'} Request
+            </DialogTitle>
+            <DialogDescription>
+              {approvalAction === 'approve' 
+                ? 'Add optional comments for this approval' 
+                : 'Please provide a reason for rejection'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Comments {approvalAction === 'reject' && '*'}</Label>
+              <Textarea
+                value={approvalComments}
+                onChange={(e) => setApprovalComments(e.target.value)}
+                placeholder={approvalAction === 'reject' ? 'Reason for rejection...' : 'Optional comments...'}
+                data-testid="input-approval-comments"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApprovalDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant={approvalAction === 'approve' ? 'default' : 'destructive'}
+              onClick={confirmApproval}
+              disabled={approvalAction === 'reject' && !approvalComments.trim()}
+              data-testid="button-confirm-approval"
+            >
+              {approvalAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
             </Button>
           </DialogFooter>
         </DialogContent>

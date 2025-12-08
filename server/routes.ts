@@ -1856,6 +1856,305 @@ export async function registerRoutes(
     }
   });
 
+  // Manager Approvals - Get pending leave requests
+  app.get('/api/manager/pending-leaves', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      // For admin/superadmin, get all pending leave requests
+      const user = await storage.getUser(userId);
+      let leaveRequests = [];
+      
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
+        const allEmployees = await storage.getAllEmployees();
+        const allLeaves = await Promise.all(
+          allEmployees.map(emp => storage.getLeaveRequestsByEmployee(emp.id))
+        );
+        leaveRequests = allLeaves.flat().filter(l => l.status === 'pending');
+      } else {
+        leaveRequests = await storage.getPendingLeaveRequestsForManager(userId);
+      }
+      
+      // Get employee info for each request
+      const leaveRequestsWithEmployee = await Promise.all(
+        leaveRequests.map(async (request) => {
+          const employee = await storage.getEmployee(request.employeeId);
+          return { ...request, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      res.json(leaveRequestsWithEmployee);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get pending leave requests' });
+    }
+  });
+
+  // Manager Approvals - Get pending advance requests
+  app.get('/api/manager/pending-advances', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      let advanceRequests = [];
+      
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
+        advanceRequests = (await storage.getAllSalaryAdvanceRequests()).filter(a => a.status === 'pending');
+      } else {
+        advanceRequests = await storage.getPendingSalaryAdvancesForManager(userId);
+      }
+      
+      const advanceRequestsWithEmployee = await Promise.all(
+        advanceRequests.map(async (request) => {
+          const employee = await storage.getEmployee(request.employeeId);
+          return { ...request, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      res.json(advanceRequestsWithEmployee);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get pending advance requests' });
+    }
+  });
+
+  // Manager Approvals - Get pending expense requests
+  app.get('/api/manager/pending-expenses', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      let expenseRequests = [];
+      
+      if (user?.role === 'admin' || user?.role === 'superadmin') {
+        expenseRequests = (await storage.getAllExpenseReimbursements()).filter(e => e.status === 'pending');
+      } else {
+        expenseRequests = await storage.getPendingExpenseReimbursementsForManager(userId);
+      }
+      
+      const expenseRequestsWithEmployee = await Promise.all(
+        expenseRequests.map(async (request) => {
+          const employee = await storage.getEmployee(request.employeeId);
+          return { ...request, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      res.json(expenseRequestsWithEmployee);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get pending expense requests' });
+    }
+  });
+
+  // Manager Approvals - Approve leave request
+  app.post('/api/manager/leaves/:id/approve', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const leaveRequest = await storage.getLeaveRequest(req.params.id);
+      if (!leaveRequest) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(leaveRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to approve this request' });
+        }
+      }
+      
+      const updated = await storage.updateLeaveRequest(req.params.id, {
+        status: 'approved',
+        managerId: userId,
+        managerComments: comments,
+        approvedAt: new Date()
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to approve leave request' });
+    }
+  });
+
+  // Manager Approvals - Reject leave request
+  app.post('/api/manager/leaves/:id/reject', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const leaveRequest = await storage.getLeaveRequest(req.params.id);
+      if (!leaveRequest) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(leaveRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to reject this request' });
+        }
+      }
+      
+      const updated = await storage.updateLeaveRequest(req.params.id, {
+        status: 'rejected',
+        managerId: userId,
+        managerComments: comments,
+        approvedAt: new Date()
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject leave request' });
+    }
+  });
+
+  // Manager Approvals - Approve advance request
+  app.post('/api/manager/advances/:id/approve', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const advanceRequest = await storage.getSalaryAdvanceRequest(req.params.id);
+      if (!advanceRequest) {
+        return res.status(404).json({ error: 'Advance request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(advanceRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to approve this request' });
+        }
+      }
+      
+      const updated = await storage.updateSalaryAdvanceRequest(req.params.id, {
+        status: 'approved',
+        approvedAmount: advanceRequest.amount
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to approve advance request' });
+    }
+  });
+
+  // Manager Approvals - Reject advance request
+  app.post('/api/manager/advances/:id/reject', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const advanceRequest = await storage.getSalaryAdvanceRequest(req.params.id);
+      if (!advanceRequest) {
+        return res.status(404).json({ error: 'Advance request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(advanceRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to reject this request' });
+        }
+      }
+      
+      const updated = await storage.updateSalaryAdvanceRequest(req.params.id, {
+        status: 'rejected'
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject advance request' });
+    }
+  });
+
+  // Manager Approvals - Approve expense request
+  app.post('/api/manager/expenses/:id/approve', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const expenseRequest = await storage.getExpenseReimbursement(req.params.id);
+      if (!expenseRequest) {
+        return res.status(404).json({ error: 'Expense request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(expenseRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to approve this request' });
+        }
+      }
+      
+      const updated = await storage.updateExpenseReimbursement(req.params.id, {
+        status: 'approved',
+        approvedBy: userId,
+        approvedAmount: expenseRequest.amount,
+        managerComments: comments,
+        approvedAt: new Date()
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to approve expense request' });
+    }
+  });
+
+  // Manager Approvals - Reject expense request
+  app.post('/api/manager/expenses/:id/reject', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { comments } = req.body;
+      const expenseRequest = await storage.getExpenseReimbursement(req.params.id);
+      if (!expenseRequest) {
+        return res.status(404).json({ error: 'Expense request not found' });
+      }
+      
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+      
+      if (!isAdmin) {
+        const employee = await storage.getEmployee(expenseRequest.employeeId);
+        if (!employee || employee.managerUserId !== userId) {
+          return res.status(403).json({ error: 'Not authorized to reject this request' });
+        }
+      }
+      
+      const updated = await storage.updateExpenseReimbursement(req.params.id, {
+        status: 'rejected',
+        approvedBy: userId,
+        managerComments: comments,
+        approvedAt: new Date()
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject expense request' });
+    }
+  });
+
   // Admin Routes - Manage Expense Reimbursements
   app.get('/api/admin/expense-reimbursements', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);

@@ -568,6 +568,7 @@ export interface IStorage {
   // Employee Portal - Leave Requests (employee-scoped)
   getLeaveRequestsByEmployee(employeeId: string): Promise<LeaveRequest[]>;
   getPendingLeaveRequestsForManager(managerUserId: string): Promise<LeaveRequest[]>;
+  getPendingSalaryAdvancesForManager(managerUserId: string): Promise<SalaryAdvanceRequest[]>;
 
   // Employee Portal - Expense Reimbursements
   getExpenseReimbursements(employeeId: string): Promise<ExpenseReimbursement[]>;
@@ -2410,6 +2411,19 @@ export class DatabaseStorage implements IStorage {
     const allRequests = await db.select().from(leaveRequests)
       .where(eq(leaveRequests.status, 'pending'))
       .orderBy(desc(leaveRequests.createdAt));
+    
+    return allRequests.filter(r => employeeIds.includes(r.employeeId));
+  }
+
+  async getPendingSalaryAdvancesForManager(managerUserId: string): Promise<SalaryAdvanceRequest[]> {
+    const managedEmployees = await this.getEmployeesByManager(managerUserId);
+    const employeeIds = managedEmployees.map(e => e.id);
+    
+    if (employeeIds.length === 0) return [];
+    
+    const allRequests = await db.select().from(salaryAdvanceRequests)
+      .where(eq(salaryAdvanceRequests.status, 'pending'))
+      .orderBy(desc(salaryAdvanceRequests.requestDate));
     
     return allRequests.filter(r => employeeIds.includes(r.employeeId));
   }
