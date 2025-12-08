@@ -68,8 +68,8 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     /www\.oakstreet/i, /^estimate no/i, /^quote date/i, /^bill to$/i, /^quote$/i,
     /^qt-\d/i, /^invoice no/i, /^invoice date/i, /^subject\s*:/i,
     /^sl\.?\s*no/i, /item.*description/i, /^particulars$/i,
-    /sub\s*total/i, /grand\s*total/i, /^total\s*[₹rs]/i,
-    /authorized signature/i, /terms\s*[&and]*\s*conditions/i,
+    /sub\s*total/i, /grand\s*total/i, /^total\s*[₹rs]/i, /^total$/i,
+    /authorized signature/i, /terms\s*[&and]*\s*conditions/i, /^terms & conditions$/i,
     /looking forward/i, /thank you for/i, /^notes$/i, /^notes:$/i,
     /service charge/i, /indian rupee/i, /rupees only/i, /lakh/i,
     /total in words/i, /amount in words/i, /charged at actual/i,
@@ -78,7 +78,18 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     /payment terms/i, /bank details/i, /account no/i, /ifsc code/i,
     /% of the amount/i, /^\d+% of/i, /balance payment/i, /advance payment/i,
     /(six|five|four|three|two|one|seven|eight|nine|ten)\s+only/i,
-    /(eighty|ninety|seventy|sixty|fifty|forty|thirty|twenty)\s*(thousand|lakh|hundred|crore)/i
+    /(eighty|ninety|seventy|sixty|fifty|forty|thirty|twenty)\s*(thousand|lakh|hundred|crore)/i,
+    /venue is to be made available/i, /loading.*unloading.*charges/i, /labour union/i,
+    /damage.*occurred.*materials/i, /cancellation.*function/i, /cancellation fees/i,
+    /covid.?19/i, /protocol.*government/i, /necessary approvals/i,
+    /rental basis/i, /gst will be extra/i, /rates will vary/i,
+    /genset fuel/i, /kseb.*electrical/i, /electrical charges/i,
+    /public performance license/i, /entertainment license/i, /ppl/i,
+    /m\/s\. oakstreet/i, /favor of/i, /sibl\d+/i,
+    /paid in advance/i, /before the event/i, /on the event day/i,
+    /participants.*abide/i, /client to obtain/i, /authorities/i,
+    /all items mentioned above/i, /above mentioned rates/i,
+    /will be at actual/i, /may come additional/i, /will be born by/i
   ];
   
   function shouldSkipRow(text: string): boolean {
