@@ -48,6 +48,10 @@ import {
   productionTasks,
   productionDecorItems,
   productionDecorElements,
+  employeeIncrements,
+  employeeAppraisals,
+  salaryAdvanceRequests,
+  employeeLeaveBalances,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -149,6 +153,14 @@ import {
   type ProductionDecorImport,
   type InsertProductionDecorImport,
   productionDecorImports,
+  type EmployeeIncrement,
+  type InsertEmployeeIncrement,
+  type EmployeeAppraisal,
+  type InsertEmployeeAppraisal,
+  type SalaryAdvanceRequest,
+  type InsertSalaryAdvanceRequest,
+  type EmployeeLeaveBalance,
+  type InsertEmployeeLeaveBalance,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -514,6 +526,38 @@ export interface IStorage {
   updateProductionDecorImport(id: string, importData: Partial<InsertProductionDecorImport>): Promise<ProductionDecorImport | undefined>;
   deleteProductionDecorImport(id: string): Promise<void>;
   createProductionDecorItemsFromImport(importBatchId: string, items: InsertProductionDecorItem[], elements: { itemIndex: number; element: InsertProductionDecorElement }[]): Promise<{ items: ProductionDecorItem[]; elements: ProductionDecorElement[] }>;
+
+  // Employee Portal - Get employee by user ID
+  getEmployeeByUserId(userId: string): Promise<Employee | undefined>;
+
+  // Employee Portal - Increments
+  getEmployeeIncrements(employeeId: string): Promise<EmployeeIncrement[]>;
+  getEmployeeIncrement(id: string): Promise<EmployeeIncrement | undefined>;
+  createEmployeeIncrement(increment: InsertEmployeeIncrement): Promise<EmployeeIncrement>;
+  updateEmployeeIncrement(id: string, increment: Partial<InsertEmployeeIncrement>): Promise<EmployeeIncrement | undefined>;
+  deleteEmployeeIncrement(id: string): Promise<void>;
+
+  // Employee Portal - Appraisals
+  getEmployeeAppraisals(employeeId: string): Promise<EmployeeAppraisal[]>;
+  getEmployeeAppraisal(id: string): Promise<EmployeeAppraisal | undefined>;
+  createEmployeeAppraisal(appraisal: InsertEmployeeAppraisal): Promise<EmployeeAppraisal>;
+  updateEmployeeAppraisal(id: string, appraisal: Partial<InsertEmployeeAppraisal>): Promise<EmployeeAppraisal | undefined>;
+  deleteEmployeeAppraisal(id: string): Promise<void>;
+
+  // Employee Portal - Salary Advance Requests
+  getSalaryAdvanceRequests(employeeId: string): Promise<SalaryAdvanceRequest[]>;
+  getAllSalaryAdvanceRequests(): Promise<SalaryAdvanceRequest[]>;
+  getSalaryAdvanceRequest(id: string): Promise<SalaryAdvanceRequest | undefined>;
+  createSalaryAdvanceRequest(request: InsertSalaryAdvanceRequest): Promise<SalaryAdvanceRequest>;
+  updateSalaryAdvanceRequest(id: string, request: Partial<InsertSalaryAdvanceRequest>): Promise<SalaryAdvanceRequest | undefined>;
+  deleteSalaryAdvanceRequest(id: string): Promise<void>;
+
+  // Employee Portal - Leave Balances
+  getEmployeeLeaveBalance(employeeId: string, fiscalYear: string): Promise<EmployeeLeaveBalance | undefined>;
+  getEmployeeLeaveBalances(employeeId: string): Promise<EmployeeLeaveBalance[]>;
+  createEmployeeLeaveBalance(balance: InsertEmployeeLeaveBalance): Promise<EmployeeLeaveBalance>;
+  updateEmployeeLeaveBalance(id: string, balance: Partial<InsertEmployeeLeaveBalance>): Promise<EmployeeLeaveBalance | undefined>;
+  getOrCreateCurrentFiscalYearLeaveBalance(employeeId: string): Promise<EmployeeLeaveBalance>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2169,6 +2213,155 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productionDecorImports.id, importBatchId));
 
     return { items: createdItems, elements: createdElements };
+  }
+
+  // Employee Portal - Get employee by user ID
+  async getEmployeeByUserId(userId: string): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.userId, userId));
+    return employee || undefined;
+  }
+
+  // Employee Portal - Increments
+  async getEmployeeIncrements(employeeId: string): Promise<EmployeeIncrement[]> {
+    return await db.select().from(employeeIncrements)
+      .where(eq(employeeIncrements.employeeId, employeeId))
+      .orderBy(desc(employeeIncrements.effectiveDate));
+  }
+
+  async getEmployeeIncrement(id: string): Promise<EmployeeIncrement | undefined> {
+    const [increment] = await db.select().from(employeeIncrements).where(eq(employeeIncrements.id, id));
+    return increment || undefined;
+  }
+
+  async createEmployeeIncrement(increment: InsertEmployeeIncrement): Promise<EmployeeIncrement> {
+    const [created] = await db.insert(employeeIncrements).values(increment).returning();
+    return created;
+  }
+
+  async updateEmployeeIncrement(id: string, increment: Partial<InsertEmployeeIncrement>): Promise<EmployeeIncrement | undefined> {
+    const [updated] = await db.update(employeeIncrements)
+      .set(increment)
+      .where(eq(employeeIncrements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEmployeeIncrement(id: string): Promise<void> {
+    await db.delete(employeeIncrements).where(eq(employeeIncrements.id, id));
+  }
+
+  // Employee Portal - Appraisals
+  async getEmployeeAppraisals(employeeId: string): Promise<EmployeeAppraisal[]> {
+    return await db.select().from(employeeAppraisals)
+      .where(eq(employeeAppraisals.employeeId, employeeId))
+      .orderBy(desc(employeeAppraisals.reviewDate));
+  }
+
+  async getEmployeeAppraisal(id: string): Promise<EmployeeAppraisal | undefined> {
+    const [appraisal] = await db.select().from(employeeAppraisals).where(eq(employeeAppraisals.id, id));
+    return appraisal || undefined;
+  }
+
+  async createEmployeeAppraisal(appraisal: InsertEmployeeAppraisal): Promise<EmployeeAppraisal> {
+    const [created] = await db.insert(employeeAppraisals).values(appraisal).returning();
+    return created;
+  }
+
+  async updateEmployeeAppraisal(id: string, appraisal: Partial<InsertEmployeeAppraisal>): Promise<EmployeeAppraisal | undefined> {
+    const [updated] = await db.update(employeeAppraisals)
+      .set(appraisal)
+      .where(eq(employeeAppraisals.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEmployeeAppraisal(id: string): Promise<void> {
+    await db.delete(employeeAppraisals).where(eq(employeeAppraisals.id, id));
+  }
+
+  // Employee Portal - Salary Advance Requests
+  async getSalaryAdvanceRequests(employeeId: string): Promise<SalaryAdvanceRequest[]> {
+    return await db.select().from(salaryAdvanceRequests)
+      .where(eq(salaryAdvanceRequests.employeeId, employeeId))
+      .orderBy(desc(salaryAdvanceRequests.requestDate));
+  }
+
+  async getAllSalaryAdvanceRequests(): Promise<SalaryAdvanceRequest[]> {
+    return await db.select().from(salaryAdvanceRequests).orderBy(desc(salaryAdvanceRequests.requestDate));
+  }
+
+  async getSalaryAdvanceRequest(id: string): Promise<SalaryAdvanceRequest | undefined> {
+    const [request] = await db.select().from(salaryAdvanceRequests).where(eq(salaryAdvanceRequests.id, id));
+    return request || undefined;
+  }
+
+  async createSalaryAdvanceRequest(request: InsertSalaryAdvanceRequest): Promise<SalaryAdvanceRequest> {
+    const [created] = await db.insert(salaryAdvanceRequests).values(request).returning();
+    return created;
+  }
+
+  async updateSalaryAdvanceRequest(id: string, request: Partial<InsertSalaryAdvanceRequest>): Promise<SalaryAdvanceRequest | undefined> {
+    const [updated] = await db.update(salaryAdvanceRequests)
+      .set(request)
+      .where(eq(salaryAdvanceRequests.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSalaryAdvanceRequest(id: string): Promise<void> {
+    await db.delete(salaryAdvanceRequests).where(eq(salaryAdvanceRequests.id, id));
+  }
+
+  // Employee Portal - Leave Balances
+  async getEmployeeLeaveBalance(employeeId: string, fiscalYear: string): Promise<EmployeeLeaveBalance | undefined> {
+    const [balance] = await db.select().from(employeeLeaveBalances)
+      .where(and(
+        eq(employeeLeaveBalances.employeeId, employeeId),
+        eq(employeeLeaveBalances.fiscalYear, fiscalYear)
+      ));
+    return balance || undefined;
+  }
+
+  async getEmployeeLeaveBalances(employeeId: string): Promise<EmployeeLeaveBalance[]> {
+    return await db.select().from(employeeLeaveBalances)
+      .where(eq(employeeLeaveBalances.employeeId, employeeId))
+      .orderBy(desc(employeeLeaveBalances.fiscalYear));
+  }
+
+  async createEmployeeLeaveBalance(balance: InsertEmployeeLeaveBalance): Promise<EmployeeLeaveBalance> {
+    const [created] = await db.insert(employeeLeaveBalances).values(balance).returning();
+    return created;
+  }
+
+  async updateEmployeeLeaveBalance(id: string, balance: Partial<InsertEmployeeLeaveBalance>): Promise<EmployeeLeaveBalance | undefined> {
+    const [updated] = await db.update(employeeLeaveBalances)
+      .set(balance)
+      .where(eq(employeeLeaveBalances.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getOrCreateCurrentFiscalYearLeaveBalance(employeeId: string): Promise<EmployeeLeaveBalance> {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const fiscalYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+    const fiscalYear = `FY${fiscalYearStart}-${(fiscalYearStart + 1).toString().slice(-2)}`;
+
+    const existing = await this.getEmployeeLeaveBalance(employeeId, fiscalYear);
+    if (existing) return existing;
+
+    const employee = await this.getEmployee(employeeId);
+    const totalLeaves = employee?.totalLeavesPerYear ?? 24;
+
+    return await this.createEmployeeLeaveBalance({
+      employeeId,
+      fiscalYear,
+      totalLeaves,
+      leavesUsed: 0,
+      leavesRemaining: totalLeaves,
+      carryForward: 0,
+    });
   }
 }
 
