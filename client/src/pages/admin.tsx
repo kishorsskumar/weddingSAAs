@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar, UserPlus, Copy, Eye, EyeOff } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,6 +81,53 @@ export default function Admin() {
   const [editHolidayDate, setEditHolidayDate] = useState('');
   const [editHolidayIsNational, setEditHolidayIsNational] = useState(true);
 
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [credentialsAcknowledged, setCredentialsAcknowledged] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ employeeId: string; email: string; temporaryPassword: string } | null>(null);
+  const [newEmployee, setNewEmployee] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    joinDate: new Date().toISOString().split('T')[0],
+    designation: '',
+    department: '',
+    salary: '',
+    address: '',
+    emergencyContact: '',
+    managerUserId: '',
+    bankAccountNumber: '',
+    bankIfscCode: '',
+    panNumber: '',
+    duties: '',
+    responsibilities: '',
+    totalLeavesPerYear: 24,
+  });
+
+  const resetEmployeeForm = () => {
+    setNewEmployee({
+      name: '',
+      email: '',
+      phone: '',
+      joinDate: new Date().toISOString().split('T')[0],
+      designation: '',
+      department: '',
+      salary: '',
+      address: '',
+      emergencyContact: '',
+      managerUserId: '',
+      bankAccountNumber: '',
+      bankIfscCode: '',
+      panNumber: '',
+      duties: '',
+      responsibilities: '',
+      totalLeavesPerYear: 24,
+    });
+    setCreatedCredentials(null);
+    setShowPassword(false);
+    setCredentialsAcknowledged(false);
+  };
+
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
     queryKey: ['/api/users'],
     queryFn: async () => {
@@ -116,6 +164,21 @@ export default function Admin() {
         headers: { 'Cache-Control': 'no-cache' },
       });
       if (!res.ok) throw new Error('Failed to fetch holidays');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    enabled: isSuperAdmin,
+  });
+
+  const { data: managers = [] } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ['/api/admin/managers'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/managers', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch managers');
       return res.json();
     },
     staleTime: 0,
@@ -177,6 +240,44 @@ export default function Admin() {
       resetNewUserForm();
     },
   });
+
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: typeof newEmployee) => {
+      const res = await fetch('/api/admin/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...data,
+          salary: parseFloat(data.salary),
+          managerUserId: data.managerUserId || null,
+        }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create employee');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      setCreatedCredentials(data.credentials);
+    },
+    onError: (error: Error) => {
+      alert(error.message);
+    },
+  });
+
+  const handleCreateEmployee = (e: React.FormEvent) => {
+    e.preventDefault();
+    createEmployeeMutation.mutate(newEmployee);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert('Copied to clipboard');
+  };
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async ({ userId, pageIds }: { userId: string; pageIds: string[] }) => {
@@ -411,10 +512,11 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-3' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-4' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -802,6 +904,320 @@ export default function Admin() {
                     )}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="onboarding" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Employee Onboarding
+                </CardTitle>
+                <Dialog open={isEmployeeDialogOpen} onOpenChange={(open) => {
+                  setIsEmployeeDialogOpen(open);
+                  if (!open) resetEmployeeForm();
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2" data-testid="button-new-employee">
+                      <Plus className="h-4 w-4" /> New Employee
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{createdCredentials ? 'Employee Created Successfully' : 'Create New Employee'}</DialogTitle>
+                      <DialogDescription>
+                        {createdCredentials 
+                          ? 'Save these credentials securely. The password is shown only once.'
+                          : 'Add a new employee with auto-generated credentials'
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {createdCredentials ? (
+                      <div className="space-y-4">
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+                          <div className="flex items-center gap-2 text-green-700 font-medium">
+                            <Shield className="h-5 w-5" />
+                            Employee Credentials
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div>
+                                <div className="text-xs text-muted-foreground">Employee ID</div>
+                                <div className="font-mono font-medium">{createdCredentials.employeeId}</div>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(createdCredentials.employeeId)}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div>
+                                <div className="text-xs text-muted-foreground">Email</div>
+                                <div className="font-mono font-medium">{createdCredentials.email}</div>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => copyToClipboard(createdCredentials.email)}>
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            
+                            <div className="flex items-center justify-between p-2 bg-white rounded border">
+                              <div>
+                                <div className="text-xs text-muted-foreground">Temporary Password</div>
+                                <div className="font-mono font-medium">
+                                  {showPassword ? createdCredentials.temporaryPassword : '••••••••••••'}
+                                </div>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => setShowPassword(!showPassword)}>
+                                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => copyToClipboard(createdCredentials.temporaryPassword)}>
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded">
+                          <Checkbox 
+                            id="credentials-acknowledged"
+                            checked={credentialsAcknowledged}
+                            onCheckedChange={(checked) => setCredentialsAcknowledged(checked as boolean)}
+                            data-testid="checkbox-credentials-acknowledged"
+                          />
+                          <Label htmlFor="credentials-acknowledged" className="text-sm text-amber-700">
+                            I have saved these credentials securely. I understand they will not be shown again.
+                          </Label>
+                        </div>
+                        
+                        <Button 
+                          className="w-full" 
+                          disabled={!credentialsAcknowledged}
+                          onClick={() => {
+                            setIsEmployeeDialogOpen(false);
+                            resetEmployeeForm();
+                          }}
+                          data-testid="button-done"
+                        >
+                          Done
+                        </Button>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleCreateEmployee} className="space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Full Name *</Label>
+                            <Input 
+                              value={newEmployee.name}
+                              onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                              required
+                              data-testid="input-emp-name"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Email *</Label>
+                            <Input 
+                              type="email"
+                              value={newEmployee.email}
+                              onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                              required
+                              data-testid="input-emp-email"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Phone</Label>
+                            <Input 
+                              value={newEmployee.phone}
+                              onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
+                              data-testid="input-emp-phone"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Join Date *</Label>
+                            <Input 
+                              type="date"
+                              value={newEmployee.joinDate}
+                              onChange={(e) => setNewEmployee({...newEmployee, joinDate: e.target.value})}
+                              required
+                              data-testid="input-emp-joindate"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Designation *</Label>
+                            <Input 
+                              value={newEmployee.designation}
+                              onChange={(e) => setNewEmployee({...newEmployee, designation: e.target.value})}
+                              required
+                              placeholder="e.g. Software Engineer"
+                              data-testid="input-emp-designation"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Department</Label>
+                            <Input 
+                              value={newEmployee.department}
+                              onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
+                              placeholder="e.g. Engineering"
+                              data-testid="input-emp-department"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Monthly Salary (INR) *</Label>
+                            <Input 
+                              type="number"
+                              value={newEmployee.salary}
+                              onChange={(e) => setNewEmployee({...newEmployee, salary: e.target.value})}
+                              required
+                              placeholder="50000"
+                              data-testid="input-emp-salary"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Annual Leave Days</Label>
+                            <Input 
+                              type="number"
+                              value={newEmployee.totalLeavesPerYear}
+                              onChange={(e) => setNewEmployee({...newEmployee, totalLeavesPerYear: parseInt(e.target.value) || 24})}
+                              data-testid="input-emp-leaves"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Address *</Label>
+                          <Textarea 
+                            value={newEmployee.address}
+                            onChange={(e) => setNewEmployee({...newEmployee, address: e.target.value})}
+                            required
+                            rows={2}
+                            data-testid="input-emp-address"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Emergency Contact *</Label>
+                          <Input 
+                            value={newEmployee.emergencyContact}
+                            onChange={(e) => setNewEmployee({...newEmployee, emergencyContact: e.target.value})}
+                            required
+                            placeholder="Name - Phone Number"
+                            data-testid="input-emp-emergency"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Assign Manager</Label>
+                          <Select 
+                            value={newEmployee.managerUserId} 
+                            onValueChange={(value) => setNewEmployee({...newEmployee, managerUserId: value})}
+                          >
+                            <SelectTrigger data-testid="select-emp-manager">
+                              <SelectValue placeholder="Select a manager (optional)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">No Manager</SelectItem>
+                              {managers.map(manager => (
+                                <SelectItem key={manager.id} value={manager.id}>
+                                  {manager.name} ({manager.role})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Bank Account Number</Label>
+                            <Input 
+                              value={newEmployee.bankAccountNumber}
+                              onChange={(e) => setNewEmployee({...newEmployee, bankAccountNumber: e.target.value})}
+                              data-testid="input-emp-bank"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>IFSC Code</Label>
+                            <Input 
+                              value={newEmployee.bankIfscCode}
+                              onChange={(e) => setNewEmployee({...newEmployee, bankIfscCode: e.target.value})}
+                              data-testid="input-emp-ifsc"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>PAN Number</Label>
+                            <Input 
+                              value={newEmployee.panNumber}
+                              onChange={(e) => setNewEmployee({...newEmployee, panNumber: e.target.value})}
+                              data-testid="input-emp-pan"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Duties</Label>
+                          <Textarea 
+                            value={newEmployee.duties}
+                            onChange={(e) => setNewEmployee({...newEmployee, duties: e.target.value})}
+                            rows={2}
+                            placeholder="List key duties..."
+                            data-testid="input-emp-duties"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label>Responsibilities</Label>
+                          <Textarea 
+                            value={newEmployee.responsibilities}
+                            onChange={(e) => setNewEmployee({...newEmployee, responsibilities: e.target.value})}
+                            rows={2}
+                            placeholder="List key responsibilities..."
+                            data-testid="input-emp-responsibilities"
+                          />
+                        </div>
+                        
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2 text-blue-700 font-medium text-sm">
+                            <Shield className="h-4 w-4" />
+                            A secure password will be auto-generated on the server
+                          </div>
+                          <p className="text-xs text-blue-600 mt-1">
+                            Credentials will be shown only once after creation. Make sure to save them securely.
+                          </p>
+                        </div>
+                        
+                        <Button 
+                          type="submit" 
+                          className="w-full" 
+                          disabled={createEmployeeMutation.isPending}
+                          data-testid="button-create-employee"
+                        >
+                          {createEmployeeMutation.isPending ? 'Creating...' : 'Create Employee'}
+                        </Button>
+                      </form>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground text-sm">
+                  Use this section to onboard new employees. Each employee gets an auto-generated unique ID 
+                  (format: OAK-YYYY-XXXX) and secure login credentials. Credentials are shown only once upon creation.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>

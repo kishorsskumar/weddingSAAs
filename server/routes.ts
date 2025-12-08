@@ -2167,9 +2167,9 @@ export async function registerRoutes(
     }
     
     try {
-      const { name, email, phone, joinDate, designation, department, salary, address, emergencyContact, managerUserId, bankAccountNumber, bankIfscCode, panNumber, duties, responsibilities, totalLeavesPerYear, password } = req.body;
+      const { name, email, phone, joinDate, designation, department, salary, address, emergencyContact, managerUserId, bankAccountNumber, bankIfscCode, panNumber, duties, responsibilities, totalLeavesPerYear } = req.body;
       
-      if (!name || !email || !joinDate || !designation || !salary || !address || !emergencyContact || !password) {
+      if (!name || !email || !joinDate || !designation || !salary || !address || !emergencyContact) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
       
@@ -2178,9 +2178,26 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'User with this email already exists' });
       }
       
+      if (managerUserId) {
+        const manager = await storage.getUser(managerUserId);
+        if (!manager) {
+          return res.status(400).json({ error: 'Selected manager does not exist' });
+        }
+        const validManagerRoles = ['admin', 'superadmin', 'manager'];
+        if (!validManagerRoles.includes(manager.role)) {
+          return res.status(400).json({ error: 'Selected user is not a valid manager' });
+        }
+      }
+      
       const employeeCode = await storage.generateEmployeeCode();
       
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%';
+      let generatedPassword = '';
+      for (let i = 0; i < 12; i++) {
+        generatedPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      
+      const hashedPassword = await bcrypt.hash(generatedPassword, 10);
       
       const result = await storage.createEmployeeWithUser({
         name,
@@ -2207,7 +2224,7 @@ export async function registerRoutes(
         credentials: {
           employeeId: employeeCode,
           email: email,
-          password: password
+          temporaryPassword: generatedPassword
         }
       });
     } catch (error: any) {
