@@ -5332,8 +5332,8 @@ function DecorPlanningSection({
       doc.setFontSize(9);
       doc.setTextColor(80);
       
-      const headers = ['Element', 'Start Time', 'End Time', 'Responsible'];
-      const colWidths = [70, 35, 35, 40];
+      const headers = ['Element', 'Date', 'Start Time', 'End Time', 'Responsible'];
+      const colWidths = [55, 28, 25, 25, 35];
       let x = leftCol;
       
       doc.setFillColor(245, 245, 245);
@@ -5345,6 +5345,8 @@ function DecorPlanningSection({
       });
       y += 8;
 
+      const setupDateStr = item.setupDate ? format(new Date(item.setupDate), 'dd/MM/yy') : '-';
+
       elements.forEach((el) => {
         if (y > 270) {
           doc.addPage();
@@ -5355,13 +5357,15 @@ function DecorPlanningSection({
         const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
         const itemName = invItem?.name || el.externalItemName || el.elementName;
         
-        doc.text(itemName.substring(0, 35), x, y);
+        doc.text(itemName.substring(0, 28), x, y);
         x += colWidths[0];
-        doc.text(el.startTime || '-', x, y);
+        doc.text(setupDateStr, x, y);
         x += colWidths[1];
-        doc.text(el.endTime || '-', x, y);
+        doc.text(el.startTime || '-', x, y);
         x += colWidths[2];
-        doc.text(el.responsible || '-', x, y);
+        doc.text(el.endTime || '-', x, y);
+        x += colWidths[3];
+        doc.text((el.responsible || '-').substring(0, 18), x, y);
         y += 6;
       });
 
@@ -5699,6 +5703,7 @@ function DecorPlanningSection({
                             <TableHeader>
                               <TableRow className="text-xs">
                                 <TableHead className="py-2">Element</TableHead>
+                                <TableHead className="py-2">Date</TableHead>
                                 <TableHead className="py-2">Start Time</TableHead>
                                 <TableHead className="py-2">End Time</TableHead>
                                 <TableHead className="py-2">Responsible</TableHead>
@@ -5716,6 +5721,7 @@ function DecorPlanningSection({
                                         <p className="text-gray-500">{el.categoryType}</p>
                                       </div>
                                     </TableCell>
+                                    <TableCell className="py-2">{item.setupDate ? format(new Date(item.setupDate), 'dd/MM/yy') : '-'}</TableCell>
                                     <TableCell className="py-2">{el.startTime || '-'}</TableCell>
                                     <TableCell className="py-2">{el.endTime || '-'}</TableCell>
                                     <TableCell className="py-2">{el.responsible || '-'}</TableCell>
@@ -6249,6 +6255,7 @@ function DecorPlanningSection({
                     <TableHeader>
                       <TableRow>
                         <TableHead>Element</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead>Start Time</TableHead>
                         <TableHead>End Time</TableHead>
                         <TableHead>Responsible</TableHead>
@@ -6260,6 +6267,7 @@ function DecorPlanningSection({
                         return (
                           <TableRow key={el.id}>
                             <TableCell>{invItem?.name || el.externalItemName || el.elementName}</TableCell>
+                            <TableCell>{viewingItem.setupDate ? format(new Date(viewingItem.setupDate), 'dd/MM/yy') : '-'}</TableCell>
                             <TableCell>{el.startTime || '-'}</TableCell>
                             <TableCell>{el.endTime || '-'}</TableCell>
                             <TableCell>{el.responsible || '-'}</TableCell>
