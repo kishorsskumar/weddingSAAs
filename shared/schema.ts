@@ -61,11 +61,19 @@ export const employees = pgTable("employees", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   employeeId: text("employee_id").notNull().unique(),
+  userId: varchar("user_id").references(() => users.id),
   joinDate: date("join_date").notNull(),
   designation: text("designation").notNull(),
+  department: text("department"),
   salary: decimal("salary", { precision: 10, scale: 2 }).notNull(),
   address: text("address").notNull(),
   emergencyContact: text("emergency_contact").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  bankAccountNumber: text("bank_account_number"),
+  bankIfscCode: text("bank_ifsc_code"),
+  panNumber: text("pan_number"),
+  totalLeavesPerYear: integer("total_leaves_per_year").default(24),
   leaveDate: date("leave_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -989,3 +997,83 @@ export const productionDecorElements = pgTable("production_decor_elements", {
 export const insertProductionDecorElementSchema = createInsertSchema(productionDecorElements).omit({ id: true, createdAt: true });
 export type InsertProductionDecorElement = z.infer<typeof insertProductionDecorElementSchema>;
 export type ProductionDecorElement = typeof productionDecorElements.$inferSelect;
+
+// Employee Portal - Increments (Salary Increases)
+export const employeeIncrements = pgTable("employee_increments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  effectiveDate: date("effective_date").notNull(),
+  previousSalary: decimal("previous_salary", { precision: 10, scale: 2 }).notNull(),
+  newSalary: decimal("new_salary", { precision: 10, scale: 2 }).notNull(),
+  incrementAmount: decimal("increment_amount", { precision: 10, scale: 2 }).notNull(),
+  incrementPercent: decimal("increment_percent", { precision: 5, scale: 2 }),
+  reason: text("reason"), // 'annual', 'promotion', 'performance', 'adjustment'
+  notes: text("notes"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeIncrementSchema = createInsertSchema(employeeIncrements).omit({ id: true, createdAt: true });
+export type InsertEmployeeIncrement = z.infer<typeof insertEmployeeIncrementSchema>;
+export type EmployeeIncrement = typeof employeeIncrements.$inferSelect;
+
+// Employee Portal - Appraisals (Performance Reviews)
+export const employeeAppraisals = pgTable("employee_appraisals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  reviewPeriodStart: date("review_period_start").notNull(),
+  reviewPeriodEnd: date("review_period_end").notNull(),
+  reviewDate: date("review_date").notNull(),
+  rating: integer("rating"), // 1-5 scale
+  ratingLabel: text("rating_label"), // 'Exceptional', 'Exceeds Expectations', 'Meets Expectations', etc.
+  strengths: text("strengths"),
+  areasOfImprovement: text("areas_of_improvement"),
+  goals: text("goals"),
+  managerComments: text("manager_comments"),
+  employeeComments: text("employee_comments"),
+  status: text("status").notNull().default('draft'), // 'draft', 'pending_review', 'completed'
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeAppraisalSchema = createInsertSchema(employeeAppraisals).omit({ id: true, createdAt: true });
+export type InsertEmployeeAppraisal = z.infer<typeof insertEmployeeAppraisalSchema>;
+export type EmployeeAppraisal = typeof employeeAppraisals.$inferSelect;
+
+// Employee Portal - Salary Advance Requests
+export const salaryAdvanceRequests = pgTable("salary_advance_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  requestDate: date("request_date").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  repaymentMonths: integer("repayment_months").default(1), // Number of months to deduct from salary
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'rejected', 'paid', 'repaid'
+  approvedAmount: decimal("approved_amount", { precision: 10, scale: 2 }),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedDate: date("approved_date"),
+  paidDate: date("paid_date"),
+  bankId: varchar("bank_id").references(() => banks.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSalaryAdvanceRequestSchema = createInsertSchema(salaryAdvanceRequests).omit({ id: true, createdAt: true });
+export type InsertSalaryAdvanceRequest = z.infer<typeof insertSalaryAdvanceRequestSchema>;
+export type SalaryAdvanceRequest = typeof salaryAdvanceRequests.$inferSelect;
+
+// Employee Portal - Leave Balance (Annual tracking)
+export const employeeLeaveBalances = pgTable("employee_leave_balances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  fiscalYear: text("fiscal_year").notNull(), // e.g., "FY2025-26"
+  totalLeaves: integer("total_leaves").notNull().default(24),
+  leavesUsed: integer("leaves_used").notNull().default(0),
+  leavesRemaining: integer("leaves_remaining").notNull().default(24),
+  carryForward: integer("carry_forward").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeLeaveBalanceSchema = createInsertSchema(employeeLeaveBalances).omit({ id: true, createdAt: true });
+export type InsertEmployeeLeaveBalance = z.infer<typeof insertEmployeeLeaveBalanceSchema>;
+export type EmployeeLeaveBalance = typeof employeeLeaveBalances.$inferSelect;
