@@ -1398,6 +1398,241 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Employee Portal - Get current user's employee profile
+  app.get('/api/employee-portal/profile', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      res.json(employee);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get employee profile' });
+    }
+  });
+
+  // Employee Portal - Increments
+  app.get('/api/employee-portal/increments', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const increments = await storage.getEmployeeIncrements(employee.id);
+      res.json(increments);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get increments' });
+    }
+  });
+
+  // Employee Portal - Appraisals
+  app.get('/api/employee-portal/appraisals', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const appraisals = await storage.getEmployeeAppraisals(employee.id);
+      res.json(appraisals);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get appraisals' });
+    }
+  });
+
+  // Employee Portal - Leave Balance
+  app.get('/api/employee-portal/leave-balance', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const leaveBalance = await storage.getOrCreateCurrentFiscalYearLeaveBalance(employee.id);
+      res.json(leaveBalance);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get leave balance' });
+    }
+  });
+
+  // Employee Portal - Leave Requests (employee's own)
+  app.get('/api/employee-portal/leave-requests', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const allRequests = await storage.getAllLeaveRequests();
+      const myRequests = allRequests.filter(r => r.employeeId === employee.id);
+      res.json(myRequests);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get leave requests' });
+    }
+  });
+
+  // Employee Portal - Submit Leave Request
+  app.post('/api/employee-portal/leave-requests', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const data = {
+        ...req.body,
+        employeeId: employee.id,
+        status: 'pending'
+      };
+      const request = await storage.createLeaveRequest(data);
+      res.json(request);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create leave request' });
+    }
+  });
+
+  // Employee Portal - Salary Advance Requests (employee's own)
+  app.get('/api/employee-portal/salary-advances', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const advances = await storage.getSalaryAdvanceRequests(employee.id);
+      res.json(advances);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get salary advances' });
+    }
+  });
+
+  // Employee Portal - Submit Salary Advance Request
+  app.post('/api/employee-portal/salary-advances', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const data = {
+        ...req.body,
+        employeeId: employee.id,
+        requestDate: new Date().toISOString().split('T')[0],
+        status: 'pending'
+      };
+      const advance = await storage.createSalaryAdvanceRequest(data);
+      res.json(advance);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create salary advance request' });
+    }
+  });
+
+  // Employee Portal - Payroll History
+  app.get('/api/employee-portal/payroll-history', requireAuth, async (req, res) => {
+    try {
+      const userId = req.user!.id;
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const allRuns = await storage.getAllPayrollRuns();
+      const paidRuns = allRuns.filter(r => r.status === 'paid');
+      
+      const payrollHistory = [];
+      for (const run of paidRuns) {
+        const items = await storage.getPayrollItemsByRunId(run.id);
+        const myItem = items.find(i => i.employeeId === employee.id);
+        if (myItem) {
+          payrollHistory.push({
+            runId: run.id,
+            month: run.month,
+            year: run.year,
+            payDate: run.payDate,
+            ...myItem
+          });
+        }
+      }
+      res.json(payrollHistory);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get payroll history' });
+    }
+  });
+
+  // Admin Routes - Manage Employee Increments
+  app.get('/api/admin/employee-increments/:employeeId', verifyAdminAccess, async (req, res) => {
+    const increments = await storage.getEmployeeIncrements(req.params.employeeId);
+    res.json(increments);
+  });
+
+  app.post('/api/admin/employee-increments', verifyAdminAccess, async (req, res) => {
+    try {
+      const increment = await storage.createEmployeeIncrement(req.body);
+      res.json(increment);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create increment' });
+    }
+  });
+
+  app.patch('/api/admin/employee-increments/:id', verifyAdminAccess, async (req, res) => {
+    try {
+      const increment = await storage.updateEmployeeIncrement(req.params.id, req.body);
+      res.json(increment);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update increment' });
+    }
+  });
+
+  app.delete('/api/admin/employee-increments/:id', verifyAdminAccess, async (req, res) => {
+    await storage.deleteEmployeeIncrement(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Admin Routes - Manage Employee Appraisals
+  app.get('/api/admin/employee-appraisals/:employeeId', verifyAdminAccess, async (req, res) => {
+    const appraisals = await storage.getEmployeeAppraisals(req.params.employeeId);
+    res.json(appraisals);
+  });
+
+  app.post('/api/admin/employee-appraisals', verifyAdminAccess, async (req, res) => {
+    try {
+      const appraisal = await storage.createEmployeeAppraisal(req.body);
+      res.json(appraisal);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create appraisal' });
+    }
+  });
+
+  app.patch('/api/admin/employee-appraisals/:id', verifyAdminAccess, async (req, res) => {
+    try {
+      const appraisal = await storage.updateEmployeeAppraisal(req.params.id, req.body);
+      res.json(appraisal);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update appraisal' });
+    }
+  });
+
+  app.delete('/api/admin/employee-appraisals/:id', verifyAdminAccess, async (req, res) => {
+    await storage.deleteEmployeeAppraisal(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Admin Routes - Manage Salary Advance Requests
+  app.get('/api/admin/salary-advances', verifyAdminAccess, async (req, res) => {
+    const advances = await storage.getAllSalaryAdvanceRequests();
+    res.json(advances);
+  });
+
+  app.patch('/api/admin/salary-advances/:id', verifyAdminAccess, async (req, res) => {
+    try {
+      const advance = await storage.updateSalaryAdvanceRequest(req.params.id, req.body);
+      res.json(advance);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update salary advance' });
+    }
+  });
+
   // Event Milestones
   app.get('/api/milestones', async (req, res) => {
     const { eventId } = req.query;
