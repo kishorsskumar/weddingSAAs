@@ -186,6 +186,7 @@ export interface IStorage {
   // User Permissions
   getUserPermissions(userId: string): Promise<UserPermission[]>;
   setUserPermissions(userId: string, pageIds: string[]): Promise<void>;
+  grantUserPermission(userId: string, pageId: string): Promise<void>;
   
   // Roles
   getAllRoles(): Promise<Role[]>;
@@ -212,11 +213,16 @@ export interface IStorage {
   // Employees
   getAllEmployees(): Promise<Employee[]>;
   getEmployee(id: string): Promise<Employee | undefined>;
+  getEmployeeByUserId(userId: string): Promise<Employee | undefined>;
+  getEmployeesWithoutUserAccount(): Promise<Employee[]>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
   deleteEmployee(id: string): Promise<void>;
   generateEmployeeCode(): Promise<string>;
+  generateTemporaryPassword(): string;
   createEmployeeWithUser(employeeData: InsertEmployee, password: string): Promise<{ employee: Employee; user: User }>;
+  linkEmployeeToUser(employeeId: string, userId: string): Promise<Employee | undefined>;
+  backfillEmployeeUserAccount(employeeId: string, hashedPassword: string): Promise<{ employee: Employee; user: User; tempPassword: string } | null>;
   
   // Daybook
   getAllDaybookEntries(): Promise<DaybookEntry[]>;
@@ -649,6 +655,14 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async grantUserPermission(userId: string, pageId: string): Promise<void> {
+    const existing = await db.select().from(userPermissions)
+      .where(and(eq(userPermissions.userId, userId), eq(userPermissions.pageId, pageId)));
+    if (existing.length === 0) {
+      await db.insert(userPermissions).values({ userId, pageId });
+    }
+  }
+
   // Roles
   async getAllRoles(): Promise<Role[]> {
     return await db.select().from(roles).orderBy(roles.name);
@@ -735,6 +749,15 @@ export class DatabaseStorage implements IStorage {
     return employee || undefined;
   }
 
+  async getEmployeeByUserId(userId: string): Promise<Employee | undefined> {
+    const [employee] = await db.select().from(employees).where(eq(employees.userId, userId));
+    return employee || undefined;
+  }
+
+  async getEmployeesWithoutUserAccount(): Promise<Employee[]> {
+    return await db.select().from(employees).where(sql`${employees.userId} IS NULL`);
+  }
+
   async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
     const [employee] = await db.insert(employees).values(insertEmployee).returning();
     return employee;
@@ -801,6 +824,56 @@ export class DatabaseStorage implements IStorage {
     const employee = newEmployee[0];
     
     return { employee, user };
+  }
+
+  generateTemporaryPassword(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  }
+
+  async linkEmployeeToUser(employeeId: string, userId: string): Promise<Employee | undefined> {
+    const [employee] = await db.update(employees)
+      .set({ userId })
+      .where(eq(employees.id, employeeId))
+      .returning();
+    return employee || undefined;
+  }
+
+  async backfillEmployeeUserAccount(employeeId: string, hashedPassword: string): Promise<{ employee: Employee; user: User; tempPassword: string } | null> {
+    const [existingEmployee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+    
+    if (!existingEmployee) {
+      return null;
+    }
+    
+    if (existingEmployee.userId) {
+      return null;
+    }
+    
+    const email = existingEmployee.email || `${existingEmployee.employeeId.toLowerCase().replace(/[^a-z0-9]/g, '')}@oak.local`;
+    
+    const [newUser] = await db.insert(users).values({
+      name: existingEmployee.name,
+      email: email,
+      password: hashedPassword,
+      role: 'employee'
+    }).returning();
+    
+    const [updatedEmployee] = await db.update(employees)
+      .set({ 
+        userId: newUser.id,
+        email: email
+      })
+      .where(eq(employees.id, employeeId))
+      .returning();
+    
+    const tempPassword = this.generateTemporaryPassword();
+    
+    return { employee: updatedEmployee, user: newUser, tempPassword };
   }
 
   // Daybook
@@ -2312,12 +2385,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productionDecorImports.id, importBatchId));
 
     return { items: createdItems, elements: createdElements };
-  }
-
-  // Employee Portal - Get employee by user ID
-  async getEmployeeByUserId(userId: string): Promise<Employee | undefined> {
-    const [employee] = await db.select().from(employees).where(eq(employees.userId, userId));
-    return employee || undefined;
   }
 
   // Employee Portal - Increments

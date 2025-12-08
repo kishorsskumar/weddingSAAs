@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -162,18 +162,36 @@ export default function HR() {
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Employee>) => {
-      const res = await fetch('/api/employees', {
+      const res = await fetch('/api/employees/with-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Failed to create employee');
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to create employee');
+      }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
       setIsDialogOpen(false);
+      if (result.credentials) {
+        setNewCredentials(result.credentials);
+        setShowCredentials(true);
+      }
+      toast({
+        title: "Employee Created",
+        description: `${result.employee.name} has been added with portal access.`,
+      });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create employee",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const updateMutation = useMutation({
@@ -219,47 +237,59 @@ export default function HR() {
       if (!submitData.leaveDate) {
         delete submitData.leaveDate;
       }
+      if (!submitData.employeeId) {
+        delete submitData.employeeId;
+      }
       createMutation.mutate(submitData);
     };
 
     return (
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
+          <p className="text-blue-700 dark:text-blue-300">
+            Employee ID and password will be automatically generated. You can share the login credentials with the employee after creation.
+          </p>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Employee ID</Label>
-            <Input {...register("employeeId")} required placeholder="e.g. OAK008" data-testid="input-employee-id" />
-          </div>
-          <div className="space-y-2">
-            <Label>Name</Label>
+          <div className="space-y-2 sm:col-span-2">
+            <Label>Name *</Label>
             <Input {...register("name")} required placeholder="Full Name" data-testid="input-name" />
           </div>
           <div className="space-y-2">
-            <Label>Designation</Label>
+            <Label>Email (for portal login)</Label>
+            <Input type="email" {...register("email")} placeholder="employee@example.com (optional)" data-testid="input-email" />
+          </div>
+          <div className="space-y-2">
+            <Label>Phone</Label>
+            <Input {...register("phone")} placeholder="Phone Number (optional)" data-testid="input-phone" />
+          </div>
+          <div className="space-y-2">
+            <Label>Designation *</Label>
             <Input {...register("designation")} required placeholder="e.g. Wedding Planner" data-testid="input-designation" />
           </div>
           <div className="space-y-2">
-            <Label>Salary (₹)</Label>
+            <Label>Salary (₹) *</Label>
             <Input type="number" {...register("salary")} required placeholder="0" data-testid="input-salary" />
           </div>
           <div className="space-y-2">
-            <Label>Joining Date</Label>
+            <Label>Joining Date *</Label>
             <Input type="date" {...register("joinDate")} required data-testid="input-join-date" />
           </div>
           <div className="space-y-2">
-            <Label>Date of Leaving (Optional)</Label>
-            <Input type="date" {...register("leaveDate")} data-testid="input-leave-date" />
+            <Label>Contract Renewal Date</Label>
+            <Input type="date" {...register("contractRenewalDate")} data-testid="input-contract-renewal" />
           </div>
         </div>
         <div className="space-y-2">
-          <Label>Address</Label>
+          <Label>Address *</Label>
           <Input {...register("address")} required placeholder="Full Address" data-testid="input-address" />
         </div>
         <div className="space-y-2">
-          <Label>Emergency Contact</Label>
-          <Input {...register("emergencyContact")} required placeholder="Phone Number" data-testid="input-emergency-contact" />
+          <Label>Emergency Contact *</Label>
+          <Input {...register("emergencyContact")} required placeholder="Emergency Contact Number" data-testid="input-emergency-contact" />
         </div>
         <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-employee">
-          {createMutation.isPending ? 'Adding...' : 'Add Employee'}
+          {createMutation.isPending ? 'Creating...' : 'Create Employee with Portal Access'}
         </Button>
       </form>
     );
@@ -427,12 +457,66 @@ export default function HR() {
             <DialogContent className="max-w-[95vw] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
+                <DialogDescription>
+                  Employee will automatically get portal login credentials
+                </DialogDescription>
               </DialogHeader>
               <AddEmployeeForm />
             </DialogContent>
           </Dialog>
         )}
       </div>
+
+      {/* Credentials Dialog */}
+      <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              Employee Portal Credentials
+            </DialogTitle>
+            <DialogDescription>
+              Share these login details with the employee. The password should be changed on first login.
+            </DialogDescription>
+          </DialogHeader>
+          {newCredentials && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Employee ID</Label>
+                  <p className="font-mono font-medium" data-testid="text-credential-employee-id">{newCredentials.employeeId}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email (Login)</Label>
+                  <p className="font-mono font-medium" data-testid="text-credential-email">{newCredentials.email}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Temporary Password</Label>
+                  <p className="font-mono font-medium text-primary" data-testid="text-credential-password">{newCredentials.temporaryPassword}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    const text = `Employee Portal Login\n\nEmployee ID: ${newCredentials.employeeId}\nEmail: ${newCredentials.email}\nPassword: ${newCredentials.temporaryPassword}\n\nPlease change your password after first login.`;
+                    navigator.clipboard.writeText(text);
+                    toast({ title: "Copied to clipboard" });
+                  }}
+                  data-testid="button-copy-credentials"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy
+                </Button>
+                <Button className="flex-1" onClick={() => setShowCredentials(false)} data-testid="button-close-credentials">
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Tabs defaultValue="current" className="space-y-4">
         <TabsList className="w-full sm:w-auto flex flex-wrap">
@@ -1680,6 +1764,13 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
 }
 
 function ConsolidatedReportSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [backfillResult, setBackfillResult] = useState<{
+    results: Array<{ employee: any; credentials: { employeeId: string; email: string; temporaryPassword: string } }>;
+  } | null>(null);
+  const [showBackfillResults, setShowBackfillResults] = useState(false);
+
   const { data: consolidatedReport, isLoading: reportLoading } = useQuery<ConsolidatedReport>({
     queryKey: ['/api/hr/consolidated-report'],
     queryFn: async () => {
@@ -1687,6 +1778,43 @@ function ConsolidatedReportSection() {
       if (!res.ok) throw new Error('Failed to fetch consolidated report');
       return res.json();
     },
+  });
+
+  const { data: employeesWithoutUser = [] } = useQuery<Employee[]>({
+    queryKey: ['/api/employees/without-user-account'],
+    queryFn: async () => {
+      const res = await fetch('/api/employees/without-user-account');
+      if (!res.ok) throw new Error('Failed to fetch employees');
+      return res.json();
+    },
+  });
+
+  const backfillMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/employees/backfill-user-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('Failed to create user accounts');
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/employees/without-user-account'] });
+      setBackfillResult(result);
+      setShowBackfillResults(true);
+      toast({
+        title: "User Accounts Created",
+        description: `Created ${result.created} portal accounts for employees.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create accounts",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -1699,6 +1827,105 @@ function ConsolidatedReportSection() {
   };
 
   return (
+    <div className="space-y-4">
+      {/* Backfill Alert */}
+      {employeesWithoutUser.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+                <div>
+                  <p className="font-medium text-orange-800 dark:text-orange-200">
+                    {employeesWithoutUser.length} employee{employeesWithoutUser.length !== 1 ? 's' : ''} without portal access
+                  </p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400">
+                    These employees cannot login to the Employee Portal
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => backfillMutation.mutate()}
+                disabled={backfillMutation.isPending}
+                data-testid="button-backfill-users"
+              >
+                {backfillMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Key className="h-4 w-4 mr-2" />
+                    Create Portal Accounts
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Backfill Results Dialog */}
+      <Dialog open={showBackfillResults} onOpenChange={setShowBackfillResults}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              Employee Portal Credentials Created
+            </DialogTitle>
+            <DialogDescription>
+              Copy and share these credentials with employees. Passwords should be changed on first login.
+            </DialogDescription>
+          </DialogHeader>
+          {backfillResult && (
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {backfillResult.results.map((result, index) => (
+                  <div key={index} className="bg-muted/50 rounded-lg p-3 space-y-1">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{result.employee?.name}</span>
+                      <Badge variant="outline">{result.credentials.employeeId}</Badge>
+                    </div>
+                    <div className="text-sm grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Email: </span>
+                        <span className="font-mono">{result.credentials.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Password: </span>
+                        <span className="font-mono text-primary">{result.credentials.temporaryPassword}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    const text = backfillResult.results.map(r => 
+                      `${r.employee?.name}\nEmployee ID: ${r.credentials.employeeId}\nEmail: ${r.credentials.email}\nPassword: ${r.credentials.temporaryPassword}\n`
+                    ).join('\n---\n\n');
+                    navigator.clipboard.writeText(text);
+                    toast({ title: "All credentials copied to clipboard" });
+                  }}
+                  data-testid="button-copy-all-credentials"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy All
+                </Button>
+                <Button className="flex-1" onClick={() => setShowBackfillResults(false)}>
+                  Done
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
     <Card>
       <CardHeader className="p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1872,5 +2099,6 @@ function ConsolidatedReportSection() {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }

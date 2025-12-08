@@ -1150,6 +1150,173 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Get employees without user accounts (for backfill)
+  app.get('/api/employees/without-user-account', async (req, res) => {
+    try {
+      const employees = await storage.getEmployeesWithoutUserAccount();
+      res.json(employees);
+    } catch (error) {
+      console.error('Error fetching employees without user account:', error);
+      res.status(500).json({ error: 'Failed to fetch employees' });
+    }
+  });
+
+  // Create employee with auto-generated credentials
+  app.post('/api/employees/with-credentials', async (req, res) => {
+    try {
+      const data = insertEmployeeSchema.parse(req.body);
+      
+      // Generate employee code if not provided
+      const employeeId = data.employeeId || await storage.generateEmployeeCode();
+      
+      // Generate a temporary password
+      const tempPassword = storage.generateTemporaryPassword();
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Ensure email is provided or generate one
+      const email = data.email || `${employeeId.toLowerCase().replace(/[^a-z0-9]/g, '')}@oak.local`;
+      
+      const result = await storage.createEmployeeWithUser(
+        { ...data, employeeId, email },
+        hashedPassword
+      );
+      
+      // Grant employee-portal permission to the new user
+      await storage.grantUserPermission(result.user.id, 'employee-portal');
+      
+      // Return employee with credentials (only shown once to admin)
+      res.json({
+        employee: result.employee,
+        user: result.user,
+        credentials: {
+          employeeId: result.employee.employeeId,
+          email: email,
+          temporaryPassword: tempPassword
+        }
+      });
+    } catch (error) {
+      console.error('Error creating employee with credentials:', error);
+      res.status(400).json({ error: 'Failed to create employee. Email may already be in use.' });
+    }
+  });
+
+  // Backfill single employee with user account
+  app.post('/api/employees/:id/create-user-account', async (req, res) => {
+    try {
+      const employeeId = req.params.id;
+      
+      // Get the employee first
+      const employee = await storage.getEmployee(employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+      
+      if (employee.userId) {
+        return res.status(400).json({ error: 'Employee already has a user account' });
+      }
+      
+      // Generate temporary password
+      const tempPassword = storage.generateTemporaryPassword();
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Create email if not exists
+      const email = employee.email || `${employee.employeeId.toLowerCase().replace(/[^a-z0-9]/g, '')}@oak.local`;
+      
+      // Create user account
+      const user = await storage.createUser({
+        name: employee.name,
+        email: email,
+        password: hashedPassword,
+        role: 'employee'
+      });
+      
+      // Grant employee-portal permission
+      await storage.grantUserPermission(user.id, 'employee-portal');
+      
+      // Link employee to user
+      const updatedEmployee = await storage.updateEmployee(employeeId, {
+        userId: user.id,
+        email: email
+      });
+      
+      res.json({
+        employee: updatedEmployee,
+        user: user,
+        credentials: {
+          employeeId: employee.employeeId,
+          email: email,
+          temporaryPassword: tempPassword
+        }
+      });
+    } catch (error) {
+      console.error('Error creating user account for employee:', error);
+      res.status(400).json({ error: 'Failed to create user account. Email may already be in use.' });
+    }
+  });
+
+  // Bulk backfill all employees without user accounts
+  app.post('/api/employees/backfill-user-accounts', async (req, res) => {
+    try {
+      const employeesWithoutUsers = await storage.getEmployeesWithoutUserAccount();
+      const results: Array<{
+        employee: any;
+        credentials: { employeeId: string; email: string; temporaryPassword: string };
+      }> = [];
+      const errors: Array<{ employeeId: string; name: string; error: string }> = [];
+      
+      for (const emp of employeesWithoutUsers) {
+        try {
+          const tempPassword = storage.generateTemporaryPassword();
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          const email = emp.email || `${emp.employeeId.toLowerCase().replace(/[^a-z0-9]/g, '')}@oak.local`;
+          
+          // Create user
+          const user = await storage.createUser({
+            name: emp.name,
+            email: email,
+            password: hashedPassword,
+            role: 'employee'
+          });
+          
+          // Grant employee-portal permission
+          await storage.grantUserPermission(user.id, 'employee-portal');
+          
+          // Link to employee
+          const updatedEmployee = await storage.updateEmployee(emp.id, {
+            userId: user.id,
+            email: email
+          });
+          
+          results.push({
+            employee: updatedEmployee,
+            credentials: {
+              employeeId: emp.employeeId,
+              email: email,
+              temporaryPassword: tempPassword
+            }
+          });
+        } catch (err) {
+          errors.push({
+            employeeId: emp.employeeId,
+            name: emp.name,
+            error: err instanceof Error ? err.message : 'Unknown error'
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        created: results.length,
+        failed: errors.length,
+        results,
+        errors
+      });
+    } catch (error) {
+      console.error('Error backfilling user accounts:', error);
+      res.status(500).json({ error: 'Failed to backfill user accounts' });
+    }
+  });
+
   // Daybook
   app.get('/api/daybook', async (req, res) => {
     const { startDate, endDate } = req.query;
