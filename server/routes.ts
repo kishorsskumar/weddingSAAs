@@ -62,25 +62,63 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
   };
   
+  const headerKeywords = [
+    'oakstreet events', 'oakstreet', 'devas studio', 'deshabhimani', 'press road',
+    'kochi kerala', 'kerala 682017', 'india', '7902373354', 'oakstreetevents18@gmail.com',
+    'www.oakstreetevents', 'estimate no', 'quote date', 'bill to', 'quote',
+    'qt-', 'invoice no', 'invoice date', 'subject :', 'subject:', 'malavika',
+    'steeles ave', 'toronto', 'm2r3w8', '2nd floor', 'above devas'
+  ];
+  
+  const footerKeywords = [
+    'sub total', 'subtotal', 'grand total', 'total ₹', 'total rs', 'total inr',
+    'authorized signature', 'terms & conditions', 'terms and conditions',
+    'looking forward', 'thank you', 'notes', 'notes:', 'service charge',
+    'indian rupee', 'rupees only', 'lakh', 'thousand', 'hundred', 'crore',
+    'total in words', 'amount in words', 'in words', 'charged at actual',
+    'additional facilities', 'additional services', 'any other additional',
+    'support the event', 'gst @', 'cgst', 'sgst', 'igst', 'tax amount',
+    'taxable amount', 'payment terms', 'bank details', 'account no',
+    'ifsc code', 'branch', 'advance', '% of the amount', 'balance',
+    'six only', 'five only', 'four only', 'three only', 'two only', 'one only',
+    'eighty', 'ninety', 'seventy', 'sixty', 'fifty', 'forty', 'thirty', 'twenty'
+  ];
+  
+  const tableHeaderKeywords = [
+    'sl no', 'sl.no', 's.no', 's no', 'item description', 'particulars',
+    'qty', 'rate', 'amount', 'unit price', 'total', 'description', 'unit'
+  ];
+  
+  function isHeaderRow(text: string): boolean {
+    const lower = text.toLowerCase();
+    return headerKeywords.some(kw => lower.includes(kw));
+  }
+  
+  function isFooterRow(text: string): boolean {
+    const lower = text.toLowerCase();
+    return footerKeywords.some(kw => lower.includes(kw));
+  }
+  
+  function isTableHeaderRow(text: string): boolean {
+    const lower = text.toLowerCase();
+    const matches = tableHeaderKeywords.filter(kw => lower.includes(kw));
+    return matches.length >= 2;
+  }
+  
+  function startsWithNumber(text: string): boolean {
+    return /^\d+\.?\s/.test(text.trim());
+  }
+  
   let slNoCounter = 1;
+  let foundFirstItem = false;
   
   for (const row of rows) {
     const rowText = row.join(' ').trim();
     if (!rowText || rowText.length < 3) continue;
     
-    if (rowText.toLowerCase().includes('sl') && 
-        rowText.toLowerCase().includes('no') &&
-        (rowText.toLowerCase().includes('item') || rowText.toLowerCase().includes('description'))) {
-      continue;
-    }
-    
-    if (rowText.toLowerCase().includes('sub total') || 
-        rowText.toLowerCase().includes('subtotal') ||
-        rowText.toLowerCase().includes('grand total') ||
-        rowText.toLowerCase().includes('authorized signature') ||
-        rowText.toLowerCase().includes('terms & conditions')) {
-      continue;
-    }
+    if (isTableHeaderRow(rowText)) continue;
+    if (isHeaderRow(rowText)) continue;
+    if (isFooterRow(rowText)) continue;
     
     const dateMatch = rowText.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})/i);
     if (dateMatch && !section.installationDate) {
@@ -88,36 +126,64 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
       const monthNum = months[dateMatch[2].toLowerCase().substring(0, 3)];
       const year = dateMatch[3];
       section.installationDate = `${year}-${monthNum}-${day}`;
-      
       if (rowText.length > 15) {
         section.heading = rowText;
       }
+      continue;
     }
     
-    let description = '';
+    const firstCell = row[0]?.trim() || '';
+    const hasSlNo = /^\d+\.?$/.test(firstCell);
     
-    if (row.length >= 4) {
-      const endIdx = Math.max(1, row.length - 3);
-      description = row.slice(0, endIdx).join(' ').trim();
-    } else if (row.length >= 2) {
-      description = row.slice(0, -1).join(' ').trim();
-    } else {
-      description = rowText;
-    }
-    
-    description = description.replace(/^\d+\.?\s*/, '').trim();
-    
-    if (description && description.length >= 2 && 
-        !description.match(/^[\d,₹.\s]+$/) &&
-        description.length <= 500) {
+    if (hasSlNo && row.length >= 2) {
+      foundFirstItem = true;
       
-      section.items.push({
-        slNo: slNoCounter++,
-        description: description,
-        startTime: '',
-        endTime: '',
-        responsible: ''
-      });
+      let description = '';
+      if (row.length >= 4) {
+        const endIdx = Math.max(1, row.length - 3);
+        description = row.slice(1, endIdx).join(' ').trim();
+      } else if (row.length >= 2) {
+        description = row.slice(1, -1).join(' ').trim() || row[1]?.trim() || '';
+      }
+      
+      if (description && description.length >= 2 && 
+          !description.match(/^[\d,₹.\s]+$/) &&
+          description.length <= 500 &&
+          !isFooterRow(description)) {
+        
+        section.items.push({
+          slNo: slNoCounter++,
+          description: description,
+          startTime: '',
+          endTime: '',
+          responsible: ''
+        });
+      }
+    } else if (foundFirstItem && row.length >= 2 && !hasSlNo) {
+      let description = '';
+      if (row.length >= 4) {
+        const endIdx = Math.max(1, row.length - 3);
+        description = row.slice(0, endIdx).join(' ').trim();
+      } else {
+        description = row.slice(0, -1).join(' ').trim() || rowText;
+      }
+      
+      description = description.replace(/^\d+\.?\s*/, '').trim();
+      
+      if (description && description.length >= 3 && 
+          !description.match(/^[\d,₹.\s]+$/) &&
+          description.length <= 500 &&
+          !isFooterRow(description) &&
+          !isHeaderRow(description)) {
+        
+        section.items.push({
+          slNo: slNoCounter++,
+          description: description,
+          startTime: '',
+          endTime: '',
+          responsible: ''
+        });
+      }
     }
   }
   
