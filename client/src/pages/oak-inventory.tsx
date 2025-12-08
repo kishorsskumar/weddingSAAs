@@ -6249,7 +6249,22 @@ function DecorPlanningSection({
               )}
 
               <div className="pt-4 border-t">
-                <h4 className="font-medium mb-3">Elements ({decorElements.filter(e => e.decorItemId === viewingItem.id).length})</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-medium">Elements ({decorElements.filter(e => e.decorItemId === viewingItem.id).length})</h4>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedItemId(viewingItem.id);
+                      resetElementForm();
+                      setElementFormData(prev => ({ ...prev, decorItemId: viewingItem.id }));
+                      setIsElementModalOpen(true);
+                    }}
+                    data-testid="button-add-element-from-view"
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Add Element
+                  </Button>
+                </div>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -6259,6 +6274,7 @@ function DecorPlanningSection({
                         <TableHead>Start Time</TableHead>
                         <TableHead>End Time</TableHead>
                         <TableHead>Responsible</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -6271,6 +6287,32 @@ function DecorPlanningSection({
                             <TableCell>{el.startTime || '-'}</TableCell>
                             <TableCell>{el.endTime || '-'}</TableCell>
                             <TableCell>{el.responsible || '-'}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex gap-1 justify-end">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7"
+                                  onClick={() => handleEditElement(el)}
+                                  data-testid={`button-view-edit-element-${el.id}`}
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-7 w-7 text-red-500 hover:text-red-700"
+                                  onClick={() => {
+                                    if (confirm('Delete this element?')) {
+                                      deleteElementMutation.mutate(el.id);
+                                    }
+                                  }}
+                                  data-testid={`button-view-delete-element-${el.id}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         );
                       })}
