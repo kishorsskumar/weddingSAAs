@@ -1042,6 +1042,11 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/meetings/all', async (req, res) => {
+    const meetings = await storage.getAllMeetings();
+    res.json(meetings);
+  });
+
   app.post('/api/meetings', async (req, res) => {
     try {
       const data = insertMeetingSchema.parse(req.body);
