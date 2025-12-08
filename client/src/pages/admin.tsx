@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { format } from "date-fns";
+import { PhotoUploader } from "@/components/PhotoUploader";
 
 type PublicHoliday = {
   id: string;
@@ -89,6 +90,8 @@ export default function Admin() {
     name: '',
     email: '',
     phone: '',
+    dateOfBirth: '',
+    photoUrl: null as string | null,
     joinDate: new Date().toISOString().split('T')[0],
     designation: '',
     department: '',
@@ -109,6 +112,8 @@ export default function Admin() {
       name: '',
       email: '',
       phone: '',
+      dateOfBirth: '',
+      photoUrl: null,
       joinDate: new Date().toISOString().split('T')[0],
       designation: '',
       department: '',
@@ -1011,6 +1016,14 @@ export default function Admin() {
                       </div>
                     ) : (
                       <form onSubmit={handleCreateEmployee} className="space-y-4">
+                        <div className="flex justify-center py-2">
+                          <PhotoUploader 
+                            currentPhotoUrl={newEmployee.photoUrl} 
+                            onPhotoChange={(url) => setNewEmployee({...newEmployee, photoUrl: url})}
+                            name={newEmployee.name}
+                          />
+                        </div>
+                        
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label>Full Name *</Label>
@@ -1039,6 +1052,16 @@ export default function Admin() {
                               value={newEmployee.phone}
                               onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
                               data-testid="input-emp-phone"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label>Date of Birth</Label>
+                            <Input 
+                              type="date"
+                              value={newEmployee.dateOfBirth}
+                              onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})}
+                              data-testid="input-emp-dob"
                             />
                           </div>
                           
