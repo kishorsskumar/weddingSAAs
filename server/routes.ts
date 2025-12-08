@@ -62,63 +62,36 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
     'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
   };
   
-  const headerKeywords = [
-    'oakstreet events', 'oakstreet', 'devas studio', 'deshabhimani', 'press road',
-    'kochi kerala', 'kerala 682017', 'india', '7902373354', 'oakstreetevents18@gmail.com',
-    'www.oakstreetevents', 'estimate no', 'quote date', 'bill to', 'quote',
-    'qt-', 'invoice no', 'invoice date', 'subject :', 'subject:', 'malavika',
-    'steeles ave', 'toronto', 'm2r3w8', '2nd floor', 'above devas'
+  const skipPatterns = [
+    /^oakstreet/i, /^2nd floor/i, /devas studio/i, /deshabhimani/i, /press road/i,
+    /kochi kerala/i, /kerala 682017/i, /^india$/i, /^7902373354$/i, /oakstreetevents.*@gmail/i,
+    /www\.oakstreet/i, /^estimate no/i, /^quote date/i, /^bill to$/i, /^quote$/i,
+    /^qt-\d/i, /^invoice no/i, /^invoice date/i, /^subject\s*:/i,
+    /^sl\.?\s*no/i, /item.*description/i, /^particulars$/i,
+    /sub\s*total/i, /grand\s*total/i, /^total\s*[₹rs]/i,
+    /authorized signature/i, /terms\s*[&and]*\s*conditions/i,
+    /looking forward/i, /thank you for/i, /^notes$/i, /^notes:$/i,
+    /service charge/i, /indian rupee/i, /rupees only/i, /lakh/i,
+    /total in words/i, /amount in words/i, /charged at actual/i,
+    /additional facilities/i, /additional services/i, /any other additional/i,
+    /support the event/i, /^[csi]gst\s*@/i, /tax amount/i, /taxable amount/i,
+    /payment terms/i, /bank details/i, /account no/i, /ifsc code/i,
+    /% of the amount/i, /^\d+% of/i, /balance payment/i, /advance payment/i,
+    /(six|five|four|three|two|one|seven|eight|nine|ten)\s+only/i,
+    /(eighty|ninety|seventy|sixty|fifty|forty|thirty|twenty)\s*(thousand|lakh|hundred|crore)/i
   ];
   
-  const footerKeywords = [
-    'sub total', 'subtotal', 'grand total', 'total ₹', 'total rs', 'total inr',
-    'authorized signature', 'terms & conditions', 'terms and conditions',
-    'looking forward', 'thank you', 'notes', 'notes:', 'service charge',
-    'indian rupee', 'rupees only', 'lakh', 'thousand', 'hundred', 'crore',
-    'total in words', 'amount in words', 'in words', 'charged at actual',
-    'additional facilities', 'additional services', 'any other additional',
-    'support the event', 'gst @', 'cgst', 'sgst', 'igst', 'tax amount',
-    'taxable amount', 'payment terms', 'bank details', 'account no',
-    'ifsc code', 'branch', 'advance', '% of the amount', 'balance',
-    'six only', 'five only', 'four only', 'three only', 'two only', 'one only',
-    'eighty', 'ninety', 'seventy', 'sixty', 'fifty', 'forty', 'thirty', 'twenty'
-  ];
-  
-  const tableHeaderKeywords = [
-    'sl no', 'sl.no', 's.no', 's no', 'item description', 'particulars',
-    'qty', 'rate', 'amount', 'unit price', 'total', 'description', 'unit'
-  ];
-  
-  function isHeaderRow(text: string): boolean {
-    const lower = text.toLowerCase();
-    return headerKeywords.some(kw => lower.includes(kw));
-  }
-  
-  function isFooterRow(text: string): boolean {
-    const lower = text.toLowerCase();
-    return footerKeywords.some(kw => lower.includes(kw));
-  }
-  
-  function isTableHeaderRow(text: string): boolean {
-    const lower = text.toLowerCase();
-    const matches = tableHeaderKeywords.filter(kw => lower.includes(kw));
-    return matches.length >= 2;
-  }
-  
-  function startsWithNumber(text: string): boolean {
-    return /^\d+\.?\s/.test(text.trim());
+  function shouldSkipRow(text: string): boolean {
+    const trimmed = text.trim();
+    if (!trimmed || trimmed.length < 3) return true;
+    if (trimmed.match(/^[\d,₹.\s-]+$/)) return true;
+    return skipPatterns.some(pattern => pattern.test(trimmed));
   }
   
   let slNoCounter = 1;
-  let foundFirstItem = false;
   
   for (const row of rows) {
     const rowText = row.join(' ').trim();
-    if (!rowText || rowText.length < 3) continue;
-    
-    if (isTableHeaderRow(rowText)) continue;
-    if (isHeaderRow(rowText)) continue;
-    if (isFooterRow(rowText)) continue;
     
     const dateMatch = rowText.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})/i);
     if (dateMatch && !section.installationDate) {
@@ -126,64 +99,47 @@ function parseScheduleFromRows(rows: string[][]): ParsedScheduleData {
       const monthNum = months[dateMatch[2].toLowerCase().substring(0, 3)];
       const year = dateMatch[3];
       section.installationDate = `${year}-${monthNum}-${day}`;
-      if (rowText.length > 15) {
+      if (rowText.length > 20) {
         section.heading = rowText;
       }
-      continue;
     }
     
+    if (shouldSkipRow(rowText)) continue;
+    
+    let description = '';
     const firstCell = row[0]?.trim() || '';
     const hasSlNo = /^\d+\.?$/.test(firstCell);
     
     if (hasSlNo && row.length >= 2) {
-      foundFirstItem = true;
-      
-      let description = '';
-      if (row.length >= 4) {
-        const endIdx = Math.max(1, row.length - 3);
-        description = row.slice(1, endIdx).join(' ').trim();
-      } else if (row.length >= 2) {
-        description = row.slice(1, -1).join(' ').trim() || row[1]?.trim() || '';
-      }
-      
-      if (description && description.length >= 2 && 
-          !description.match(/^[\d,₹.\s]+$/) &&
-          description.length <= 500 &&
-          !isFooterRow(description)) {
-        
-        section.items.push({
-          slNo: slNoCounter++,
-          description: description,
-          startTime: '',
-          endTime: '',
-          responsible: ''
-        });
-      }
-    } else if (foundFirstItem && row.length >= 2 && !hasSlNo) {
-      let description = '';
-      if (row.length >= 4) {
-        const endIdx = Math.max(1, row.length - 3);
-        description = row.slice(0, endIdx).join(' ').trim();
+      if (row.length >= 5) {
+        description = row.slice(1, row.length - 3).join(' ').trim();
+      } else if (row.length >= 3) {
+        description = row.slice(1, -1).join(' ').trim();
       } else {
-        description = row.slice(0, -1).join(' ').trim() || rowText;
+        description = row[1]?.trim() || '';
       }
-      
+    } else {
+      if (row.length >= 4) {
+        description = row.slice(0, row.length - 3).join(' ').trim();
+      } else if (row.length >= 2) {
+        description = row.slice(0, -1).join(' ').trim();
+      } else {
+        description = rowText;
+      }
       description = description.replace(/^\d+\.?\s*/, '').trim();
+    }
+    
+    if (description && description.length >= 3 && 
+        !shouldSkipRow(description) &&
+        description.length <= 500) {
       
-      if (description && description.length >= 3 && 
-          !description.match(/^[\d,₹.\s]+$/) &&
-          description.length <= 500 &&
-          !isFooterRow(description) &&
-          !isHeaderRow(description)) {
-        
-        section.items.push({
-          slNo: slNoCounter++,
-          description: description,
-          startTime: '',
-          endTime: '',
-          responsible: ''
-        });
-      }
+      section.items.push({
+        slNo: slNoCounter++,
+        description: description,
+        startTime: '',
+        endTime: '',
+        responsible: ''
+      });
     }
   }
   
@@ -3303,8 +3259,19 @@ export async function registerRoutes(
         });
       }
       
+      console.log(`[PDF Parse] First 10 raw rows:`);
+      tableRows.slice(0, 10).forEach((row, i) => {
+        console.log(`  Row ${i}: [${row.join(' | ')}]`);
+      });
+      
       const parsedData = parseScheduleFromRows(tableRows);
       console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections with ${parsedData.sections.reduce((sum, s) => sum + s.items.length, 0)} total items`);
+      if (parsedData.sections[0]?.items.length > 0) {
+        console.log(`[PDF Parse] First 3 items:`);
+        parsedData.sections[0].items.slice(0, 3).forEach((item, i) => {
+          console.log(`  Item ${i}: ${item.description}`);
+        });
+      }
       
       res.json({ 
         success: true, 
