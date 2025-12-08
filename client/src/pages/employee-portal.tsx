@@ -28,7 +28,11 @@ import {
   Phone,
   Mail,
   MapPin,
-  Building2
+  Building2,
+  Receipt,
+  PartyPopper,
+  ClipboardList,
+  Upload
 } from "lucide-react";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -130,6 +134,37 @@ interface PayrollHistoryItem {
   netPay: string;
 }
 
+interface ExpenseReimbursement {
+  id: string;
+  employeeId: string;
+  requestDate: string;
+  expenseDate: string;
+  category: string;
+  description: string;
+  amount: string;
+  voucherPath: string | null;
+  status: string;
+  approvedAmount: string | null;
+  managerComments: string | null;
+  approvedAt: string | null;
+}
+
+interface PublicHoliday {
+  id: string;
+  date: string;
+  name: string;
+  description: string | null;
+  isNational: boolean;
+  year: number;
+}
+
+interface EmployeeDuties {
+  duties: string;
+  responsibilities: string;
+  designation: string;
+  department: string | null;
+}
+
 function formatCurrency(amount: string | number): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('en-IN', {
@@ -189,6 +224,7 @@ export default function EmployeePortal() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -233,6 +269,27 @@ export default function EmployeePortal() {
 
   const { data: payrollHistory = [] } = useQuery<PayrollHistoryItem[]>({
     queryKey: ['/api/employee-portal/payroll-history'],
+    enabled: !!profile,
+  });
+
+  const { data: expenseReimbursements = [] } = useQuery<ExpenseReimbursement[]>({
+    queryKey: ['/api/employee-portal/expense-reimbursements'],
+    enabled: !!profile,
+  });
+
+  const { data: publicHolidays = [] } = useQuery<PublicHoliday[]>({
+    queryKey: ['/api/public-holidays'],
+    queryFn: async () => {
+      const currentYear = new Date().getFullYear();
+      const res = await fetch(`/api/public-holidays?year=${currentYear}`);
+      if (!res.ok) throw new Error('Failed to fetch holidays');
+      return res.json();
+    },
+    enabled: !!profile,
+  });
+
+  const { data: employeeDuties } = useQuery<EmployeeDuties>({
+    queryKey: ['/api/employee-portal/duties'],
     enabled: !!profile,
   });
 
@@ -285,6 +342,33 @@ export default function EmployeePortal() {
       toast({
         title: "Error",
         description: "Failed to submit salary advance request",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const submitExpenseReimbursement = useMutation({
+    mutationFn: async (data: { expenseDate: string; category: string; description: string; amount: string }) => {
+      const res = await fetch('/api/employee-portal/expense-reimbursements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to submit expense reimbursement request');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/expense-reimbursements'] });
+      setIsExpenseDialogOpen(false);
+      toast({
+        title: "Success",
+        description: "Expense reimbursement request submitted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to submit expense reimbursement request",
         variant: "destructive",
       });
     },
@@ -357,7 +441,7 @@ export default function EmployeePortal() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 gap-1">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-9 gap-1">
           <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
             <User className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Overview</span>
@@ -365,6 +449,10 @@ export default function EmployeePortal() {
           <TabsTrigger value="leaves" className="text-xs md:text-sm" data-testid="tab-leaves">
             <CalendarDays className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Leaves</span>
+          </TabsTrigger>
+          <TabsTrigger value="expenses" className="text-xs md:text-sm" data-testid="tab-expenses">
+            <Receipt className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Expenses</span>
           </TabsTrigger>
           <TabsTrigger value="payroll" className="text-xs md:text-sm" data-testid="tab-payroll">
             <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
@@ -381,6 +469,14 @@ export default function EmployeePortal() {
           <TabsTrigger value="advances" className="text-xs md:text-sm" data-testid="tab-advances">
             <CreditCard className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Advances</span>
+          </TabsTrigger>
+          <TabsTrigger value="holidays" className="text-xs md:text-sm" data-testid="tab-holidays">
+            <PartyPopper className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Holidays</span>
+          </TabsTrigger>
+          <TabsTrigger value="duties" className="text-xs md:text-sm" data-testid="tab-duties">
+            <ClipboardList className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Duties</span>
           </TabsTrigger>
         </TabsList>
 
@@ -883,6 +979,195 @@ export default function EmployeePortal() {
             </motion.div>
           </motion.div>
         </TabsContent>
+
+        <TabsContent value="expenses">
+          <motion.div 
+            className="space-y-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Receipt className="h-5 w-5" />
+                      Expense Reimbursements
+                    </CardTitle>
+                    <CardDescription>Track your expense reimbursement requests</CardDescription>
+                  </div>
+                  <Button onClick={() => setIsExpenseDialogOpen(true)} data-testid="button-new-expense">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Request
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Expense Date</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Comments</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {expenseReimbursements.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                              No expense reimbursement requests found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          expenseReimbursements.map((expense) => (
+                            <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
+                              <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                              <TableCell className="capitalize">{expense.category}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
+                              <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                              <TableCell>{getStatusBadge(expense.status)}</TableCell>
+                              <TableCell className="max-w-[150px] truncate">{expense.managerComments || '-'}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="holidays">
+          <motion.div 
+            className="space-y-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <PartyPopper className="h-5 w-5" />
+                    Public Holidays {new Date().getFullYear()}
+                  </CardTitle>
+                  <CardDescription>Upcoming holidays for the current year</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Holiday</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Type</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {publicHolidays.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                              No public holidays found for this year
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          publicHolidays.map((holiday) => (
+                            <TableRow key={holiday.id} data-testid={`row-holiday-${holiday.id}`}>
+                              <TableCell>{formatDate(holiday.date)}</TableCell>
+                              <TableCell className="font-medium">{holiday.name}</TableCell>
+                              <TableCell>{holiday.description || '-'}</TableCell>
+                              <TableCell>
+                                <Badge variant={holiday.isNational ? 'default' : 'secondary'}>
+                                  {holiday.isNational ? 'National' : 'Regional'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
+
+        <TabsContent value="duties">
+          <motion.div 
+            className="space-y-4"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <motion.div variants={staggerItem}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5" />
+                    My Duties & Responsibilities
+                  </CardTitle>
+                  <CardDescription>Your assigned duties and responsibilities</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Briefcase className="h-4 w-4 text-oak-dark" />
+                        <span className="font-medium">Designation</span>
+                      </div>
+                      <p className="text-lg">{employeeDuties?.designation || profile.designation}</p>
+                    </div>
+                    <div className="p-4 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Building2 className="h-4 w-4 text-oak-dark" />
+                        <span className="font-medium">Department</span>
+                      </div>
+                      <p className="text-lg">{employeeDuties?.department || profile.department || '-'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium text-lg mb-3 flex items-center gap-2">
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                        Duties
+                      </h4>
+                      <div className="p-4 bg-muted/30 rounded-lg border">
+                        {employeeDuties?.duties ? (
+                          <p className="whitespace-pre-wrap text-muted-foreground">{employeeDuties.duties}</p>
+                        ) : (
+                          <p className="text-muted-foreground italic">No duties assigned yet. Contact your manager for more information.</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-lg mb-3 flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5 text-blue-600" />
+                        Responsibilities
+                      </h4>
+                      <div className="p-4 bg-muted/30 rounded-lg border">
+                        {employeeDuties?.responsibilities ? (
+                          <p className="whitespace-pre-wrap text-muted-foreground">{employeeDuties.responsibilities}</p>
+                        ) : (
+                          <p className="text-muted-foreground italic">No responsibilities assigned yet. Contact your manager for more information.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </motion.div>
+        </TabsContent>
       </Tabs>
 
       <LeaveRequestDialog 
@@ -897,6 +1182,13 @@ export default function EmployeePortal() {
         onOpenChange={setIsAdvanceDialogOpen}
         onSubmit={(data) => submitAdvanceRequest.mutate(data)}
         isLoading={submitAdvanceRequest.isPending}
+      />
+
+      <ExpenseReimbursementDialog 
+        open={isExpenseDialogOpen} 
+        onOpenChange={setIsExpenseDialogOpen}
+        onSubmit={(data) => submitExpenseReimbursement.mutate(data)}
+        isLoading={submitExpenseReimbursement.isPending}
       />
     </motion.div>
   );
@@ -1057,6 +1349,100 @@ function AdvanceRequestDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading} data-testid="button-submit-advance">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ExpenseReimbursementDialog({ 
+  open, 
+  onOpenChange, 
+  onSubmit, 
+  isLoading 
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: { expenseDate: string; category: string; description: string; amount: string }) => void;
+  isLoading: boolean;
+}) {
+  const [expenseDate, setExpenseDate] = useState('');
+  const [category, setCategory] = useState('');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({ expenseDate, category, description, amount });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Request Expense Reimbursement</DialogTitle>
+          <DialogDescription>Submit a request for expense reimbursement</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Expense Date</Label>
+              <Input 
+                type="date" 
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                required
+                data-testid="input-expense-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (₹)</Label>
+              <Input 
+                type="number" 
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Enter amount"
+                required
+                data-testid="input-expense-amount"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger data-testid="select-expense-category">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="travel">Travel</SelectItem>
+                <SelectItem value="food">Food & Meals</SelectItem>
+                <SelectItem value="accommodation">Accommodation</SelectItem>
+                <SelectItem value="supplies">Office Supplies</SelectItem>
+                <SelectItem value="communication">Communication</SelectItem>
+                <SelectItem value="transport">Local Transport</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea 
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the expense..."
+              required
+              data-testid="input-expense-description"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading || !category} data-testid="button-submit-expense">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Submit Request
             </Button>
