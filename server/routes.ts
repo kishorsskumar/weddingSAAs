@@ -29,6 +29,21 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PgSession = connectPgSimple(session);
 
+// Helper function to get current Indian fiscal year (April to March)
+function getCurrentFiscalYear(): string {
+  const now = new Date();
+  const month = now.getMonth(); // 0-indexed (0 = Jan, 3 = Apr)
+  const year = now.getFullYear();
+  
+  // If current month is Jan-Mar, fiscal year started previous calendar year
+  // If current month is Apr-Dec, fiscal year started this calendar year
+  if (month < 3) { // Jan, Feb, Mar
+    return `${year - 1}-${String(year).slice(-2)}`;
+  } else { // Apr onwards
+    return `${year}-${String(year + 1).slice(-2)}`;
+  }
+}
+
 interface ParsedScheduleItem {
   slNo: number;
   description: string;
@@ -1791,6 +1806,218 @@ export async function registerRoutes(
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to get employee data' });
+    }
+  });
+
+  // HR Consolidated Employee Report - for admin/superadmin
+  app.get('/api/hr/consolidated-report', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      // Only admin/superadmin can access
+      if (!['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const fiscalYear = req.query.fiscalYear as string || getCurrentFiscalYear();
+      const allEmployees = await storage.getAllEmployees();
+      
+      // Get consolidated data for each employee
+      const consolidatedData = await Promise.all(
+        allEmployees.map(async (employee) => {
+          const leaveBalance = await storage.getOrCreateCurrentFiscalYearLeaveBalance(employee.id);
+          const leaveRequests = await storage.getLeaveRequestsByEmployee(employee.id);
+          const salaryAdvances = await storage.getSalaryAdvanceRequests(employee.id);
+          const allExpenses = await storage.getAllExpenseReimbursements();
+          const expenses = allExpenses.filter(e => e.employeeId === employee.id);
+          const increments = await storage.getEmployeeIncrements(employee.id);
+          const incentives = await storage.getEmployeeIncentivesByFiscalYear(employee.id, fiscalYear);
+          
+          // Calculate leave metrics
+          const approvedLeaves = leaveRequests.filter(lr => lr.status === 'approved');
+          const leaveDaysTaken = approvedLeaves.reduce((sum, lr) => {
+            const start = new Date(lr.startDate);
+            const end = new Date(lr.endDate);
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            return sum + days;
+          }, 0);
+          
+          // Calculate loss of pay (leaves beyond balance)
+          const totalLeaves = leaveBalance?.totalLeaves || 24;
+          const lossOfPayDays = Math.max(0, leaveDaysTaken - totalLeaves);
+          const dailyRate = parseFloat(employee.salary) / 30; // Assuming 30 days/month
+          const lossOfPayAmount = lossOfPayDays * dailyRate;
+          
+          // Calculate pending/approved advances
+          const pendingAdvances = salaryAdvances.filter(a => a.status === 'pending').reduce((sum, a) => sum + parseFloat(a.amount), 0);
+          const approvedAdvances = salaryAdvances.filter(a => a.status === 'approved').reduce((sum, a) => sum + parseFloat(a.amount), 0);
+          
+          // Calculate approved expenses
+          const approvedExpenses = expenses.filter(e => e.status === 'approved' || e.status === 'paid')
+            .reduce((sum, e) => sum + parseFloat(e.approvedAmount || e.amount), 0);
+          
+          // Calculate incentives
+          const totalIncentives = incentives.filter(i => i.status === 'approved' || i.status === 'paid')
+            .reduce((sum, i) => sum + parseFloat(i.amount), 0);
+          
+          // Calculate net payroll (simplified)
+          const monthlySalary = parseFloat(employee.salary);
+          const netPayroll = monthlySalary - lossOfPayAmount + totalIncentives - approvedAdvances;
+          
+          // Get manager info
+          let managerName = null;
+          if (employee.managerUserId) {
+            const manager = await storage.getUser(employee.managerUserId);
+            managerName = manager?.name || null;
+          }
+          
+          return {
+            employee: {
+              id: employee.id,
+              employeeId: employee.employeeId,
+              name: employee.name,
+              designation: employee.designation,
+              department: employee.department,
+              salary: employee.salary,
+              joinDate: employee.joinDate,
+              contractRenewalDate: employee.contractRenewalDate,
+              email: employee.email,
+              phone: employee.phone,
+              managerName,
+            },
+            leaveMetrics: {
+              totalLeaves,
+              leavesUsed: leaveDaysTaken,
+              leavesRemaining: Math.max(0, totalLeaves - leaveDaysTaken),
+              lossOfPayDays,
+              casualLeavesTaken: approvedLeaves.filter(l => l.leaveType === 'casual').length,
+              sickLeavesTaken: approvedLeaves.filter(l => l.leaveType === 'sick').length,
+              earnedLeavesTaken: approvedLeaves.filter(l => l.leaveType === 'earned').length,
+            },
+            financialMetrics: {
+              monthlySalary,
+              lossOfPayAmount,
+              pendingAdvances,
+              approvedAdvances,
+              approvedExpenses,
+              totalIncentives,
+              netPayroll,
+            },
+            increments: increments.slice(0, 3), // Last 3 increments
+            contractRenewalDate: employee.contractRenewalDate,
+          };
+        })
+      );
+      
+      res.json({
+        fiscalYear,
+        employees: consolidatedData,
+        summary: {
+          totalEmployees: consolidatedData.length,
+          totalPayroll: consolidatedData.reduce((sum, e) => sum + e.financialMetrics.netPayroll, 0),
+          totalIncentives: consolidatedData.reduce((sum, e) => sum + e.financialMetrics.totalIncentives, 0),
+          totalLossOfPay: consolidatedData.reduce((sum, e) => sum + e.financialMetrics.lossOfPayAmount, 0),
+          totalAdvances: consolidatedData.reduce((sum, e) => sum + e.financialMetrics.approvedAdvances, 0),
+          totalExpenses: consolidatedData.reduce((sum, e) => sum + e.financialMetrics.approvedExpenses, 0),
+        }
+      });
+    } catch (error) {
+      console.error('HR consolidated report error:', error);
+      res.status(500).json({ error: 'Failed to generate consolidated report' });
+    }
+  });
+
+  // HR Incentives Management
+  app.get('/api/hr/incentives', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const incentives = await storage.getAllEmployeeIncentives();
+      res.json(incentives);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get incentives' });
+    }
+  });
+
+  app.get('/api/hr/incentives/:employeeId', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const incentives = await storage.getEmployeeIncentives(req.params.employeeId);
+      res.json(incentives);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get employee incentives' });
+    }
+  });
+
+  app.post('/api/hr/incentives', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const incentive = await storage.createEmployeeIncentive(req.body);
+      res.status(201).json(incentive);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create incentive' });
+    }
+  });
+
+  app.patch('/api/hr/incentives/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const incentive = await storage.updateEmployeeIncentive(req.params.id, req.body);
+      res.json(incentive);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update incentive' });
+    }
+  });
+
+  app.delete('/api/hr/incentives/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      await storage.deleteEmployeeIncentive(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete incentive' });
     }
   });
 

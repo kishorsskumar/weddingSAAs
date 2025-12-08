@@ -54,6 +54,7 @@ import {
   employeeLeaveBalances,
   expenseReimbursements,
   publicHolidays,
+  employeeIncentives,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -167,6 +168,8 @@ import {
   type InsertExpenseReimbursement,
   type PublicHoliday,
   type InsertPublicHoliday,
+  type EmployeeIncentive,
+  type InsertEmployeeIncentive,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -591,6 +594,15 @@ export interface IStorage {
 
   // Manager-managed employees
   getEmployeesByManager(managerUserId: string): Promise<Employee[]>;
+
+  // Employee Incentives
+  getEmployeeIncentives(employeeId: string): Promise<EmployeeIncentive[]>;
+  getAllEmployeeIncentives(): Promise<EmployeeIncentive[]>;
+  getEmployeeIncentive(id: string): Promise<EmployeeIncentive | undefined>;
+  createEmployeeIncentive(incentive: InsertEmployeeIncentive): Promise<EmployeeIncentive>;
+  updateEmployeeIncentive(id: string, incentive: Partial<InsertEmployeeIncentive>): Promise<EmployeeIncentive | undefined>;
+  deleteEmployeeIncentive(id: string): Promise<void>;
+  getEmployeeIncentivesByFiscalYear(employeeId: string, fiscalYear: string): Promise<EmployeeIncentive[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2567,6 +2579,50 @@ export class DatabaseStorage implements IStorage {
   async getEmployeesByManager(managerUserId: string): Promise<Employee[]> {
     return await db.select().from(employees)
       .where(eq(employees.managerUserId, managerUserId));
+  }
+
+  // Employee Incentives
+  async getEmployeeIncentives(employeeId: string): Promise<EmployeeIncentive[]> {
+    return await db.select().from(employeeIncentives)
+      .where(eq(employeeIncentives.employeeId, employeeId))
+      .orderBy(desc(employeeIncentives.date));
+  }
+
+  async getAllEmployeeIncentives(): Promise<EmployeeIncentive[]> {
+    return await db.select().from(employeeIncentives)
+      .orderBy(desc(employeeIncentives.date));
+  }
+
+  async getEmployeeIncentive(id: string): Promise<EmployeeIncentive | undefined> {
+    const [incentive] = await db.select().from(employeeIncentives)
+      .where(eq(employeeIncentives.id, id));
+    return incentive || undefined;
+  }
+
+  async createEmployeeIncentive(incentive: InsertEmployeeIncentive): Promise<EmployeeIncentive> {
+    const [created] = await db.insert(employeeIncentives).values(incentive).returning();
+    return created;
+  }
+
+  async updateEmployeeIncentive(id: string, incentive: Partial<InsertEmployeeIncentive>): Promise<EmployeeIncentive | undefined> {
+    const [updated] = await db.update(employeeIncentives)
+      .set(incentive)
+      .where(eq(employeeIncentives.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEmployeeIncentive(id: string): Promise<void> {
+    await db.delete(employeeIncentives).where(eq(employeeIncentives.id, id));
+  }
+
+  async getEmployeeIncentivesByFiscalYear(employeeId: string, fiscalYear: string): Promise<EmployeeIncentive[]> {
+    return await db.select().from(employeeIncentives)
+      .where(and(
+        eq(employeeIncentives.employeeId, employeeId),
+        eq(employeeIncentives.fiscalYear, fiscalYear)
+      ))
+      .orderBy(desc(employeeIncentives.date));
   }
 }
 

@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -48,6 +48,62 @@ interface Bank {
   balance: string;
 }
 
+interface ConsolidatedEmployeeData {
+  employee: {
+    id: string;
+    employeeId: string;
+    name: string;
+    designation: string;
+    department: string | null;
+    salary: string;
+    joinDate: string;
+    contractRenewalDate: string | null;
+    email: string | null;
+    phone: string | null;
+    managerName: string | null;
+  };
+  leaveMetrics: {
+    totalLeaves: number;
+    leavesUsed: number;
+    leavesRemaining: number;
+    lossOfPayDays: number;
+    casualLeavesTaken: number;
+    sickLeavesTaken: number;
+    earnedLeavesTaken: number;
+  };
+  financialMetrics: {
+    monthlySalary: number;
+    lossOfPayAmount: number;
+    pendingAdvances: number;
+    approvedAdvances: number;
+    approvedExpenses: number;
+    totalIncentives: number;
+    netPayroll: number;
+  };
+  increments: any[];
+  contractRenewalDate: string | null;
+}
+
+interface ConsolidatedReport {
+  fiscalYear: string;
+  employees: ConsolidatedEmployeeData[];
+  summary: {
+    totalEmployees: number;
+    totalPayroll: number;
+    totalIncentives: number;
+    totalLossOfPay: number;
+    totalAdvances: number;
+    totalExpenses: number;
+  };
+}
+
+interface Manager {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export default function HR() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -79,6 +135,30 @@ export default function HR() {
       return dateB - dateA;
     });
   }, [employees]);
+
+  const { data: consolidatedReport, isLoading: reportLoading } = useQuery<ConsolidatedReport>({
+    queryKey: ['/api/hr/consolidated-report'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/consolidated-report');
+      if (!res.ok) throw new Error('Failed to fetch consolidated report');
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: managers = [] } = useQuery<Manager[]>({
+    queryKey: ['/api/admin/managers'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/managers');
+      if (!res.ok) throw new Error('Failed to fetch managers');
+      return res.json();
+    },
+    enabled: user?.role === 'superadmin',
+  });
+
+  const { toast } = useToast();
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [newCredentials, setNewCredentials] = useState<{ employeeId: string; email: string; temporaryPassword: string } | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<Employee>) => {
@@ -371,6 +451,12 @@ export default function HR() {
               Approvals
             </TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="report" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2" data-testid="tab-consolidated-report">
+              <FileBarChart className="h-4 w-4" />
+              Report
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="current" className="space-y-4">
@@ -422,6 +508,13 @@ export default function HR() {
         {(isAdmin || user?.role === 'manager') && (
           <TabsContent value="approvals">
             <ManagerApprovalsSection isAdmin={isAdmin} />
+          </TabsContent>
+        )}
+
+        {/* Consolidated Report Tab */}
+        {isAdmin && (
+          <TabsContent value="report">
+            <ConsolidatedReportSection />
           </TabsContent>
         )}
       </Tabs>
@@ -1583,5 +1676,201 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function ConsolidatedReportSection() {
+  const { data: consolidatedReport, isLoading: reportLoading } = useQuery<ConsolidatedReport>({
+    queryKey: ['/api/hr/consolidated-report'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/consolidated-report');
+      if (!res.ok) throw new Error('Failed to fetch consolidated report');
+      return res.json();
+    },
+  });
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '-';
+    try {
+      return format(parseISO(dateStr), 'dd/MM/yyyy');
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileBarChart className="h-5 w-5" />
+              Consolidated Employee Report
+            </CardTitle>
+            <CardDescription>
+              FY {consolidatedReport?.fiscalYear || '-'} • All employee metrics in one view
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" data-testid="button-export-report">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 sm:p-6 pt-0">
+        {reportLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : consolidatedReport ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Total Employees</div>
+                  <div className="text-xl font-bold" data-testid="stat-total-employees">
+                    {consolidatedReport.summary.totalEmployees}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Total Payroll</div>
+                  <div className="text-xl font-bold text-green-600" data-testid="stat-total-payroll">
+                    ₹{consolidatedReport.summary.totalPayroll.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Incentives</div>
+                  <div className="text-xl font-bold text-blue-600" data-testid="stat-total-incentives">
+                    ₹{consolidatedReport.summary.totalIncentives.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Loss of Pay</div>
+                  <div className="text-xl font-bold text-red-600" data-testid="stat-total-lop">
+                    ₹{consolidatedReport.summary.totalLossOfPay.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Advances</div>
+                  <div className="text-xl font-bold text-orange-600" data-testid="stat-total-advances">
+                    ₹{consolidatedReport.summary.totalAdvances.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/50">
+                <CardContent className="p-3">
+                  <div className="text-xs text-muted-foreground">Expenses</div>
+                  <div className="text-xl font-bold text-purple-600" data-testid="stat-total-expenses">
+                    ₹{consolidatedReport.summary.totalExpenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="min-w-[140px]">Employee</TableHead>
+                    <TableHead>Designation</TableHead>
+                    <TableHead className="text-right">Salary</TableHead>
+                    <TableHead className="text-center">Leaves Used</TableHead>
+                    <TableHead className="text-center">LOP Days</TableHead>
+                    <TableHead className="text-right">LOP Amount</TableHead>
+                    <TableHead className="text-right">Incentives</TableHead>
+                    <TableHead className="text-right">Advances</TableHead>
+                    <TableHead className="text-right">Net Payroll</TableHead>
+                    <TableHead>Contract Renewal</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {consolidatedReport.employees.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                        No employee data available
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    consolidatedReport.employees.map((data: ConsolidatedEmployeeData) => (
+                      <TableRow key={data.employee.id} data-testid={`row-report-${data.employee.id}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{data.employee.name}</div>
+                            <div className="text-xs text-muted-foreground">{data.employee.employeeId}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div>{data.employee.designation}</div>
+                            <div className="text-xs text-muted-foreground">{data.employee.department || '-'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ₹{Number(data.employee.salary).toLocaleString('en-IN')}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-col items-center">
+                            <span className="font-medium">{data.leaveMetrics.leavesUsed}</span>
+                            <span className="text-xs text-muted-foreground">of {data.leaveMetrics.totalLeaves}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {data.leaveMetrics.lossOfPayDays > 0 ? (
+                            <Badge variant="destructive">{data.leaveMetrics.lossOfPayDays}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-red-600">
+                          {data.financialMetrics.lossOfPayAmount > 0 
+                            ? `₹${data.financialMetrics.lossOfPayAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-blue-600">
+                          {data.financialMetrics.totalIncentives > 0 
+                            ? `₹${data.financialMetrics.totalIncentives.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-orange-600">
+                          {data.financialMetrics.approvedAdvances > 0 
+                            ? `₹${data.financialMetrics.approvedAdvances.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-green-600">
+                          ₹{data.financialMetrics.netPayroll.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </TableCell>
+                        <TableCell>
+                          {data.contractRenewalDate ? (
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(data.contractRenewalDate)}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+            Failed to load report data
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

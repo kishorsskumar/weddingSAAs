@@ -64,6 +64,7 @@ export const employees = pgTable("employees", {
   userId: varchar("user_id").references(() => users.id),
   managerUserId: varchar("manager_user_id").references(() => users.id),
   joinDate: date("join_date").notNull(),
+  contractRenewalDate: date("contract_renewal_date"),
   designation: text("designation").notNull(),
   department: text("department"),
   salary: decimal("salary", { precision: 10, scale: 2 }).notNull(),
@@ -1123,3 +1124,24 @@ export const publicHolidays = pgTable("public_holidays", {
 export const insertPublicHolidaySchema = createInsertSchema(publicHolidays).omit({ id: true, createdAt: true });
 export type InsertPublicHoliday = z.infer<typeof insertPublicHolidaySchema>;
 export type PublicHoliday = typeof publicHolidays.$inferSelect;
+
+// Employee Incentives/Bonuses
+export const employeeIncentives = pgTable("employee_incentives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  date: date("date").notNull(),
+  type: text("type").notNull(), // 'bonus', 'performance', 'festival', 'retention', 'other'
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  fiscalYear: text("fiscal_year").notNull(), // '2024-25'
+  month: text("month"), // 'April', 'May', etc
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'paid'
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  paidDate: date("paid_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmployeeIncentiveSchema = createInsertSchema(employeeIncentives).omit({ id: true, createdAt: true });
+export type InsertEmployeeIncentive = z.infer<typeof insertEmployeeIncentiveSchema>;
+export type EmployeeIncentive = typeof employeeIncentives.$inferSelect;
