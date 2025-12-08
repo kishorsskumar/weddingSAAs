@@ -33,8 +33,6 @@ interface ParsedLineItem {
   slNo: number;
   description: string;
   quantity: number;
-  rate: number;
-  amount: number;
   notes?: string;
 }
 
@@ -144,9 +142,7 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
         currentSection.items.push({
           slNo: parseInt(itemMatch[1]) || currentSection.items.length + 1,
           description: itemMatch[2].trim(),
-          quantity,
-          rate: cleanNumber(itemMatch[4]),
-          amount: cleanNumber(itemMatch[5]),
+          quantity
         });
         continue;
       }
@@ -157,15 +153,12 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
       const slNo = parseInt(parts[0].trim());
       let desc = '';
       let qty = 0;
-      let rate = 0;
-      let amount = 0;
       
       for (let j = parts.length - 1; j >= 1; j--) {
         const val = cleanNumber(parts[j]);
-        if (val > 0) {
-          if (!amount) amount = val;
-          else if (!rate) rate = val;
-          else if (!qty) { qty = val; break; }
+        if (val > 0 && !qty) { 
+          qty = val; 
+          break; 
         }
       }
       
@@ -182,9 +175,7 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
         currentSection.items.push({
           slNo,
           description: desc,
-          quantity: qty,
-          rate,
-          amount,
+          quantity: qty
         });
         continue;
       }
@@ -195,12 +186,10 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
       const slNo = parseInt(altMatch[1]);
       const rest = altMatch[2];
       const numbers = rest.match(/[\d,.]+/g) || [];
-      if (numbers.length >= 3) {
-        const qty = cleanNumber(numbers[numbers.length - 3]);
-        const rate = cleanNumber(numbers[numbers.length - 2]);
-        const amount = cleanNumber(numbers[numbers.length - 1]);
+      if (numbers.length >= 1) {
+        const qty = cleanNumber(numbers[numbers.length - 1]);
         let desc = rest;
-        for (const num of numbers.slice(-3)) {
+        for (const num of numbers) {
           desc = desc.replace(num, '').trim();
         }
         desc = desc.replace(/\s+/g, ' ').trim();
@@ -209,9 +198,7 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
           currentSection.items.push({
             slNo,
             description: desc,
-            quantity: qty,
-            rate,
-            amount,
+            quantity: qty
           });
         }
       }
@@ -234,12 +221,10 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
     for (const line of lines) {
       if (line.match(/^\d+\s+\w/)) {
         const numbers = line.match(/[\d,.]+/g) || [];
-        if (numbers.length >= 3) {
-          const qty = cleanNumber(numbers[numbers.length - 3]);
-          const rate = cleanNumber(numbers[numbers.length - 2]);
-          const amount = cleanNumber(numbers[numbers.length - 1]);
+        if (numbers.length >= 1) {
+          const qty = cleanNumber(numbers[numbers.length - 1]);
           let desc = line.replace(/^\d+\s*/, '');
-          for (const num of numbers.slice(-3)) {
+          for (const num of numbers) {
             desc = desc.replace(num, '').trim();
           }
           desc = desc.replace(/\s+/g, ' ').trim();
@@ -248,9 +233,7 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
             fallbackSection.items.push({
               slNo: fallbackSection.items.length + 1,
               description: desc,
-              quantity: qty,
-              rate,
-              amount,
+              quantity: qty
             });
           }
         }
@@ -263,6 +246,214 @@ function parseEstimatePDF(text: string): ParsedEstimateData {
   }
   
   return { sections: result, rawLines: lines };
+}
+
+function parseEstimateFromRows(rows: string[][]): ParsedEstimateData {
+  const sections: ParsedSection[] = [];
+  let currentSection: ParsedSection | null = null;
+  
+  const dayHeaderRegex = /DAY\s*\d+\s*:\s*(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})\s*[-–]\s*(.+)/i;
+  const altDayRegex = /^(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})\s*[-–]\s*(.+)/i;
+  
+  const months: { [key: string]: string } = {
+    'jan': '01', 'feb': '02', 'mar': '03', 'apr': '04', 'may': '05', 'jun': '06',
+    'jul': '07', 'aug': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dec': '12'
+  };
+  
+  function extractTimeRange(text: string): { startTime: string | null; endTime: string | null } {
+    const patterns = [
+      /\(([^)]+)\)/,
+      /(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)\s*(?:to|-)\s*(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        if (match[2]) {
+          return { startTime: normalizeTime(match[1]), endTime: normalizeTime(match[2]) };
+        } else if (match[1]) {
+          const timeMatch = match[1].match(/(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)\s*(?:to|-)\s*(\d{1,2}[.:]\d{2}\s*(?:AM|PM)?)/i);
+          if (timeMatch) {
+            return { startTime: normalizeTime(timeMatch[1]), endTime: normalizeTime(timeMatch[2]) };
+          }
+        }
+      }
+    }
+    return { startTime: null, endTime: null };
+  }
+  
+  for (const row of rows) {
+    const rowText = row.join(' ').trim();
+    
+    if (rowText.toLowerCase().includes('sl') && rowText.toLowerCase().includes('item') && 
+        (rowText.toLowerCase().includes('qty') || rowText.toLowerCase().includes('description'))) {
+      continue;
+    }
+    
+    if (rowText.toLowerCase().includes('sub total') || rowText.toLowerCase().includes('subtotal') ||
+        rowText.toLowerCase().includes('service charge') || rowText.toLowerCase().includes('grand total') ||
+        rowText.toLowerCase().includes('total ₹') || rowText.toLowerCase().includes('authorized signature') ||
+        rowText.toLowerCase().includes('terms & conditions') || rowText.toLowerCase().includes('notes') ||
+        rowText.toLowerCase().includes('looking forward') || rowText.toLowerCase().includes('indian rupee')) {
+      continue;
+    }
+    
+    let dayMatch = rowText.match(dayHeaderRegex) || rowText.match(altDayRegex);
+    if (dayMatch) {
+      const day = dayMatch[1];
+      const month = dayMatch[2];
+      const year = dayMatch[3];
+      const eventPart = dayMatch[4]?.trim() || 'Event';
+      
+      const eventNameMatch = eventPart.match(/^([^(]+)/);
+      const eventName = eventNameMatch ? eventNameMatch[1].trim() : eventPart;
+      
+      const monthNum = months[month.toLowerCase().substring(0, 3)];
+      const dateStr = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+      
+      const { startTime, endTime } = extractTimeRange(eventPart);
+      
+      currentSection = {
+        originalHeading: rowText,
+        eventName,
+        category: eventName,
+        date: dateStr,
+        startTime,
+        endTime,
+        items: []
+      };
+      sections.push(currentSection);
+      continue;
+    }
+    
+    const isCategoryHeader = /^[A-Z][A-Z\s&]+$/.test(rowText) && 
+      rowText.length >= 5 && 
+      rowText.length <= 50 &&
+      !rowText.match(/^\d/) &&
+      !rowText.match(/[\d₹]/);
+    
+    if (isCategoryHeader && currentSection) {
+      const skipKeywords = ['SL', 'NO', 'ITEM', 'DESCRIPTION', 'QTY', 'RATE', 'AMOUNT', 'TOTAL', 'SUB'];
+      if (!skipKeywords.some(k => rowText.toUpperCase().startsWith(k))) {
+        if (currentSection.items.length > 0) {
+          currentSection = {
+            originalHeading: rowText,
+            eventName: currentSection.eventName,
+            category: rowText,
+            date: currentSection.date,
+            startTime: currentSection.startTime,
+            endTime: currentSection.endTime,
+            items: []
+          };
+          sections.push(currentSection);
+        } else {
+          currentSection.category = rowText;
+        }
+        continue;
+      }
+    }
+    
+    if (!currentSection) {
+      if (rowText.match(/\d{1,2}\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i)) {
+        const simpleMatch = rowText.match(/(\d{1,2})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s*(\d{4})?/i);
+        if (simpleMatch) {
+          const day = simpleMatch[1];
+          const month = simpleMatch[2];
+          const year = simpleMatch[3] || new Date().getFullYear().toString();
+          const monthNum = months[month.toLowerCase().substring(0, 3)];
+          const dateStr = `${year}-${monthNum}-${day.padStart(2, '0')}`;
+          
+          currentSection = {
+            originalHeading: rowText,
+            eventName: 'Imported Event',
+            category: 'General',
+            date: dateStr,
+            startTime: null,
+            endTime: null,
+            items: []
+          };
+          sections.push(currentSection);
+        }
+      }
+      continue;
+    }
+    
+    if (row.length >= 2) {
+      const firstCell = row[0]?.trim() || '';
+      const slNoMatch = firstCell.match(/^(\d+)\.?$/);
+      
+      if (slNoMatch) {
+        const slNo = parseInt(slNoMatch[1]);
+        
+        let description = '';
+        let quantity: number = 1;
+        
+        const numericCells: { index: number; value: number; raw: string; hasUnit: boolean }[] = [];
+        for (let i = 1; i < row.length; i++) {
+          const cell = row[i]?.trim() || '';
+          if (cell.startsWith('₹')) continue;
+          
+          const pureNumMatch = cell.replace(/,/g, '').match(/^(\d+(?:\.\d+)?)$/);
+          if (pureNumMatch) {
+            const val = parseFloat(pureNumMatch[1]);
+            numericCells.push({ index: i, value: val, raw: cell, hasUnit: false });
+            continue;
+          }
+          
+          const numWithUnitMatch = cell.replace(/,/g, '').match(/^(\d+(?:\.\d+)?)\s*(nos?|no\.?|pcs?|set|sets|mtr|mtrs?|meters?|units?|bundles?|pairs?|bags?|boxes?)$/i);
+          if (numWithUnitMatch) {
+            const val = parseFloat(numWithUnitMatch[1]);
+            numericCells.push({ index: i, value: val, raw: cell, hasUnit: true });
+          }
+        }
+        
+        const cellWithUnit = numericCells.find(nc => nc.hasUnit);
+        if (cellWithUnit) {
+          quantity = cellWithUnit.value;
+        } else if (numericCells.length >= 3) {
+          quantity = numericCells[0].value;
+        } else if (numericCells.length >= 1) {
+          quantity = numericCells[0].value;
+        }
+        
+        const skipIndices = new Set<number>();
+        for (const nc of numericCells) {
+          skipIndices.add(nc.index);
+        }
+        
+        for (let i = 1; i < row.length; i++) {
+          if (skipIndices.has(i)) continue;
+          const cell = row[i]?.trim() || '';
+          if (cell.startsWith('₹')) continue;
+          if (cell && cell.length > 0) {
+            description += (description ? ' ' : '') + cell;
+          }
+        }
+        
+        if (description && quantity > 0) {
+          currentSection.items.push({
+            slNo,
+            description: description.trim(),
+            quantity: quantity
+          });
+        }
+      }
+    }
+  }
+  
+  if (sections.length === 0) {
+    sections.push({
+      originalHeading: 'Imported Items',
+      eventName: 'Imported Event',
+      category: 'General',
+      date: null,
+      startTime: null,
+      endTime: null,
+      items: []
+    });
+  }
+  
+  return { sections, rawLines: rows.map(r => r.join(' | ')) };
 }
 
 function normalizeTime(time: string): string {
@@ -2880,9 +3071,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Invalid PDF data format - could not decode base64' });
       }
       
-      let pdfText = '';
+      let tableRows: string[][] = [];
       try {
-        console.log(`[PDF Parse] Using pdfjs-dist library`);
+        console.log(`[PDF Parse] Using pdfjs-dist library with table extraction`);
         
         const pdfUint8Array = new Uint8Array(pdfBuffer);
         const loadingTask = pdfjsLib.getDocument({ data: pdfUint8Array });
@@ -2892,12 +3083,52 @@ export async function registerRoutes(
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
           const page = await pdfDoc.getPage(pageNum);
           const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-          pdfText += pageText + '\n';
+          
+          const rowMap: Map<number, { x: number; text: string }[]> = new Map();
+          
+          for (const item of textContent.items as any[]) {
+            if (!item.str || item.str.trim() === '') continue;
+            
+            const y = Math.round(item.transform[5] / 3) * 3;
+            const x = item.transform[4];
+            
+            if (!rowMap.has(y)) {
+              rowMap.set(y, []);
+            }
+            rowMap.get(y)!.push({ x, text: item.str });
+          }
+          
+          const sortedYs = Array.from(rowMap.keys()).sort((a, b) => b - a);
+          
+          for (const y of sortedYs) {
+            const rowItems = rowMap.get(y)!;
+            rowItems.sort((a, b) => a.x - b.x);
+            
+            const cells: string[] = [];
+            let currentCell = '';
+            let lastX = -1000;
+            
+            for (const item of rowItems) {
+              if (lastX !== -1000 && item.x - lastX > 50) {
+                if (currentCell.trim()) {
+                  cells.push(currentCell.trim());
+                }
+                currentCell = item.text;
+              } else {
+                currentCell += (currentCell ? ' ' : '') + item.text;
+              }
+              lastX = item.x + (item.text.length * 5);
+            }
+            if (currentCell.trim()) {
+              cells.push(currentCell.trim());
+            }
+            
+            if (cells.length > 0) {
+              tableRows.push(cells);
+            }
+          }
         }
-        console.log(`[PDF Parse] PDF parsed successfully, text length: ${pdfText.length}`);
+        console.log(`[PDF Parse] Extracted ${tableRows.length} rows from PDF`);
       } catch (parseError: any) {
         console.error('[PDF Parse] pdfjs-dist library error:', parseError);
         return res.status(400).json({ 
@@ -2905,20 +3136,19 @@ export async function registerRoutes(
         });
       }
       
-      if (!pdfText || pdfText.trim().length === 0) {
+      if (tableRows.length === 0) {
         return res.status(400).json({ 
           error: 'The PDF appears to be empty or contains only images. Please use a text-based PDF estimate.' 
         });
       }
       
-      const parsedData = parseEstimatePDF(pdfText);
+      const parsedData = parseEstimateFromRows(tableRows);
       console.log(`[PDF Parse] Parsing complete, found ${parsedData.sections.length} sections`);
       
       res.json({ 
         success: true, 
         parsedData,
-        filename,
-        rawText: pdfText 
+        filename
       });
     } catch (error: any) {
       console.error('[PDF Parse] Unexpected error:', error);
