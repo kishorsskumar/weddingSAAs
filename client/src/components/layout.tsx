@@ -23,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import logo from "@assets/oakstreet_white_1764858814551.png";
-import mobileLogo from "@assets/OAK_1_1765218494736.jpg";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -67,7 +66,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hasOwnSidebar = PAGES_WITH_OWN_SIDEBAR.includes(location);
   const navItems = ALL_PAGES.filter((page) => allowedPages.includes(page.id));
 
-  const NavContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+  const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <motion.div 
         className="p-6"
@@ -75,11 +74,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <img 
-          src={isMobile ? mobileLogo : logo} 
-          alt="Oak Street Events" 
-          className={isMobile ? "h-12 w-auto mb-2 rounded" : "h-16 w-auto mb-2"} 
-        />
+        <img src={logo} alt="Oak Event" className="h-16 w-auto mb-2" />
         <p className="text-xs text-sidebar-foreground/60 mt-1">Crafting your Stories</p>
       </motion.div>
 
@@ -199,7 +194,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 border-r bg-sidebar">
-        <NavContent isMobile={false} />
+        <NavContent />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -210,7 +205,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 w-64 border-r-0">
-          <NavContent isMobile={true} />
+          <NavContent />
         </SheetContent>
       </Sheet>
 
