@@ -62,6 +62,7 @@ export const employees = pgTable("employees", {
   name: text("name").notNull(),
   employeeId: text("employee_id").notNull().unique(),
   userId: varchar("user_id").references(() => users.id),
+  managerUserId: varchar("manager_user_id").references(() => users.id),
   joinDate: date("join_date").notNull(),
   designation: text("designation").notNull(),
   department: text("department"),
@@ -75,6 +76,8 @@ export const employees = pgTable("employees", {
   panNumber: text("pan_number"),
   totalLeavesPerYear: integer("total_leaves_per_year").default(24),
   leaveDate: date("leave_date"),
+  duties: text("duties"),
+  responsibilities: text("responsibilities"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -125,9 +128,12 @@ export const leaveRequests = pgTable("leave_requests", {
   employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
+  leaveType: text("leave_type").default('casual'),
   reason: text("reason"),
-  status: text("status").notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  status: text("status").notNull().default('pending'),
   managerId: varchar("manager_id").references(() => users.id),
+  managerComments: text("manager_comments"),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1077,3 +1083,43 @@ export const employeeLeaveBalances = pgTable("employee_leave_balances", {
 export const insertEmployeeLeaveBalanceSchema = createInsertSchema(employeeLeaveBalances).omit({ id: true, createdAt: true });
 export type InsertEmployeeLeaveBalance = z.infer<typeof insertEmployeeLeaveBalanceSchema>;
 export type EmployeeLeaveBalance = typeof employeeLeaveBalances.$inferSelect;
+
+// Employee Portal - Expense Reimbursement Requests
+export const expenseReimbursements = pgTable("expense_reimbursements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  requestDate: date("request_date").notNull(),
+  expenseDate: date("expense_date").notNull(),
+  category: text("category").notNull(), // 'travel', 'food', 'accommodation', 'supplies', 'other'
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  voucherPath: text("voucher_path"), // File path for uploaded voucher/receipt
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'rejected', 'paid'
+  approvedAmount: decimal("approved_amount", { precision: 10, scale: 2 }),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  managerComments: text("manager_comments"),
+  paidDate: date("paid_date"),
+  bankId: varchar("bank_id").references(() => banks.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExpenseReimbursementSchema = createInsertSchema(expenseReimbursements).omit({ id: true, createdAt: true });
+export type InsertExpenseReimbursement = z.infer<typeof insertExpenseReimbursementSchema>;
+export type ExpenseReimbursement = typeof expenseReimbursements.$inferSelect;
+
+// Public Holidays (Managed by Superadmin)
+export const publicHolidays = pgTable("public_holidays", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: date("date").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isNational: boolean("is_national").default(true), // National vs regional holiday
+  year: integer("year").notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPublicHolidaySchema = createInsertSchema(publicHolidays).omit({ id: true, createdAt: true });
+export type InsertPublicHoliday = z.infer<typeof insertPublicHolidaySchema>;
+export type PublicHoliday = typeof publicHolidays.$inferSelect;
