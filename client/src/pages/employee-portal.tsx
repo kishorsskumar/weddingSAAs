@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -32,8 +32,15 @@ import {
   Receipt,
   PartyPopper,
   ClipboardList,
-  Upload
+  Upload,
+  Lock,
+  Eye,
+  EyeOff,
+  Users,
+  ArrowLeft,
+  Shield
 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 import { format, parseISO, differenceInDays } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -225,8 +232,18 @@ export default function EmployeePortal() {
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const canViewOtherEmployees = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'manager';
 
   const { data: profile, isLoading: profileLoading, error: profileError } = useQuery<EmployeeProfile>({
     queryKey: ['/api/employee-portal/profile'],
@@ -292,6 +309,91 @@ export default function EmployeePortal() {
     queryKey: ['/api/employee-portal/duties'],
     enabled: !!profile,
   });
+
+  // Query for managed employees (managers/superadmins)
+  const { data: managedEmployees = [] } = useQuery<EmployeeProfile[]>({
+    queryKey: ['/api/employee-portal/managed-employees'],
+    queryFn: async () => {
+      const res = await fetch('/api/employee-portal/managed-employees', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: canViewOtherEmployees,
+  });
+
+  // Query for viewing a specific employee's portal (when selected)
+  const { data: viewedEmployeeData, isLoading: viewingLoading } = useQuery<{
+    employee: EmployeeProfile;
+    increments: EmployeeIncrement[];
+    appraisals: EmployeeAppraisal[];
+    leaveBalance: LeaveBalance;
+    leaveRequests: LeaveRequest[];
+    salaryAdvances: SalaryAdvanceRequest[];
+    expenses: ExpenseReimbursement[];
+  }>({
+    queryKey: ['/api/employee-portal/view', selectedEmployeeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/employee-portal/view/${selectedEmployeeId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load employee data');
+      return res.json();
+    },
+    enabled: !!selectedEmployeeId && canViewOtherEmployees,
+  });
+
+  // Password change mutation
+  const changePasswordMutation = useMutation({
+    mutationFn: async ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) => {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to change password');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setIsPasswordDialogOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
+  };
 
   const submitLeaveRequest = useMutation({
     mutationFn: async (data: { startDate: string; endDate: string; leaveType: string; reason: string }) => {
@@ -438,7 +540,253 @@ export default function EmployeePortal() {
           <h1 className="text-2xl md:text-3xl font-bold text-oak-dark">Employee Portal</h1>
           <p className="text-muted-foreground">Welcome back, {profile.name}</p>
         </div>
+        <div className="flex gap-2">
+          {canViewOtherEmployees && managedEmployees.length > 0 && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="gap-2" data-testid="button-view-team">
+                  <Users className="h-4 w-4" />
+                  View Team ({managedEmployees.length})
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    {user?.role === 'superadmin' ? 'All Employees' : 'Your Team'}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {user?.role === 'superadmin' 
+                      ? 'View any employee portal as superadmin'
+                      : 'View portals of employees assigned to you'
+                    }
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  {managedEmployees.map((emp) => (
+                    <div 
+                      key={emp.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setSelectedEmployeeId(emp.id);
+                      }}
+                      data-testid={`employee-card-${emp.id}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{emp.name}</div>
+                          <div className="text-sm text-muted-foreground">{emp.designation}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm">
+                        <div className="font-mono text-muted-foreground">{emp.employeeId}</div>
+                        <div className="text-muted-foreground">{emp.department || 'No Dept'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+          <Button variant="outline" className="gap-2" onClick={() => setIsPasswordDialogOpen(true)} data-testid="button-change-password">
+            <Lock className="h-4 w-4" />
+            <span className="hidden md:inline">Change Password</span>
+          </Button>
+        </div>
       </div>
+
+      {/* Password Change Dialog */}
+      <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Change Password
+            </DialogTitle>
+            <DialogDescription>
+              Update your account password. You'll need your current password.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Current Password</Label>
+              <div className="relative">
+                <Input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  data-testid="input-current-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <div className="relative">
+                <Input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  data-testid="input-new-password"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Minimum 8 characters</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm New Password</Label>
+              <Input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                data-testid="input-confirm-password"
+              />
+            </div>
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={changePasswordMutation.isPending}
+              data-testid="button-submit-password"
+            >
+              {changePasswordMutation.isPending ? 'Changing...' : 'Change Password'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Viewing Employee Modal */}
+      <Dialog open={!!selectedEmployeeId} onOpenChange={(open) => !open && setSelectedEmployeeId(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {viewingLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : viewedEmployeeData ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedEmployeeId(null)}>
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <div>
+                    <DialogTitle className="flex items-center gap-2">
+                      {viewedEmployeeData.employee.name}
+                      <Badge variant="outline">{viewedEmployeeData.employee.employeeId}</Badge>
+                    </DialogTitle>
+                    <DialogDescription>
+                      {viewedEmployeeData.employee.designation} • {viewedEmployeeData.employee.department || 'No Department'}
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="grid gap-4">
+                {/* Employee Overview */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card>
+                    <CardContent className="p-3">
+                      <div className="text-xs text-muted-foreground">Salary</div>
+                      <div className="font-semibold">{formatCurrency(viewedEmployeeData.employee.salary)}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3">
+                      <div className="text-xs text-muted-foreground">Join Date</div>
+                      <div className="font-semibold">{formatDate(viewedEmployeeData.employee.joinDate)}</div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3">
+                      <div className="text-xs text-muted-foreground">Leave Balance</div>
+                      <div className="font-semibold">
+                        {viewedEmployeeData.leaveBalance?.leavesRemaining || 0} days
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-3">
+                      <div className="text-xs text-muted-foreground">Pending Requests</div>
+                      <div className="font-semibold">
+                        {viewedEmployeeData.leaveRequests.filter(r => r.status === 'pending').length +
+                         viewedEmployeeData.salaryAdvances.filter(r => r.status === 'pending').length +
+                         viewedEmployeeData.expenses.filter(r => r.status === 'pending').length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Contact Info */}
+                <Card>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-sm">Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="py-2 grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-muted-foreground">Email:</span> {viewedEmployeeData.employee.email || '-'}</div>
+                    <div><span className="text-muted-foreground">Phone:</span> {viewedEmployeeData.employee.phone || '-'}</div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Address:</span> {viewedEmployeeData.employee.address}</div>
+                    <div className="col-span-2"><span className="text-muted-foreground">Emergency:</span> {viewedEmployeeData.employee.emergencyContact}</div>
+                  </CardContent>
+                </Card>
+
+                {/* Recent Activity */}
+                {(viewedEmployeeData.leaveRequests.length > 0 || viewedEmployeeData.salaryAdvances.length > 0 || viewedEmployeeData.expenses.length > 0) && (
+                  <Card>
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm">Recent Requests</CardTitle>
+                    </CardHeader>
+                    <CardContent className="py-2 space-y-2 max-h-48 overflow-y-auto">
+                      {viewedEmployeeData.leaveRequests.slice(0, 5).map(req => (
+                        <div key={req.id} className="flex justify-between items-center text-sm p-2 bg-muted/50 rounded">
+                          <span>Leave: {formatDate(req.startDate)} - {formatDate(req.endDate)}</span>
+                          {getStatusBadge(req.status)}
+                        </div>
+                      ))}
+                      {viewedEmployeeData.salaryAdvances.slice(0, 3).map(req => (
+                        <div key={req.id} className="flex justify-between items-center text-sm p-2 bg-muted/50 rounded">
+                          <span>Advance: {formatCurrency(req.amount)}</span>
+                          {getStatusBadge(req.status)}
+                        </div>
+                      ))}
+                      {viewedEmployeeData.expenses.slice(0, 3).map(req => (
+                        <div key={req.id} className="flex justify-between items-center text-sm p-2 bg-muted/50 rounded">
+                          <span>Expense: {formatCurrency(req.amount)} - {req.category}</span>
+                          {getStatusBadge(req.status)}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Failed to load employee data
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 md:grid-cols-9 gap-1">

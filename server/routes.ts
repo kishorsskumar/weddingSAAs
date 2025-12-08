@@ -759,6 +759,39 @@ export async function registerRoutes(
     });
   });
 
+  // Password change endpoint
+  app.post('/api/auth/change-password', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+    
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!isValidPassword) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+    
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    await storage.updateUser(userId, { password: hashedNewPassword });
+    
+    res.json({ success: true, message: 'Password changed successfully' });
+  });
+
   // Helper function to verify admin/superadmin access
   const verifyAdminAccess = async (req: any, res: any): Promise<{ user: any } | null> => {
     const userId = (req.session as any).userId;
@@ -1678,6 +1711,86 @@ export async function registerRoutes(
       res.json(advance);
     } catch (error) {
       res.status(400).json({ error: 'Failed to update salary advance' });
+    }
+  });
+
+  // Manager/Superadmin - Get employees they can view
+  app.get('/api/employee-portal/managed-employees', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      const allEmployees = await storage.getAllEmployees();
+      
+      if (user.role === 'superadmin') {
+        // Superadmin can see all employees
+        res.json(allEmployees);
+      } else if (user.role === 'admin' || user.role === 'manager') {
+        // Managers can only see their assigned employees
+        const managedEmployees = allEmployees.filter(emp => emp.managerUserId === userId);
+        res.json(managedEmployees);
+      } else {
+        // Regular users can't see other employees
+        res.json([]);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get managed employees' });
+    }
+  });
+
+  // Manager/Superadmin - View specific employee's portal data
+  app.get('/api/employee-portal/view/:employeeId', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      const employee = await storage.getEmployee(req.params.employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+      
+      // Check access rights
+      const isSuperadmin = user.role === 'superadmin';
+      const isManager = (user.role === 'admin' || user.role === 'manager') && employee.managerUserId === userId;
+      
+      if (!isSuperadmin && !isManager) {
+        return res.status(403).json({ error: 'Not authorized to view this employee' });
+      }
+      
+      // Get all employee data
+      const increments = await storage.getEmployeeIncrements(employee.id);
+      const appraisals = await storage.getEmployeeAppraisals(employee.id);
+      const leaveBalance = await storage.getOrCreateCurrentFiscalYearLeaveBalance(employee.id);
+      const leaveRequests = await storage.getLeaveRequestsByEmployee(employee.id);
+      const salaryAdvances = await storage.getSalaryAdvanceRequests(employee.id);
+      const allExpenses = await storage.getAllExpenseReimbursements();
+      const expenses = allExpenses.filter(e => e.employeeId === employee.id);
+      
+      res.json({
+        employee,
+        increments,
+        appraisals,
+        leaveBalance,
+        leaveRequests,
+        salaryAdvances,
+        expenses,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get employee data' });
     }
   });
 

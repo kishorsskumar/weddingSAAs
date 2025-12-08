@@ -250,7 +250,7 @@ export default function Admin() {
         body: JSON.stringify({
           ...data,
           salary: parseFloat(data.salary),
-          managerUserId: data.managerUserId || null,
+          managerUserId: data.managerUserId && data.managerUserId !== 'none' ? data.managerUserId : null,
         }),
       });
       if (!res.ok) {
@@ -1129,7 +1129,7 @@ export default function Admin() {
                               <SelectValue placeholder="Select a manager (optional)" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">No Manager</SelectItem>
+                              <SelectItem value="none">No Manager</SelectItem>
                               {managers.map(manager => (
                                 <SelectItem key={manager.id} value={manager.id}>
                                   {manager.name} ({manager.role})
