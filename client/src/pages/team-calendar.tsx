@@ -39,7 +39,7 @@ export default function TeamCalendar() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings/all'] });
       setIsDialogOpen(false);
     },
   });
@@ -55,7 +55,7 @@ export default function TeamCalendar() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings/all'] });
       setEditingMeeting(null);
     },
   });
@@ -67,7 +67,7 @@ export default function TeamCalendar() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/meetings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/meetings/all'] });
     },
   });
 
