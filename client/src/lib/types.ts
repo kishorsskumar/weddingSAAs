@@ -26,12 +26,25 @@ export interface Employee {
   id: string;
   name: string;
   employeeId: string;
+  userId?: string | null;
+  managerUserId?: string | null;
+  dateOfBirth?: string | null;
   joinDate: string;
+  contractRenewalDate?: string | null;
   designation: string;
+  department?: string | null;
   salary: string;
   address: string;
   emergencyContact: string;
+  phone?: string | null;
+  email?: string | null;
+  bankAccountNumber?: string | null;
+  bankIfscCode?: string | null;
+  panNumber?: string | null;
+  totalLeavesPerYear?: number;
   leaveDate?: string | null;
+  duties?: string | null;
+  responsibilities?: string | null;
   createdAt?: string;
 }
 

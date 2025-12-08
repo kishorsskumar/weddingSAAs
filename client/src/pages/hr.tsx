@@ -264,6 +264,10 @@ export default function HR() {
             <Input {...register("phone")} placeholder="Phone Number (optional)" data-testid="input-phone" />
           </div>
           <div className="space-y-2">
+            <Label>Date of Birth</Label>
+            <Input type="date" {...register("dateOfBirth")} data-testid="input-date-of-birth" />
+          </div>
+          <div className="space-y-2">
             <Label>Designation *</Label>
             <Input {...register("designation")} required placeholder="e.g. Wedding Planner" data-testid="input-designation" />
           </div>
@@ -302,6 +306,7 @@ export default function HR() {
         name: employee.name,
         designation: employee.designation,
         salary: employee.salary,
+        dateOfBirth: employee.dateOfBirth || '',
         joinDate: employee.joinDate,
         leaveDate: employee.leaveDate || '',
         address: employee.address,
@@ -313,6 +318,9 @@ export default function HR() {
       const submitData = { ...data };
       if (!submitData.leaveDate) {
         submitData.leaveDate = null;
+      }
+      if (!submitData.dateOfBirth) {
+        submitData.dateOfBirth = null;
       }
       updateMutation.mutate({ id: employee.id, data: submitData });
     };
@@ -327,6 +335,10 @@ export default function HR() {
           <div className="space-y-2">
             <Label>Name</Label>
             <Input {...register("name")} required data-testid="input-edit-name" />
+          </div>
+          <div className="space-y-2">
+            <Label>Date of Birth</Label>
+            <Input type="date" {...register("dateOfBirth")} data-testid="input-edit-date-of-birth" />
           </div>
           <div className="space-y-2">
             <Label>Designation</Label>
