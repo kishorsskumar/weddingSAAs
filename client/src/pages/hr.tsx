@@ -441,7 +441,7 @@ export default function HR() {
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                          <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Edit Employee</DialogTitle>
                             </DialogHeader>
@@ -489,7 +489,7 @@ export default function HR() {
                 <Plus className="h-4 w-4" /> New Employee
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-[95vw] sm:max-w-lg">
+            <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Employee</DialogTitle>
                 <DialogDescription>
