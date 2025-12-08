@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
+import { format } from "date-fns";
+
+type PublicHoliday = {
+  id: string;
+  name: string;
+  date: string;
+  year: number;
+  isNational: boolean;
+  createdBy: string | null;
+};
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard" },
@@ -60,6 +70,16 @@ export default function Admin() {
   const [editRoleLabel, setEditRoleLabel] = useState('');
   const [editRoleDescription, setEditRoleDescription] = useState('');
 
+  const [isHolidayDialogOpen, setIsHolidayDialogOpen] = useState(false);
+  const [isEditHolidayDialogOpen, setIsEditHolidayDialogOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(null);
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayIsNational, setNewHolidayIsNational] = useState(true);
+  const [editHolidayName, setEditHolidayName] = useState('');
+  const [editHolidayDate, setEditHolidayDate] = useState('');
+  const [editHolidayIsNational, setEditHolidayIsNational] = useState(true);
+
   const { data: users = [], isLoading: usersLoading, error: usersError } = useQuery<User[]>({
     queryKey: ['/api/users'],
     queryFn: async () => {
@@ -88,12 +108,35 @@ export default function Admin() {
     refetchOnMount: true,
   });
 
+  const { data: holidays = [], isLoading: holidaysLoading } = useQuery<PublicHoliday[]>({
+    queryKey: ['/api/public-holidays'],
+    queryFn: async () => {
+      const res = await fetch('/api/public-holidays', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch holidays');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    enabled: isSuperAdmin,
+  });
+
   useEffect(() => {
     if (editingRole) {
       setEditRoleLabel(editingRole.label);
       setEditRoleDescription(editingRole.description || '');
     }
   }, [editingRole]);
+
+  useEffect(() => {
+    if (editingHoliday) {
+      setEditHolidayName(editingHoliday.name);
+      setEditHolidayDate(editingHoliday.date);
+      setEditHolidayIsNational(editingHoliday.isNational);
+    }
+  }, [editingHoliday]);
 
   const getRoleLabel = (roleName: string) => {
     const role = roles.find(r => r.name === roleName);
@@ -110,6 +153,12 @@ export default function Admin() {
   const resetNewRoleForm = () => {
     setNewRoleLabel('');
     setNewRoleDescription('');
+  };
+
+  const resetNewHolidayForm = () => {
+    setNewHolidayName('');
+    setNewHolidayDate('');
+    setNewHolidayIsNational(true);
   };
 
   const createMutation = useMutation({
@@ -220,6 +269,51 @@ export default function Admin() {
     },
   });
 
+  const createHolidayMutation = useMutation({
+    mutationFn: async (data: { name: string; date: string; year: number; isNational: boolean }) => {
+      const res = await fetch('/api/public-holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create holiday');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/public-holidays'] });
+      setIsHolidayDialogOpen(false);
+      resetNewHolidayForm();
+    },
+  });
+
+  const updateHolidayMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name: string; date: string; year: number; isNational: boolean } }) => {
+      const res = await fetch(`/api/public-holidays/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update holiday');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/public-holidays'] });
+      setIsEditHolidayDialogOpen(false);
+      setEditingHoliday(null);
+    },
+  });
+
+  const deleteHolidayMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/public-holidays/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete holiday');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/public-holidays'] });
+    },
+  });
+
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setEditRole(user.role);
@@ -229,6 +323,38 @@ export default function Admin() {
   const openEditRoleDialog = (role: Role) => {
     setEditingRole(role);
     setIsEditRoleDialogOpen(true);
+  };
+
+  const openEditHolidayDialog = (holiday: PublicHoliday) => {
+    setEditingHoliday(holiday);
+    setIsEditHolidayDialogOpen(true);
+  };
+
+  const handleCreateHoliday = (e: React.FormEvent) => {
+    e.preventDefault();
+    const date = new Date(newHolidayDate);
+    createHolidayMutation.mutate({
+      name: newHolidayName,
+      date: newHolidayDate,
+      year: date.getFullYear(),
+      isNational: newHolidayIsNational,
+    });
+  };
+
+  const handleUpdateHoliday = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingHoliday) {
+      const date = new Date(editHolidayDate);
+      updateHolidayMutation.mutate({
+        id: editingHoliday.id,
+        data: {
+          name: editHolidayName,
+          date: editHolidayDate,
+          year: date.getFullYear(),
+          isNational: editHolidayIsNational,
+        },
+      });
+    }
   };
 
   const handleUpdateUser = () => {
@@ -285,9 +411,10 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-3' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -566,7 +693,164 @@ export default function Admin() {
             </Card>
           </TabsContent>
         )}
+
+        {isSuperAdmin && (
+          <TabsContent value="holidays" className="mt-4">
+            <div className="flex justify-end mb-4">
+              <Dialog open={isHolidayDialogOpen} onOpenChange={(open) => {
+                setIsHolidayDialogOpen(open);
+                if (!open) resetNewHolidayForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-holiday">
+                    <Plus className="h-4 w-4" /> New Holiday
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-[95vw] sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Add Public Holiday</DialogTitle>
+                    <DialogDescription>Add a new public holiday to the calendar</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateHoliday} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Holiday Name</Label>
+                      <Input 
+                        value={newHolidayName}
+                        onChange={(e) => setNewHolidayName(e.target.value)}
+                        required 
+                        placeholder="e.g., Diwali, Independence Day" 
+                        data-testid="input-holiday-name" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Date</Label>
+                      <Input 
+                        type="date"
+                        value={newHolidayDate}
+                        onChange={(e) => setNewHolidayDate(e.target.value)}
+                        required 
+                        data-testid="input-holiday-date" 
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="new-holiday-national"
+                        checked={newHolidayIsNational}
+                        onCheckedChange={(checked) => setNewHolidayIsNational(checked as boolean)}
+                        data-testid="checkbox-holiday-national"
+                      />
+                      <Label htmlFor="new-holiday-national" className="text-sm">National Holiday</Label>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={createHolidayMutation.isPending} data-testid="button-create-holiday">
+                      {createHolidayMutation.isPending ? 'Creating...' : 'Add Holiday'}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <Card>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg">Manage Public Holidays</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+                {holidaysLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading holidays...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {holidays.map((holiday) => (
+                      <div key={holiday.id} className="border rounded-lg p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Calendar className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium flex items-center gap-2">
+                              {holiday.name}
+                              {holiday.isNational && (
+                                <Badge variant="secondary" className="text-xs">National</Badge>
+                              )}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {format(new Date(holiday.date), 'dd MMM yyyy')}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => openEditHolidayDialog(holiday)}
+                            data-testid={`button-edit-holiday-${holiday.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => deleteHolidayMutation.mutate(holiday.id)}
+                            data-testid={`button-delete-holiday-${holiday.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    {holidays.length === 0 && (
+                      <p className="text-center py-8 text-muted-foreground text-sm">No public holidays configured</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
+
+      <Dialog open={isEditHolidayDialogOpen} onOpenChange={setIsEditHolidayDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Holiday</DialogTitle>
+            <DialogDescription>Update holiday details</DialogDescription>
+          </DialogHeader>
+          {editingHoliday && (
+            <form onSubmit={handleUpdateHoliday} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Holiday Name</Label>
+                <Input 
+                  value={editHolidayName}
+                  onChange={(e) => setEditHolidayName(e.target.value)}
+                  required 
+                  data-testid="input-edit-holiday-name" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input 
+                  type="date"
+                  value={editHolidayDate}
+                  onChange={(e) => setEditHolidayDate(e.target.value)}
+                  required 
+                  data-testid="input-edit-holiday-date" 
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="edit-holiday-national"
+                  checked={editHolidayIsNational}
+                  onCheckedChange={(checked) => setEditHolidayIsNational(checked as boolean)}
+                  data-testid="checkbox-edit-holiday-national"
+                />
+                <Label htmlFor="edit-holiday-national" className="text-sm">National Holiday</Label>
+              </div>
+              <Button type="submit" className="w-full" disabled={updateHolidayMutation.isPending} data-testid="button-save-holiday">
+                {updateHolidayMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
