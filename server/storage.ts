@@ -212,6 +212,8 @@ export interface IStorage {
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
   deleteEmployee(id: string): Promise<void>;
+  generateEmployeeCode(): Promise<string>;
+  createEmployeeWithUser(employeeData: InsertEmployee, password: string): Promise<{ employee: Employee; user: User }>;
   
   // Daybook
   getAllDaybookEntries(): Promise<DaybookEntry[]>;
@@ -733,6 +735,60 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEmployee(id: string): Promise<void> {
     await db.delete(employees).where(eq(employees.id, id));
+  }
+
+  async generateEmployeeCode(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const documentType = 'employee_code';
+    
+    const [sequence] = await db.select().from(documentSequences)
+      .where(eq(documentSequences.documentType, documentType));
+    
+    if (!sequence) {
+      await db.insert(documentSequences).values({
+        documentType,
+        prefix: `OAK-${year}-`,
+        nextNumber: 1,
+        paddingLength: 4
+      });
+      return `OAK-${year}-0001`;
+    }
+    
+    const prefix = sequence.prefix.includes(year.toString()) 
+      ? sequence.prefix 
+      : `OAK-${year}-`;
+    
+    const code = `${prefix}${String(sequence.nextNumber).padStart(sequence.paddingLength, '0')}`;
+    
+    await db.update(documentSequences)
+      .set({ 
+        nextNumber: sequence.nextNumber + 1,
+        prefix: prefix
+      })
+      .where(eq(documentSequences.documentType, documentType));
+    
+    return code;
+  }
+
+  async createEmployeeWithUser(employeeData: InsertEmployee, hashedPassword: string): Promise<{ employee: Employee; user: User }> {
+    const newUser = await db.insert(users).values({
+      name: employeeData.name,
+      email: employeeData.email!,
+      password: hashedPassword,
+      role: 'employee'
+    }).returning();
+    
+    const user = newUser[0];
+    
+    const newEmployee = await db.insert(employees).values({
+      ...employeeData,
+      userId: user.id
+    }).returning();
+    
+    const employee = newEmployee[0];
+    
+    return { employee, user };
   }
 
   // Daybook

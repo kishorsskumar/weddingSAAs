@@ -2155,6 +2155,83 @@ export async function registerRoutes(
     }
   });
 
+  // Admin Routes - Create Employee (Superadmin only)
+  app.post('/api/admin/employees', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can create employees' });
+    }
+    
+    try {
+      const { name, email, phone, joinDate, designation, department, salary, address, emergencyContact, managerUserId, bankAccountNumber, bankIfscCode, panNumber, duties, responsibilities, totalLeavesPerYear, password } = req.body;
+      
+      if (!name || !email || !joinDate || !designation || !salary || !address || !emergencyContact || !password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'User with this email already exists' });
+      }
+      
+      const employeeCode = await storage.generateEmployeeCode();
+      
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const result = await storage.createEmployeeWithUser({
+        name,
+        employeeId: employeeCode,
+        email,
+        phone,
+        joinDate,
+        designation,
+        department,
+        salary: salary.toString(),
+        address,
+        emergencyContact,
+        managerUserId: managerUserId || null,
+        bankAccountNumber,
+        bankIfscCode,
+        panNumber,
+        duties,
+        responsibilities,
+        totalLeavesPerYear: totalLeavesPerYear || 24,
+      }, hashedPassword);
+      
+      res.json({
+        employee: result.employee,
+        credentials: {
+          employeeId: employeeCode,
+          email: email,
+          password: password
+        }
+      });
+    } catch (error: any) {
+      console.error('Employee creation error:', error);
+      res.status(400).json({ error: error.message || 'Failed to create employee' });
+    }
+  });
+
+  // Get all managers (for manager assignment dropdown)
+  app.get('/api/admin/managers', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const allUsers = await storage.getAllUsers();
+      const managers = allUsers.filter(u => 
+        u.role === 'admin' || u.role === 'superadmin' || u.role === 'manager'
+      );
+      res.json(managers.map(m => ({ id: m.id, name: m.name, email: m.email, role: m.role })));
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch managers' });
+    }
+  });
+
   // Admin Routes - Manage Expense Reimbursements
   app.get('/api/admin/expense-reimbursements', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);
