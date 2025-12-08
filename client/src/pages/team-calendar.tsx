@@ -10,7 +10,6 @@ import { ChevronLeft, ChevronRight, Clock, Plus, User, Pencil, Trash2, X } from 
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/context/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function TeamCalendar() {
@@ -19,8 +18,6 @@ export default function TeamCalendar() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'superadmin';
 
   const { data: meetings = [] } = useQuery<Meeting[]>({
     queryKey: ['/api/meetings/all'],
@@ -336,15 +333,13 @@ export default function TeamCalendar() {
                           <Clock className="h-2.5 w-2.5" />
                           {meeting.time} - {meeting.title}
                         </span>
-                        {isSuperAdmin && (
-                          <button
-                            onClick={(e) => handleDelete(e, meeting.id, meeting.title)}
-                            className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity ml-1 flex-shrink-0"
-                            data-testid={`button-delete-calendar-meeting-${meeting.id}`}
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
+                        <button
+                          onClick={(e) => handleDelete(e, meeting.id, meeting.title)}
+                          className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity ml-1 flex-shrink-0"
+                          data-testid={`button-delete-calendar-meeting-${meeting.id}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
                     ))}
                     {meetingCount > 2 && (
@@ -394,26 +389,26 @@ export default function TeamCalendar() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="font-semibold text-blue-900">{meeting.title}</h4>
-                      {isSuperAdmin && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                            onClick={() => setEditingMeeting(meeting)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={(e) => handleDelete(e, meeting.id, meeting.title)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      )}
+                      <div className="flex gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                          onClick={() => setEditingMeeting(meeting)}
+                          data-testid={`button-edit-meeting-${meeting.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => handleDelete(e, meeting.id, meeting.title)}
+                          data-testid={`button-delete-meeting-${meeting.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="text-sm text-blue-800 space-y-0.5">
                       <p className="flex items-center gap-2">
