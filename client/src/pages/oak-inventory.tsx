@@ -5277,7 +5277,9 @@ function DecorPlanningSection({
   const handleDownloadPDF = async (item: ProductionDecorItem) => {
     try {
       const jsPDF = (await import('jspdf')).default;
-      const elements = decorElements.filter(e => e.decorItemId === item.id);
+      const elements = decorElements
+        .filter(e => e.decorItemId === item.id)
+        .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
       
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -5602,7 +5604,9 @@ function DecorPlanningSection({
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredItems.map((item) => {
             const colorScheme = PASTEL_COLORS[item.pastelColor || 'blue'];
-            const elements = decorElements.filter(e => e.decorItemId === item.id);
+            const elements = decorElements
+              .filter(e => e.decorItemId === item.id)
+              .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime());
             const isExpanded = expandedCards.has(item.id);
             const linkedEvent = getLinkedEvent(item.eventId);
 
@@ -6290,7 +6294,10 @@ function DecorPlanningSection({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {decorElements.filter(e => e.decorItemId === viewingItem.id).map((el) => {
+                      {decorElements
+                        .filter(e => e.decorItemId === viewingItem.id)
+                        .sort((a, b) => new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime())
+                        .map((el) => {
                         const invItem = inventoryItems.find(inv => inv.id === el.linkedInventoryItemId);
                         return (
                           <TableRow key={el.id}>
