@@ -978,7 +978,10 @@ export const productionDecorElements = pgTable("production_decor_elements", {
   linkedInventoryItemId: varchar("linked_inventory_item_id").references(() => inventoryItems.id),
   externalItemName: text("external_item_name"), // For items not in inventory
   source: text("source").notNull().default('in_stock'), // 'in_stock', 'to_buy', 'to_rent'
-  assignedPersonVendor: text("assigned_person_vendor"), // Person or vendor name
+  startTime: text("start_time"), // Start time for production task (e.g., '09:00')
+  endTime: text("end_time"), // End time for production task (e.g., '17:00')
+  responsible: text("responsible"), // Person responsible for this task
+  assignedPersonVendor: text("assigned_person_vendor"), // Person or vendor name (legacy)
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
