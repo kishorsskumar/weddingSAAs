@@ -23,6 +23,42 @@ export function PhotoUploader({ currentPhotoUrl, onPhotoChange, name = "" }: Pho
       .slice(0, 2);
   };
 
+  const compressImage = (file: File, maxWidth: number = 400, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -40,46 +76,12 @@ export function PhotoUploader({ currentPhotoUrl, onPhotoChange, name = "" }: Pho
     setUploading(true);
 
     try {
-      const uploadRes = await fetch('/api/objects/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      
-      if (!uploadRes.ok) {
-        throw new Error('Failed to get upload URL');
-      }
-      
-      const { uploadURL } = await uploadRes.json();
-
-      const putRes = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-
-      if (!putRes.ok) {
-        throw new Error('Failed to upload file');
-      }
-
-      const finalizeRes = await fetch('/api/objects/finalize', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadURL }),
-      });
-
-      if (!finalizeRes.ok) {
-        throw new Error('Failed to finalize upload');
-      }
-
-      const { objectPath } = await finalizeRes.json();
-      
-      setPreviewUrl(objectPath);
-      onPhotoChange(objectPath);
+      const compressedDataUrl = await compressImage(file, 400, 0.8);
+      setPreviewUrl(compressedDataUrl);
+      onPhotoChange(compressedDataUrl);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload photo. Please try again.');
+      alert('Failed to process photo. Please try again.');
     } finally {
       setUploading(false);
     }

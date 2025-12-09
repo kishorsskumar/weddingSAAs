@@ -2018,7 +2018,7 @@ export async function registerRoutes(
           }, 0);
           
           // Calculate loss of pay (leaves beyond balance)
-          const totalLeaves = leaveBalance?.totalLeaves || 24;
+          const totalLeaves = leaveBalance?.allocated || 24;
           const lossOfPayDays = Math.max(0, leaveDaysTaken - totalLeaves);
           const dailyRate = parseFloat(employee.salary) / 30; // Assuming 30 days/month
           const lossOfPayAmount = lossOfPayDays * dailyRate;
