@@ -46,12 +46,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { pageTransition, staggerContainer, staggerItem, TIMING } from "@/lib/animations";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface EmployeeProfile {
   id: string;
   name: string;
   employeeId: string;
   userId: string | null;
+  photoUrl: string | null;
+  dateOfBirth: string | null;
   joinDate: string;
   designation: string;
   department: string | null;
@@ -932,6 +935,18 @@ export default function EmployeePortal() {
                   <CardDescription>Your personal and employment details</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4 pb-4 border-b">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src={profile.photoUrl || undefined} alt={profile.name} />
+                      <AvatarFallback className="text-lg bg-primary/10">
+                        {profile.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-lg font-semibold">{profile.name}</p>
+                      <p className="text-sm text-muted-foreground">{profile.designation}</p>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-3">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     <div>
