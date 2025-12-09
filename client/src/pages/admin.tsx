@@ -25,6 +25,16 @@ type PublicHoliday = {
   createdBy: string | null;
 };
 
+type LeaveCategory = {
+  id: string;
+  name: string;
+  description: string | null;
+  defaultAnnualAllowance: number;
+  isSystem: boolean;
+  createdBy: string | null;
+  createdAt: string | null;
+};
+
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard" },
   { id: "event-calendar", label: "Event Calendar" },
@@ -81,6 +91,17 @@ export default function Admin() {
   const [editHolidayName, setEditHolidayName] = useState('');
   const [editHolidayDate, setEditHolidayDate] = useState('');
   const [editHolidayIsNational, setEditHolidayIsNational] = useState(true);
+
+  // Leave Categories state
+  const [isLeaveCategoryDialogOpen, setIsLeaveCategoryDialogOpen] = useState(false);
+  const [isEditLeaveCategoryDialogOpen, setIsEditLeaveCategoryDialogOpen] = useState(false);
+  const [editingLeaveCategory, setEditingLeaveCategory] = useState<LeaveCategory | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDescription, setNewCategoryDescription] = useState('');
+  const [newCategoryAllowance, setNewCategoryAllowance] = useState(12);
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editCategoryDescription, setEditCategoryDescription] = useState('');
+  const [editCategoryAllowance, setEditCategoryAllowance] = useState(12);
 
   const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -169,6 +190,21 @@ export default function Admin() {
         headers: { 'Cache-Control': 'no-cache' },
       });
       if (!res.ok) throw new Error('Failed to fetch holidays');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    enabled: isSuperAdmin,
+  });
+
+  const { data: leaveCategories = [], isLoading: leaveCategoriesLoading } = useQuery<LeaveCategory[]>({
+    queryKey: ['/api/leave-categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/leave-categories', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch leave categories');
       return res.json();
     },
     staleTime: 0,
@@ -500,6 +536,92 @@ export default function Admin() {
     },
   });
 
+  // Leave Category mutations
+  const createLeaveCategoryMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; defaultAnnualAllowance: number }) => {
+      const res = await fetch('/api/leave-categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create leave category');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-categories'] });
+      setIsLeaveCategoryDialogOpen(false);
+      resetNewLeaveCategoryForm();
+    },
+  });
+
+  const updateLeaveCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name?: string; description?: string; defaultAnnualAllowance?: number } }) => {
+      const res = await fetch(`/api/leave-categories/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update leave category');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-categories'] });
+      setIsEditLeaveCategoryDialogOpen(false);
+      setEditingLeaveCategory(null);
+    },
+  });
+
+  const deleteLeaveCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/leave-categories/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete leave category');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-categories'] });
+    },
+  });
+
+  const resetNewLeaveCategoryForm = () => {
+    setNewCategoryName('');
+    setNewCategoryDescription('');
+    setNewCategoryAllowance(12);
+  };
+
+  const openEditLeaveCategoryDialog = (category: LeaveCategory) => {
+    setEditingLeaveCategory(category);
+    setEditCategoryName(category.name);
+    setEditCategoryDescription(category.description || '');
+    setEditCategoryAllowance(category.defaultAnnualAllowance);
+    setIsEditLeaveCategoryDialogOpen(true);
+  };
+
+  const handleCreateLeaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    createLeaveCategoryMutation.mutate({
+      name: newCategoryName,
+      description: newCategoryDescription,
+      defaultAnnualAllowance: newCategoryAllowance,
+    });
+  };
+
+  const handleUpdateLeaveCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLeaveCategory) {
+      updateLeaveCategoryMutation.mutate({
+        id: editingLeaveCategory.id,
+        data: {
+          name: editingLeaveCategory.isSystem ? undefined : editCategoryName,
+          description: editingLeaveCategory.isSystem ? undefined : editCategoryDescription,
+          defaultAnnualAllowance: editCategoryAllowance,
+        },
+      });
+    }
+  };
+
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setEditRole(user.role);
@@ -597,10 +719,11 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-4' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-5' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="leave" data-testid="tab-leave">Leave</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
         </TabsList>
 
@@ -986,6 +1109,125 @@ export default function Admin() {
                     ))}
                     {holidays.length === 0 && (
                       <p className="text-center py-8 text-muted-foreground text-sm">No public holidays configured</p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="leave" className="mt-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Leave Categories
+                </CardTitle>
+                <Dialog open={isLeaveCategoryDialogOpen} onOpenChange={(open) => {
+                  setIsLeaveCategoryDialogOpen(open);
+                  if (!open) resetNewLeaveCategoryForm();
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2" data-testid="button-add-leave-category">
+                      <Plus className="h-4 w-4" /> Add Category
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Add Leave Category</DialogTitle>
+                      <DialogDescription>Create a new leave category for employees</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleCreateLeaveCategory} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Category Name</Label>
+                        <Input 
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="e.g., Maternity Leave"
+                          required 
+                          data-testid="input-category-name" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea 
+                          value={newCategoryDescription}
+                          onChange={(e) => setNewCategoryDescription(e.target.value)}
+                          placeholder="Optional description"
+                          data-testid="input-category-description" 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Default Annual Allowance (days)</Label>
+                        <Input 
+                          type="number"
+                          value={newCategoryAllowance}
+                          onChange={(e) => setNewCategoryAllowance(parseInt(e.target.value) || 0)}
+                          min={0}
+                          required 
+                          data-testid="input-category-allowance" 
+                        />
+                      </div>
+                      <Button type="submit" className="w-full" disabled={createLeaveCategoryMutation.isPending} data-testid="button-create-category">
+                        {createLeaveCategoryMutation.isPending ? 'Creating...' : 'Add Category'}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                  <p className="font-medium">Leave Reset Policy</p>
+                  <p className="mt-1">Leave balances automatically reset to default values on January 1st each year.</p>
+                </div>
+                
+                {leaveCategoriesLoading ? (
+                  <p>Loading leave categories...</p>
+                ) : (
+                  <div className="space-y-3">
+                    {leaveCategories.map((category) => (
+                      <div key={category.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`leave-category-${category.id}`}>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{category.name}</span>
+                            {category.isSystem && (
+                              <Badge variant="secondary" className="text-xs">System</Badge>
+                            )}
+                          </div>
+                          {category.description && (
+                            <div className="text-xs text-muted-foreground mt-1">{category.description}</div>
+                          )}
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Default: {category.defaultAnnualAllowance} days/year
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => openEditLeaveCategoryDialog(category)}
+                            data-testid={`button-edit-category-${category.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          {!category.isSystem && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={() => deleteLeaveCategoryMutation.mutate(category.id)}
+                              data-testid={`button-delete-category-${category.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {leaveCategories.length === 0 && (
+                      <p className="text-center py-8 text-muted-foreground text-sm">No leave categories configured</p>
                     )}
                   </div>
                 )}
@@ -1531,6 +1773,62 @@ export default function Admin() {
               </div>
               <Button type="submit" className="w-full" disabled={updateHolidayMutation.isPending} data-testid="button-save-holiday">
                 {updateHolidayMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditLeaveCategoryDialogOpen} onOpenChange={setIsEditLeaveCategoryDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Leave Category</DialogTitle>
+            <DialogDescription>
+              {editingLeaveCategory?.isSystem 
+                ? 'Update default allowance for this system category'
+                : 'Update leave category details'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          {editingLeaveCategory && (
+            <form onSubmit={handleUpdateLeaveCategory} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Category Name</Label>
+                <Input 
+                  value={editCategoryName}
+                  onChange={(e) => setEditCategoryName(e.target.value)}
+                  disabled={editingLeaveCategory.isSystem}
+                  className={editingLeaveCategory.isSystem ? "bg-muted" : ""}
+                  required 
+                  data-testid="input-edit-category-name" 
+                />
+                {editingLeaveCategory.isSystem && (
+                  <p className="text-xs text-muted-foreground">System categories cannot be renamed</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea 
+                  value={editCategoryDescription}
+                  onChange={(e) => setEditCategoryDescription(e.target.value)}
+                  disabled={editingLeaveCategory.isSystem}
+                  className={editingLeaveCategory.isSystem ? "bg-muted" : ""}
+                  data-testid="input-edit-category-description" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Default Annual Allowance (days)</Label>
+                <Input 
+                  type="number"
+                  value={editCategoryAllowance}
+                  onChange={(e) => setEditCategoryAllowance(parseInt(e.target.value) || 0)}
+                  min={0}
+                  required 
+                  data-testid="input-edit-category-allowance" 
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={updateLeaveCategoryMutation.isPending} data-testid="button-save-category">
+                {updateLeaveCategoryMutation.isPending ? 'Saving...' : 'Save Changes'}
               </Button>
             </form>
           )}

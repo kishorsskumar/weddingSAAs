@@ -2935,6 +2935,179 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Leave Categories (Superadmin only for management, all users can view)
+  app.get('/api/leave-categories', async (req, res) => {
+    const categories = await storage.getAllLeaveCategories();
+    res.json(categories);
+  });
+
+  app.post('/api/leave-categories', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage leave categories' });
+    }
+    
+    try {
+      const { name, description, defaultAnnualAllowance } = req.body;
+      const category = await storage.createLeaveCategory({
+        name,
+        description,
+        defaultAnnualAllowance: defaultAnnualAllowance || 12,
+        isSystem: false,
+        createdBy: userId
+      });
+      res.json(category);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create leave category' });
+    }
+  });
+
+  app.patch('/api/leave-categories/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage leave categories' });
+    }
+    
+    try {
+      const category = await storage.getLeaveCategory(req.params.id);
+      if (category?.isSystem) {
+        // Only allow updating allowance for system categories
+        const { defaultAnnualAllowance } = req.body;
+        const updated = await storage.updateLeaveCategory(req.params.id, { defaultAnnualAllowance });
+        return res.json(updated);
+      }
+      
+      const updated = await storage.updateLeaveCategory(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update leave category' });
+    }
+  });
+
+  app.delete('/api/leave-categories/:id', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can manage leave categories' });
+    }
+    
+    try {
+      const category = await storage.getLeaveCategory(req.params.id);
+      if (category?.isSystem) {
+        return res.status(400).json({ error: 'Cannot delete system leave categories' });
+      }
+      
+      await storage.deleteLeaveCategory(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete leave category' });
+    }
+  });
+
+  // Employee Leave Balances (Superadmin can view/edit all, employees can view their own)
+  app.get('/api/employee-leave-balances', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const { employeeId, year } = req.query;
+    const currentYear = year ? parseInt(year as string) : new Date().getFullYear();
+    
+    if (user.role === 'superadmin' || user.role === 'admin') {
+      if (employeeId) {
+        const balances = await storage.getEmployeeLeaveBalancesByYear(employeeId as string, currentYear);
+        return res.json(balances);
+      } else {
+        const balances = await storage.getAllEmployeeLeaveBalancesForYear(currentYear);
+        return res.json(balances);
+      }
+    } else {
+      // Regular employee - only their own balances
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const balances = await storage.getEmployeeLeaveBalancesByYear(employee.id, currentYear);
+      return res.json(balances);
+    }
+  });
+
+  app.post('/api/employee-leave-balances/initialize', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const { employeeId, year } = req.body;
+      const currentYear = year || new Date().getFullYear();
+      const balances = await storage.initializeEmployeeLeaveBalances(employeeId, currentYear);
+      res.json(balances);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to initialize leave balances' });
+    }
+  });
+
+  app.patch('/api/employee-leave-balances/adjust', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    // Verify superadmin role
+    const userId = (req.session as any).userId;
+    const user = await storage.getUser(userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Only superadmin can adjust leave balances' });
+    }
+    
+    try {
+      const { employeeId, categoryId, year, allocated, reason } = req.body;
+      
+      if (!employeeId || !categoryId || !year || allocated === undefined) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      const balance = await storage.adjustEmployeeLeaveBalance(
+        employeeId,
+        categoryId,
+        year,
+        allocated,
+        reason || 'Manual adjustment by superadmin',
+        userId
+      );
+      res.json(balance);
+    } catch (error) {
+      console.error('Error adjusting leave balance:', error);
+      res.status(400).json({ error: 'Failed to adjust leave balance' });
+    }
+  });
+
+  // Get leave balance adjustments history for an employee
+  app.get('/api/employee-leave-balances/:employeeId/adjustments', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const adjustments = await storage.getLeaveBalanceAdjustments(req.params.employeeId);
+      res.json(adjustments);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to fetch adjustment history' });
+    }
+  });
+
   // Admin - Assign manager to employee
   app.patch('/api/admin/employees/:id/manager', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);

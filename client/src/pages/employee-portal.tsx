@@ -80,9 +80,18 @@ interface LeaveRequest {
   startDate: string;
   endDate: string;
   leaveType: string;
+  categoryId: string | null;
   reason: string | null;
   status: string;
   createdAt: string;
+}
+
+interface LeaveCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  defaultAnnualAllowance: number;
+  isSystem: boolean;
 }
 
 interface EmployeeIncrement {
@@ -305,6 +314,15 @@ export default function EmployeePortal() {
     enabled: !!profile,
   });
 
+  const { data: leaveCategories = [] } = useQuery<LeaveCategory[]>({
+    queryKey: ['/api/leave-categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/leave-categories');
+      if (!res.ok) throw new Error('Failed to fetch leave categories');
+      return res.json();
+    },
+  });
+
   const { data: employeeDuties } = useQuery<EmployeeDuties>({
     queryKey: ['/api/employee-portal/duties'],
     enabled: !!profile,
@@ -396,7 +414,7 @@ export default function EmployeePortal() {
   };
 
   const submitLeaveRequest = useMutation({
-    mutationFn: async (data: { startDate: string; endDate: string; leaveType: string; reason: string }) => {
+    mutationFn: async (data: { startDate: string; endDate: string; leaveType: string; categoryId: string; reason: string }) => {
       const res = await fetch('/api/employee-portal/leave-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1523,6 +1541,7 @@ export default function EmployeePortal() {
         onOpenChange={setIsLeaveDialogOpen}
         onSubmit={(data) => submitLeaveRequest.mutate(data)}
         isLoading={submitLeaveRequest.isPending}
+        leaveCategories={leaveCategories}
       />
 
       <AdvanceRequestDialog 
@@ -1546,21 +1565,25 @@ function LeaveRequestDialog({
   open, 
   onOpenChange, 
   onSubmit, 
-  isLoading 
+  isLoading,
+  leaveCategories 
 }: { 
   open: boolean; 
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: { startDate: string; endDate: string; leaveType: string; reason: string }) => void;
+  onSubmit: (data: { startDate: string; endDate: string; leaveType: string; categoryId: string; reason: string }) => void;
   isLoading: boolean;
+  leaveCategories: LeaveCategory[];
 }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [leaveType, setLeaveType] = useState('casual');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [reason, setReason] = useState('');
 
+  const selectedCategory = leaveCategories.find(c => c.id === selectedCategoryId);
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ startDate, endDate, leaveType, reason });
+    if (!selectedCategoryId || !selectedCategory) return;
+    onSubmit({ startDate, endDate, leaveType: selectedCategory.name.toLowerCase(), categoryId: selectedCategoryId, reason });
   };
 
   return (
@@ -1595,15 +1618,16 @@ function LeaveRequestDialog({
           </div>
           <div className="space-y-2">
             <Label>Leave Type</Label>
-            <Select value={leaveType} onValueChange={setLeaveType}>
+            <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
               <SelectTrigger data-testid="select-leave-type">
-                <SelectValue />
+                <SelectValue placeholder="Select leave type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="casual">Casual Leave</SelectItem>
-                <SelectItem value="sick">Sick Leave</SelectItem>
-                <SelectItem value="earned">Earned Leave</SelectItem>
-                <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                {leaveCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name} ({category.defaultAnnualAllowance} days/year)
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

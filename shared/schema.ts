@@ -33,6 +33,21 @@ export const insertRoleSchema = createInsertSchema(roles).omit({ id: true, creat
 export type InsertRole = z.infer<typeof insertRoleSchema>;
 export type Role = typeof roles.$inferSelect;
 
+// Leave Categories (Casual, Sick, etc.)
+export const leaveCategories = pgTable("leave_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  defaultAnnualAllowance: integer("default_annual_allowance").notNull().default(12),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLeaveCategorySchema = createInsertSchema(leaveCategories).omit({ id: true, createdAt: true });
+export type InsertLeaveCategory = z.infer<typeof insertLeaveCategorySchema>;
+export type LeaveCategory = typeof leaveCategories.$inferSelect;
+
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
@@ -131,7 +146,8 @@ export const leaveRequests = pgTable("leave_requests", {
   employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
-  leaveType: text("leave_type").default('casual'),
+  leaveType: text("leave_type").default('casual'), // Legacy field for backwards compatibility
+  categoryId: varchar("category_id").references(() => leaveCategories.id), // New category reference
   reason: text("reason"),
   status: text("status").notNull().default('pending'),
   managerId: varchar("manager_id").references(() => users.id),
@@ -1071,21 +1087,40 @@ export const insertSalaryAdvanceRequestSchema = createInsertSchema(salaryAdvance
 export type InsertSalaryAdvanceRequest = z.infer<typeof insertSalaryAdvanceRequestSchema>;
 export type SalaryAdvanceRequest = typeof salaryAdvanceRequests.$inferSelect;
 
-// Employee Portal - Leave Balance (Annual tracking)
+// Employee Portal - Leave Balance (Per category, per year tracking)
 export const employeeLeaveBalances = pgTable("employee_leave_balances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
-  fiscalYear: text("fiscal_year").notNull(), // e.g., "FY2025-26"
-  totalLeaves: integer("total_leaves").notNull().default(24),
-  leavesUsed: integer("leaves_used").notNull().default(0),
-  leavesRemaining: integer("leaves_remaining").notNull().default(24),
+  categoryId: varchar("category_id").notNull().references(() => leaveCategories.id, { onDelete: 'cascade' }),
+  year: integer("year").notNull(), // Calendar year e.g., 2025
+  allocated: integer("allocated").notNull().default(12), // Total allocated for this category
+  used: integer("used").notNull().default(0),
+  manuallyAdjusted: integer("manually_adjusted").notNull().default(0), // Superadmin adjustments
   carryForward: integer("carry_forward").default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertEmployeeLeaveBalanceSchema = createInsertSchema(employeeLeaveBalances).omit({ id: true, createdAt: true });
+export const insertEmployeeLeaveBalanceSchema = createInsertSchema(employeeLeaveBalances).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmployeeLeaveBalance = z.infer<typeof insertEmployeeLeaveBalanceSchema>;
 export type EmployeeLeaveBalance = typeof employeeLeaveBalances.$inferSelect;
+
+// Leave Balance Adjustments (Audit log)
+export const leaveBalanceAdjustments = pgTable("leave_balance_adjustments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  categoryId: varchar("category_id").notNull().references(() => leaveCategories.id, { onDelete: 'cascade' }),
+  year: integer("year").notNull(),
+  previousValue: integer("previous_value").notNull(),
+  newValue: integer("new_value").notNull(),
+  reason: text("reason"),
+  adjustedBy: varchar("adjusted_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLeaveBalanceAdjustmentSchema = createInsertSchema(leaveBalanceAdjustments).omit({ id: true, createdAt: true });
+export type InsertLeaveBalanceAdjustment = z.infer<typeof insertLeaveBalanceAdjustmentSchema>;
+export type LeaveBalanceAdjustment = typeof leaveBalanceAdjustments.$inferSelect;
 
 // Employee Portal - Expense Reimbursement Requests
 export const expenseReimbursements = pgTable("expense_reimbursements", {

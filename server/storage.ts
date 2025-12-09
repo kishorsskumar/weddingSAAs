@@ -55,6 +55,8 @@ import {
   expenseReimbursements,
   publicHolidays,
   employeeIncentives,
+  leaveCategories,
+  leaveBalanceAdjustments,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -170,6 +172,10 @@ import {
   type InsertPublicHoliday,
   type EmployeeIncentive,
   type InsertEmployeeIncentive,
+  type LeaveCategory,
+  type InsertLeaveCategory,
+  type LeaveBalanceAdjustment,
+  type InsertLeaveBalanceAdjustment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -609,6 +615,26 @@ export interface IStorage {
   updateEmployeeIncentive(id: string, incentive: Partial<InsertEmployeeIncentive>): Promise<EmployeeIncentive | undefined>;
   deleteEmployeeIncentive(id: string): Promise<void>;
   getEmployeeIncentivesByFiscalYear(employeeId: string, fiscalYear: string): Promise<EmployeeIncentive[]>;
+
+  // Leave Categories
+  getAllLeaveCategories(): Promise<LeaveCategory[]>;
+  getLeaveCategory(id: string): Promise<LeaveCategory | undefined>;
+  getLeaveCategoryByName(name: string): Promise<LeaveCategory | undefined>;
+  createLeaveCategory(category: InsertLeaveCategory): Promise<LeaveCategory>;
+  updateLeaveCategory(id: string, category: Partial<InsertLeaveCategory>): Promise<LeaveCategory | undefined>;
+  deleteLeaveCategory(id: string): Promise<void>;
+
+  // Leave Balances (Per Category)
+  getEmployeeLeaveBalanceByCategory(employeeId: string, categoryId: string, year: number): Promise<EmployeeLeaveBalance | undefined>;
+  getEmployeeLeaveBalancesByYear(employeeId: string, year: number): Promise<EmployeeLeaveBalance[]>;
+  getAllEmployeeLeaveBalancesForYear(year: number): Promise<EmployeeLeaveBalance[]>;
+  createOrUpdateLeaveBalance(employeeId: string, categoryId: string, year: number, data: { allocated?: number; used?: number; manuallyAdjusted?: number }): Promise<EmployeeLeaveBalance>;
+  initializeEmployeeLeaveBalances(employeeId: string, year: number): Promise<EmployeeLeaveBalance[]>;
+  adjustEmployeeLeaveBalance(employeeId: string, categoryId: string, year: number, newAllocated: number, reason: string, adjustedBy: string): Promise<EmployeeLeaveBalance>;
+
+  // Leave Balance Adjustments (Audit)
+  getLeaveBalanceAdjustments(employeeId: string): Promise<LeaveBalanceAdjustment[]>;
+  createLeaveBalanceAdjustment(adjustment: InsertLeaveBalanceAdjustment): Promise<LeaveBalanceAdjustment>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2485,12 +2511,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(salaryAdvanceRequests).where(eq(salaryAdvanceRequests.id, id));
   }
 
-  // Employee Portal - Leave Balances
+  // Employee Portal - Leave Balances (Legacy methods - kept for backward compatibility)
   async getEmployeeLeaveBalance(employeeId: string, fiscalYear: string): Promise<EmployeeLeaveBalance | undefined> {
+    // Parse fiscal year to get calendar year (e.g., "FY2024-25" -> 2024)
+    const match = fiscalYear.match(/FY(\d{4})/);
+    const year = match ? parseInt(match[1]) : new Date().getFullYear();
+    
     const [balance] = await db.select().from(employeeLeaveBalances)
       .where(and(
         eq(employeeLeaveBalances.employeeId, employeeId),
-        eq(employeeLeaveBalances.fiscalYear, fiscalYear)
+        eq(employeeLeaveBalances.year, year)
       ));
     return balance || undefined;
   }
@@ -2498,7 +2528,7 @@ export class DatabaseStorage implements IStorage {
   async getEmployeeLeaveBalances(employeeId: string): Promise<EmployeeLeaveBalance[]> {
     return await db.select().from(employeeLeaveBalances)
       .where(eq(employeeLeaveBalances.employeeId, employeeId))
-      .orderBy(desc(employeeLeaveBalances.fiscalYear));
+      .orderBy(desc(employeeLeaveBalances.year));
   }
 
   async createEmployeeLeaveBalance(balance: InsertEmployeeLeaveBalance): Promise<EmployeeLeaveBalance> {
@@ -2517,24 +2547,14 @@ export class DatabaseStorage implements IStorage {
   async getOrCreateCurrentFiscalYearLeaveBalance(employeeId: string): Promise<EmployeeLeaveBalance> {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    const fiscalYearStart = currentMonth >= 4 ? currentYear : currentYear - 1;
-    const fiscalYear = `FY${fiscalYearStart}-${(fiscalYearStart + 1).toString().slice(-2)}`;
 
-    const existing = await this.getEmployeeLeaveBalance(employeeId, fiscalYear);
-    if (existing) return existing;
+    // Check for any balance for current year
+    const existingBalances = await this.getEmployeeLeaveBalancesByYear(employeeId, currentYear);
+    if (existingBalances.length > 0) return existingBalances[0];
 
-    const employee = await this.getEmployee(employeeId);
-    const totalLeaves = employee?.totalLeavesPerYear ?? 24;
-
-    return await this.createEmployeeLeaveBalance({
-      employeeId,
-      fiscalYear,
-      totalLeaves,
-      leavesUsed: 0,
-      leavesRemaining: totalLeaves,
-      carryForward: 0,
-    });
+    // Initialize balances for all categories
+    const balances = await this.initializeEmployeeLeaveBalances(employeeId, currentYear);
+    return balances[0];
   }
 
   // Employee Portal - Leave Requests (employee-scoped)
@@ -2697,6 +2717,140 @@ export class DatabaseStorage implements IStorage {
         eq(employeeIncentives.fiscalYear, fiscalYear)
       ))
       .orderBy(desc(employeeIncentives.date));
+  }
+
+  // Leave Categories
+  async getAllLeaveCategories(): Promise<LeaveCategory[]> {
+    return await db.select().from(leaveCategories).orderBy(leaveCategories.name);
+  }
+
+  async getLeaveCategory(id: string): Promise<LeaveCategory | undefined> {
+    const [category] = await db.select().from(leaveCategories).where(eq(leaveCategories.id, id));
+    return category || undefined;
+  }
+
+  async getLeaveCategoryByName(name: string): Promise<LeaveCategory | undefined> {
+    const [category] = await db.select().from(leaveCategories).where(eq(leaveCategories.name, name));
+    return category || undefined;
+  }
+
+  async createLeaveCategory(category: InsertLeaveCategory): Promise<LeaveCategory> {
+    const [created] = await db.insert(leaveCategories).values(category).returning();
+    return created;
+  }
+
+  async updateLeaveCategory(id: string, category: Partial<InsertLeaveCategory>): Promise<LeaveCategory | undefined> {
+    const [updated] = await db.update(leaveCategories)
+      .set(category)
+      .where(eq(leaveCategories.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteLeaveCategory(id: string): Promise<void> {
+    await db.delete(leaveCategories).where(eq(leaveCategories.id, id));
+  }
+
+  // Leave Balances (Per Category)
+  async getEmployeeLeaveBalanceByCategory(employeeId: string, categoryId: string, year: number): Promise<EmployeeLeaveBalance | undefined> {
+    const [balance] = await db.select().from(employeeLeaveBalances)
+      .where(and(
+        eq(employeeLeaveBalances.employeeId, employeeId),
+        eq(employeeLeaveBalances.categoryId, categoryId),
+        eq(employeeLeaveBalances.year, year)
+      ));
+    return balance || undefined;
+  }
+
+  async getEmployeeLeaveBalancesByYear(employeeId: string, year: number): Promise<EmployeeLeaveBalance[]> {
+    return await db.select().from(employeeLeaveBalances)
+      .where(and(
+        eq(employeeLeaveBalances.employeeId, employeeId),
+        eq(employeeLeaveBalances.year, year)
+      ));
+  }
+
+  async getAllEmployeeLeaveBalancesForYear(year: number): Promise<EmployeeLeaveBalance[]> {
+    return await db.select().from(employeeLeaveBalances)
+      .where(eq(employeeLeaveBalances.year, year));
+  }
+
+  async createOrUpdateLeaveBalance(employeeId: string, categoryId: string, year: number, data: { allocated?: number; used?: number; manuallyAdjusted?: number }): Promise<EmployeeLeaveBalance> {
+    const existing = await this.getEmployeeLeaveBalanceByCategory(employeeId, categoryId, year);
+    
+    if (existing) {
+      const [updated] = await db.update(employeeLeaveBalances)
+        .set({
+          ...data,
+          updatedAt: new Date()
+        })
+        .where(eq(employeeLeaveBalances.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const category = await this.getLeaveCategory(categoryId);
+      const [created] = await db.insert(employeeLeaveBalances).values({
+        employeeId,
+        categoryId,
+        year,
+        allocated: data.allocated ?? category?.defaultAnnualAllowance ?? 12,
+        used: data.used ?? 0,
+        manuallyAdjusted: data.manuallyAdjusted ?? 0,
+      }).returning();
+      return created;
+    }
+  }
+
+  async initializeEmployeeLeaveBalances(employeeId: string, year: number): Promise<EmployeeLeaveBalance[]> {
+    const categories = await this.getAllLeaveCategories();
+    const balances: EmployeeLeaveBalance[] = [];
+    
+    for (const category of categories) {
+      const existing = await this.getEmployeeLeaveBalanceByCategory(employeeId, category.id, year);
+      if (!existing) {
+        const balance = await this.createOrUpdateLeaveBalance(employeeId, category.id, year, {
+          allocated: category.defaultAnnualAllowance
+        });
+        balances.push(balance);
+      } else {
+        balances.push(existing);
+      }
+    }
+    
+    return balances;
+  }
+
+  async adjustEmployeeLeaveBalance(employeeId: string, categoryId: string, year: number, newAllocated: number, reason: string, adjustedBy: string): Promise<EmployeeLeaveBalance> {
+    const existing = await this.getEmployeeLeaveBalanceByCategory(employeeId, categoryId, year);
+    const previousValue = existing?.allocated ?? 0;
+    
+    // Create adjustment audit log
+    await this.createLeaveBalanceAdjustment({
+      employeeId,
+      categoryId,
+      year,
+      previousValue,
+      newValue: newAllocated,
+      reason,
+      adjustedBy
+    });
+    
+    // Update the balance
+    return await this.createOrUpdateLeaveBalance(employeeId, categoryId, year, {
+      allocated: newAllocated
+    });
+  }
+
+  // Leave Balance Adjustments (Audit)
+  async getLeaveBalanceAdjustments(employeeId: string): Promise<LeaveBalanceAdjustment[]> {
+    return await db.select().from(leaveBalanceAdjustments)
+      .where(eq(leaveBalanceAdjustments.employeeId, employeeId))
+      .orderBy(desc(leaveBalanceAdjustments.createdAt));
+  }
+
+  async createLeaveBalanceAdjustment(adjustment: InsertLeaveBalanceAdjustment): Promise<LeaveBalanceAdjustment> {
+    const [created] = await db.insert(leaveBalanceAdjustments).values(adjustment).returning();
+    return created;
   }
 }
 
