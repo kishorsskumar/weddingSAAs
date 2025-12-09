@@ -77,5 +77,5 @@ integrations = ["javascript_database:1.0.0"]
 [userenv]
 
 [userenv.shared]
-PRIVATE_OBJECT_DIR = "/uploads"
-PUBLIC_OBJECT_SEARCH_PATHS = "/uploads"
+PRIVATE_OBJECT_DIR = "/oak-uploads"
+PUBLIC_OBJECT_SEARCH_PATHS = "/oak-uploads"
