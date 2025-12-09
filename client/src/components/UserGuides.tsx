@@ -6,19 +6,20 @@ import { Download, Smartphone, BookOpen, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const OAK_COLORS = {
-  primary: '#8B7355',
-  gold: '#C4A962',
-  dark: '#2D2A26',
-  light: '#F5F1EB',
+  primary: '#7C8B5D',
+  accent: '#9AAF6C',
+  dark: '#2D3A1F',
+  light: '#F5F7F0',
+  gold: '#B8A44C',
 };
 
 function addHeader(doc: jsPDF, title: string) {
   const pageWidth = doc.internal.pageSize.getWidth();
   
-  doc.setFillColor(139, 115, 85);
+  doc.setFillColor(124, 139, 93);
   doc.rect(0, 0, pageWidth, 35, 'F');
   
-  doc.setFillColor(196, 169, 98);
+  doc.setFillColor(184, 164, 76);
   doc.rect(0, 35, pageWidth, 3, 'F');
   
   doc.setTextColor(255, 255, 255);
@@ -30,22 +31,22 @@ function addHeader(doc: jsPDF, title: string) {
   doc.setFont('helvetica', 'normal');
   doc.text('Employee Portal User Guide', pageWidth - 20, 22, { align: 'right' });
   
-  doc.setTextColor(45, 42, 38);
+  doc.setTextColor(45, 58, 31);
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
   doc.text(title, 20, 52);
   
-  return 60;
+  return 65;
 }
 
 function addFooter(doc: jsPDF, pageNum: number) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   
-  doc.setFillColor(196, 169, 98);
+  doc.setFillColor(154, 175, 108);
   doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
   
-  doc.setTextColor(45, 42, 38);
+  doc.setTextColor(45, 58, 31);
   doc.setFontSize(8);
   doc.text(`Page ${pageNum}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
   doc.text('Oak Street Events - Confidential', 20, pageHeight - 6);
@@ -56,60 +57,63 @@ function addSection(doc: jsPDF, y: number, title: string, content: string[]): nu
   const margin = 20;
   const maxWidth = pageWidth - (margin * 2);
   
-  doc.setFillColor(196, 169, 98);
+  doc.setFillColor(154, 175, 108);
   doc.rect(margin - 5, y - 5, 3, 20, 'F');
   
-  doc.setTextColor(139, 115, 85);
+  doc.setTextColor(124, 139, 93);
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.text(title, margin + 5, y + 5);
   
-  y += 15;
+  y += 18;
   
-  doc.setTextColor(45, 42, 38);
+  doc.setTextColor(45, 58, 31);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   
-  content.forEach((line, idx) => {
-    if (y > doc.internal.pageSize.getHeight() - 30) {
+  let stepCounter = 0;
+  
+  content.forEach((line) => {
+    if (y > doc.internal.pageSize.getHeight() - 35) {
       addFooter(doc, 1);
       doc.addPage();
       y = 30;
     }
     
     if (line.startsWith('•')) {
-      doc.setFillColor(196, 169, 98);
+      doc.setFillColor(154, 175, 108);
       doc.circle(margin + 3, y - 2, 1.5, 'F');
       const lines = doc.splitTextToSize(line.substring(2), maxWidth - 15);
+      doc.setTextColor(45, 58, 31);
       doc.text(lines, margin + 10, y);
-      y += lines.length * 5 + 3;
+      y += lines.length * 6 + 4;
     } else if (line.startsWith('[STEP]')) {
+      stepCounter++;
       const stepText = line.replace('[STEP]', '').trim();
-      const stepNum = idx + 1;
       
-      doc.setFillColor(139, 115, 85);
-      doc.circle(margin + 5, y - 2, 8, 'F');
+      doc.setFillColor(124, 139, 93);
+      doc.circle(margin + 8, y + 2, 6, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.text(String(stepNum), margin + 5, y, { align: 'center' });
+      doc.text(String(stepCounter), margin + 8, y + 4, { align: 'center' });
       
-      doc.setTextColor(45, 42, 38);
+      doc.setTextColor(45, 58, 31);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      const lines = doc.splitTextToSize(stepText, maxWidth - 25);
-      doc.text(lines, margin + 18, y);
-      y += lines.length * 5 + 8;
+      const lines = doc.splitTextToSize(stepText, maxWidth - 30);
+      doc.text(lines, margin + 20, y + 4);
+      y += Math.max(lines.length * 6, 12) + 6;
     } else if (line === '') {
-      y += 5;
+      y += 6;
     } else {
       const lines = doc.splitTextToSize(line, maxWidth);
       doc.text(lines, margin, y);
-      y += lines.length * 5 + 3;
+      y += lines.length * 6 + 4;
     }
   });
   
-  return y + 10;
+  return y + 12;
 }
 
 function generateInstallGuide(): jsPDF {
@@ -131,7 +135,7 @@ function generateInstallGuide(): jsPDF {
     '[STEP] Open Chrome browser on your Android phone',
     '[STEP] Navigate to www.oakstreetevent.com',
     '[STEP] Log in with your employee credentials',
-    '[STEP] Tap the three-dot menu icon (⋮) in the top-right corner',
+    '[STEP] Tap the three-dot menu icon in the top-right corner',
     '[STEP] Select "Add to Home screen" or "Install app"',
     '[STEP] Enter a name for the app (e.g., "Oak Portal")',
     '[STEP] Tap "Add" or "Install"',
@@ -150,6 +154,18 @@ function generateInstallGuide(): jsPDF {
     'The app icon will now appear on your home screen.'
   ]);
   
+  addFooter(doc, 1);
+  doc.addPage();
+  y = 30;
+  
+  doc.setFillColor(124, 139, 93);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Oak Street Events - Web App Installation Guide', 20, 13);
+  y = 35;
+  
   y = addSection(doc, y, 'Benefits of Installing the Web App', [
     '• Quick access from your home screen without opening a browser',
     '• Full-screen experience without browser navigation bars',
@@ -164,7 +180,14 @@ function generateInstallGuide(): jsPDF {
     '• Contact your manager or IT support if you continue to have issues'
   ]);
   
-  addFooter(doc, 1);
+  y = addSection(doc, y, 'Need Help?', [
+    'For technical issues or questions:',
+    '• Contact your manager',
+    '• Reach out to HR department',
+    '• Email: support@oakstreetevent.com'
+  ]);
+  
+  addFooter(doc, 2);
   
   return doc;
 }
@@ -216,6 +239,14 @@ function generatePortalGuide(): jsPDF {
   doc.addPage();
   y = 30;
   
+  doc.setFillColor(124, 139, 93);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Oak Street Events - Employee Portal Guide', 20, 13);
+  y = 35;
+  
   y = addSection(doc, y, 'Viewing Payroll & Salary Slips', [
     '[STEP] Click on the "Payroll" tab',
     '[STEP] View your payroll history with monthly breakdown',
@@ -247,6 +278,18 @@ function generatePortalGuide(): jsPDF {
     '[STEP] Submit for manager approval'
   ]);
   
+  addFooter(doc, 2);
+  doc.addPage();
+  y = 30;
+  
+  doc.setFillColor(124, 139, 93);
+  doc.rect(0, 0, doc.internal.pageSize.getWidth(), 20, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Oak Street Events - Employee Portal Guide', 20, 13);
+  y = 35;
+  
   y = addSection(doc, y, 'Updating Your Profile', [
     'Your profile information is managed by HR. If you need to update:',
     '• Contact details (phone, email)',
@@ -264,7 +307,7 @@ function generatePortalGuide(): jsPDF {
     '• Email: support@oakstreetevent.com'
   ]);
   
-  addFooter(doc, 2);
+  addFooter(doc, 3);
   
   return doc;
 }
