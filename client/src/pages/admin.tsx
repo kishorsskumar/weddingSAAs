@@ -191,6 +191,86 @@ export default function Admin() {
     enabled: isSuperAdmin,
   });
 
+  const { data: usersWithoutEmployee = [], refetch: refetchUsersWithoutEmployee } = useQuery<{ id: string; name: string; email: string; role: string }[]>({
+    queryKey: ['/api/admin/users-without-employee'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/users-without-employee', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch users without employee');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    enabled: isSuperAdmin,
+  });
+
+  const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [linkEmployeeData, setLinkEmployeeData] = useState({
+    phone: '',
+    dateOfBirth: '',
+    photoUrl: null as string | null,
+    joinDate: new Date().toISOString().split('T')[0],
+    designation: '',
+    department: '',
+    salary: '',
+    address: '',
+    emergencyContact: '',
+    managerUserId: '',
+    bankAccountNumber: '',
+    bankIfscCode: '',
+    panNumber: '',
+    duties: '',
+    responsibilities: '',
+    totalLeavesPerYear: 24,
+  });
+
+  const resetLinkEmployeeForm = () => {
+    setSelectedUserId('');
+    setLinkEmployeeData({
+      phone: '',
+      dateOfBirth: '',
+      photoUrl: null,
+      joinDate: new Date().toISOString().split('T')[0],
+      designation: '',
+      department: '',
+      salary: '',
+      address: '',
+      emergencyContact: '',
+      managerUserId: '',
+      bankAccountNumber: '',
+      bankIfscCode: '',
+      panNumber: '',
+      duties: '',
+      responsibilities: '',
+      totalLeavesPerYear: 24,
+    });
+  };
+
+  const linkUserToEmployeeMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/admin/link-user-to-employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to link user to employee');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users-without-employee'] });
+      setIsLinkUserDialogOpen(false);
+      resetLinkEmployeeForm();
+    },
+  });
+
   useEffect(() => {
     if (editingRole) {
       setEditRoleLabel(editingRole.label);
@@ -917,20 +997,30 @@ export default function Admin() {
         {isSuperAdmin && (
           <TabsContent value="onboarding" className="mt-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
                 <CardTitle className="flex items-center gap-2">
                   <UserPlus className="h-5 w-5" />
                   Employee Onboarding
                 </CardTitle>
-                <Dialog open={isEmployeeDialogOpen} onOpenChange={(open) => {
-                  setIsEmployeeDialogOpen(open);
-                  if (!open) resetEmployeeForm();
-                }}>
-                  <DialogTrigger asChild>
-                    <Button className="gap-2" data-testid="button-new-employee">
-                      <Plus className="h-4 w-4" /> New Employee
-                    </Button>
-                  </DialogTrigger>
+                <div className="flex gap-2 flex-wrap">
+                  <Button 
+                    variant="outline"
+                    className="gap-2" 
+                    onClick={() => setIsLinkUserDialogOpen(true)}
+                    data-testid="button-link-existing-user"
+                    disabled={usersWithoutEmployee.length === 0}
+                  >
+                    <UserPlus className="h-4 w-4" /> Link Existing User {usersWithoutEmployee.length > 0 && `(${usersWithoutEmployee.length})`}
+                  </Button>
+                  <Dialog open={isEmployeeDialogOpen} onOpenChange={(open) => {
+                    setIsEmployeeDialogOpen(open);
+                    if (!open) resetEmployeeForm();
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button className="gap-2" data-testid="button-new-employee">
+                        <Plus className="h-4 w-4" /> New Employee
+                      </Button>
+                    </DialogTrigger>
                   <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>{createdCredentials ? 'Employee Created Successfully' : 'Create New Employee'}</DialogTitle>
@@ -1234,7 +1324,8 @@ export default function Admin() {
                       </form>
                     )}
                   </DialogContent>
-                </Dialog>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-sm">
@@ -1246,6 +1337,161 @@ export default function Admin() {
           </TabsContent>
         )}
       </Tabs>
+
+      <Dialog open={isLinkUserDialogOpen} onOpenChange={(open) => {
+        setIsLinkUserDialogOpen(open);
+        if (!open) resetLinkEmployeeForm();
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Link Existing User to Employee Record</DialogTitle>
+            <DialogDescription>
+              Create an employee profile for an existing user who doesn't have one yet.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (!selectedUserId) return;
+            linkUserToEmployeeMutation.mutate({
+              userId: selectedUserId,
+              phone: linkEmployeeData.phone,
+              dateOfBirth: linkEmployeeData.dateOfBirth || null,
+              photoUrl: linkEmployeeData.photoUrl,
+              joinDate: linkEmployeeData.joinDate,
+              designation: linkEmployeeData.designation,
+              department: linkEmployeeData.department,
+              salary: linkEmployeeData.salary,
+              address: linkEmployeeData.address,
+              emergencyContact: linkEmployeeData.emergencyContact,
+              managerUserId: linkEmployeeData.managerUserId || null,
+              bankAccountNumber: linkEmployeeData.bankAccountNumber,
+              bankIfscCode: linkEmployeeData.bankIfscCode,
+              panNumber: linkEmployeeData.panNumber,
+              duties: linkEmployeeData.duties,
+              responsibilities: linkEmployeeData.responsibilities,
+              totalLeavesPerYear: linkEmployeeData.totalLeavesPerYear,
+            });
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select User *</Label>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger data-testid="select-link-user">
+                  <SelectValue placeholder="Choose a user to link" />
+                </SelectTrigger>
+                <SelectContent>
+                  {usersWithoutEmployee.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} ({u.email}) - {u.role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Phone *</Label>
+                <Input 
+                  value={linkEmployeeData.phone}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, phone: e.target.value})}
+                  required
+                  data-testid="input-link-phone"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Date of Birth</Label>
+                <Input 
+                  type="date"
+                  value={linkEmployeeData.dateOfBirth}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, dateOfBirth: e.target.value})}
+                  data-testid="input-link-dob"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Join Date *</Label>
+                <Input 
+                  type="date"
+                  value={linkEmployeeData.joinDate}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, joinDate: e.target.value})}
+                  required
+                  data-testid="input-link-joindate"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Designation *</Label>
+                <Input 
+                  value={linkEmployeeData.designation}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, designation: e.target.value})}
+                  required
+                  placeholder="e.g. Wedding Planner"
+                  data-testid="input-link-designation"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Department</Label>
+                <Input 
+                  value={linkEmployeeData.department}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, department: e.target.value})}
+                  data-testid="input-link-department"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Monthly Salary (INR) *</Label>
+                <Input 
+                  type="number"
+                  value={linkEmployeeData.salary}
+                  onChange={(e) => setLinkEmployeeData({...linkEmployeeData, salary: e.target.value})}
+                  required
+                  data-testid="input-link-salary"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Address *</Label>
+              <Textarea 
+                value={linkEmployeeData.address}
+                onChange={(e) => setLinkEmployeeData({...linkEmployeeData, address: e.target.value})}
+                required
+                rows={2}
+                data-testid="input-link-address"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Emergency Contact *</Label>
+              <Input 
+                value={linkEmployeeData.emergencyContact}
+                onChange={(e) => setLinkEmployeeData({...linkEmployeeData, emergencyContact: e.target.value})}
+                required
+                placeholder="Name - Phone Number"
+                data-testid="input-link-emergency"
+              />
+            </div>
+            
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-700">
+                The user will automatically get access to the Employee Portal after linking.
+              </p>
+            </div>
+            
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={linkUserToEmployeeMutation.isPending || !selectedUserId}
+              data-testid="button-link-employee"
+            >
+              {linkUserToEmployeeMutation.isPending ? 'Creating Employee Record...' : 'Create Employee Record'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditHolidayDialogOpen} onOpenChange={setIsEditHolidayDialogOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">

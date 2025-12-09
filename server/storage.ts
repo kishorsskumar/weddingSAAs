@@ -758,6 +758,13 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(employees).where(sql`${employees.userId} IS NULL`);
   }
 
+  async getUsersWithoutEmployeeRecord(): Promise<User[]> {
+    const allUsers = await db.select().from(users);
+    const employeesWithUsers = await db.select({ userId: employees.userId }).from(employees).where(sql`${employees.userId} IS NOT NULL`);
+    const linkedUserIds = new Set(employeesWithUsers.map(e => e.userId));
+    return allUsers.filter(u => !linkedUserIds.has(u.id) && u.role !== 'superadmin');
+  }
+
   async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
     const [employee] = await db.insert(employees).values(insertEmployee).returning();
     return employee;

@@ -2756,6 +2756,97 @@ export async function registerRoutes(
     }
   });
 
+  // Get users without employee records (for linking feature)
+  app.get('/api/admin/users-without-employee', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const usersWithoutEmployee = await storage.getUsersWithoutEmployeeRecord();
+      res.json(usersWithoutEmployee.map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role })));
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch users without employee records' });
+    }
+  });
+
+  // Create employee for existing user (link user to employee record)
+  app.post('/api/admin/link-user-to-employee', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
+    try {
+      const { 
+        userId,
+        phone,
+        dateOfBirth,
+        photoUrl,
+        joinDate,
+        designation,
+        department,
+        salary,
+        address,
+        emergencyContact,
+        managerUserId,
+        bankAccountNumber,
+        bankIfscCode,
+        panNumber,
+        duties,
+        responsibilities,
+        totalLeavesPerYear
+      } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: 'User ID is required' });
+      }
+      
+      if (!phone || !designation || !salary || !address || !emergencyContact || !joinDate) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      const existingEmployee = await storage.getEmployeeByUserId(userId);
+      if (existingEmployee) {
+        return res.status(400).json({ error: 'User already has an employee record' });
+      }
+      
+      const employeeId = await storage.generateEmployeeCode();
+      
+      const employee = await storage.createEmployee({
+        employeeId,
+        name: user.name,
+        email: user.email,
+        phone,
+        dateOfBirth: dateOfBirth || null,
+        photoUrl: photoUrl || null,
+        joinDate,
+        designation,
+        department: department || null,
+        salary: salary.toString(),
+        address,
+        emergencyContact,
+        userId: userId,
+        managerUserId: managerUserId || null,
+        bankAccountNumber: bankAccountNumber || null,
+        bankIfscCode: bankIfscCode || null,
+        panNumber: panNumber || null,
+        duties: duties || null,
+        responsibilities: responsibilities || null,
+        totalLeavesPerYear: totalLeavesPerYear || 24,
+      });
+      
+      await storage.grantUserPermission(userId, 'employee-portal');
+      
+      res.json({ employee, user });
+    } catch (error) {
+      console.error('Error linking user to employee:', error);
+      res.status(400).json({ error: 'Failed to create employee record for user' });
+    }
+  });
+
   // Admin Routes - Manage Expense Reimbursements
   app.get('/api/admin/expense-reimbursements', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);
