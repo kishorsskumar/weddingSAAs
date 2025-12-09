@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { parseTransactionScreenshot } from "./transaction-scanner";
 import { 
   insertUserSchema,
   insertRoleSchema,
@@ -1461,6 +1462,29 @@ export async function registerRoutes(
     
     await storage.deleteDaybookEntry(req.params.id);
     res.json({ success: true });
+  });
+
+  // Transaction Scanner - AI-powered transaction screenshot parsing
+  app.post('/api/daybook/scan-transaction', async (req, res) => {
+    try {
+      const { image } = req.body;
+      
+      if (!image) {
+        return res.status(400).json({ error: 'Image data is required' });
+      }
+      
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: 'OpenAI API key not configured' });
+      }
+      
+      const parsed = await parseTransactionScreenshot(image);
+      res.json(parsed);
+    } catch (error) {
+      console.error('Transaction scan error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to parse transaction' 
+      });
+    }
   });
 
   // Daybook Categories
