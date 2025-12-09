@@ -56,6 +56,16 @@ const ICONS: Record<string, any> = {
 
 const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales", "/oak-inventory"];
 
+const ROLE_LABELS: Record<string, string> = {
+  superadmin: "Super Admin",
+  admin: "Admin",
+  manager: "Operations Manager",
+  employee: "Employee",
+  wedding_planner: "Wedding Planner",
+  accountant: "Accountant",
+  production_manager: "Production Manager",
+};
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
@@ -157,8 +167,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </motion.div>
           <div className="flex-1 overflow-hidden">
             <p className="text-sm font-medium truncate">{user.name}</p>
-            <p className="text-xs text-sidebar-foreground/60 truncate capitalize">
-              {user.role}
+            <p className="text-xs text-sidebar-foreground/60 truncate">
+              {ROLE_LABELS[user.role] || user.role}
             </p>
           </div>
         </div>
