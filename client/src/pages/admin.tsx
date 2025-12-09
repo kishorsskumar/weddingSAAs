@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar, UserPlus, Copy, Eye, EyeOff } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar, UserPlus, Copy, Eye, EyeOff, Users, Phone, Mail, MapPin, Building2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -240,6 +240,42 @@ export default function Admin() {
     staleTime: 0,
     refetchOnMount: true,
     enabled: isSuperAdmin,
+  });
+
+  type EmployeeData = {
+    id: string;
+    employeeId: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    department: string | null;
+    designation: string | null;
+    joinDate: string | null;
+    leaveDate: string | null;
+    salary: string | null;
+    address: string | null;
+    photoUrl: string | null;
+  };
+
+  const { data: allEmployees = [], isLoading: employeesLoading } = useQuery<EmployeeData[]>({
+    queryKey: ['/api/employees'],
+    queryFn: async () => {
+      const res = await fetch('/api/employees', {
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) throw new Error('Failed to fetch employees');
+      return res.json();
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    enabled: isSuperAdmin,
+  });
+
+  const currentEmployees = allEmployees.filter(emp => !emp.leaveDate).sort((a, b) => {
+    const idA = parseInt(a.employeeId.replace(/\D/g, '')) || 0;
+    const idB = parseInt(b.employeeId.replace(/\D/g, '')) || 0;
+    return idB - idA;
   });
 
   const [isLinkUserDialogOpen, setIsLinkUserDialogOpen] = useState(false);
@@ -719,8 +755,9 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-5' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-6' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
+          {isSuperAdmin && <TabsTrigger value="employees" data-testid="tab-employees">Employees</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="leave" data-testid="tab-leave">Leave</TabsTrigger>}
@@ -897,6 +934,81 @@ export default function Admin() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isSuperAdmin && (
+          <TabsContent value="employees" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  All Employees ({currentEmployees.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {employeesLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading employees...</div>
+                ) : currentEmployees.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No employees found. Use the Onboarding tab to add employees.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {currentEmployees.map((employee) => (
+                      <div key={employee.id} className="border rounded-lg p-4 bg-muted/20">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-medium text-primary overflow-hidden flex-shrink-0">
+                            {employee.photoUrl ? (
+                              <img src={employee.photoUrl} alt={employee.name} className="w-full h-full object-cover" />
+                            ) : (
+                              employee.name.charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-base">{employee.name}</h3>
+                              <Badge variant="outline" className="text-xs">{employee.employeeId}</Badge>
+                            </div>
+                            {employee.designation && (
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                                <Building2 className="h-3 w-3" />
+                                {employee.designation} {employee.department && `• ${employee.department}`}
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-sm">
+                              {employee.email && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Mail className="h-3 w-3" />
+                                  <span className="truncate">{employee.email}</span>
+                                </div>
+                              )}
+                              {employee.phone && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Phone className="h-3 w-3" />
+                                  {employee.phone}
+                                </div>
+                              )}
+                              {employee.joinDate && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Calendar className="h-3 w-3" />
+                                  Joined: {format(new Date(employee.joinDate), 'dd MMM yyyy')}
+                                </div>
+                              )}
+                              {employee.salary && (
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <span className="font-medium">₹{parseInt(employee.salary).toLocaleString('en-IN')}/month</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {isSuperAdmin && (
           <TabsContent value="roles" className="mt-4">
