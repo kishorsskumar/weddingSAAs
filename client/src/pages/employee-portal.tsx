@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { pageTransition, staggerContainer, staggerItem, TIMING } from "@/lib/animations";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { UserGuides } from "@/components/UserGuides";
 
 interface EmployeeProfile {
   id: string;
@@ -1027,6 +1028,15 @@ export default function EmployeePortal() {
                 </CardContent>
               </Card>
             </motion.div>
+          </motion.div>
+
+          <motion.div 
+            className="mt-4"
+            variants={staggerItem}
+            initial="initial"
+            animate="animate"
+          >
+            <UserGuides />
           </motion.div>
         </TabsContent>
 
