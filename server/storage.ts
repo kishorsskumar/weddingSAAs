@@ -817,7 +817,7 @@ export class DatabaseStorage implements IStorage {
       await db.insert(documentSequences).values({
         documentType,
         prefix: `OAK-${year}-`,
-        nextNumber: 1,
+        nextNumber: 2,
         paddingLength: 4
       });
       return `OAK-${year}-0001`;
@@ -827,11 +827,38 @@ export class DatabaseStorage implements IStorage {
       ? sequence.prefix 
       : `OAK-${year}-`;
     
-    const code = `${prefix}${String(sequence.nextNumber).padStart(sequence.paddingLength, '0')}`;
+    const currentNumber = sequence.nextNumber;
+    const code = `${prefix}${String(currentNumber).padStart(sequence.paddingLength, '0')}`;
+    
+    const existingEmployee = await db.select().from(employees)
+      .where(eq(employees.employeeId, code))
+      .limit(1);
+    
+    if (existingEmployee.length > 0) {
+      const maxEmployee = await db.select({ employeeId: employees.employeeId })
+        .from(employees)
+        .where(sql`${employees.employeeId} LIKE ${`OAK-${year}-%`}`)
+        .orderBy(sql`${employees.employeeId} DESC`)
+        .limit(1);
+      
+      let nextNum = currentNumber + 1;
+      if (maxEmployee.length > 0) {
+        const match = maxEmployee[0].employeeId.match(/OAK-\d{4}-(\d+)/);
+        if (match) {
+          nextNum = Math.max(nextNum, parseInt(match[1], 10) + 1);
+        }
+      }
+      
+      await db.update(documentSequences)
+        .set({ nextNumber: nextNum + 1, prefix })
+        .where(eq(documentSequences.documentType, documentType));
+      
+      return `${prefix}${String(nextNum).padStart(sequence.paddingLength, '0')}`;
+    }
     
     await db.update(documentSequences)
       .set({ 
-        nextNumber: sequence.nextNumber + 1,
+        nextNumber: currentNumber + 1,
         prefix: prefix
       })
       .where(eq(documentSequences.documentType, documentType));
