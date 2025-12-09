@@ -15,10 +15,6 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33837
-externalPort = 6000
-
-[[ports]]
 localPort = 35309
 externalPort = 4200
 
@@ -79,3 +75,6 @@ integrations = ["javascript_database:1.0.0"]
 [userenv.shared]
 PRIVATE_OBJECT_DIR = "/oak-uploads"
 PUBLIC_OBJECT_SEARCH_PATHS = "/oak-uploads"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-a1e1bcaa-925d-42a7-b663-86cb2a1ee7fe"
