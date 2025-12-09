@@ -7,6 +7,7 @@ interface User {
   email: string;
   role: string;
   avatar: string | null;
+  createdVia: string | null;
 }
 
 interface AuthContextType {
@@ -58,7 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       setUser(data.user);
       setAllowedPages(data.permissions);
-      setLocation("/");
+      
+      // Route based on how user was created
+      if (data.user.createdVia === 'employee_onboarding') {
+        setLocation("/employee-portal");
+      } else {
+        setLocation("/");
+      }
     } catch (error) {
       alert('Login failed. Please check your credentials.');
     } finally {

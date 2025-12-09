@@ -11,6 +11,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull(), // 'admin' | 'manager' | 'employee'
   avatar: text("avatar"),
+  createdVia: text("created_via").default('admin_panel'), // 'admin_panel' | 'employee_onboarding'
   createdAt: timestamp("created_at").defaultNow(),
 });
 

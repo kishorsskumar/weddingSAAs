@@ -728,6 +728,7 @@ export async function registerRoutes(
           email: user.email,
           role: user.role,
           avatar: user.avatar,
+          createdVia: user.createdVia,
         },
         permissions: permissionsList
       });
@@ -769,6 +770,7 @@ export async function registerRoutes(
         email: user.email,
         role: user.role,
         avatar: user.avatar,
+        createdVia: user.createdVia,
       },
       permissions: permissionsList
     });
@@ -887,7 +889,7 @@ export async function registerRoutes(
       }
 
       const hashedPassword = await bcrypt.hash(data.password, 10);
-      const user = await storage.createUser({ ...data, password: hashedPassword });
+      const user = await storage.createUser({ ...data, password: hashedPassword, createdVia: 'admin_panel' });
       
       await storage.setUserPermissions(user.id, ['dashboard']);
       
@@ -1227,7 +1229,8 @@ export async function registerRoutes(
         name: employee.name,
         email: email,
         password: hashedPassword,
-        role: 'employee'
+        role: 'employee',
+        createdVia: 'employee_onboarding'
       });
       
       // Grant employee-portal permission
@@ -1275,7 +1278,8 @@ export async function registerRoutes(
             name: emp.name,
             email: email,
             password: hashedPassword,
-            role: 'employee'
+            role: 'employee',
+            createdVia: 'employee_onboarding'
           });
           
           // Grant employee-portal permission

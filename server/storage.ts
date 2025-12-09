@@ -844,7 +844,8 @@ export class DatabaseStorage implements IStorage {
       name: employeeData.name,
       email: employeeData.email!,
       password: hashedPassword,
-      role: 'employee'
+      role: 'employee',
+      createdVia: 'employee_onboarding'
     }).returning();
     
     const user = newUser[0];
@@ -893,7 +894,8 @@ export class DatabaseStorage implements IStorage {
       name: existingEmployee.name,
       email: email,
       password: hashedPassword,
-      role: 'employee'
+      role: 'employee',
+      createdVia: 'employee_onboarding'
     }).returning();
     
     const [updatedEmployee] = await db.update(employees)
