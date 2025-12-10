@@ -5699,9 +5699,11 @@ export async function registerRoutes(
         submittedBy: userId || null,
         status: 'pending'
       };
+      console.log('[event-manpower] Creating with data:', JSON.stringify(data, null, 2));
       const record = await storage.createEventManpower(data);
       res.json(record);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[event-manpower] Error creating record:', error.message || error);
       res.status(400).json({ error: 'Failed to create manpower record' });
     }
   });
