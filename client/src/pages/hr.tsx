@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { format, parseISO } from "date-fns";
@@ -1306,6 +1308,31 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
   const [approvalComments, setApprovalComments] = useState('');
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [isDaybookDialogOpen, setIsDaybookDialogOpen] = useState(false);
+  const [selectedExpenseForDaybook, setSelectedExpenseForDaybook] = useState<any>(null);
+  const [daybookEventId, setDaybookEventId] = useState<string>('');
+  const [daybookCategory, setDaybookCategory] = useState<string>('');
+  const [daybookEventSearch, setDaybookEventSearch] = useState('');
+  const [daybookEventOpen, setDaybookEventOpen] = useState(false);
+
+  const { data: events = [] } = useQuery<any[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events');
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: approvedExpenses = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/expense-reimbursements/approved'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/expense-reimbursements/approved');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
 
   const { data: pendingLeaves = [] } = useQuery<any[]>({
     queryKey: ['/api/manager/pending-leaves'],
@@ -1448,6 +1475,47 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
     },
   });
 
+  const pushToDaybook = useMutation({
+    mutationFn: async ({ id, eventId, category }: { id: string; eventId?: string; category?: string }) => {
+      const res = await fetch(`/api/admin/expense-reimbursements/${id}/push-to-daybook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, category }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to push to daybook');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/expense-reimbursements/approved'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      toast({ title: 'Expense pushed to daybook successfully' });
+      setIsDaybookDialogOpen(false);
+      setSelectedExpenseForDaybook(null);
+      setDaybookEventId('');
+      setDaybookCategory('');
+    },
+    onError: () => {
+      toast({ title: 'Failed to push to daybook', variant: 'destructive' });
+    },
+  });
+
+  const handlePushToDaybook = (expense: any) => {
+    setSelectedExpenseForDaybook(expense);
+    setDaybookCategory(expense.category || '');
+    setDaybookEventId('');
+    setIsDaybookDialogOpen(true);
+  };
+
+  const confirmPushToDaybook = () => {
+    if (!selectedExpenseForDaybook) return;
+    pushToDaybook.mutate({
+      id: selectedExpenseForDaybook.id,
+      eventId: daybookEventId || undefined,
+      category: daybookCategory || undefined,
+    });
+  };
+
   const handleApprovalAction = (request: any, type: 'leave' | 'advance' | 'expense', action: 'approve' | 'reject') => {
     setSelectedRequest({ ...request, type });
     setApprovalAction(action);
@@ -1542,6 +1610,11 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
           <TabsTrigger value="expenses" className="text-xs sm:text-sm">
             Expenses ({pendingExpenses.length})
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="approved-expenses" className="text-xs sm:text-sm">
+              Approved ({approvedExpenses.length})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="leaves">
@@ -1756,6 +1829,66 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="approved-expenses">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Receipt className="h-5 w-5" />
+                  Approved Expenses - Push to Daybook
+                </CardTitle>
+                <CardDescription>Push approved expense reimbursements to Oak Daybook with optional event or category assignment</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Expense Date</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {approvedExpenses.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            No approved expenses waiting to be pushed to daybook
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        approvedExpenses.map((expense: any) => (
+                          <TableRow key={expense.id} data-testid={`row-approved-expense-${expense.id}`}>
+                            <TableCell className="font-medium">{expense.employeeName || 'Employee'}</TableCell>
+                            <TableCell className="capitalize">{expense.category}</TableCell>
+                            <TableCell>₹{Number(expense.amount).toLocaleString()}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{expense.description}</TableCell>
+                            <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                            <TableCell>
+                              <Button
+                                size="sm"
+                                className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+                                onClick={() => handlePushToDaybook(expense)}
+                                data-testid={`button-push-daybook-${expense.id}`}
+                              >
+                                <BookOpen className="h-4 w-4 mr-1" />
+                                Push to Daybook
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
       </Tabs>
 
       <Dialog open={isApprovalDialogOpen} onOpenChange={setIsApprovalDialogOpen}>
@@ -1790,6 +1923,80 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
               data-testid="button-confirm-approval"
             >
               {approvalAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDaybookDialogOpen} onOpenChange={setIsDaybookDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Push to Oak Daybook</DialogTitle>
+            <DialogDescription>
+              {selectedExpenseForDaybook && (
+                <>
+                  Expense: ₹{Number(selectedExpenseForDaybook.amount).toLocaleString()} - {selectedExpenseForDaybook.description}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Link to Event (Optional)</Label>
+              <Popover open={daybookEventOpen} onOpenChange={setDaybookEventOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={daybookEventOpen} className="w-full justify-between" data-testid="select-daybook-event">
+                    {daybookEventId ? events.find((e: any) => e.id === daybookEventId)?.title || 'Select event...' : 'Select event (optional)...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search events..." value={daybookEventSearch} onValueChange={setDaybookEventSearch} data-testid="input-daybook-event-search" />
+                    <CommandEmpty>No events found.</CommandEmpty>
+                    <CommandGroup className="max-h-60 overflow-y-auto">
+                      <CommandItem value="none" onSelect={() => { setDaybookEventId(''); setDaybookEventOpen(false); }}>
+                        <Check className={`mr-2 h-4 w-4 ${!daybookEventId ? 'opacity-100' : 'opacity-0'}`} />
+                        No event (general expense)
+                      </CommandItem>
+                      {events.map((event: any) => (
+                        <CommandItem key={event.id} value={event.title} onSelect={() => { setDaybookEventId(event.id); setDaybookEventOpen(false); }} data-testid={`option-daybook-event-${event.id}`}>
+                          <Check className={`mr-2 h-4 w-4 ${daybookEventId === event.id ? 'opacity-100' : 'opacity-0'}`} />
+                          {event.title}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Expense Category</Label>
+              <Select value={daybookCategory} onValueChange={setDaybookCategory}>
+                <SelectTrigger data-testid="select-daybook-category">
+                  <SelectValue placeholder="Select category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="travel">Travel</SelectItem>
+                  <SelectItem value="meals">Meals</SelectItem>
+                  <SelectItem value="supplies">Office Supplies</SelectItem>
+                  <SelectItem value="equipment">Equipment</SelectItem>
+                  <SelectItem value="transportation">Transportation</SelectItem>
+                  <SelectItem value="accommodation">Accommodation</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDaybookDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+              onClick={confirmPushToDaybook}
+              disabled={pushToDaybook.isPending}
+              data-testid="button-confirm-push-daybook"
+            >
+              {pushToDaybook.isPending ? 'Pushing...' : 'Push to Daybook'}
             </Button>
           </DialogFooter>
         </DialogContent>

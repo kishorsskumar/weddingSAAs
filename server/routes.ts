@@ -3197,6 +3197,60 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/expense-reimbursements/approved', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    try {
+      const allExpenses = await storage.getAllExpenseReimbursements();
+      const approved = allExpenses.filter(e => e.status === 'approved');
+      const employees = await storage.getAllEmployees();
+      const withNames = approved.map(exp => ({
+        ...exp,
+        employeeName: employees.find(e => e.id === exp.employeeId)?.name || 'Unknown'
+      }));
+      res.json(withNames);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch approved expenses' });
+    }
+  });
+
+  app.post('/api/admin/expense-reimbursements/:id/push-to-daybook', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    try {
+      const expense = await storage.getExpenseReimbursement(req.params.id);
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense reimbursement not found' });
+      }
+      if (expense.status !== 'approved') {
+        return res.status(400).json({ error: 'Only approved expenses can be pushed to daybook' });
+      }
+
+      const { eventId, category } = req.body;
+      const employee = await storage.getEmployee(expense.employeeId);
+      
+      const daybookEntry = await storage.createDaybookEntry({
+        date: expense.expenseDate,
+        description: `Employee Expense (${employee?.name || 'Unknown'}): ${expense.description}`,
+        type: 'expense',
+        amount: String(expense.amount),
+        category: category || expense.category || 'Other Expenses',
+        bankId: null,
+        eventId: eventId || null
+      });
+
+      await storage.updateExpenseReimbursement(req.params.id, {
+        status: 'paid',
+        paidDate: new Date().toISOString().split('T')[0]
+      });
+
+      res.json({ daybookEntry, expense: { ...expense, status: 'paid' } });
+    } catch (error) {
+      console.error('Push to daybook error:', error);
+      res.status(400).json({ error: 'Failed to push expense to daybook' });
+    }
+  });
+
   // Public Holidays (Superadmin only for management, all users can view)
   app.get('/api/public-holidays', async (req, res) => {
     const { year } = req.query;
