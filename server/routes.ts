@@ -3214,6 +3214,108 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/approved-payouts', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    try {
+      const allExpenses = await storage.getAllExpenseReimbursements();
+      const approvedExpenses = allExpenses.filter(e => e.status === 'approved');
+      
+      const allAdvances = await storage.getAllSalaryAdvanceRequests();
+      const approvedAdvances = allAdvances.filter((a: any) => a.status === 'approved');
+      
+      const employees = await storage.getAllEmployees();
+      
+      const payouts = [
+        ...approvedExpenses.map(exp => ({
+          id: exp.id,
+          type: 'expense' as const,
+          employeeId: exp.employeeId,
+          employeeName: employees.find(e => e.id === exp.employeeId)?.name || 'Unknown',
+          amount: exp.amount,
+          description: exp.description,
+          category: exp.category,
+          date: exp.expenseDate,
+          approvedAt: exp.approvedAt,
+        })),
+        ...approvedAdvances.map((adv: any) => ({
+          id: adv.id,
+          type: 'advance' as const,
+          employeeId: adv.employeeId,
+          employeeName: employees.find(e => e.id === adv.employeeId)?.name || 'Unknown',
+          amount: adv.amount,
+          description: adv.reason || 'Salary Advance',
+          category: 'Salary Advance',
+          date: adv.requestDate,
+          approvedAt: adv.approvedAt,
+        })),
+      ].sort((a, b) => new Date(b.approvedAt || 0).getTime() - new Date(a.approvedAt || 0).getTime());
+      
+      res.json(payouts);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch approved payouts' });
+    }
+  });
+
+  app.post('/api/admin/approved-payouts/:id/push-to-daybook', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    try {
+      const { type, eventId, category } = req.body;
+      
+      if (type === 'expense') {
+        const expense = await storage.getExpenseReimbursement(req.params.id);
+        if (!expense) return res.status(404).json({ error: 'Expense not found' });
+        if (expense.status !== 'approved') return res.status(400).json({ error: 'Only approved records can be pushed' });
+        
+        const employee = await storage.getEmployee(expense.employeeId);
+        const daybookEntry = await storage.createDaybookEntry({
+          date: expense.expenseDate,
+          description: `Employee Expense (${employee?.name || 'Unknown'}): ${expense.description}`,
+          type: 'expense',
+          amount: String(expense.amount),
+          category: category || expense.category || 'Other Expenses',
+          bankId: null,
+          eventId: eventId || null
+        });
+        
+        await storage.updateExpenseReimbursement(req.params.id, {
+          status: 'paid',
+          paidDate: new Date().toISOString().split('T')[0]
+        });
+        
+        res.json({ daybookEntry });
+      } else if (type === 'advance') {
+        const advance = await storage.getSalaryAdvanceRequest(req.params.id);
+        if (!advance) return res.status(404).json({ error: 'Advance not found' });
+        if (advance.status !== 'approved') return res.status(400).json({ error: 'Only approved records can be pushed' });
+        
+        const employee = await storage.getEmployee(advance.employeeId);
+        const daybookEntry = await storage.createDaybookEntry({
+          date: advance.requestDate,
+          description: `Salary Advance (${employee?.name || 'Unknown'}): ${advance.reason || 'N/A'}`,
+          type: 'expense',
+          amount: String(advance.amount),
+          category: category || 'Salary Advance',
+          bankId: null,
+          eventId: eventId || null
+        });
+        
+        await storage.updateSalaryAdvanceRequest(req.params.id, {
+          status: 'paid',
+          paidDate: new Date().toISOString().split('T')[0]
+        });
+        
+        res.json({ daybookEntry });
+      } else {
+        res.status(400).json({ error: 'Invalid type' });
+      }
+    } catch (error) {
+      console.error('Push to daybook error:', error);
+      res.status(400).json({ error: 'Failed to push to daybook' });
+    }
+  });
+
   app.post('/api/admin/expense-reimbursements/:id/push-to-daybook', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);
     if (!auth) return;

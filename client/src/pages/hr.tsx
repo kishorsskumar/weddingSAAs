@@ -1324,10 +1324,10 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
     },
   });
 
-  const { data: approvedExpenses = [] } = useQuery<any[]>({
-    queryKey: ['/api/admin/expense-reimbursements/approved'],
+  const { data: approvedPayouts = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/approved-payouts'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/expense-reimbursements/approved');
+      const res = await fetch('/api/admin/approved-payouts');
       if (!res.ok) return [];
       return res.json();
     },
@@ -1476,20 +1476,20 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
   });
 
   const pushToDaybook = useMutation({
-    mutationFn: async ({ id, eventId, category }: { id: string; eventId?: string; category?: string }) => {
-      const res = await fetch(`/api/admin/expense-reimbursements/${id}/push-to-daybook`, {
+    mutationFn: async ({ id, type, eventId, category }: { id: string; type: string; eventId?: string; category?: string }) => {
+      const res = await fetch(`/api/admin/approved-payouts/${id}/push-to-daybook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, category }),
+        body: JSON.stringify({ type, eventId, category }),
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to push to daybook');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/admin/expense-reimbursements/approved'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/approved-payouts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
-      toast({ title: 'Expense pushed to daybook successfully' });
+      toast({ title: 'Pushed to daybook successfully' });
       setIsDaybookDialogOpen(false);
       setSelectedExpenseForDaybook(null);
       setDaybookEventId('');
@@ -1500,9 +1500,9 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
     },
   });
 
-  const handlePushToDaybook = (expense: any) => {
-    setSelectedExpenseForDaybook(expense);
-    setDaybookCategory(expense.category || '');
+  const handlePushToDaybook = (payout: any) => {
+    setSelectedExpenseForDaybook(payout);
+    setDaybookCategory(payout.category || '');
     setDaybookEventId('');
     setIsDaybookDialogOpen(true);
   };
@@ -1511,6 +1511,7 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
     if (!selectedExpenseForDaybook) return;
     pushToDaybook.mutate({
       id: selectedExpenseForDaybook.id,
+      type: selectedExpenseForDaybook.type,
       eventId: daybookEventId || undefined,
       category: daybookCategory || undefined,
     });
@@ -1611,8 +1612,8 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
             Expenses ({pendingExpenses.length})
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="approved-expenses" className="text-xs sm:text-sm">
-              Approved ({approvedExpenses.length})
+            <TabsTrigger value="approved-payouts" className="text-xs sm:text-sm">
+              Approved Payouts ({approvedPayouts.length})
             </TabsTrigger>
           )}
         </TabsList>
@@ -1831,49 +1832,55 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
         </TabsContent>
 
         {isAdmin && (
-          <TabsContent value="approved-expenses">
+          <TabsContent value="approved-payouts">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Receipt className="h-5 w-5" />
-                  Approved Expenses - Push to Daybook
+                  Approved Payouts - Push to Daybook
                 </CardTitle>
-                <CardDescription>Push approved expense reimbursements to Oak Daybook with optional event or category assignment</CardDescription>
+                <CardDescription>Push approved expenses and salary advances to Oak Daybook with optional event or category assignment</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>Type</TableHead>
                         <TableHead>Employee</TableHead>
                         <TableHead>Category</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Description</TableHead>
-                        <TableHead>Expense Date</TableHead>
+                        <TableHead>Date</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {approvedExpenses.length === 0 ? (
+                      {approvedPayouts.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No approved expenses waiting to be pushed to daybook
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No approved payouts waiting to be pushed to daybook
                           </TableCell>
                         </TableRow>
                       ) : (
-                        approvedExpenses.map((expense: any) => (
-                          <TableRow key={expense.id} data-testid={`row-approved-expense-${expense.id}`}>
-                            <TableCell className="font-medium">{expense.employeeName || 'Employee'}</TableCell>
-                            <TableCell className="capitalize">{expense.category}</TableCell>
-                            <TableCell>₹{Number(expense.amount).toLocaleString()}</TableCell>
-                            <TableCell className="max-w-[150px] truncate">{expense.description}</TableCell>
-                            <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                        approvedPayouts.map((payout: any) => (
+                          <TableRow key={`${payout.type}-${payout.id}`} data-testid={`row-approved-payout-${payout.id}`}>
+                            <TableCell>
+                              <Badge variant={payout.type === 'expense' ? 'default' : 'secondary'} className={payout.type === 'expense' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
+                                {payout.type === 'expense' ? 'Expense' : 'Advance'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-medium">{payout.employeeName || 'Employee'}</TableCell>
+                            <TableCell className="capitalize">{payout.category}</TableCell>
+                            <TableCell>₹{Number(payout.amount).toLocaleString()}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{payout.description}</TableCell>
+                            <TableCell>{formatDate(payout.date)}</TableCell>
                             <TableCell>
                               <Button
                                 size="sm"
                                 className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
-                                onClick={() => handlePushToDaybook(expense)}
-                                data-testid={`button-push-daybook-${expense.id}`}
+                                onClick={() => handlePushToDaybook(payout)}
+                                data-testid={`button-push-daybook-${payout.id}`}
                               >
                                 <BookOpen className="h-4 w-4 mr-1" />
                                 Push to Daybook
