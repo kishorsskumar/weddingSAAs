@@ -336,14 +336,26 @@ function QuickEntryTab() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      // Step 1: Get upload URL
       const uploadRes = await fetch('/api/objects/upload', { method: 'POST', credentials: 'include' });
-      if (!uploadRes.ok) throw new Error('Failed to initiate upload');
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to get upload URL from server');
+      }
       const { uploadURL } = await uploadRes.json();
-      if (!uploadURL) throw new Error('No upload URL received');
+      if (!uploadURL) throw new Error('Server did not provide upload URL');
       
-      const putRes = await fetch(uploadURL, { method: 'PUT', body: file });
-      if (!putRes.ok) throw new Error('Failed to upload file');
+      // Step 2: Upload file to signed URL with Content-Type
+      const putRes = await fetch(uploadURL, { 
+        method: 'PUT', 
+        body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+      });
+      if (!putRes.ok) {
+        throw new Error(`Failed to upload file to storage (${putRes.status})`);
+      }
       
+      // Step 3: Finalize upload
       const finalizeRes = await fetch('/api/objects/finalize', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -354,6 +366,7 @@ function QuickEntryTab() {
       const { objectPath } = await finalizeRes.json();
       if (!objectPath) throw new Error('No file path received');
       
+      // Step 4: Create quick entry record
       const entryRes = await fetch('/api/employee-portal/quick-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -367,7 +380,8 @@ function QuickEntryTab() {
       processEntry(entry.id);
     },
     onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error('Upload error:', error);
+      toast({ title: "Upload Error", description: error.message, variant: "destructive" });
       setIsProcessing(false);
     },
   });
