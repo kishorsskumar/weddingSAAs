@@ -2561,6 +2561,294 @@ export async function registerRoutes(
     }
   });
 
+  // Employee Portal - Quick Entries (AI-processed payment screenshots)
+  app.get('/api/employee-portal/quick-entries', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const entries = await storage.getQuickEntriesByEmployee(employee.id);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get quick entries' });
+    }
+  });
+
+  app.post('/api/employee-portal/quick-entries', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const employee = await storage.getEmployeeByUserId(userId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee profile not found' });
+      }
+      const entry = await storage.createQuickEntry({
+        employeeId: employee.id,
+        source: req.body.source || 'upload',
+        filePath: req.body.filePath,
+        status: 'uploaded'
+      });
+      res.json(entry);
+    } catch (error) {
+      console.error('Error creating quick entry:', error);
+      res.status(400).json({ error: 'Failed to create quick entry' });
+    }
+  });
+
+  app.patch('/api/employee-portal/quick-entries/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      
+      // Only owner or superadmin can edit
+      if (!isSuperadmin && (!employee || entry.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      
+      const updated = await storage.updateQuickEntry(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update quick entry' });
+    }
+  });
+
+  app.delete('/api/employee-portal/quick-entries/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      
+      // Only owner or superadmin can delete, and only if not approved
+      if (!isSuperadmin && (!employee || entry.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (entry.status === 'approved') {
+        return res.status(400).json({ error: 'Cannot delete approved entries' });
+      }
+      
+      await storage.deleteQuickEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete quick entry' });
+    }
+  });
+
+  // Employee Portal - Process Quick Entry with AI
+  app.post('/api/employee-portal/quick-entries/:id/process', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      
+      const { image } = req.body;
+      if (!image) {
+        return res.status(400).json({ error: 'Image data is required' });
+      }
+      
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: 'OpenAI API key not configured' });
+      }
+      
+      // Update status to processing
+      await storage.updateQuickEntry(req.params.id, { status: 'processing' });
+      
+      try {
+        const parsed = await parseTransactionScreenshot(image);
+        
+        // Update entry with parsed data
+        const updated = await storage.updateQuickEntry(req.params.id, {
+          amount: parsed.amount.toString(),
+          transactionDate: new Date(parsed.date),
+          direction: parsed.type === 'income' ? 'received' : 'paid',
+          counterpartyName: parsed.counterparty || undefined,
+          transactionId: parsed.reference || undefined,
+          confidence: (parsed.confidence * 100).toString(),
+          rawExtraction: parsed as any,
+          status: 'awaiting_review',
+          notes: parsed.description
+        });
+        
+        res.json(updated);
+      } catch (parseError) {
+        await storage.updateQuickEntry(req.params.id, { status: 'failed' });
+        throw parseError;
+      }
+    } catch (error) {
+      console.error('Quick entry processing error:', error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to process quick entry' 
+      });
+    }
+  });
+
+  // HR/Admin - Get all pending quick entries for approval
+  app.get('/api/hr/quick-entries/pending', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      
+      const entries = await storage.getPendingQuickEntries();
+      
+      // Get employee info for each entry
+      const entriesWithEmployee = await Promise.all(
+        entries.map(async (entry) => {
+          const employee = await storage.getEmployee(entry.employeeId);
+          return { ...entry, employeeName: employee?.name || 'Unknown' };
+        })
+      );
+      
+      res.json(entriesWithEmployee);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get pending quick entries' });
+    }
+  });
+
+  // HR/Admin - Approve quick entry and push to daybook
+  app.post('/api/hr/quick-entries/:id/approve', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      if (entry.status !== 'awaiting_review') {
+        return res.status(400).json({ error: 'Entry is not awaiting review' });
+      }
+      
+      const { eventId, categoryId, bankId, notes } = req.body;
+      
+      // Create daybook entry
+      const daybookEntry = await storage.createDaybookEntry({
+        date: entry.transactionDate ? entry.transactionDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        type: entry.direction === 'received' ? 'income' : 'expense',
+        amount: entry.amount || '0',
+        category: categoryId || 'General',
+        description: notes || entry.notes || `Quick Entry - ${entry.counterpartyName || 'Transaction'}`,
+        bankId: bankId || undefined,
+        eventId: eventId || undefined
+      });
+      
+      // Update bank balance if bank is selected
+      if (bankId) {
+        const bank = await storage.getBank(bankId);
+        if (bank) {
+          const amount = parseFloat(entry.amount || '0');
+          const newBalance = entry.direction === 'received'
+            ? parseFloat(bank.balance) + amount
+            : parseFloat(bank.balance) - amount;
+          await storage.updateBank(bankId, { balance: newBalance.toString() });
+        }
+      }
+      
+      // Update event P&L if event is selected
+      if (eventId) {
+        const event = await storage.getEvent(eventId);
+        if (event) {
+          const amount = parseFloat(entry.amount || '0');
+          if (entry.direction === 'received') {
+            const newPaymentReceived = parseFloat(event.paymentReceived) + amount;
+            await storage.updateEvent(eventId, { paymentReceived: newPaymentReceived.toFixed(2) });
+          } else {
+            const newCost = parseFloat(event.cost) + amount;
+            await storage.updateEvent(eventId, { cost: newCost.toFixed(2) });
+          }
+        }
+      }
+      
+      // Update quick entry as approved
+      const updated = await storage.updateQuickEntry(req.params.id, {
+        status: 'approved',
+        reviewerId: userId,
+        eventId,
+        categoryId,
+        bankId,
+        notes,
+        daybookEntryId: daybookEntry.id
+      });
+      
+      res.json({ entry: updated, daybookEntry });
+    } catch (error) {
+      console.error('Quick entry approval error:', error);
+      res.status(400).json({ error: 'Failed to approve quick entry' });
+    }
+  });
+
+  // HR/Admin - Reject quick entry
+  app.post('/api/hr/quick-entries/:id/reject', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !['superadmin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      
+      const { reviewerNotes } = req.body;
+      
+      const updated = await storage.updateQuickEntry(req.params.id, {
+        status: 'rejected',
+        reviewerId: userId,
+        reviewerNotes
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject quick entry' });
+    }
+  });
+
   // Employee Portal - Duties and Responsibilities
   app.get('/api/employee-portal/duties', async (req, res) => {
     const userId = (req.session as any).userId;
