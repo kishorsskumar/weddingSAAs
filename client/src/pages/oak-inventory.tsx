@@ -85,7 +85,7 @@ const COMPANY_DEFAULTS = {
   gstNumber: '',
 };
 
-type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans' | 'decor-planning';
+type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans' | 'decor-planning' | 'transportation' | 'manpower';
 
 const DEFAULT_CATEGORIES = ["Décor", "Furniture", "Lighting", "Linens", "Props", "Florals", "Electronics", "Other"];
 const EVENT_TYPES = ["Wedding Stage Décor", "Reception Setup", "Corporate Event", "Birthday Party", "Other"];
@@ -116,6 +116,8 @@ const sidebarItems = [
   { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
   { id: 'production-plans', label: 'Execution Plans', icon: Factory },
   { id: 'decor-planning', label: 'Production Planning', icon: ClipboardList },
+  { id: 'transportation', label: 'Event Transportation', icon: Truck },
+  { id: 'manpower', label: 'Event Manpower', icon: Users },
 ];
 
 function ImageUpload({ 
@@ -482,6 +484,12 @@ export default function OakInventory() {
               inventoryItems={inventoryItems}
               users={users}
             />
+          )}
+          {activeSection === 'transportation' && (
+            <EventTransportationSection events={events} />
+          )}
+          {activeSection === 'manpower' && (
+            <EventManpowerSection events={events} />
           )}
         </div>
       </main>
@@ -6547,6 +6555,635 @@ function DecorPlanningSection({
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Event Transportation Section
+function EventTransportationSection({ events }: { events: Event[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
+  const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    eventId: '',
+    date: new Date().toISOString().split('T')[0],
+    amount: '',
+    description: '',
+  });
+
+  const { data: transportationRecords = [] } = useQuery<any[]>({
+    queryKey: ['/api/event-transportation'],
+  });
+
+  const { data: banks = [] } = useQuery<any[]>({
+    queryKey: ['/api/banks'],
+  });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
+
+  const filteredRecords = useMemo(() => {
+    if (selectedEventId === 'all') return transportationRecords;
+    return transportationRecords.filter((r: any) => r.eventId === selectedEventId);
+  }, [transportationRecords, selectedEventId]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/event-transportation', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      toast({ title: 'Transportation record added' });
+      setIsModalOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: 'Failed to add record', variant: 'destructive' }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest('PATCH', `/api/event-transportation/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      toast({ title: 'Record updated' });
+      setIsModalOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: 'Failed to update record', variant: 'destructive' }),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('PATCH', `/api/event-transportation/${id}/approve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      toast({ title: 'Record approved' });
+    },
+    onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: async ({ id, bankId, date }: { id: string; bankId?: string; date?: string }) => 
+      apiRequest('PATCH', `/api/event-transportation/${id}/pay`, { bankId, date }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      toast({ title: 'Marked as paid and added to daybook' });
+    },
+    onError: () => toast({ title: 'Failed to mark as paid', variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/event-transportation/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      toast({ title: 'Record deleted' });
+    },
+    onError: () => toast({ title: 'Failed to delete', variant: 'destructive' }),
+  });
+
+  const resetForm = () => {
+    setFormData({
+      eventId: '',
+      date: new Date().toISOString().split('T')[0],
+      amount: '',
+      description: '',
+    });
+    setEditingRecord(null);
+  };
+
+  const handleSubmit = () => {
+    if (!formData.eventId || !formData.amount) {
+      toast({ title: 'Please fill required fields', variant: 'destructive' });
+      return;
+    }
+    if (editingRecord) {
+      updateMutation.mutate({ id: editingRecord.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const handleEdit = (record: any) => {
+    setFormData({
+      eventId: record.eventId,
+      date: record.date,
+      amount: record.amount,
+      description: record.description || '',
+    });
+    setEditingRecord(record);
+    setIsModalOpen(true);
+  };
+
+  const getEventName = (eventId: string) => {
+    const event = events.find(e => e.id === eventId);
+    return event?.title || 'Unknown Event';
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+      case 'approved': return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Approved</Badge>;
+      case 'paid': return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Paid</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Event Transportation</h2>
+          <p className="text-gray-600 mt-1">Track commercial transportation costs per event</p>
+        </div>
+        <Button
+          onClick={() => { resetForm(); setIsModalOpen(true); }}
+          className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+          data-testid="button-add-transportation"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Add Transportation
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="w-64">
+          <Popover open={eventPopoverOpen} onOpenChange={setEventPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" className="w-full justify-between" data-testid="select-event-filter">
+                {selectedEventId === 'all' ? 'All Events' : getEventName(selectedEventId)}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0">
+              <Command>
+                <CommandInput placeholder="Search events..." />
+                <CommandList>
+                  <CommandEmpty>No events found</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem value="all" onSelect={() => { setSelectedEventId('all'); setEventPopoverOpen(false); }}>
+                      <Check className={cn("mr-2 h-4 w-4", selectedEventId === 'all' ? "opacity-100" : "opacity-0")} />
+                      All Events
+                    </CommandItem>
+                    {events.map(event => (
+                      <CommandItem key={event.id} value={event.id} onSelect={() => { setSelectedEventId(event.id); setEventPopoverOpen(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", selectedEventId === event.id ? "opacity-100" : "opacity-0")} />
+                        {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead>Date</TableHead>
+                <TableHead>Event</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    No transportation records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredRecords.map((record: any) => (
+                  <TableRow key={record.id} data-testid={`row-transportation-${record.id}`}>
+                    <TableCell>{format(new Date(record.date), 'MMM d, yyyy')}</TableCell>
+                    <TableCell className="font-medium">{getEventName(record.eventId)}</TableCell>
+                    <TableCell className="max-w-xs truncate">{record.description || '-'}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(record.amount)}</TableCell>
+                    <TableCell>{getStatusBadge(record.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {record.status === 'pending' && (
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-transportation-${record.id}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            {isAdmin && (
+                              <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-transportation-${record.id}`}>
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-transportation-${record.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                        {record.status === 'approved' && isAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => payMutation.mutate({ id: record.id })} className="text-green-600" data-testid={`button-pay-transportation-${record.id}`}>
+                            <Check className="w-4 h-4 mr-1" /> Pay
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingRecord ? 'Edit Transportation' : 'Add Transportation'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Event *</Label>
+              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
+                <SelectTrigger data-testid="select-event">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map(event => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Date *</Label>
+              <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (₹) *</Label>
+              <Input type="number" value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} placeholder="0" data-testid="input-amount" />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Transportation details..." data-testid="input-description" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-save-transportation">
+              {editingRecord ? 'Update' : 'Add'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Event Manpower Section
+function EventManpowerSection({ events }: { events: Event[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string>('all');
+  const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    eventId: '',
+    subcontractorName: '',
+    numberOfPersons: '',
+    date: new Date().toISOString().split('T')[0],
+    hoursWorked: '',
+    ratePerHour: '',
+    totalAmount: '',
+    description: '',
+  });
+
+  const { data: manpowerRecords = [] } = useQuery<any[]>({
+    queryKey: ['/api/event-manpower'],
+  });
+
+  const { data: currentUser } = useQuery<any>({
+    queryKey: ['/api/user'],
+  });
+
+  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
+
+  const filteredRecords = useMemo(() => {
+    if (selectedEventId === 'all') return manpowerRecords;
+    return manpowerRecords.filter((r: any) => r.eventId === selectedEventId);
+  }, [manpowerRecords, selectedEventId]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest('POST', '/api/event-manpower', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      toast({ title: 'Manpower record added' });
+      setIsModalOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: 'Failed to add record', variant: 'destructive' }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => apiRequest('PATCH', `/api/event-manpower/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      toast({ title: 'Record updated' });
+      setIsModalOpen(false);
+      resetForm();
+    },
+    onError: () => toast({ title: 'Failed to update record', variant: 'destructive' }),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('PATCH', `/api/event-manpower/${id}/approve`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      toast({ title: 'Record approved' });
+    },
+    onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: async ({ id, bankId, date }: { id: string; bankId?: string; date?: string }) => 
+      apiRequest('PATCH', `/api/event-manpower/${id}/pay`, { bankId, date }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      toast({ title: 'Marked as paid and added to daybook' });
+    },
+    onError: () => toast({ title: 'Failed to mark as paid', variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest('DELETE', `/api/event-manpower/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      toast({ title: 'Record deleted' });
+    },
+    onError: () => toast({ title: 'Failed to delete', variant: 'destructive' }),
+  });
+
+  const resetForm = () => {
+    setFormData({
+      eventId: '',
+      subcontractorName: '',
+      numberOfPersons: '',
+      date: new Date().toISOString().split('T')[0],
+      hoursWorked: '',
+      ratePerHour: '',
+      totalAmount: '',
+      description: '',
+    });
+    setEditingRecord(null);
+  };
+
+  const calculateTotal = () => {
+    const hours = parseFloat(formData.hoursWorked) || 0;
+    const rate = parseFloat(formData.ratePerHour) || 0;
+    const persons = parseInt(formData.numberOfPersons) || 1;
+    if (hours > 0 && rate > 0) {
+      return (hours * rate * persons).toFixed(2);
+    }
+    return formData.totalAmount;
+  };
+
+  const handleSubmit = () => {
+    if (!formData.eventId || !formData.subcontractorName || !formData.numberOfPersons || !formData.hoursWorked) {
+      toast({ title: 'Please fill required fields', variant: 'destructive' });
+      return;
+    }
+    const total = calculateTotal();
+    const submitData = { ...formData, totalAmount: total || formData.totalAmount };
+    if (editingRecord) {
+      updateMutation.mutate({ id: editingRecord.id, data: submitData });
+    } else {
+      createMutation.mutate(submitData);
+    }
+  };
+
+  const handleEdit = (record: any) => {
+    setFormData({
+      eventId: record.eventId,
+      subcontractorName: record.subcontractorName,
+      numberOfPersons: String(record.numberOfPersons),
+      date: record.date,
+      hoursWorked: record.hoursWorked,
+      ratePerHour: record.ratePerHour || '',
+      totalAmount: record.totalAmount,
+      description: record.description || '',
+    });
+    setEditingRecord(record);
+    setIsModalOpen(true);
+  };
+
+  const getEventName = (eventId: string) => {
+    const event = events.find(e => e.id === eventId);
+    return event?.title || 'Unknown Event';
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending': return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+      case 'approved': return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Approved</Badge>;
+      case 'paid': return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Paid</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Event Manpower</h2>
+          <p className="text-gray-600 mt-1">Track subcontractor manpower costs per event</p>
+        </div>
+        <Button
+          onClick={() => { resetForm(); setIsModalOpen(true); }}
+          className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+          data-testid="button-add-manpower"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Add Manpower
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className="w-64">
+          <Popover open={eventPopoverOpen} onOpenChange={setEventPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" className="w-full justify-between" data-testid="select-manpower-event-filter">
+                {selectedEventId === 'all' ? 'All Events' : getEventName(selectedEventId)}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0">
+              <Command>
+                <CommandInput placeholder="Search events..." />
+                <CommandList>
+                  <CommandEmpty>No events found</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem value="all" onSelect={() => { setSelectedEventId('all'); setEventPopoverOpen(false); }}>
+                      <Check className={cn("mr-2 h-4 w-4", selectedEventId === 'all' ? "opacity-100" : "opacity-0")} />
+                      All Events
+                    </CommandItem>
+                    {events.map(event => (
+                      <CommandItem key={event.id} value={event.id} onSelect={() => { setSelectedEventId(event.id); setEventPopoverOpen(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", selectedEventId === event.id ? "opacity-100" : "opacity-0")} />
+                        {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead>Date</TableHead>
+                <TableHead>Event</TableHead>
+                <TableHead>Subcontractor</TableHead>
+                <TableHead className="text-center">Persons</TableHead>
+                <TableHead className="text-center">Hours</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRecords.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    No manpower records found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredRecords.map((record: any) => (
+                  <TableRow key={record.id} data-testid={`row-manpower-${record.id}`}>
+                    <TableCell>{format(new Date(record.date), 'MMM d, yyyy')}</TableCell>
+                    <TableCell className="font-medium">{getEventName(record.eventId)}</TableCell>
+                    <TableCell>{record.subcontractorName}</TableCell>
+                    <TableCell className="text-center">{record.numberOfPersons}</TableCell>
+                    <TableCell className="text-center">{record.hoursWorked}h</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(record.totalAmount)}</TableCell>
+                    <TableCell>{getStatusBadge(record.status)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {record.status === 'pending' && (
+                          <>
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-manpower-${record.id}`}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            {isAdmin && (
+                              <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-manpower-${record.id}`}>
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-manpower-${record.id}`}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                        {record.status === 'approved' && isAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => payMutation.mutate({ id: record.id })} className="text-green-600" data-testid={`button-pay-manpower-${record.id}`}>
+                            <Check className="w-4 h-4 mr-1" /> Pay
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingRecord ? 'Edit Manpower' : 'Add Manpower'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Event *</Label>
+              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
+                <SelectTrigger data-testid="select-manpower-event">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  {events.map(event => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Subcontractor Name *</Label>
+              <Input value={formData.subcontractorName} onChange={(e) => setFormData({ ...formData, subcontractorName: e.target.value })} placeholder="Name or company" data-testid="input-subcontractor" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Number of Persons *</Label>
+                <Input type="number" value={formData.numberOfPersons} onChange={(e) => setFormData({ ...formData, numberOfPersons: e.target.value })} placeholder="1" data-testid="input-persons" />
+              </div>
+              <div className="space-y-2">
+                <Label>Date *</Label>
+                <Input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} data-testid="input-manpower-date" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Hours Worked *</Label>
+                <Input type="number" step="0.5" value={formData.hoursWorked} onChange={(e) => setFormData({ ...formData, hoursWorked: e.target.value })} placeholder="8" data-testid="input-hours" />
+              </div>
+              <div className="space-y-2">
+                <Label>Rate/Hour (₹)</Label>
+                <Input type="number" value={formData.ratePerHour} onChange={(e) => setFormData({ ...formData, ratePerHour: e.target.value })} placeholder="Optional" data-testid="input-rate" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Total Amount (₹) *</Label>
+              <Input 
+                type="number" 
+                value={calculateTotal() || formData.totalAmount} 
+                onChange={(e) => setFormData({ ...formData, totalAmount: e.target.value })} 
+                placeholder="0"
+                data-testid="input-manpower-total" 
+              />
+              {formData.hoursWorked && formData.ratePerHour && formData.numberOfPersons && (
+                <p className="text-xs text-gray-500">
+                  Calculated: {formData.numberOfPersons} persons × {formData.hoursWorked}h × ₹{formData.ratePerHour}/h = {formatCurrency(calculateTotal())}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Work details..." data-testid="input-manpower-description" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-save-manpower">
+              {editingRecord ? 'Update' : 'Add'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

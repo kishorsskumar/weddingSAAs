@@ -5608,6 +5608,14 @@ export async function registerRoutes(
 
   app.patch('/api/event-transportation/:id/approve', verifyAdminAccess, async (req, res) => {
     try {
+      const existingRecords = await storage.getAllEventTransportation();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Transportation record not found' });
+      }
+      if (existing.status !== 'pending') {
+        return res.status(400).json({ error: 'Only pending records can be approved' });
+      }
       const userId = (req as any).session?.userId;
       const record = await storage.updateEventTransportation(req.params.id, {
         status: 'approved',
@@ -5628,6 +5636,9 @@ export async function registerRoutes(
       
       if (!existing) {
         return res.status(404).json({ error: 'Transportation record not found' });
+      }
+      if (existing.status !== 'approved') {
+        return res.status(400).json({ error: 'Only approved records can be paid' });
       }
 
       // Create daybook expense entry
@@ -5706,6 +5717,14 @@ export async function registerRoutes(
 
   app.patch('/api/event-manpower/:id/approve', verifyAdminAccess, async (req, res) => {
     try {
+      const existingRecords = await storage.getAllEventManpower();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Manpower record not found' });
+      }
+      if (existing.status !== 'pending') {
+        return res.status(400).json({ error: 'Only pending records can be approved' });
+      }
       const userId = (req as any).session?.userId;
       const record = await storage.updateEventManpower(req.params.id, {
         status: 'approved',
@@ -5726,6 +5745,9 @@ export async function registerRoutes(
       
       if (!existing) {
         return res.status(404).json({ error: 'Manpower record not found' });
+      }
+      if (existing.status !== 'approved') {
+        return res.status(400).json({ error: 'Only approved records can be paid' });
       }
 
       // Create daybook expense entry
