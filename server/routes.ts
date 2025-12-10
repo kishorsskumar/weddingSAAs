@@ -5566,6 +5566,202 @@ export async function registerRoutes(
     }
   });
 
+  // Event Transportation Routes
+  app.get('/api/event-transportation', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string | undefined;
+      if (eventId) {
+        const records = await storage.getEventTransportation(eventId);
+        res.json(records);
+      } else {
+        const records = await storage.getAllEventTransportation();
+        res.json(records);
+      }
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to fetch transportation records' });
+    }
+  });
+
+  app.post('/api/event-transportation', async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const data = {
+        ...req.body,
+        submittedBy: userId || null,
+        status: 'pending'
+      };
+      const record = await storage.createEventTransportation(data);
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create transportation record' });
+    }
+  });
+
+  app.patch('/api/event-transportation/:id', async (req, res) => {
+    try {
+      const record = await storage.updateEventTransportation(req.params.id, req.body);
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update transportation record' });
+    }
+  });
+
+  app.patch('/api/event-transportation/:id/approve', verifyAdminAccess, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const record = await storage.updateEventTransportation(req.params.id, {
+        status: 'approved',
+        approvedBy: userId,
+        approvedAt: new Date()
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to approve transportation record' });
+    }
+  });
+
+  app.patch('/api/event-transportation/:id/pay', verifyAdminAccess, async (req, res) => {
+    try {
+      const { bankId, date } = req.body;
+      const existingRecords = await storage.getAllEventTransportation();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      
+      if (!existing) {
+        return res.status(404).json({ error: 'Transportation record not found' });
+      }
+
+      // Create daybook expense entry
+      const event = await storage.getEvent(existing.eventId);
+      const daybookEntry = await storage.createDaybookEntry({
+        date: date || new Date().toISOString().split('T')[0],
+        description: `Transportation for ${event?.title || 'Event'}: ${existing.description || 'N/A'}`,
+        type: 'expense',
+        amount: String(existing.amount),
+        category: 'Event Transportation',
+        bankId: bankId || null,
+        eventId: existing.eventId
+      });
+
+      // Update transportation record
+      const record = await storage.updateEventTransportation(req.params.id, {
+        status: 'paid',
+        paidDate: date || new Date().toISOString().split('T')[0],
+        daybookEntryId: daybookEntry.id
+      });
+
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to mark transportation as paid' });
+    }
+  });
+
+  app.delete('/api/event-transportation/:id', async (req, res) => {
+    try {
+      await storage.deleteEventTransportation(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete transportation record' });
+    }
+  });
+
+  // Event Manpower Routes
+  app.get('/api/event-manpower', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string | undefined;
+      if (eventId) {
+        const records = await storage.getEventManpower(eventId);
+        res.json(records);
+      } else {
+        const records = await storage.getAllEventManpower();
+        res.json(records);
+      }
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to fetch manpower records' });
+    }
+  });
+
+  app.post('/api/event-manpower', async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const data = {
+        ...req.body,
+        submittedBy: userId || null,
+        status: 'pending'
+      };
+      const record = await storage.createEventManpower(data);
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to create manpower record' });
+    }
+  });
+
+  app.patch('/api/event-manpower/:id', async (req, res) => {
+    try {
+      const record = await storage.updateEventManpower(req.params.id, req.body);
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update manpower record' });
+    }
+  });
+
+  app.patch('/api/event-manpower/:id/approve', verifyAdminAccess, async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const record = await storage.updateEventManpower(req.params.id, {
+        status: 'approved',
+        approvedBy: userId,
+        approvedAt: new Date()
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to approve manpower record' });
+    }
+  });
+
+  app.patch('/api/event-manpower/:id/pay', verifyAdminAccess, async (req, res) => {
+    try {
+      const { bankId, date } = req.body;
+      const existingRecords = await storage.getAllEventManpower();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      
+      if (!existing) {
+        return res.status(404).json({ error: 'Manpower record not found' });
+      }
+
+      // Create daybook expense entry
+      const event = await storage.getEvent(existing.eventId);
+      const daybookEntry = await storage.createDaybookEntry({
+        date: date || new Date().toISOString().split('T')[0],
+        description: `Manpower for ${event?.title || 'Event'}: ${existing.subcontractorName} (${existing.numberOfPersons} persons, ${existing.hoursWorked}h)`,
+        type: 'expense',
+        amount: String(existing.totalAmount),
+        category: 'Event Manpower',
+        bankId: bankId || null,
+        eventId: existing.eventId
+      });
+
+      // Update manpower record
+      const record = await storage.updateEventManpower(req.params.id, {
+        status: 'paid',
+        paidDate: date || new Date().toISOString().split('T')[0],
+        daybookEntryId: daybookEntry.id
+      });
+
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to mark manpower as paid' });
+    }
+  });
+
+  app.delete('/api/event-manpower/:id', async (req, res) => {
+    try {
+      await storage.deleteEventManpower(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete manpower record' });
+    }
+  });
+
   // Object Storage - Image Upload Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
