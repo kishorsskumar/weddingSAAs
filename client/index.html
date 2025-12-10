@@ -26,7 +26,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- PWA Loading Screen -->
+      <div id="pwa-loading" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: linear-gradient(135deg, #5B8C51 0%, #7C8B5D 50%, #B8A44C 100%);">
+        <img src="/oak-street-logo.png" alt="Oak Street Events" style="width: 120px; height: 120px; object-fit: contain; margin-bottom: 16px;" />
+        <p style="color: white; font-family: 'Inter', sans-serif; font-size: 18px; margin: 0;">Loading...</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
