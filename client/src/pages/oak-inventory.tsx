@@ -6620,12 +6620,19 @@ function EventTransportationSection({ events }: { events: Event[] }) {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest('PATCH', `/api/event-transportation/${id}/approve`),
+    mutationFn: async (id: string) => {
+      console.log('[Transportation] Approving record:', id);
+      const response = await apiRequest('PATCH', `/api/event-transportation/${id}/approve`);
+      return response;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
       toast({ title: 'Record approved' });
     },
-    onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
+    onError: (error) => {
+      console.error('[Transportation] Approve error:', error);
+      toast({ title: 'Failed to approve', variant: 'destructive' });
+    },
   });
 
   const payMutation = useMutation({
@@ -6926,12 +6933,19 @@ function EventManpowerSection({ events }: { events: Event[] }) {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest('PATCH', `/api/event-manpower/${id}/approve`),
+    mutationFn: async (id: string) => {
+      console.log('[Manpower] Approving record:', id);
+      const response = await apiRequest('PATCH', `/api/event-manpower/${id}/approve`);
+      return response;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
       toast({ title: 'Record approved' });
     },
-    onError: () => toast({ title: 'Failed to approve', variant: 'destructive' }),
+    onError: (error) => {
+      console.error('[Manpower] Approve error:', error);
+      toast({ title: 'Failed to approve', variant: 'destructive' });
+    },
   });
 
   const payMutation = useMutation({
