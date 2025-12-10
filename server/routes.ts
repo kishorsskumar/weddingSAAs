@@ -5631,6 +5631,28 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/event-transportation/:id/reject', async (req, res) => {
+    try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
+      const existingRecords = await storage.getAllEventTransportation();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Transportation record not found' });
+      }
+      if (existing.status !== 'pending') {
+        return res.status(400).json({ error: 'Only pending records can be rejected' });
+      }
+      const record = await storage.updateEventTransportation(req.params.id, {
+        status: 'rejected'
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject transportation record' });
+    }
+  });
+
   app.patch('/api/event-transportation/:id/pay', async (req, res) => {
     try {
       const auth = await verifyAdminAccess(req, res);
@@ -5745,6 +5767,28 @@ export async function registerRoutes(
       res.json(record);
     } catch (error) {
       res.status(400).json({ error: 'Failed to approve manpower record' });
+    }
+  });
+
+  app.patch('/api/event-manpower/:id/reject', async (req, res) => {
+    try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
+      const existingRecords = await storage.getAllEventManpower();
+      const existing = existingRecords.find(r => r.id === req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Manpower record not found' });
+      }
+      if (existing.status !== 'pending') {
+        return res.status(400).json({ error: 'Only pending records can be rejected' });
+      }
+      const record = await storage.updateEventManpower(req.params.id, {
+        status: 'rejected'
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to reject manpower record' });
     }
   });
 

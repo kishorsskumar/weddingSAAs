@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -6577,6 +6578,9 @@ function EventTransportationSection({ events }: { events: Event[] }) {
     description: '',
   });
   const [formEventPopoverOpen, setFormEventPopoverOpen] = useState(false);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [selectedRecordForAction, setSelectedRecordForAction] = useState<any>(null);
 
   const { data: transportationRecords = [] } = useQuery<any[]>({
     queryKey: ['/api/event-transportation'],
@@ -6647,6 +6651,24 @@ function EventTransportationSection({ events }: { events: Event[] }) {
       console.error('[Transportation] Approve mutation error:', error);
       toast({ title: 'Failed to approve', variant: 'destructive' });
     },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/event-transportation/${id}/reject`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
+      toast({ title: 'Record rejected' });
+      setApproveDialogOpen(false);
+      setSelectedRecordForAction(null);
+    },
+    onError: () => toast({ title: 'Failed to reject', variant: 'destructive' }),
   });
 
   const payMutation = useMutation({
@@ -6797,26 +6819,24 @@ function EventTransportationSection({ events }: { events: Event[] }) {
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {(record.status === 'pending' || record.status === 'approved') && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-transportation-${record.id}`}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            {record.status === 'pending' && isAdmin && (
-                              <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-transportation-${record.id}`}>
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-transportation-${record.id}`}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
+                        {record.status !== 'rejected' && (
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-transportation-${record.id}`}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {record.status === 'pending' && isAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedRecordForAction(record); setApproveDialogOpen(true); }} className="text-blue-600" data-testid={`button-approve-transportation-${record.id}`}>
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
                         )}
                         {record.status === 'approved' && isAdmin && (
-                          <Button variant="ghost" size="sm" onClick={() => payMutation.mutate({ id: record.id })} className="text-green-600" data-testid={`button-pay-transportation-${record.id}`}>
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedRecordForAction(record); setPayDialogOpen(true); }} className="text-green-600" data-testid={`button-pay-transportation-${record.id}`}>
                             <Check className="w-4 h-4 mr-1" /> Pay
                           </Button>
                         )}
+                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-transportation-${record.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -6885,6 +6905,56 @@ function EventTransportationSection({ events }: { events: Event[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve or Reject Transportation</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedRecordForAction && (
+                <>
+                  <strong>{getEventName(selectedRecordForAction.eventId)}</strong><br />
+                  Amount: {formatCurrency(selectedRecordForAction.amount)}<br />
+                  {selectedRecordForAction.description && <>Description: {selectedRecordForAction.description}</>}
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setApproveDialogOpen(false); setSelectedRecordForAction(null); }}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={() => { if (selectedRecordForAction) rejectMutation.mutate(selectedRecordForAction.id); }} data-testid="button-reject-transportation">
+              <XCircle className="w-4 h-4 mr-1" /> Reject
+            </Button>
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-transportation">
+              <CheckCircle className="w-4 h-4 mr-1" /> Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedRecordForAction && (
+                <>
+                  Are you sure you want to mark this as paid?<br /><br />
+                  <strong>{getEventName(selectedRecordForAction.eventId)}</strong><br />
+                  Amount: {formatCurrency(selectedRecordForAction.amount)}<br />
+                  This will create a daybook expense entry.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPayDialogOpen(false); setSelectedRecordForAction(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { payMutation.mutate({ id: selectedRecordForAction.id }); setPayDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-green-600 hover:bg-green-700" data-testid="button-confirm-pay-transportation">
+              <Check className="w-4 h-4 mr-1" /> Confirm Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -6898,6 +6968,9 @@ function EventManpowerSection({ events }: { events: Event[] }) {
   const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
   const [formEventPopoverOpen, setFormEventPopoverOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [selectedRecordForAction, setSelectedRecordForAction] = useState<any>(null);
   const [formData, setFormData] = useState({
     eventId: '',
     subcontractorName: '',
@@ -6974,6 +7047,24 @@ function EventManpowerSection({ events }: { events: Event[] }) {
       console.error('[Manpower] Approve mutation error:', error);
       toast({ title: 'Failed to approve', variant: 'destructive' });
     },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/event-manpower/${id}/reject`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error(await response.text());
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
+      toast({ title: 'Record rejected' });
+      setApproveDialogOpen(false);
+      setSelectedRecordForAction(null);
+    },
+    onError: () => toast({ title: 'Failed to reject', variant: 'destructive' }),
   });
 
   const payMutation = useMutation({
@@ -7146,26 +7237,24 @@ function EventManpowerSection({ events }: { events: Event[] }) {
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {(record.status === 'pending' || record.status === 'approved') && (
-                          <>
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-manpower-${record.id}`}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            {record.status === 'pending' && isAdmin && (
-                              <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-manpower-${record.id}`}>
-                                <CheckCircle className="w-4 h-4" />
-                              </Button>
-                            )}
-                            <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-manpower-${record.id}`}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
+                        {record.status !== 'rejected' && (
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-manpower-${record.id}`}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {record.status === 'pending' && isAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedRecordForAction(record); setApproveDialogOpen(true); }} className="text-blue-600" data-testid={`button-approve-manpower-${record.id}`}>
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
                         )}
                         {record.status === 'approved' && isAdmin && (
-                          <Button variant="ghost" size="sm" onClick={() => payMutation.mutate({ id: record.id })} className="text-green-600" data-testid={`button-pay-manpower-${record.id}`}>
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedRecordForAction(record); setPayDialogOpen(true); }} className="text-green-600" data-testid={`button-pay-manpower-${record.id}`}>
                             <Check className="w-4 h-4 mr-1" /> Pay
                           </Button>
                         )}
+                        <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(record.id)} className="text-red-600" data-testid={`button-delete-manpower-${record.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -7261,6 +7350,58 @@ function EventManpowerSection({ events }: { events: Event[] }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve or Reject Manpower</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedRecordForAction && (
+                <>
+                  <strong>{getEventName(selectedRecordForAction.eventId)}</strong><br />
+                  Worker: {selectedRecordForAction.subcontractorName}<br />
+                  Amount: {formatCurrency(selectedRecordForAction.totalAmount)}<br />
+                  {selectedRecordForAction.numberOfPersons} person(s), {selectedRecordForAction.hoursWorked}h
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setApproveDialogOpen(false); setSelectedRecordForAction(null); }}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={() => { if (selectedRecordForAction) rejectMutation.mutate(selectedRecordForAction.id); }} data-testid="button-reject-manpower">
+              <XCircle className="w-4 h-4 mr-1" /> Reject
+            </Button>
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-manpower">
+              <CheckCircle className="w-4 h-4 mr-1" /> Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              {selectedRecordForAction && (
+                <>
+                  Are you sure you want to mark this as paid?<br /><br />
+                  <strong>{getEventName(selectedRecordForAction.eventId)}</strong><br />
+                  Worker: {selectedRecordForAction.subcontractorName}<br />
+                  Amount: {formatCurrency(selectedRecordForAction.totalAmount)}<br />
+                  This will create a daybook expense entry.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setPayDialogOpen(false); setSelectedRecordForAction(null); }}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { payMutation.mutate({ id: selectedRecordForAction.id }); setPayDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-green-600 hover:bg-green-700" data-testid="button-confirm-pay-manpower">
+              <Check className="w-4 h-4 mr-1" /> Confirm Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
