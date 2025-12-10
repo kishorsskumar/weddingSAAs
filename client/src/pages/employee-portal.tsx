@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -188,6 +188,28 @@ interface EmployeeDuties {
   department: string | null;
 }
 
+interface QuickEntry {
+  id: string;
+  employeeId: string;
+  source: string;
+  filePath: string;
+  amount: string | null;
+  currency: string;
+  transactionDate: string | null;
+  direction: string | null;
+  counterpartyName: string | null;
+  counterpartyUpi: string | null;
+  transactionId: string | null;
+  confidence: string | null;
+  status: string;
+  eventId: string | null;
+  categoryId: string | null;
+  bankId: string | null;
+  notes: string | null;
+  reviewerNotes: string | null;
+  createdAt: string;
+}
+
 function formatCurrency(amount: string | number): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('en-IN', {
@@ -241,6 +263,225 @@ function getRatingStars(rating: number | null) {
 
 function getMonthName(month: number): string {
   return new Date(2000, month - 1).toLocaleString('en-IN', { month: 'long' });
+}
+
+function QuickEntryTab() {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const { data: quickEntries = [], isLoading } = useQuery<QuickEntry[]>({
+    queryKey: ['/api/employee-portal/quick-entries'],
+    queryFn: async () => {
+      const res = await fetch('/api/employee-portal/quick-entries', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch quick entries');
+      return res.json();
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const uploadRes = await fetch('/api/objects/upload', { method: 'POST', credentials: 'include' });
+      const { uploadURL } = await uploadRes.json();
+      await fetch(uploadURL, { method: 'PUT', body: file });
+      const finalizeRes = await fetch('/api/objects/finalize', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadURL }),
+        credentials: 'include',
+      });
+      const { objectPath } = await finalizeRes.json();
+      const entryRes = await fetch('/api/employee-portal/quick-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: objectPath, source: 'upload' }),
+        credentials: 'include',
+      });
+      return entryRes.json();
+    },
+    onSuccess: (entry) => {
+      processEntry(entry.id);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsProcessing(false);
+    },
+  });
+
+  const processEntry = async (entryId: string) => {
+    if (!previewUrl) return;
+    try {
+      const res = await fetch(`/api/employee-portal/quick-entries/${entryId}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: previewUrl }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to process screenshot');
+      toast({ title: "Success", description: "Screenshot processed successfully!" });
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/quick-entries'] });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to process screenshot. Please try again.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+      setSelectedFile(null);
+      setPreviewUrl(null);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPreviewUrl(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUpload = () => {
+    if (!selectedFile) return;
+    setIsProcessing(true);
+    uploadMutation.mutate(selectedFile);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      uploaded: { variant: 'secondary', label: 'Uploaded' },
+      processing: { variant: 'secondary', label: 'Processing...' },
+      awaiting_review: { variant: 'outline', label: 'Awaiting Review' },
+      approved: { variant: 'default', label: 'Approved' },
+      rejected: { variant: 'destructive', label: 'Rejected' },
+      failed: { variant: 'destructive', label: 'Failed' },
+    };
+    const { variant, label } = config[status] || { variant: 'secondary', label: status };
+    return <Badge variant={variant}>{label}</Badge>;
+  };
+
+  return (
+    <motion.div className="space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5" />
+            Quick Entry - AI Payment Scanner
+          </CardTitle>
+          <CardDescription>
+            Upload or share a payment screenshot (UPI, GPay, PhonePe, etc.) and AI will automatically extract the details
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="border-2 border-dashed rounded-lg p-6 text-center">
+            {previewUrl ? (
+              <div className="space-y-4">
+                <img src={previewUrl} alt="Preview" className="max-h-48 mx-auto rounded-lg shadow" />
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" onClick={() => { setSelectedFile(null); setPreviewUrl(null); }} data-testid="button-cancel-upload">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpload} disabled={isProcessing} data-testid="button-process-screenshot">
+                    {isProcessing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Process with AI
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-col items-center gap-2">
+                  <Upload className="h-12 w-12 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Tap to upload or share from your payment app
+                  </p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  data-testid="input-file-upload"
+                />
+                <Button onClick={() => fileInputRef.current?.click()} data-testid="button-select-file">
+                  Select Screenshot
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-muted/50 rounded-lg p-4 text-sm">
+            <p className="font-medium mb-2">Supported payment apps:</p>
+            <p className="text-muted-foreground">
+              Google Pay, PhonePe, Paytm, HDFC, ICICI, SBI, and most Indian bank apps
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Quick Entries</CardTitle>
+          <CardDescription>Track the status of your submitted payment screenshots</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : quickEntries.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Receipt className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No quick entries yet</p>
+              <p className="text-sm">Upload a payment screenshot to get started</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Counterparty</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {quickEntries.map((entry) => (
+                  <TableRow key={entry.id} data-testid={`quick-entry-row-${entry.id}`}>
+                    <TableCell>{formatDate(entry.transactionDate || entry.createdAt)}</TableCell>
+                    <TableCell className="font-medium">
+                      {entry.amount ? formatCurrency(entry.amount) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {entry.direction === 'received' ? (
+                        <Badge variant="outline" className="text-green-600">Received</Badge>
+                      ) : entry.direction === 'paid' ? (
+                        <Badge variant="outline" className="text-red-600">Paid</Badge>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell>{entry.counterpartyName || '-'}</TableCell>
+                    <TableCell>{getStatusBadge(entry.status)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
 }
 
 export default function EmployeePortal() {
@@ -954,10 +1195,14 @@ export default function EmployeePortal() {
       </Dialog>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-9 gap-1">
+        <TabsList className="grid w-full grid-cols-5 md:grid-cols-10 gap-1">
           <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
             <User className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="quick-entry" className="text-xs md:text-sm" data-testid="tab-quick-entry">
+            <Upload className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Quick Entry</span>
           </TabsTrigger>
           <TabsTrigger value="leaves" className="text-xs md:text-sm" data-testid="tab-leaves">
             <CalendarDays className="h-4 w-4 mr-1 md:mr-2" />
@@ -1181,6 +1426,10 @@ export default function EmployeePortal() {
           >
             <UserGuides />
           </motion.div>
+        </TabsContent>
+
+        <TabsContent value="quick-entry">
+          <QuickEntryTab />
         </TabsContent>
 
         <TabsContent value="leaves">
