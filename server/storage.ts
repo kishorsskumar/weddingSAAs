@@ -178,10 +178,13 @@ import {
   type InsertLeaveBalanceAdjustment,
   eventTransportation,
   eventManpower,
+  quickEntries,
   type EventTransportation,
   type InsertEventTransportation,
   type EventManpower,
   type InsertEventManpower,
+  type QuickEntry,
+  type InsertQuickEntry,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -655,6 +658,15 @@ export interface IStorage {
   createEventManpower(data: InsertEventManpower): Promise<EventManpower>;
   updateEventManpower(id: string, data: Partial<InsertEventManpower>): Promise<EventManpower | undefined>;
   deleteEventManpower(id: string): Promise<void>;
+  
+  // Quick Entries (AI-processed payment screenshots)
+  getQuickEntriesByEmployee(employeeId: string): Promise<QuickEntry[]>;
+  getAllQuickEntries(): Promise<QuickEntry[]>;
+  getPendingQuickEntries(): Promise<QuickEntry[]>;
+  getQuickEntry(id: string): Promise<QuickEntry | undefined>;
+  createQuickEntry(entry: InsertQuickEntry): Promise<QuickEntry>;
+  updateQuickEntry(id: string, entry: Partial<InsertQuickEntry>): Promise<QuickEntry | undefined>;
+  deleteQuickEntry(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2956,6 +2968,45 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventManpower(id: string): Promise<void> {
     await db.delete(eventManpower).where(eq(eventManpower.id, id));
+  }
+
+  // Quick Entries (AI-processed payment screenshots)
+  async getQuickEntriesByEmployee(employeeId: string): Promise<QuickEntry[]> {
+    return await db.select().from(quickEntries)
+      .where(eq(quickEntries.employeeId, employeeId))
+      .orderBy(desc(quickEntries.createdAt));
+  }
+
+  async getAllQuickEntries(): Promise<QuickEntry[]> {
+    return await db.select().from(quickEntries).orderBy(desc(quickEntries.createdAt));
+  }
+
+  async getPendingQuickEntries(): Promise<QuickEntry[]> {
+    return await db.select().from(quickEntries)
+      .where(eq(quickEntries.status, 'awaiting_review'))
+      .orderBy(desc(quickEntries.createdAt));
+  }
+
+  async getQuickEntry(id: string): Promise<QuickEntry | undefined> {
+    const [entry] = await db.select().from(quickEntries).where(eq(quickEntries.id, id));
+    return entry || undefined;
+  }
+
+  async createQuickEntry(entry: InsertQuickEntry): Promise<QuickEntry> {
+    const [created] = await db.insert(quickEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateQuickEntry(id: string, entry: Partial<InsertQuickEntry>): Promise<QuickEntry | undefined> {
+    const [updated] = await db.update(quickEntries)
+      .set({ ...entry, updatedAt: new Date() })
+      .where(eq(quickEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteQuickEntry(id: string): Promise<void> {
+    await db.delete(quickEntries).where(eq(quickEntries.id, id));
   }
 }
 
