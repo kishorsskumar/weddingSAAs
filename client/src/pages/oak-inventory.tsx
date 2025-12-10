@@ -6571,10 +6571,12 @@ function EventTransportationSection({ events }: { events: Event[] }) {
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [formData, setFormData] = useState({
     eventId: '',
+    subcontractorName: '',
     date: new Date().toISOString().split('T')[0],
     amount: '',
     description: '',
   });
+  const [formEventPopoverOpen, setFormEventPopoverOpen] = useState(false);
 
   const { data: transportationRecords = [] } = useQuery<any[]>({
     queryKey: ['/api/event-transportation'],
@@ -6649,6 +6651,7 @@ function EventTransportationSection({ events }: { events: Event[] }) {
   const resetForm = () => {
     setFormData({
       eventId: '',
+      subcontractorName: '',
       date: new Date().toISOString().split('T')[0],
       amount: '',
       description: '',
@@ -6671,6 +6674,7 @@ function EventTransportationSection({ events }: { events: Event[] }) {
   const handleEdit = (record: any) => {
     setFormData({
       eventId: record.eventId,
+      subcontractorName: record.subcontractorName || '',
       date: record.date,
       amount: record.amount,
       description: record.description || '',
@@ -6810,18 +6814,34 @@ function EventTransportationSection({ events }: { events: Event[] }) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Event *</Label>
-              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
-                <SelectTrigger data-testid="select-event">
-                  <SelectValue placeholder="Select event" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={formEventPopoverOpen} onOpenChange={setFormEventPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between" data-testid="select-event">
+                    {formData.eventId ? getEventName(formData.eventId) : 'Select event...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search events..." />
+                    <CommandList className="max-h-60">
+                      <CommandEmpty>No events found</CommandEmpty>
+                      <CommandGroup>
+                        {events.map(event => (
+                          <CommandItem key={event.id} value={`${event.title} ${format(new Date(event.date), 'MMM d, yyyy')}`} onSelect={() => { setFormData({ ...formData, eventId: event.id }); setFormEventPopoverOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", formData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                            {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Subcontractor Name</Label>
+              <Input value={formData.subcontractorName} onChange={(e) => setFormData({ ...formData, subcontractorName: e.target.value })} placeholder="Enter subcontractor name" data-testid="input-subcontractor-name" />
             </div>
             <div className="space-y-2">
               <Label>Date *</Label>
@@ -6855,6 +6875,7 @@ function EventManpowerSection({ events }: { events: Event[] }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>('all');
   const [eventPopoverOpen, setEventPopoverOpen] = useState(false);
+  const [formEventPopoverOpen, setFormEventPopoverOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<any>(null);
   const [formData, setFormData] = useState({
     eventId: '',
@@ -7121,18 +7142,30 @@ function EventManpowerSection({ events }: { events: Event[] }) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Event *</Label>
-              <Select value={formData.eventId} onValueChange={(v) => setFormData({ ...formData, eventId: v })}>
-                <SelectTrigger data-testid="select-manpower-event">
-                  <SelectValue placeholder="Select event" />
-                </SelectTrigger>
-                <SelectContent>
-                  {events.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={formEventPopoverOpen} onOpenChange={setFormEventPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between" data-testid="select-manpower-event">
+                    {formData.eventId ? getEventName(formData.eventId) : 'Select event...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search events..." />
+                    <CommandList className="max-h-60">
+                      <CommandEmpty>No events found</CommandEmpty>
+                      <CommandGroup>
+                        {events.map(event => (
+                          <CommandItem key={event.id} value={`${event.title} ${format(new Date(event.date), 'MMM d, yyyy')}`} onSelect={() => { setFormData({ ...formData, eventId: event.id }); setFormEventPopoverOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4", formData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                            {event.title} ({format(new Date(event.date), 'MMM d, yyyy')})
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Subcontractor Name *</Label>

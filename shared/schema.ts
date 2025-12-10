@@ -1188,6 +1188,7 @@ export type EmployeeIncentive = typeof employeeIncentives.$inferSelect;
 export const eventTransportation = pgTable("event_transportation", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  subcontractorName: text("subcontractor_name"),
   date: date("date").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   description: text("description"),

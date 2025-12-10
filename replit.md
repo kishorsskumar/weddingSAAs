@@ -16,6 +16,10 @@ Preferred communication style: Simple, everyday language.
   4. `server/routes.ts` - ALL_PAGES array for permission system
 - Superadmin dashboard must always display Quick Access cards for ALL available pages
 
+**UI/UX Preferences:**
+- Event dropdowns should be searchable and scrollable using a Combobox pattern (Command + Popover)
+- Use the same searchable dropdown pattern for any long lists throughout the app
+
 ## System Architecture
 
 ### Frontend Architecture
