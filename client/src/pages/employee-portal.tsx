@@ -995,8 +995,8 @@ export default function EmployeePortal() {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-oak-dark">Employee Portal</h1>
-          <p className="text-muted-foreground">Welcome back, {profile.name}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-oak-dark pl-12 md:pl-0">Employee Portal</h1>
+          <p className="text-muted-foreground pl-12 md:pl-0">Welcome back, {profile.name}</p>
         </div>
         <div className="flex gap-2">
           {isSuperadmin && (
