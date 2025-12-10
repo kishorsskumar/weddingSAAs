@@ -1845,6 +1845,78 @@ export async function registerRoutes(
     }
   });
 
+  // Employee Portal - Update Leave Request (pending only)
+  app.patch('/api/employee-portal/leave-requests/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const requests = await storage.getLeaveRequestsByEmployee(employee?.id || '');
+      const leaveRequest = requests.find((r: any) => r.id === req.params.id);
+      
+      if (!leaveRequest) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+      
+      // Only owner or superadmin can edit, and only if pending
+      if (!isSuperadmin && (!employee || leaveRequest.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (leaveRequest.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only edit pending requests' });
+      }
+      
+      const updated = await storage.updateLeaveRequest(req.params.id, {
+        startDate: req.body.startDate,
+        endDate: req.body.endDate,
+        leaveType: req.body.leaveType,
+        categoryId: req.body.categoryId,
+        reason: req.body.reason
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update leave request' });
+    }
+  });
+
+  // Employee Portal - Delete Leave Request (pending only)
+  app.delete('/api/employee-portal/leave-requests/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const requests = await storage.getLeaveRequestsByEmployee(employee?.id || '');
+      const leaveRequest = requests.find((r: any) => r.id === req.params.id);
+      
+      if (!leaveRequest) {
+        return res.status(404).json({ error: 'Leave request not found' });
+      }
+      
+      // Only owner or superadmin can delete, and only if pending
+      if (!isSuperadmin && (!employee || leaveRequest.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (leaveRequest.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only delete pending requests' });
+      }
+      
+      await storage.deleteLeaveRequest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete leave request' });
+    }
+  });
+
   // Employee Portal - Salary Advance Requests (employee's own)
   app.get('/api/employee-portal/salary-advances', async (req, res) => {
     const userId = (req.session as any).userId;
@@ -1884,6 +1956,76 @@ export async function registerRoutes(
       res.json(advance);
     } catch (error) {
       res.status(400).json({ error: 'Failed to create salary advance request' });
+    }
+  });
+
+  // Employee Portal - Update Salary Advance Request (pending only)
+  app.patch('/api/employee-portal/salary-advances/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const advances = await storage.getSalaryAdvanceRequests(employee?.id || '');
+      const advance = advances.find(a => a.id === req.params.id);
+      
+      if (!advance) {
+        return res.status(404).json({ error: 'Salary advance not found' });
+      }
+      
+      // Only owner or superadmin can edit, and only if pending
+      if (!isSuperadmin && (!employee || advance.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (advance.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only edit pending requests' });
+      }
+      
+      const updated = await storage.updateSalaryAdvanceRequest(req.params.id, {
+        amount: req.body.amount,
+        reason: req.body.reason,
+        repaymentMonths: req.body.repaymentMonths
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update salary advance request' });
+    }
+  });
+
+  // Employee Portal - Delete Salary Advance Request (pending only)
+  app.delete('/api/employee-portal/salary-advances/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const advances = await storage.getSalaryAdvanceRequests(employee?.id || '');
+      const advance = advances.find(a => a.id === req.params.id);
+      
+      if (!advance) {
+        return res.status(404).json({ error: 'Salary advance not found' });
+      }
+      
+      // Only owner or superadmin can delete, and only if pending
+      if (!isSuperadmin && (!employee || advance.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (advance.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only delete pending requests' });
+      }
+      
+      await storage.deleteSalaryAdvanceRequest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete salary advance request' });
     }
   });
 
@@ -2345,6 +2487,77 @@ export async function registerRoutes(
       res.json(reimbursement);
     } catch (error) {
       res.status(400).json({ error: 'Failed to create expense reimbursement request' });
+    }
+  });
+
+  // Employee Portal - Update Expense Reimbursement (pending only)
+  app.patch('/api/employee-portal/expense-reimbursements/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const expenses = await storage.getExpenseReimbursements(employee?.id || '');
+      const expense = expenses.find(e => e.id === req.params.id);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense reimbursement not found' });
+      }
+      
+      // Only owner or superadmin can edit, and only if pending
+      if (!isSuperadmin && (!employee || expense.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (expense.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only edit pending requests' });
+      }
+      
+      const updated = await storage.updateExpenseReimbursement(req.params.id, {
+        expenseDate: req.body.expenseDate,
+        category: req.body.category,
+        description: req.body.description,
+        amount: req.body.amount
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update expense reimbursement' });
+    }
+  });
+
+  // Employee Portal - Delete Expense Reimbursement (pending only)
+  app.delete('/api/employee-portal/expense-reimbursements/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const expenses = await storage.getExpenseReimbursements(employee?.id || '');
+      const expense = expenses.find(e => e.id === req.params.id);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense reimbursement not found' });
+      }
+      
+      // Only owner or superadmin can delete, and only if pending
+      if (!isSuperadmin && (!employee || expense.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      if (expense.status !== 'pending') {
+        return res.status(400).json({ error: 'Can only delete pending requests' });
+      }
+      
+      await storage.deleteExpenseReimbursement(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete expense reimbursement' });
     }
   });
 

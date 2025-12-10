@@ -38,7 +38,8 @@ import {
   EyeOff,
   Users,
   ArrowLeft,
-  Shield
+  Shield,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -497,6 +498,65 @@ export default function EmployeePortal() {
       });
     },
   });
+
+  // Delete mutations for pending requests
+  const deleteLeaveRequest = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employee-portal/leave-requests/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/leave-requests'] });
+      toast({ title: "Success", description: "Leave request deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteSalaryAdvance = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employee-portal/salary-advances/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/salary-advances'] });
+      toast({ title: "Success", description: "Salary advance request deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteExpenseReimbursement = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employee-portal/expense-reimbursements/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to delete');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/expense-reimbursements'] });
+      toast({ title: "Success", description: "Expense request deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Check if user can edit/delete (employee owner or superadmin)
+  const canEditDelete = (status: string) => status === 'pending';
+  const isSuperadmin = user?.role === 'superadmin';
 
   if (profileLoading) {
     return (
@@ -1107,12 +1167,13 @@ export default function EmployeePortal() {
                           <TableHead>Days</TableHead>
                           <TableHead>Reason</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {leaveRequests.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                               No leave requests found
                             </TableCell>
                           </TableRow>
@@ -1127,6 +1188,24 @@ export default function EmployeePortal() {
                                 <TableCell>{days}</TableCell>
                                 <TableCell className="max-w-[200px] truncate">{request.reason || '-'}</TableCell>
                                 <TableCell>{getStatusBadge(request.status)}</TableCell>
+                                <TableCell className="text-right">
+                                  {canEditDelete(request.status) && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm('Delete this leave request?')) {
+                                          deleteLeaveRequest.mutate(request.id);
+                                        }
+                                      }}
+                                      disabled={deleteLeaveRequest.isPending}
+                                      data-testid={`button-delete-leave-${request.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
                               </TableRow>
                             );
                           })
@@ -1339,12 +1418,13 @@ export default function EmployeePortal() {
                           <TableHead>Repayment Months</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Approved Amount</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {salaryAdvances.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                               No salary advance requests found
                             </TableCell>
                           </TableRow>
@@ -1358,6 +1438,24 @@ export default function EmployeePortal() {
                               <TableCell>{getStatusBadge(advance.status)}</TableCell>
                               <TableCell>
                                 {advance.approvedAmount ? formatCurrency(advance.approvedAmount) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {canEditDelete(advance.status) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm('Delete this salary advance request?')) {
+                                        deleteSalaryAdvance.mutate(advance.id);
+                                      }
+                                    }}
+                                    disabled={deleteSalaryAdvance.isPending}
+                                    data-testid={`button-delete-advance-${advance.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </TableCell>
                             </TableRow>
                           ))
@@ -1404,12 +1502,13 @@ export default function EmployeePortal() {
                           <TableHead>Amount</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Comments</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {expenseReimbursements.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                               No expense reimbursement requests found
                             </TableCell>
                           </TableRow>
@@ -1422,6 +1521,24 @@ export default function EmployeePortal() {
                               <TableCell>{formatCurrency(expense.amount)}</TableCell>
                               <TableCell>{getStatusBadge(expense.status)}</TableCell>
                               <TableCell className="max-w-[150px] truncate">{expense.managerComments || '-'}</TableCell>
+                              <TableCell className="text-right">
+                                {canEditDelete(expense.status) && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm('Delete this expense request?')) {
+                                        deleteExpenseReimbursement.mutate(expense.id);
+                                      }
+                                    }}
+                                    disabled={deleteExpenseReimbursement.isPending}
+                                    data-testid={`button-delete-expense-${expense.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </TableCell>
                             </TableRow>
                           ))
                         )}
