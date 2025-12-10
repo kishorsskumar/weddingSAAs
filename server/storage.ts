@@ -176,6 +176,12 @@ import {
   type InsertLeaveCategory,
   type LeaveBalanceAdjustment,
   type InsertLeaveBalanceAdjustment,
+  eventTransportation,
+  eventManpower,
+  type EventTransportation,
+  type InsertEventTransportation,
+  type EventManpower,
+  type InsertEventManpower,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -635,6 +641,20 @@ export interface IStorage {
   // Leave Balance Adjustments (Audit)
   getLeaveBalanceAdjustments(employeeId: string): Promise<LeaveBalanceAdjustment[]>;
   createLeaveBalanceAdjustment(adjustment: InsertLeaveBalanceAdjustment): Promise<LeaveBalanceAdjustment>;
+  
+  // Event Transportation
+  getEventTransportation(eventId: string): Promise<EventTransportation[]>;
+  getAllEventTransportation(): Promise<EventTransportation[]>;
+  createEventTransportation(data: InsertEventTransportation): Promise<EventTransportation>;
+  updateEventTransportation(id: string, data: Partial<InsertEventTransportation>): Promise<EventTransportation | undefined>;
+  deleteEventTransportation(id: string): Promise<void>;
+  
+  // Event Manpower
+  getEventManpower(eventId: string): Promise<EventManpower[]>;
+  getAllEventManpower(): Promise<EventManpower[]>;
+  createEventManpower(data: InsertEventManpower): Promise<EventManpower>;
+  updateEventManpower(id: string, data: Partial<InsertEventManpower>): Promise<EventManpower | undefined>;
+  deleteEventManpower(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2880,6 +2900,62 @@ export class DatabaseStorage implements IStorage {
   async createLeaveBalanceAdjustment(adjustment: InsertLeaveBalanceAdjustment): Promise<LeaveBalanceAdjustment> {
     const [created] = await db.insert(leaveBalanceAdjustments).values(adjustment).returning();
     return created;
+  }
+
+  // Event Transportation
+  async getEventTransportation(eventId: string): Promise<EventTransportation[]> {
+    return await db.select().from(eventTransportation)
+      .where(eq(eventTransportation.eventId, eventId))
+      .orderBy(desc(eventTransportation.date));
+  }
+
+  async getAllEventTransportation(): Promise<EventTransportation[]> {
+    return await db.select().from(eventTransportation).orderBy(desc(eventTransportation.date));
+  }
+
+  async createEventTransportation(data: InsertEventTransportation): Promise<EventTransportation> {
+    const [created] = await db.insert(eventTransportation).values(data).returning();
+    return created;
+  }
+
+  async updateEventTransportation(id: string, data: Partial<InsertEventTransportation>): Promise<EventTransportation | undefined> {
+    const [updated] = await db.update(eventTransportation)
+      .set(data)
+      .where(eq(eventTransportation.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEventTransportation(id: string): Promise<void> {
+    await db.delete(eventTransportation).where(eq(eventTransportation.id, id));
+  }
+
+  // Event Manpower
+  async getEventManpower(eventId: string): Promise<EventManpower[]> {
+    return await db.select().from(eventManpower)
+      .where(eq(eventManpower.eventId, eventId))
+      .orderBy(desc(eventManpower.date));
+  }
+
+  async getAllEventManpower(): Promise<EventManpower[]> {
+    return await db.select().from(eventManpower).orderBy(desc(eventManpower.date));
+  }
+
+  async createEventManpower(data: InsertEventManpower): Promise<EventManpower> {
+    const [created] = await db.insert(eventManpower).values(data).returning();
+    return created;
+  }
+
+  async updateEventManpower(id: string, data: Partial<InsertEventManpower>): Promise<EventManpower | undefined> {
+    const [updated] = await db.update(eventManpower)
+      .set(data)
+      .where(eq(eventManpower.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEventManpower(id: string): Promise<void> {
+    await db.delete(eventManpower).where(eq(eventManpower.id, id));
   }
 }
 
