@@ -1197,9 +1197,23 @@ export async function registerRoutes(
           temporaryPassword: tempPassword
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating employee with credentials:', error);
-      res.status(400).json({ error: 'Failed to create employee. Email may already be in use.' });
+      // Provide more specific error messages
+      if (error.code === '23505') {
+        // Unique constraint violation
+        if (error.constraint?.includes('email')) {
+          res.status(400).json({ error: 'An account with this email already exists.' });
+        } else if (error.constraint?.includes('employee_id')) {
+          res.status(400).json({ error: 'This employee ID already exists. Please try again.' });
+        } else {
+          res.status(400).json({ error: 'A duplicate record exists. Please try different values.' });
+        }
+      } else if (error.message) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(400).json({ error: 'Failed to create employee. Please try again.' });
+      }
     }
   });
 
