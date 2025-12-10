@@ -5606,8 +5606,11 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/event-transportation/:id/approve', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/event-transportation/:id/approve', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
       const existingRecords = await storage.getAllEventTransportation();
       const existing = existingRecords.find(r => r.id === req.params.id);
       if (!existing) {
@@ -5628,8 +5631,11 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/event-transportation/:id/pay', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/event-transportation/:id/pay', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
       const { bankId, date } = req.body;
       const existingRecords = await storage.getAllEventTransportation();
       const existing = existingRecords.find(r => r.id === req.params.id);
@@ -5717,8 +5723,11 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/event-manpower/:id/approve', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/event-manpower/:id/approve', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
       const existingRecords = await storage.getAllEventManpower();
       const existing = existingRecords.find(r => r.id === req.params.id);
       if (!existing) {
@@ -5739,8 +5748,11 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/event-manpower/:id/pay', verifyAdminAccess, async (req, res) => {
+  app.patch('/api/event-manpower/:id/pay', async (req, res) => {
     try {
+      const auth = await verifyAdminAccess(req, res);
+      if (!auth) return;
+      
       const { bankId, date } = req.body;
       const existingRecords = await storage.getAllEventManpower();
       const existing = existingRecords.find(r => r.id === req.params.id);
