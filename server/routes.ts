@@ -5697,9 +5697,9 @@ export async function registerRoutes(
       const data = {
         ...req.body,
         submittedBy: userId || null,
-        status: 'pending'
+        status: 'pending',
+        ratePerHour: req.body.ratePerHour && req.body.ratePerHour !== '' ? req.body.ratePerHour : null,
       };
-      console.log('[event-manpower] Creating with data:', JSON.stringify(data, null, 2));
       const record = await storage.createEventManpower(data);
       res.json(record);
     } catch (error: any) {
