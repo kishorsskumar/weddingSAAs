@@ -78,6 +78,9 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
   
+  // Check if user has access to milestones
+  const hasAccess = isSuperAdmin || allowedPages.includes('event-milestones');
+  
   // Fetch pending milestones - server filters by authenticated user's role
   const { data: pendingMilestones = [] } = useQuery<PendingMilestone[]>({
     queryKey: ['/api/milestones/pending-by-planner'],
@@ -86,6 +89,7 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Failed to fetch pending milestones');
       return res.json();
     },
+    enabled: hasAccess,
   });
 
   // Mutation to mark milestone as completed
@@ -317,8 +321,8 @@ export default function Dashboard() {
         </motion.div>
       </motion.div>
 
-      {/* Pending Tasks Section - for Wedding Planners */}
-      {pendingMilestones.length > 0 && (
+      {/* Pending Tasks Section - only show if user has access to milestones */}
+      {pendingMilestones.length > 0 && hasAccess && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -697,6 +698,14 @@ export default function EmployeePortal() {
           <p className="text-muted-foreground">Welcome back, {profile.name}</p>
         </div>
         <div className="flex gap-2">
+          {isSuperadmin && (
+            <Link href="/hr">
+              <Button className="gap-2 bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-add-new-employee">
+                <Plus className="h-4 w-4" />
+                Add New Employee
+              </Button>
+            </Link>
+          )}
           {canViewOtherEmployees && managedEmployees.length > 0 && (
             <Dialog>
               <DialogTrigger asChild>
