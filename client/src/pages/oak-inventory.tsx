@@ -6622,15 +6622,29 @@ function EventTransportationSection({ events }: { events: Event[] }) {
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log('[Transportation] Approving record:', id);
-      const response = await apiRequest('PATCH', `/api/event-transportation/${id}/approve`);
-      return response;
+      try {
+        const response = await fetch(`/api/event-transportation/${id}/approve`, {
+          method: 'PATCH',
+          credentials: 'include',
+        });
+        console.log('[Transportation] Response status:', response.status);
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('[Transportation] Error response:', text);
+          throw new Error(text);
+        }
+        return response.json();
+      } catch (err) {
+        console.error('[Transportation] Fetch error:', err);
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-transportation'] });
       toast({ title: 'Record approved' });
     },
     onError: (error) => {
-      console.error('[Transportation] Approve error:', error);
+      console.error('[Transportation] Approve mutation error:', error);
       toast({ title: 'Failed to approve', variant: 'destructive' });
     },
   });
@@ -6935,15 +6949,29 @@ function EventManpowerSection({ events }: { events: Event[] }) {
   const approveMutation = useMutation({
     mutationFn: async (id: string) => {
       console.log('[Manpower] Approving record:', id);
-      const response = await apiRequest('PATCH', `/api/event-manpower/${id}/approve`);
-      return response;
+      try {
+        const response = await fetch(`/api/event-manpower/${id}/approve`, {
+          method: 'PATCH',
+          credentials: 'include',
+        });
+        console.log('[Manpower] Response status:', response.status);
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('[Manpower] Error response:', text);
+          throw new Error(text);
+        }
+        return response.json();
+      } catch (err) {
+        console.error('[Manpower] Fetch error:', err);
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/event-manpower'] });
       toast({ title: 'Record approved' });
     },
     onError: (error) => {
-      console.error('[Manpower] Approve error:', error);
+      console.error('[Manpower] Approve mutation error:', error);
       toast({ title: 'Failed to approve', variant: 'destructive' });
     },
   });
