@@ -6,13 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, ChevronLeft, Pencil, Trash2, RefreshCw, CheckCircle2, Clock } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { Plus, ChevronLeft, Pencil, Trash2, RefreshCw, CheckCircle2, Clock, AlertTriangle, Calendar, MapPin, User } from "lucide-react";
+import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { Link } from "wouter";
+
+interface PendingMilestone extends EventMilestone {
+  event?: Event;
+}
 
 export default function EventMilestones() {
   const [selectedEventId, setSelectedEventId] = useState<string>("");
@@ -30,6 +35,16 @@ export default function EventMilestones() {
     },
   });
 
+  // Fetch pending milestones - server filters by role
+  const { data: pendingMilestones = [], isLoading: pendingLoading } = useQuery<PendingMilestone[]>({
+    queryKey: ['/api/milestones/pending-by-planner'],
+    queryFn: async () => {
+      const res = await fetch('/api/milestones/pending-by-planner');
+      if (!res.ok) throw new Error('Failed to fetch pending milestones');
+      return res.json();
+    },
+  });
+
   const { data: milestones = [], isLoading: milestonesLoading } = useQuery<EventMilestone[]>({
     queryKey: ['/api/milestones', selectedEventId],
     queryFn: async () => {
@@ -42,6 +57,40 @@ export default function EventMilestones() {
   });
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
+
+  // Group pending milestones by event
+  const eventsWithPendingTasks = useMemo(() => {
+    const eventMap = new Map<string, { event: Event; milestones: PendingMilestone[]; overdueCount: number }>();
+    const today = startOfDay(new Date());
+    
+    pendingMilestones.forEach(milestone => {
+      if (!milestone.event) return;
+      const eventId = milestone.eventId;
+      
+      if (!eventMap.has(eventId)) {
+        eventMap.set(eventId, { 
+          event: milestone.event, 
+          milestones: [], 
+          overdueCount: 0 
+        });
+      }
+      
+      const entry = eventMap.get(eventId)!;
+      entry.milestones.push(milestone);
+      
+      if (isBefore(parseISO(milestone.date), today)) {
+        entry.overdueCount++;
+      }
+    });
+    
+    // Sort by overdue count (descending), then by event date (ascending)
+    return Array.from(eventMap.values()).sort((a, b) => {
+      if (b.overdueCount !== a.overdueCount) {
+        return b.overdueCount - a.overdueCount;
+      }
+      return new Date(a.event.date).getTime() - new Date(b.event.date).getTime();
+    });
+  }, [pendingMilestones]);
 
   const sortedEvents = useMemo(() => {
     return [...events].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -111,6 +160,7 @@ export default function EventMilestones() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/milestones', selectedEventId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/milestones/pending-by-planner'] });
     },
   });
 
@@ -231,6 +281,18 @@ export default function EventMilestones() {
           <p className="text-sm text-muted-foreground">Track event planning progress</p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedEventId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedEventId("")}
+              className="gap-2"
+              data-testid="button-back-to-dashboard"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              All Events
+            </Button>
+          )}
           <Select value={selectedEventId} onValueChange={setSelectedEventId}>
             <SelectTrigger className="w-[250px]" data-testid="select-event">
               <SelectValue placeholder="Select an event" />
@@ -260,11 +322,128 @@ export default function EventMilestones() {
       </div>
 
       {!selectedEventId ? (
-        <Card className="border-dashed">
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">Select an event to view its milestones</p>
-          </CardContent>
-        </Card>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              Events with Pending Tasks
+            </h2>
+            <span className="text-sm text-muted-foreground">
+              {eventsWithPendingTasks.length} events with pending milestones
+            </span>
+          </div>
+          
+          {pendingLoading ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-muted-foreground">Loading pending tasks...</p>
+              </CardContent>
+            </Card>
+          ) : eventsWithPendingTasks.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <p className="text-muted-foreground">All tasks are completed! No pending milestones.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {eventsWithPendingTasks.map(({ event, milestones: eventMilestones, overdueCount }) => {
+                const today = startOfDay(new Date());
+                const upcomingMilestones = eventMilestones
+                  .filter(m => !isBefore(parseISO(m.date), today))
+                  .slice(0, 3);
+                const overdueMilestones = eventMilestones
+                  .filter(m => isBefore(parseISO(m.date), today))
+                  .slice(0, 3);
+                
+                return (
+                  <Card 
+                    key={event.id} 
+                    className={cn(
+                      "cursor-pointer hover:border-primary/50 transition-all",
+                      overdueCount > 0 && "border-red-500/50 bg-red-950/10"
+                    )}
+                    onClick={() => setSelectedEventId(event.id)}
+                    data-testid={`card-event-pending-${event.id}`}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-base line-clamp-1">
+                          {event.customer}
+                        </CardTitle>
+                        {overdueCount > 0 && (
+                          <Badge variant="destructive" className="shrink-0">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {overdueCount} Overdue
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(event.date)}
+                        </span>
+                        {event.venue && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {event.venue}
+                          </span>
+                        )}
+                        {event.planner && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {event.planner}
+                          </span>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Pending Tasks</span>
+                          <span className="font-medium">{eventMilestones.length}</span>
+                        </div>
+                        
+                        {overdueMilestones.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-red-400">Overdue:</p>
+                            {overdueMilestones.map(m => (
+                              <div key={m.id} className="flex items-center gap-2 text-xs text-red-300/80">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                                <span className="truncate flex-1">{m.name}</span>
+                                <span className="text-red-400/60 shrink-0">{formatDate(m.date)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {upcomingMilestones.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium text-amber-400">Upcoming:</p>
+                            {upcomingMilestones.map(m => (
+                              <div key={m.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                <span className="truncate flex-1">{m.name}</span>
+                                <span className="text-muted-foreground/60 shrink-0">{formatDate(m.date)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {eventMilestones.length > 6 && (
+                          <p className="text-xs text-muted-foreground text-center pt-1">
+                            +{eventMilestones.length - 6} more tasks...
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       ) : milestonesLoading ? (
         <Card>
           <CardContent className="py-12 text-center">
