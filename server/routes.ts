@@ -3262,13 +3262,32 @@ export async function registerRoutes(
     if (!auth) return;
     try {
       const { type, eventId, category } = req.body;
+      const recordId = req.params.id;
       
-      if (type === 'expense') {
-        const expense = await storage.getExpenseReimbursement(req.params.id);
-        if (!expense) return res.status(404).json({ error: 'Expense not found' });
-        if (expense.status !== 'approved') return res.status(400).json({ error: 'Only approved records can be pushed' });
-        
+      // Server-side validation: verify the record exists and matches the claimed type
+      const expense = await storage.getExpenseReimbursement(recordId);
+      const advance = await storage.getSalaryAdvanceRequest(recordId);
+      
+      // Determine actual record type from server data
+      let actualType: 'expense' | 'advance' | null = null;
+      if (expense && expense.status === 'approved') actualType = 'expense';
+      else if (advance && advance.status === 'approved') actualType = 'advance';
+      
+      if (!actualType) {
+        return res.status(404).json({ error: 'No approved record found with this ID' });
+      }
+      
+      // Verify client type matches server data for safety
+      if (type !== actualType) {
+        return res.status(400).json({ error: 'Record type mismatch' });
+      }
+      
+      const paidDate = new Date().toISOString().split('T')[0];
+      
+      if (actualType === 'expense' && expense) {
         const employee = await storage.getEmployee(expense.employeeId);
+        
+        // Create daybook entry first
         const daybookEntry = await storage.createDaybookEntry({
           date: expense.expenseDate,
           description: `Employee Expense (${employee?.name || 'Unknown'}): ${expense.description}`,
@@ -3279,18 +3298,17 @@ export async function registerRoutes(
           eventId: eventId || null
         });
         
-        await storage.updateExpenseReimbursement(req.params.id, {
+        // Mark as paid after successful daybook entry
+        await storage.updateExpenseReimbursement(recordId, {
           status: 'paid',
-          paidDate: new Date().toISOString().split('T')[0]
+          paidDate
         });
         
-        res.json({ daybookEntry });
-      } else if (type === 'advance') {
-        const advance = await storage.getSalaryAdvanceRequest(req.params.id);
-        if (!advance) return res.status(404).json({ error: 'Advance not found' });
-        if (advance.status !== 'approved') return res.status(400).json({ error: 'Only approved records can be pushed' });
-        
+        res.json({ daybookEntry, type: 'expense' });
+      } else if (actualType === 'advance' && advance) {
         const employee = await storage.getEmployee(advance.employeeId);
+        
+        // Create daybook entry first
         const daybookEntry = await storage.createDaybookEntry({
           date: advance.requestDate,
           description: `Salary Advance (${employee?.name || 'Unknown'}): ${advance.reason || 'N/A'}`,
@@ -3301,14 +3319,13 @@ export async function registerRoutes(
           eventId: eventId || null
         });
         
-        await storage.updateSalaryAdvanceRequest(req.params.id, {
+        // Mark as paid after successful daybook entry
+        await storage.updateSalaryAdvanceRequest(recordId, {
           status: 'paid',
-          paidDate: new Date().toISOString().split('T')[0]
+          paidDate
         });
         
-        res.json({ daybookEntry });
-      } else {
-        res.status(400).json({ error: 'Invalid type' });
+        res.json({ daybookEntry, type: 'advance' });
       }
     } catch (error) {
       console.error('Push to daybook error:', error);
