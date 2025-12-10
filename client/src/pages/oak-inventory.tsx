@@ -6586,11 +6586,11 @@ function EventTransportationSection({ events }: { events: Event[] }) {
     queryKey: ['/api/banks'],
   });
 
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ['/api/user'],
+  const { data: authData } = useQuery<any>({
+    queryKey: ['/api/auth/me'],
   });
 
-  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
+  const isAdmin = authData?.user?.role === 'superadmin' || authData?.user?.role === 'admin';
 
   const filteredRecords = useMemo(() => {
     if (selectedEventId === 'all') return transportationRecords;
@@ -6892,11 +6892,11 @@ function EventManpowerSection({ events }: { events: Event[] }) {
     queryKey: ['/api/event-manpower'],
   });
 
-  const { data: currentUser } = useQuery<any>({
-    queryKey: ['/api/user'],
+  const { data: authData } = useQuery<any>({
+    queryKey: ['/api/auth/me'],
   });
 
-  const isAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'admin';
+  const isAdmin = authData?.user?.role === 'superadmin' || authData?.user?.role === 'admin';
 
   const filteredRecords = useMemo(() => {
     if (selectedEventId === 'all') return manpowerRecords;
