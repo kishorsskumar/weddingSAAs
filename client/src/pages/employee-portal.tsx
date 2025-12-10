@@ -275,27 +275,47 @@ function QuickEntryTab() {
 
   // Handle shared screenshots from Web Share Target
   React.useEffect(() => {
-    const handleSharedScreenshot = async () => {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('share-target') === 'quick-entry') {
+    const loadFromCache = async (retries = 3): Promise<boolean> => {
+      for (let i = 0; i < retries; i++) {
         try {
           const cache = await caches.open('oak-street-quick-entry-v1');
           const response = await cache.match('shared-screenshot');
           if (response) {
             const blob = await response.blob();
-            const file = new File([blob], 'shared-screenshot.jpg', { type: blob.type });
+            const filename = response.headers.get('X-Filename') || 'shared-screenshot.jpg';
+            const contentType = response.headers.get('Content-Type') || blob.type || 'image/jpeg';
+            const file = new File([blob], filename, { type: contentType });
             setSelectedFile(file);
             const reader = new FileReader();
             reader.onloadend = () => setPreviewUrl(reader.result as string);
             reader.readAsDataURL(file);
             await cache.delete('shared-screenshot');
-            // Clean up URL
-            window.history.replaceState({}, '', '/employee-portal');
             toast({ title: "Screenshot received", description: "Tap 'Process with AI' to extract payment details" });
+            return true;
           }
+          if (i < retries - 1) await new Promise(r => setTimeout(r, 300));
         } catch (error) {
-          console.error('Error loading shared screenshot:', error);
+          console.error('Error loading shared screenshot (attempt ' + (i+1) + '):', error);
         }
+      }
+      return false;
+    };
+
+    const handleSharedScreenshot = async () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('share-target') === 'quick-entry') {
+        console.log('[QuickEntry] Share target detected, loading from cache...');
+        const loaded = await loadFromCache(5);
+        if (loaded) {
+          window.history.replaceState({}, '', '/employee-portal');
+        } else {
+          console.log('[QuickEntry] Could not load screenshot from cache');
+          toast({ title: "Share Error", description: "Could not load the shared image. Please try again.", variant: "destructive" });
+        }
+      }
+      if (params.get('share-error') === 'true') {
+        toast({ title: "Share Error", description: "Failed to receive the shared image. Please try again.", variant: "destructive" });
+        window.history.replaceState({}, '', '/employee-portal');
       }
     };
     handleSharedScreenshot();
@@ -303,22 +323,8 @@ function QuickEntryTab() {
     // Listen for messages from service worker
     const handleMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'shared-screenshot') {
-        try {
-          const cache = await caches.open('oak-street-quick-entry-v1');
-          const response = await cache.match('shared-screenshot');
-          if (response) {
-            const blob = await response.blob();
-            const file = new File([blob], event.data.filename || 'shared-screenshot.jpg', { type: blob.type });
-            setSelectedFile(file);
-            const reader = new FileReader();
-            reader.onloadend = () => setPreviewUrl(reader.result as string);
-            reader.readAsDataURL(file);
-            await cache.delete('shared-screenshot');
-            toast({ title: "Screenshot received", description: "Tap 'Process with AI' to extract payment details" });
-          }
-        } catch (error) {
-          console.error('Error loading shared screenshot:', error);
-        }
+        console.log('[QuickEntry] Received message from service worker');
+        await loadFromCache(3);
       }
     };
     navigator.serviceWorker?.addEventListener('message', handleMessage);
