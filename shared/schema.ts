@@ -1183,3 +1183,47 @@ export const employeeIncentives = pgTable("employee_incentives", {
 export const insertEmployeeIncentiveSchema = createInsertSchema(employeeIncentives).omit({ id: true, createdAt: true });
 export type InsertEmployeeIncentive = z.infer<typeof insertEmployeeIncentiveSchema>;
 export type EmployeeIncentive = typeof employeeIncentives.$inferSelect;
+
+// Event Transportation - Commercial transportation costs per event
+export const eventTransportation = pgTable("event_transportation", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  date: date("date").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'paid'
+  submittedBy: varchar("submitted_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  paidDate: date("paid_date"),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventTransportationSchema = createInsertSchema(eventTransportation).omit({ id: true, createdAt: true });
+export type InsertEventTransportation = z.infer<typeof insertEventTransportationSchema>;
+export type EventTransportation = typeof eventTransportation.$inferSelect;
+
+// Event Manpower - Subcontractor manpower costs per event
+export const eventManpower = pgTable("event_manpower", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  subcontractorName: text("subcontractor_name").notNull(),
+  numberOfPersons: integer("number_of_persons").notNull(),
+  date: date("date").notNull(),
+  hoursWorked: decimal("hours_worked", { precision: 5, scale: 2 }).notNull(),
+  ratePerHour: decimal("rate_per_hour", { precision: 10, scale: 2 }),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  description: text("description"),
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'paid'
+  submittedBy: varchar("submitted_by").references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  paidDate: date("paid_date"),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventManpowerSchema = createInsertSchema(eventManpower).omit({ id: true, createdAt: true });
+export type InsertEventManpower = z.infer<typeof insertEventManpowerSchema>;
+export type EventManpower = typeof eventManpower.$inferSelect;
