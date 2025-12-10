@@ -6797,12 +6797,12 @@ function EventTransportationSection({ events }: { events: Event[] }) {
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {record.status === 'pending' && (
+                        {(record.status === 'pending' || record.status === 'approved') && (
                           <>
                             <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-transportation-${record.id}`}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {isAdmin && (
+                            {record.status === 'pending' && isAdmin && (
                               <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-transportation-${record.id}`}>
                                 <CheckCircle className="w-4 h-4" />
                               </Button>
@@ -7146,12 +7146,12 @@ function EventManpowerSection({ events }: { events: Event[] }) {
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {record.status === 'pending' && (
+                        {(record.status === 'pending' || record.status === 'approved') && (
                           <>
                             <Button variant="ghost" size="sm" onClick={() => handleEdit(record)} data-testid={`button-edit-manpower-${record.id}`}>
                               <Edit className="w-4 h-4" />
                             </Button>
-                            {isAdmin && (
+                            {record.status === 'pending' && isAdmin && (
                               <Button variant="ghost" size="sm" onClick={() => approveMutation.mutate(record.id)} className="text-blue-600" data-testid={`button-approve-manpower-${record.id}`}>
                                 <CheckCircle className="w-4 h-4" />
                               </Button>
