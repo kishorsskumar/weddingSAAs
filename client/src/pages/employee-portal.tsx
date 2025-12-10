@@ -39,7 +39,8 @@ import {
   Users,
   ArrowLeft,
   Shield,
-  Trash2
+  Trash2,
+  Pencil
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { format, parseISO, differenceInDays } from "date-fns";
@@ -253,6 +254,9 @@ export default function EmployeePortal() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [editingLeave, setEditingLeave] = useState<LeaveRequest | null>(null);
+  const [editingAdvance, setEditingAdvance] = useState<SalaryAdvanceRequest | null>(null);
+  const [editingExpense, setEditingExpense] = useState<ExpenseReimbursement | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -548,6 +552,76 @@ export default function EmployeePortal() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/expense-reimbursements'] });
       toast({ title: "Success", description: "Expense request deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Update mutations for pending requests
+  const updateLeaveRequest = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/employee-portal/leave-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/leave-requests'] });
+      setEditingLeave(null);
+      toast({ title: "Success", description: "Leave request updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateSalaryAdvance = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/employee-portal/salary-advances/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/salary-advances'] });
+      setEditingAdvance(null);
+      toast({ title: "Success", description: "Salary advance request updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateExpenseReimbursement = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/employee-portal/expense-reimbursements/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/expense-reimbursements'] });
+      setEditingExpense(null);
+      toast({ title: "Success", description: "Expense request updated" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1190,20 +1264,31 @@ export default function EmployeePortal() {
                                 <TableCell>{getStatusBadge(request.status)}</TableCell>
                                 <TableCell className="text-right">
                                   {canEditDelete(request.status) && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                      onClick={() => {
-                                        if (confirm('Delete this leave request?')) {
-                                          deleteLeaveRequest.mutate(request.id);
-                                        }
-                                      }}
-                                      disabled={deleteLeaveRequest.isPending}
-                                      data-testid={`button-delete-leave-${request.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex justify-end gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => setEditingLeave(request)}
+                                        data-testid={`button-edit-leave-${request.id}`}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-destructive hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm('Delete this leave request?')) {
+                                            deleteLeaveRequest.mutate(request.id);
+                                          }
+                                        }}
+                                        disabled={deleteLeaveRequest.isPending}
+                                        data-testid={`button-delete-leave-${request.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                   )}
                                 </TableCell>
                               </TableRow>
@@ -1217,6 +1302,65 @@ export default function EmployeePortal() {
               </Card>
             </motion.div>
           </motion.div>
+
+          {/* Edit Leave Request Dialog */}
+          <Dialog open={!!editingLeave} onOpenChange={(open) => !open && setEditingLeave(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Leave Request</DialogTitle>
+              </DialogHeader>
+              {editingLeave && (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  updateLeaveRequest.mutate({
+                    id: editingLeave.id,
+                    data: {
+                      startDate: formData.get('startDate'),
+                      endDate: formData.get('endDate'),
+                      leaveType: formData.get('leaveType'),
+                      reason: formData.get('reason'),
+                    }
+                  });
+                }} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date</Label>
+                      <Input type="date" name="startDate" defaultValue={editingLeave.startDate} required data-testid="input-edit-leave-start" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Date</Label>
+                      <Input type="date" name="endDate" defaultValue={editingLeave.endDate} required data-testid="input-edit-leave-end" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Leave Type</Label>
+                    <Select name="leaveType" defaultValue={editingLeave.leaveType}>
+                      <SelectTrigger data-testid="select-edit-leave-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="casual">Casual Leave</SelectItem>
+                        <SelectItem value="sick">Sick Leave</SelectItem>
+                        <SelectItem value="annual">Annual Leave</SelectItem>
+                        <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason</Label>
+                    <Textarea name="reason" defaultValue={editingLeave.reason || ''} data-testid="input-edit-leave-reason" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditingLeave(null)}>Cancel</Button>
+                    <Button type="submit" disabled={updateLeaveRequest.isPending} data-testid="button-save-leave">
+                      {updateLeaveRequest.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="payroll">
@@ -1441,20 +1585,31 @@ export default function EmployeePortal() {
                               </TableCell>
                               <TableCell className="text-right">
                                 {canEditDelete(advance.status) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      if (confirm('Delete this salary advance request?')) {
-                                        deleteSalaryAdvance.mutate(advance.id);
-                                      }
-                                    }}
-                                    disabled={deleteSalaryAdvance.isPending}
-                                    data-testid={`button-delete-advance-${advance.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <div className="flex justify-end gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => setEditingAdvance(advance)}
+                                      data-testid={`button-edit-advance-${advance.id}`}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm('Delete this salary advance request?')) {
+                                          deleteSalaryAdvance.mutate(advance.id);
+                                        }
+                                      }}
+                                      disabled={deleteSalaryAdvance.isPending}
+                                      data-testid={`button-delete-advance-${advance.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1467,6 +1622,57 @@ export default function EmployeePortal() {
               </Card>
             </motion.div>
           </motion.div>
+
+          {/* Edit Salary Advance Dialog */}
+          <Dialog open={!!editingAdvance} onOpenChange={(open) => !open && setEditingAdvance(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Salary Advance Request</DialogTitle>
+              </DialogHeader>
+              {editingAdvance && (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  updateSalaryAdvance.mutate({
+                    id: editingAdvance.id,
+                    data: {
+                      amount: formData.get('amount'),
+                      reason: formData.get('reason'),
+                      repaymentMonths: parseInt(formData.get('repaymentMonths') as string),
+                    }
+                  });
+                }} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input type="number" name="amount" defaultValue={editingAdvance.amount} required data-testid="input-edit-advance-amount" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Repayment Months</Label>
+                    <Select name="repaymentMonths" defaultValue={String(editingAdvance.repaymentMonths)}>
+                      <SelectTrigger data-testid="select-edit-advance-months">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1,2,3,4,5,6,9,12].map(m => (
+                          <SelectItem key={m} value={String(m)}>{m} month{m > 1 ? 's' : ''}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason</Label>
+                    <Textarea name="reason" defaultValue={editingAdvance.reason || ''} data-testid="input-edit-advance-reason" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditingAdvance(null)}>Cancel</Button>
+                    <Button type="submit" disabled={updateSalaryAdvance.isPending} data-testid="button-save-advance">
+                      {updateSalaryAdvance.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="expenses">
@@ -1523,20 +1729,31 @@ export default function EmployeePortal() {
                               <TableCell className="max-w-[150px] truncate">{expense.managerComments || '-'}</TableCell>
                               <TableCell className="text-right">
                                 {canEditDelete(expense.status) && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      if (confirm('Delete this expense request?')) {
-                                        deleteExpenseReimbursement.mutate(expense.id);
-                                      }
-                                    }}
-                                    disabled={deleteExpenseReimbursement.isPending}
-                                    data-testid={`button-delete-expense-${expense.id}`}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <div className="flex justify-end gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => setEditingExpense(expense)}
+                                      data-testid={`button-edit-expense-${expense.id}`}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm('Delete this expense request?')) {
+                                          deleteExpenseReimbursement.mutate(expense.id);
+                                        }
+                                      }}
+                                      disabled={deleteExpenseReimbursement.isPending}
+                                      data-testid={`button-delete-expense-${expense.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 )}
                               </TableCell>
                             </TableRow>
@@ -1549,6 +1766,65 @@ export default function EmployeePortal() {
               </Card>
             </motion.div>
           </motion.div>
+
+          {/* Edit Expense Reimbursement Dialog */}
+          <Dialog open={!!editingExpense} onOpenChange={(open) => !open && setEditingExpense(null)}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Expense Reimbursement</DialogTitle>
+              </DialogHeader>
+              {editingExpense && (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  updateExpenseReimbursement.mutate({
+                    id: editingExpense.id,
+                    data: {
+                      expenseDate: formData.get('expenseDate'),
+                      category: formData.get('category'),
+                      description: formData.get('description'),
+                      amount: formData.get('amount'),
+                    }
+                  });
+                }} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Expense Date</Label>
+                    <Input type="date" name="expenseDate" defaultValue={editingExpense.expenseDate} required data-testid="input-edit-expense-date" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select name="category" defaultValue={editingExpense.category}>
+                      <SelectTrigger data-testid="select-edit-expense-category">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="travel">Travel</SelectItem>
+                        <SelectItem value="meals">Meals</SelectItem>
+                        <SelectItem value="supplies">Office Supplies</SelectItem>
+                        <SelectItem value="equipment">Equipment</SelectItem>
+                        <SelectItem value="communication">Communication</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Description</Label>
+                    <Textarea name="description" defaultValue={editingExpense.description} required data-testid="input-edit-expense-description" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Amount</Label>
+                    <Input type="number" name="amount" defaultValue={editingExpense.amount} required data-testid="input-edit-expense-amount" />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setEditingExpense(null)}>Cancel</Button>
+                    <Button type="submit" disabled={updateExpenseReimbursement.isPending} data-testid="button-save-expense">
+                      {updateExpenseReimbursement.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="holidays">
