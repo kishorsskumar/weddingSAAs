@@ -285,21 +285,30 @@ function QuickEntryTab() {
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       const uploadRes = await fetch('/api/objects/upload', { method: 'POST', credentials: 'include' });
+      if (!uploadRes.ok) throw new Error('Failed to initiate upload');
       const { uploadURL } = await uploadRes.json();
-      await fetch(uploadURL, { method: 'PUT', body: file });
+      if (!uploadURL) throw new Error('No upload URL received');
+      
+      const putRes = await fetch(uploadURL, { method: 'PUT', body: file });
+      if (!putRes.ok) throw new Error('Failed to upload file');
+      
       const finalizeRes = await fetch('/api/objects/finalize', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uploadURL }),
         credentials: 'include',
       });
+      if (!finalizeRes.ok) throw new Error('Failed to finalize upload');
       const { objectPath } = await finalizeRes.json();
+      if (!objectPath) throw new Error('No file path received');
+      
       const entryRes = await fetch('/api/employee-portal/quick-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath: objectPath, source: 'upload' }),
         credentials: 'include',
       });
+      if (!entryRes.ok) throw new Error('Failed to create quick entry');
       return entryRes.json();
     },
     onSuccess: (entry) => {

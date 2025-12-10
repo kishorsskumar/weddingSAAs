@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { format, parseISO } from "date-fns";
@@ -1308,6 +1308,12 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
   const [approvalComments, setApprovalComments] = useState('');
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false);
   const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
+  const [isQuickEntryDialogOpen, setIsQuickEntryDialogOpen] = useState(false);
+  const [selectedQuickEntry, setSelectedQuickEntry] = useState<any>(null);
+  const [quickEntryEventId, setQuickEntryEventId] = useState<string>('');
+  const [quickEntryCategoryId, setQuickEntryCategoryId] = useState<string>('');
+  const [quickEntryBankId, setQuickEntryBankId] = useState<string>('');
+  const [quickEntryNotes, setQuickEntryNotes] = useState('');
   const [isDaybookDialogOpen, setIsDaybookDialogOpen] = useState(false);
   const [selectedExpenseForDaybook, setSelectedExpenseForDaybook] = useState<any>(null);
   const [daybookEventId, setDaybookEventId] = useState<string>('');
@@ -1322,6 +1328,16 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
       if (!res.ok) return [];
       return res.json();
     },
+  });
+
+  const { data: banks = [] } = useQuery<any[]>({
+    queryKey: ['/api/banks'],
+    queryFn: async () => {
+      const res = await fetch('/api/banks');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
   });
 
   const { data: approvedPayouts = [] } = useQuery<any[]>({
@@ -1359,6 +1375,16 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
       if (!res.ok) return [];
       return res.json();
     },
+  });
+
+  const { data: pendingQuickEntries = [] } = useQuery<any[]>({
+    queryKey: ['/api/hr/quick-entries/pending'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/quick-entries/pending');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
   });
 
   const approveLeave = useMutation({
@@ -1524,6 +1550,72 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
     setIsApprovalDialogOpen(true);
   };
 
+  const quickEntryApprove = useMutation({
+    mutationFn: async ({ id, eventId, categoryId, bankId, notes }: { id: string; eventId?: string; categoryId?: string; bankId?: string; notes?: string }) => {
+      const res = await fetch(`/api/hr/quick-entries/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ eventId, categoryId, bankId, notes }),
+      });
+      if (!res.ok) throw new Error('Failed to approve quick entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/hr/quick-entries/pending'] });
+      setIsQuickEntryDialogOpen(false);
+      setSelectedQuickEntry(null);
+      setQuickEntryEventId('');
+      setQuickEntryCategoryId('');
+      setQuickEntryBankId('');
+      setQuickEntryNotes('');
+      toast({ title: 'Success', description: 'Quick entry approved and added to daybook' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const quickEntryReject = useMutation({
+    mutationFn: async ({ id, reviewerNotes }: { id: string; reviewerNotes?: string }) => {
+      const res = await fetch(`/api/hr/quick-entries/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reviewerNotes }),
+      });
+      if (!res.ok) throw new Error('Failed to reject quick entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/hr/quick-entries/pending'] });
+      toast({ title: 'Success', description: 'Quick entry rejected' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleQuickEntryAction = (entry: any, action: 'approve' | 'reject') => {
+    if (action === 'approve') {
+      setSelectedQuickEntry(entry);
+      setIsQuickEntryDialogOpen(true);
+    } else {
+      quickEntryReject.mutate({ id: entry.id });
+    }
+  };
+
+  const confirmQuickEntryApproval = () => {
+    if (!selectedQuickEntry) return;
+    quickEntryApprove.mutate({
+      id: selectedQuickEntry.id,
+      eventId: quickEntryEventId || undefined,
+      categoryId: quickEntryCategoryId || undefined,
+      bankId: quickEntryBankId || undefined,
+      notes: quickEntryNotes || undefined,
+    });
+  };
+
   const confirmApproval = () => {
     if (!selectedRequest) return;
     
@@ -1611,6 +1703,11 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
           <TabsTrigger value="expenses" className="text-xs sm:text-sm">
             Expenses ({pendingExpenses.length})
           </TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="quick-entries" className="text-xs sm:text-sm">
+              Quick Entries ({pendingQuickEntries.length})
+            </TabsTrigger>
+          )}
           {isAdmin && (
             <TabsTrigger value="approved-payouts" className="text-xs sm:text-sm">
               Approved Payouts ({approvedPayouts.length})
@@ -1832,6 +1929,89 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
         </TabsContent>
 
         {isAdmin && (
+          <TabsContent value="quick-entries">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  AI Quick Entries - Pending Review
+                </CardTitle>
+                <CardDescription>Review and approve payment screenshots submitted by employees</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Counterparty</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Confidence</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingQuickEntries.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No pending quick entries to review
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        pendingQuickEntries.map((entry: any) => (
+                          <TableRow key={entry.id} data-testid={`row-quick-entry-${entry.id}`}>
+                            <TableCell className="font-medium">{entry.employeeName || 'Employee'}</TableCell>
+                            <TableCell>₹{entry.amount ? Number(entry.amount).toLocaleString() : '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={entry.direction === 'received' ? 'text-green-600' : 'text-red-600'}>
+                                {entry.direction === 'received' ? 'Received' : entry.direction === 'paid' ? 'Paid' : '-'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{entry.counterpartyName || '-'}</TableCell>
+                            <TableCell>{entry.transactionDate ? formatDate(entry.transactionDate) : formatDate(entry.createdAt)}</TableCell>
+                            <TableCell>
+                              <Badge variant={Number(entry.confidence) >= 0.8 ? 'default' : Number(entry.confidence) >= 0.5 ? 'secondary' : 'outline'}>
+                                {entry.confidence ? `${Math.round(Number(entry.confidence) * 100)}%` : 'N/A'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 hover:text-green-700"
+                                  onClick={() => handleQuickEntryAction(entry, 'approve')}
+                                  data-testid={`button-approve-quick-entry-${entry.id}`}
+                                >
+                                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleQuickEntryAction(entry, 'reject')}
+                                  data-testid={`button-reject-quick-entry-${entry.id}`}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {isAdmin && (
           <TabsContent value="approved-payouts">
             <Card>
               <CardHeader>
@@ -1930,6 +2110,87 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
               data-testid="button-confirm-approval"
             >
               {approvalAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isQuickEntryDialogOpen} onOpenChange={setIsQuickEntryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Approve Quick Entry</DialogTitle>
+            <DialogDescription>
+              {selectedQuickEntry && (
+                <>
+                  Amount: ₹{selectedQuickEntry.amount ? Number(selectedQuickEntry.amount).toLocaleString() : '0'} 
+                  ({selectedQuickEntry.direction === 'received' ? 'Received' : 'Paid'})
+                  {selectedQuickEntry.counterpartyName && ` - ${selectedQuickEntry.counterpartyName}`}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Event (Optional)</Label>
+              <Select value={quickEntryEventId} onValueChange={setQuickEntryEventId}>
+                <SelectTrigger data-testid="select-quick-entry-event">
+                  <SelectValue placeholder="Select event" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {events.map((event: any) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Category *</Label>
+              <Input
+                value={quickEntryCategoryId}
+                onChange={(e) => setQuickEntryCategoryId(e.target.value)}
+                placeholder="e.g., Travel, Food, Supplies"
+                data-testid="input-quick-entry-category"
+              />
+              <p className="text-xs text-muted-foreground">Required for daybook entry</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Bank Account (Optional)</Label>
+              <Select value={quickEntryBankId} onValueChange={setQuickEntryBankId}>
+                <SelectTrigger data-testid="select-quick-entry-bank">
+                  <SelectValue placeholder="Select bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">None</SelectItem>
+                  {banks.map((bank: any) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      {bank.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={quickEntryNotes}
+                onChange={(e) => setQuickEntryNotes(e.target.value)}
+                placeholder="Additional notes for daybook entry"
+                data-testid="input-quick-entry-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsQuickEntryDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={confirmQuickEntryApproval} 
+              disabled={!quickEntryCategoryId.trim()}
+              data-testid="button-confirm-quick-entry"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Approve & Add to Daybook
             </Button>
           </DialogFooter>
         </DialogContent>
