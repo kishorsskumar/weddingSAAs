@@ -2020,10 +2020,10 @@ function ConsolidatedReportSection() {
   } | null>(null);
   const [showBackfillResults, setShowBackfillResults] = useState(false);
 
-  const { data: consolidatedReport, isLoading: reportLoading } = useQuery<ConsolidatedReport>({
+  const { data: consolidatedReport, isLoading: reportLoading, isError: reportError } = useQuery<ConsolidatedReport>({
     queryKey: ['/api/hr/consolidated-report'],
     queryFn: async () => {
-      const res = await fetch('/api/hr/consolidated-report');
+      const res = await fetch('/api/hr/consolidated-report', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch consolidated report');
       return res.json();
     },
@@ -2032,7 +2032,7 @@ function ConsolidatedReportSection() {
   const { data: employeesWithoutUser = [] } = useQuery<Employee[]>({
     queryKey: ['/api/employees/without-user-account'],
     queryFn: async () => {
-      const res = await fetch('/api/employees/without-user-account');
+      const res = await fetch('/api/employees/without-user-account', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch employees');
       return res.json();
     },
@@ -2198,6 +2198,11 @@ function ConsolidatedReportSection() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
+        ) : reportError ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+            Failed to load report data. Please try refreshing the page.
+          </div>
         ) : consolidatedReport ? (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -2343,7 +2348,7 @@ function ConsolidatedReportSection() {
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-            Failed to load report data
+            No report data available
           </div>
         )}
       </CardContent>
