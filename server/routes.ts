@@ -45,6 +45,66 @@ function getCurrentFiscalYear(): string {
   }
 }
 
+function generateMilestonesForEvent(eventId: string, eventDate: string, eventTime?: string | null): InsertEventMilestone[] {
+  const dateObj = new Date(eventDate);
+  
+  const addDays = (date: Date, days: number) => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result.toISOString().split('T')[0];
+  };
+
+  const subtractDays = (date: Date, days: number) => {
+    const result = new Date(date);
+    result.setDate(result.getDate() - days);
+    return result.toISOString().split('T')[0];
+  };
+
+  return [
+    { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Create Client Folder & CRM Entry', date: subtractDays(dateObj, 90), status: 'pending' },
+    { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Internal Kick off Meeting', date: subtractDays(dateObj, 87), status: 'pending' },
+    { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Client Kick off Meeting', date: subtractDays(dateObj, 80), status: 'pending' },
+    { eventId, phase: 1, phaseName: 'Event Kickoff', name: 'Venue Recce', date: subtractDays(dateObj, 80), status: 'pending' },
+
+    { eventId, phase: 2, phaseName: 'Design', name: 'Theme & Mood board finalization', date: subtractDays(dateObj, 70), status: 'pending' },
+    { eventId, phase: 2, phaseName: 'Design', name: '2D/3D approval', date: subtractDays(dateObj, 60), status: 'pending' },
+    { eventId, phase: 2, phaseName: 'Design', name: 'Freeze Decor Design', date: subtractDays(dateObj, 60), status: 'pending' },
+
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: '2nd Installment Payment', date: subtractDays(dateObj, 60), status: 'pending' },
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Budget approval from client', date: subtractDays(dateObj, 60), status: 'pending' },
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Production / high value purchase', date: subtractDays(dateObj, 60), status: 'pending' },
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Vendor booking', date: subtractDays(dateObj, 60), status: 'pending' },
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Any change request', date: subtractDays(dateObj, 45), status: 'pending' },
+    { eventId, phase: 3, phaseName: 'Procurement & Production', name: 'Production File & Checklist', date: subtractDays(dateObj, 45), status: 'pending' },
+
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Printables Design Approval', date: subtractDays(dateObj, 30), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: '3rd Installment Payment', date: subtractDays(dateObj, 22), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Production/Transportation plans', date: subtractDays(dateObj, 21), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Venue coordination call', date: subtractDays(dateObj, 19), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Internal Coordination meeting', date: subtractDays(dateObj, 16), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Client coordination Meeting', date: subtractDays(dateObj, 15), status: 'pending' },
+    { eventId, phase: 4, phaseName: 'Logistics & Coordination', name: 'Vendor coordination meeting', date: subtractDays(dateObj, 13), status: 'pending' },
+
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Printables to Printer', date: subtractDays(dateObj, 7), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Execution team briefing', date: subtractDays(dateObj, 5), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Final vendor confirmation call', date: subtractDays(dateObj, 4), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Material arrangement warehouse', date: subtractDays(dateObj, 3), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Flower/Rental arrangements', date: subtractDays(dateObj, 2), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Material loading', date: subtractDays(dateObj, 2), status: 'pending' },
+    { eventId, phase: 5, phaseName: 'Event Week', name: 'Truck departure', date: subtractDays(dateObj, 2), status: 'pending' },
+
+    { eventId, phase: 6, phaseName: 'Event Day', name: 'Wedding planner Reporting', date: eventDate, time: '11:00 am', status: 'pending' },
+    { eventId, phase: 6, phaseName: 'Event Day', name: 'Venue Fully Ready', date: eventDate, time: '1:00 pm', status: 'pending' },
+    { eventId, phase: 6, phaseName: 'Event Day', name: 'Guest Management Team Reporting', date: eventDate, time: '2:00 pm', status: 'pending' },
+
+    { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Demobilisation', date: addDays(dateObj, 1), time: '6:00 pm', status: 'pending' },
+    { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Final payment collection', date: addDays(dateObj, 2), status: 'pending' },
+    { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Vendor settlement', date: addDays(dateObj, 7), status: 'pending' },
+    { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Feedback', date: addDays(dateObj, 8), status: 'pending' },
+    { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Close the event', date: addDays(dateObj, 10), status: 'pending' },
+  ];
+}
+
 interface ParsedScheduleItem {
   slNo: number;
   description: string;
@@ -1062,6 +1122,22 @@ export async function registerRoutes(
     try {
       const data = insertEventSchema.parse(req.body);
       const event = await storage.createEvent(data);
+      
+      // Auto-generate milestones for events from Jan 1, 2026 onwards
+      const eventDate = new Date(event.date);
+      const cutoffDate = new Date('2026-01-01');
+      
+      if (eventDate >= cutoffDate) {
+        try {
+          const milestones = generateMilestonesForEvent(event.id, event.date, event.time);
+          await storage.createManyMilestones(milestones);
+          console.log(`Auto-generated ${milestones.length} milestones for event ${event.title}`);
+        } catch (milestoneError) {
+          console.error('Failed to auto-generate milestones:', milestoneError);
+          // Don't fail the event creation if milestones fail
+        }
+      }
+      
       res.json(event);
     } catch (error) {
       res.status(400).json({ error: 'Invalid event data' });
@@ -3289,6 +3365,99 @@ export async function registerRoutes(
   app.delete('/api/milestones/:id', async (req, res) => {
     await storage.deleteMilestone(req.params.id);
     res.json({ success: true });
+  });
+
+  // Backfill milestones for all 2026+ events that don't have any
+  app.post('/api/milestones/backfill-2026', async (req, res) => {
+    try {
+      const allEvents = await storage.getAllEvents();
+      const cutoffDate = new Date('2026-01-01');
+      
+      // Get events from 2026+ that don't have milestones yet
+      const eventsToBackfill = allEvents.filter(e => new Date(e.date) >= cutoffDate);
+      
+      let created = 0;
+      let skipped = 0;
+      
+      for (const event of eventsToBackfill) {
+        const existingMilestones = await storage.getMilestonesByEventId(event.id);
+        
+        if (existingMilestones.length === 0) {
+          const milestones = generateMilestonesForEvent(event.id, event.date, event.time);
+          await storage.createManyMilestones(milestones);
+          created += milestones.length;
+          console.log(`Generated ${milestones.length} milestones for event ${event.title}`);
+        } else {
+          skipped++;
+        }
+      }
+      
+      res.json({ 
+        message: `Backfill complete`, 
+        eventsProcessed: eventsToBackfill.length,
+        milestonesCreated: created,
+        eventsSkipped: skipped
+      });
+    } catch (error) {
+      console.error('Error backfilling milestones:', error);
+      res.status(500).json({ error: 'Failed to backfill milestones' });
+    }
+  });
+
+  // Get pending milestones for a planner (with event info) - secured by role
+  app.get('/api/milestones/pending-by-planner', async (req, res) => {
+    try {
+      // Get authenticated user
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
+      const currentUser = await storage.getUser(userId);
+      if (!currentUser) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      const allMilestones = await storage.getAllMilestones();
+      const allEvents = await storage.getAllEvents();
+      
+      // Filter for events from Jan 1, 2026 onwards
+      const cutoffDate = new Date('2026-01-01');
+      const eligibleEventIds = new Set(
+        allEvents
+          .filter(e => new Date(e.date) >= cutoffDate)
+          .map(e => e.id)
+      );
+      
+      // Create event lookup map
+      const eventMap = new Map(allEvents.map(e => [e.id, e]));
+      
+      // Filter pending milestones for eligible events
+      let pendingMilestones = allMilestones
+        .filter(m => m.status === 'pending' && eligibleEventIds.has(m.eventId))
+        .map(m => ({
+          ...m,
+          event: eventMap.get(m.eventId)
+        }));
+      
+      // Role-based filtering: superadmin/admin can see all, others only see their own
+      const isAdminOrSuperadmin = currentUser.role === 'superadmin' || currentUser.role === 'admin';
+      
+      if (!isAdminOrSuperadmin) {
+        // Non-admin users only see milestones for events where they are the planner
+        pendingMilestones = pendingMilestones.filter(m => 
+          m.event?.planner?.toLowerCase() === currentUser.name?.toLowerCase()
+        );
+      }
+      
+      // Sort by milestone date (ascending - most urgent first)
+      pendingMilestones.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      res.json(pendingMilestones);
+    } catch (error) {
+      console.error('Error fetching pending milestones by planner:', error);
+      res.status(500).json({ error: 'Failed to fetch pending milestones' });
+    }
   });
 
   // Oak Book - Customers

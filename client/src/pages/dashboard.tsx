@@ -2,6 +2,9 @@ import { useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { motion } from "framer-motion";
 import { 
   Calendar, 
@@ -17,11 +20,17 @@ import {
   Package,
   Briefcase,
   Shield,
-  UserCircle
+  UserCircle,
+  Clock,
+  AlertCircle
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Event } from "@/lib/types";
-import type { InventoryItem } from "@shared/schema";
+import type { InventoryItem, EventMilestone } from "@shared/schema";
+
+interface PendingMilestone extends EventMilestone {
+  event?: Event;
+}
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard, description: "Overview & stats" },
@@ -66,6 +75,41 @@ export default function Dashboard() {
     },
     enabled: isSuperAdmin,
   });
+
+  const queryClient = useQueryClient();
+  
+  // Fetch pending milestones - server filters by authenticated user's role
+  const { data: pendingMilestones = [] } = useQuery<PendingMilestone[]>({
+    queryKey: ['/api/milestones/pending-by-planner'],
+    queryFn: async () => {
+      const res = await fetch('/api/milestones/pending-by-planner');
+      if (!res.ok) throw new Error('Failed to fetch pending milestones');
+      return res.json();
+    },
+  });
+
+  // Mutation to mark milestone as completed
+  const completeMilestone = useMutation({
+    mutationFn: async (milestoneId: string) => {
+      const res = await fetch(`/api/milestones/${milestoneId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      if (!res.ok) throw new Error('Failed to complete milestone');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/milestones/pending-by-planner'] });
+    },
+  });
+
+  // Get overdue and upcoming tasks
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const overdueTasks = pendingMilestones.filter(m => new Date(m.date) < today);
+  const upcomingTasks = pendingMilestones.filter(m => new Date(m.date) >= today).slice(0, 10);
 
   const events = useMemo(() => {
     if (isAdmin) return allEvents;
@@ -272,6 +316,125 @@ export default function Dashboard() {
           })}
         </motion.div>
       </motion.div>
+
+      {/* Pending Tasks Section - for Wedding Planners */}
+      {pendingMilestones.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-serif font-semibold text-primary flex items-center gap-2">
+              <CheckSquare className="h-5 w-5" />
+              Pending Tasks
+              {overdueTasks.length > 0 && (
+                <Badge variant="destructive" className="ml-2" data-testid="badge-overdue-count">
+                  {overdueTasks.length} overdue
+                </Badge>
+              )}
+            </h2>
+            <Link href="/milestones">
+              <Button variant="outline" size="sm" data-testid="button-view-all-milestones">
+                View All
+              </Button>
+            </Link>
+          </div>
+          
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {/* Overdue Tasks */}
+                {overdueTasks.slice(0, 5).map((milestone, index) => (
+                  <motion.div
+                    key={milestone.id}
+                    className="flex items-center gap-3 p-3 sm:p-4 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * index }}
+                    data-testid={`task-overdue-${milestone.id}`}
+                  >
+                    <Checkbox
+                      checked={false}
+                      onCheckedChange={() => completeMilestone.mutate(milestone.id)}
+                      disabled={completeMilestone.isPending}
+                      data-testid={`checkbox-task-${milestone.id}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">{milestone.name}</p>
+                        <Badge variant="outline" className="text-[10px] shrink-0 border-red-300 text-red-600">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Overdue
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <span className="truncate">{milestone.event?.title || 'Event'}</span>
+                        <span>•</span>
+                        <span className="text-red-600 font-medium">
+                          Due: {new Date(milestone.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] hidden sm:flex shrink-0">
+                      {milestone.phaseName}
+                    </Badge>
+                  </motion.div>
+                ))}
+                
+                {/* Upcoming Tasks */}
+                {upcomingTasks.map((milestone, index) => (
+                  <motion.div
+                    key={milestone.id}
+                    className="flex items-center gap-3 p-3 sm:p-4 hover:bg-muted/50 transition-colors"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.05 * (index + overdueTasks.length) }}
+                    data-testid={`task-upcoming-${milestone.id}`}
+                  >
+                    <Checkbox
+                      checked={false}
+                      onCheckedChange={() => completeMilestone.mutate(milestone.id)}
+                      disabled={completeMilestone.isPending}
+                      data-testid={`checkbox-task-${milestone.id}`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">{milestone.name}</p>
+                        {new Date(milestone.date).toDateString() === today.toDateString() && (
+                          <Badge variant="outline" className="text-[10px] shrink-0 border-amber-300 text-amber-600">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Today
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                        <span className="truncate">{milestone.event?.title || 'Event'}</span>
+                        <span>•</span>
+                        <span>Due: {new Date(milestone.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                        {milestone.time && <span>at {milestone.time}</span>}
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] hidden sm:flex shrink-0">
+                      {milestone.phaseName}
+                    </Badge>
+                  </motion.div>
+                ))}
+              </div>
+              
+              {pendingMilestones.length > 15 && (
+                <div className="p-3 text-center border-t bg-muted/30">
+                  <Link href="/milestones">
+                    <Button variant="ghost" size="sm" className="text-primary" data-testid="button-see-more-tasks">
+                      See {pendingMilestones.length - 15} more pending tasks
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       <motion.div 
         className="grid gap-4 sm:gap-8 grid-cols-1 md:grid-cols-2"
