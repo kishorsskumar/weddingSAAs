@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useLocation } from "wouter";
+import { queryClient } from "@/lib/queryClient";
 
 interface User {
   id: string;
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
+    // Clear any cached data from previous user before login
+    queryClient.clear();
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -75,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
+    // Clear all cached queries to prevent data leakage between users
+    queryClient.clear();
     setUser(null);
     setAllowedPages([]);
     setLocation("/login");

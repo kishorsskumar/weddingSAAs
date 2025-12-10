@@ -55,8 +55,10 @@ export default function Dashboard() {
   const accessiblePages = isSuperAdmin 
     ? ALL_PAGES.filter(p => p.id !== 'dashboard')
     : ALL_PAGES.filter(p => allowedPages.includes(p.id) && p.id !== 'dashboard');
-  const isWeddingPlanner = user?.role === 'wedding_planner' || user?.role === 'employee';
+  const isWeddingPlanner = user?.role === 'wedding_planner';
+  const isEmployee = user?.role === 'employee';
 
+  // Only fetch events for admins and wedding planners, not for regular employees
   const { data: allEvents = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
     queryFn: async () => {
@@ -64,6 +66,7 @@ export default function Dashboard() {
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
+    enabled: isAdmin || isWeddingPlanner,
   });
 
   const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
