@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags } from "lucide-react";
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags, Camera, Upload, Loader2 } from "lucide-react";
 import { format, addDays, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,18 @@ export default function Daybook() {
   const [editingCategory, setEditingCategory] = useState<DaybookCategory | null>(null);
   const [editingEntry, setEditingEntry] = useState<DaybookEntry | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
+  const [scanningImage, setScanningImage] = useState<string | null>(null);
+  const [scannedData, setScannedData] = useState<{
+    type: 'income' | 'expense';
+    amount: number;
+    date: string;
+    description: string;
+    paymentMethod: string;
+    reference: string | null;
+    counterparty: string | null;
+    confidence: number;
+  } | null>(null);
   const [periodType, setPeriodType] = useState<"day" | "month" | "year" | "custom">("month");
   const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
@@ -320,8 +332,113 @@ export default function Daybook() {
     },
   });
 
+  const scanTransactionMutation = useMutation({
+    mutationFn: async (image: string) => {
+      const res = await fetch('/api/daybook/scan-transaction', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to scan transaction');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setScannedData(data);
+      toast({
+        title: "Transaction Scanned",
+        description: `Detected ${data.type}: ₹${data.amount.toLocaleString()} with ${Math.round(data.confidence * 100)}% confidence`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Scan Failed",
+        description: error instanceof Error ? error.message : "Failed to parse transaction",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a JPG, PNG, or WebP image.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      setScanningImage(base64);
+      setScannedData(null);
+      scanTransactionMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const incomeCategories = categories.filter(c => c.type === 'income');
   const expenseCategories = categories.filter(c => c.type === 'expense');
+
+  const handleCreateFromScan = () => {
+    if (!scannedData) return;
+    
+    // Map to valid category - use first matching category for the type, or "Other"
+    const typeCategories = scannedData.type === 'income' ? incomeCategories : expenseCategories;
+    const defaultCategory = typeCategories.find(c => 
+      c.name.toLowerCase() === 'other' || 
+      c.name.toLowerCase() === 'general' ||
+      c.name.toLowerCase().includes('payment')
+    )?.name || typeCategories[0]?.name || 'Other';
+    
+    // Build description from scanned data
+    const description = [
+      scannedData.description,
+      scannedData.counterparty ? `(${scannedData.type === 'income' ? 'From' : 'To'}: ${scannedData.counterparty})` : null,
+      scannedData.paymentMethod ? `via ${scannedData.paymentMethod}` : null,
+    ].filter(Boolean).join(' ');
+    
+    const entryData = {
+      type: scannedData.type,
+      amount: scannedData.amount.toString(),
+      date: scannedData.date || formattedDate,
+      description: description,
+      category: defaultCategory,
+      notes: scannedData.reference ? `Transaction Ref: ${scannedData.reference}` : undefined,
+    };
+
+    createMutation.mutate(entryData, {
+      onSuccess: () => {
+        setIsScanDialogOpen(false);
+        setScanningImage(null);
+        setScannedData(null);
+        toast({
+          title: "Entry Created",
+          description: "Transaction has been added to the daybook.",
+        });
+      },
+    });
+  };
 
   const SimpleTransactionForm = ({ type, onClose }: { type: 'income' | 'expense'; onClose: () => void }) => {
     const { register, handleSubmit, setValue, reset, watch } = useForm<any>({
@@ -1155,6 +1272,17 @@ export default function Daybook() {
           >
             Today
           </Button>
+          {canEditEntries && (
+            <Button 
+              size="sm"
+              onClick={() => setIsScanDialogOpen(true)}
+              className="gap-1 bg-[#7C8B5D] hover:bg-[#6A7850]"
+              data-testid="button-scan-transaction"
+            >
+              <Camera className="h-4 w-4" />
+              <span className="hidden sm:inline">Scan</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1775,6 +1903,168 @@ export default function Daybook() {
               isPending={updateEntryMutation.isPending}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Transaction Scanner Dialog */}
+      <Dialog open={isScanDialogOpen} onOpenChange={(open) => {
+        setIsScanDialogOpen(open);
+        if (!open) {
+          setScanningImage(null);
+          setScannedData(null);
+        }
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-serif text-[#7C8B5D] flex items-center gap-2">
+              <Camera className="h-5 w-5" />
+              Scan Transaction
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!scanningImage ? (
+              <div className="border-2 border-dashed border-[#7C8B5D]/50 rounded-lg p-8 text-center hover:border-[#7C8B5D] transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                  id="transaction-image"
+                  data-testid="input-transaction-image"
+                />
+                <label htmlFor="transaction-image" className="cursor-pointer">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="p-4 bg-[#7C8B5D]/10 rounded-full">
+                      <Upload className="h-8 w-8 text-[#7C8B5D]" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">Upload Transaction Screenshot</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Supports UPI, NEFT, IMPS, Bank App screenshots
+                      </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="mt-2">
+                      Choose File
+                    </Button>
+                  </div>
+                </label>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="relative rounded-lg overflow-hidden bg-muted">
+                  <img 
+                    src={scanningImage} 
+                    alt="Transaction screenshot" 
+                    className="w-full max-h-[200px] object-contain"
+                  />
+                  {scanTransactionMutation.isPending && (
+                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="h-8 w-8 animate-spin text-[#7C8B5D]" />
+                        <p className="text-sm font-medium">Analyzing transaction...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {scannedData && (
+                  <Card className="border-[#7C8B5D]/30">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Transaction Type</span>
+                        <span className={`px-2 py-1 rounded text-sm font-medium ${
+                          scannedData.type === 'income' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {scannedData.type === 'income' ? 'Income' : 'Expense'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Amount</span>
+                        <span className={`text-lg font-bold ${
+                          scannedData.type === 'income' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {scannedData.type === 'income' ? '+' : '-'}₹{scannedData.amount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Date</span>
+                        <span className="text-sm">{scannedData.date}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Description</span>
+                        <span className="text-sm text-right max-w-[60%]">{scannedData.description}</span>
+                      </div>
+                      {scannedData.counterparty && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">
+                            {scannedData.type === 'income' ? 'From' : 'To'}
+                          </span>
+                          <span className="text-sm">{scannedData.counterparty}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Payment Method</span>
+                        <span className="text-sm">{scannedData.paymentMethod}</span>
+                      </div>
+                      {scannedData.reference && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Reference</span>
+                          <span className="text-sm font-mono text-muted-foreground">{scannedData.reference}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <span className="text-sm font-medium">AI Confidence</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${
+                                scannedData.confidence >= 0.8 ? 'bg-green-500' :
+                                scannedData.confidence >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'
+                              }`}
+                              style={{ width: `${scannedData.confidence * 100}%` }}
+                            />
+                          </div>
+                          <span className="text-sm">{Math.round(scannedData.confidence * 100)}%</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => {
+                      setScanningImage(null);
+                      setScannedData(null);
+                    }}
+                  >
+                    Scan Another
+                  </Button>
+                  {scannedData && (
+                    <Button 
+                      className="flex-1 bg-[#7C8B5D] hover:bg-[#6A7850]"
+                      onClick={handleCreateFromScan}
+                      disabled={createMutation.isPending}
+                      data-testid="button-create-from-scan"
+                    >
+                      {createMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        'Add to Daybook'
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
