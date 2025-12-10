@@ -1228,3 +1228,34 @@ export const eventManpower = pgTable("event_manpower", {
 export const insertEventManpowerSchema = createInsertSchema(eventManpower).omit({ id: true, createdAt: true });
 export type InsertEventManpower = z.infer<typeof insertEventManpowerSchema>;
 export type EventManpower = typeof eventManpower.$inferSelect;
+
+// Quick Entries - AI-processed payment screenshots from employees
+export const quickEntries = pgTable("quick_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  source: text("source").notNull().default('upload'), // 'share' | 'upload'
+  filePath: text("file_path").notNull(), // Path to uploaded screenshot
+  amount: decimal("amount", { precision: 12, scale: 2 }),
+  currency: text("currency").default('INR'),
+  transactionDate: timestamp("transaction_date"),
+  direction: text("direction"), // 'paid' | 'received'
+  counterpartyName: text("counterparty_name"),
+  counterpartyUpi: text("counterparty_upi"),
+  transactionId: text("transaction_id"),
+  confidence: decimal("confidence", { precision: 5, scale: 2 }), // AI confidence score 0-100
+  rawExtraction: jsonb("raw_extraction"), // Full AI extraction response
+  status: text("status").notNull().default('uploaded'), // 'uploaded' | 'processing' | 'awaiting_review' | 'approved' | 'rejected' | 'failed'
+  eventId: varchar("event_id").references(() => events.id),
+  categoryId: varchar("category_id"),
+  bankId: varchar("bank_id").references(() => banks.id),
+  notes: text("notes"),
+  reviewerId: varchar("reviewer_id").references(() => users.id),
+  reviewerNotes: text("reviewer_notes"),
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuickEntrySchema = createInsertSchema(quickEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertQuickEntry = z.infer<typeof insertQuickEntrySchema>;
+export type QuickEntry = typeof quickEntries.$inferSelect;
