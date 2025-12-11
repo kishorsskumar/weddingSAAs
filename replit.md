@@ -141,3 +141,26 @@ Preferred communication style: Simple, everyday language.
 - Monorepo structure with shared types reduces duplication and maintains consistency
 - Vite chosen for superior DX with fast HMR and optimized production builds
 - Component-first architecture allows for easy extension and maintenance
+
+### Calendar Integration
+
+**Google Calendar Integration (Active)**
+- Connected via Replit's Google Calendar connector
+- Uses googleapis package for API access
+- Events sync to Google Calendar with customer, venue, planner details
+- Sync available per event or bulk sync all events
+- Admin Panel → Calendar tab for configuration and sync management
+- Events store googleCalendarEventId for tracking sync status
+
+**Outlook Calendar Integration (Not Set Up)**
+- User dismissed the Outlook integration setup
+- Can be enabled later through Replit's connector system
+- Events schema includes outlookCalendarEventId field for future use
+
+**Calendar API Endpoints**
+- GET /api/calendar/google/status - Check connection status
+- GET /api/calendar/google/calendars - List available calendars
+- POST /api/calendar/google/sync/:eventId - Sync single event
+- POST /api/calendar/google/sync-all - Bulk sync all events
+- DELETE /api/calendar/google/event/:eventId - Remove from calendar
+- GET /api/calendar/google/events - Get calendar events
