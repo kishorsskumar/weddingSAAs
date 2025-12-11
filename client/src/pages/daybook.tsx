@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags, Camera, Upload, Loader2 } from "lucide-react";
 import { format, addDays, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { useForm } from "react-hook-form";
@@ -1251,10 +1252,26 @@ export default function Daybook() {
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-2 border rounded-md px-3 py-2 bg-card min-w-[140px] justify-center">
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs sm:text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
-          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button 
+                variant="outline" 
+                className="min-w-[140px] justify-center gap-2"
+                data-testid="button-date-picker"
+              >
+                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs sm:text-sm font-medium">{format(currentDate, "dd MMM yyyy")}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="center">
+              <Calendar
+                mode="single"
+                selected={currentDate}
+                onSelect={(date) => date && setCurrentDate(date)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
           <Button 
             variant="outline" 
             size="icon" 
