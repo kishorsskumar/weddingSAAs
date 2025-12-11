@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link } from "wouter";
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -787,7 +787,18 @@ function QuickEntryTab() {
 }
 
 export default function EmployeePortal() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [location, setLocation] = useLocation();
+  
+  // Get tab from URL query params - read once on mount
+  const getTabFromUrl = () => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('tab') || 'overview';
+    }
+    return 'overview';
+  };
+  
+  const [activeTab, setActiveTab] = useState(getTabFromUrl);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isAdvanceDialogOpen, setIsAdvanceDialogOpen] = useState(false);
   const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
@@ -804,6 +815,14 @@ export default function EmployeePortal() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Update URL when tab changes - use replaceState to avoid back button issues
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    // Only update URL, don't use wouter navigation to avoid page refresh
+    const newUrl = tab === 'overview' ? '/employee-portal' : `/employee-portal?tab=${tab}`;
+    window.history.replaceState(null, '', newUrl);
+  };
   
   const canViewOtherEmployees = user?.role === 'superadmin' || user?.role === 'admin' || user?.role === 'manager';
 
@@ -1496,7 +1515,7 @@ export default function EmployeePortal() {
         </DialogContent>
       </Dialog>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5 md:grid-cols-10 gap-1">
           <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
             <User className="h-4 w-4 mr-1 md:mr-2" />

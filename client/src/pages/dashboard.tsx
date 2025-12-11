@@ -1,10 +1,15 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/context/auth-context";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { motion } from "framer-motion";
 import { 
   Calendar, 
@@ -27,9 +32,14 @@ import {
   Banknote,
   FileText,
   Camera,
-  ArrowRight
+  ArrowRight,
+  Upload,
+  Loader2,
+  CheckCircle2,
+  Pencil
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import type { Event } from "@/lib/types";
 import type { InventoryItem, EventMilestone } from "@shared/schema";
 
@@ -421,6 +431,36 @@ export default function Dashboard() {
               </motion.div>
             )}
           </motion.div>
+        </motion.div>
+      )}
+
+      {/* Quick Entry Upload Section - for superadmin */}
+      {isSuperAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28, duration: 0.4 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-serif font-semibold text-primary flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Quick Entry
+            </h2>
+          </div>
+          <Link href="/employee-portal?tab=quick-entry">
+            <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-[#7C8B5D] bg-[#7C8B5D]/5 hover:bg-[#7C8B5D]/10">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="p-3 rounded-full bg-[#7C8B5D]/20">
+                  <Camera className="h-6 w-6 text-[#7C8B5D]" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Upload Payment Screenshot</p>
+                  <p className="text-sm text-muted-foreground">AI will extract payment details automatically</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          </Link>
         </motion.div>
       )}
 

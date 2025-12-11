@@ -2592,12 +2592,32 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
+      const user = await storage.getUser(userId);
+      const isSuperadmin = user?.role === 'superadmin';
       const employee = await storage.getEmployeeByUserId(userId);
-      if (!employee) {
+      
+      // Superadmin can create entries for any employee (or themselves if they have a profile)
+      let targetEmployeeId = employee?.id;
+      
+      // If superadmin provides an employeeId, validate it exists and use that
+      if (isSuperadmin && req.body.employeeId) {
+        const targetEmployee = await storage.getEmployee(req.body.employeeId);
+        if (!targetEmployee) {
+          return res.status(400).json({ error: 'Invalid employee ID specified' });
+        }
+        targetEmployeeId = req.body.employeeId;
+      }
+      
+      // If superadmin has no employee profile and didn't specify one, require employeeId
+      if (!targetEmployeeId) {
+        if (isSuperadmin) {
+          return res.status(400).json({ error: 'Please specify an employee for this entry' });
+        }
         return res.status(404).json({ error: 'Employee profile not found' });
       }
+      
       const entry = await storage.createQuickEntry({
-        employeeId: employee.id,
+        employeeId: targetEmployeeId,
         source: req.body.source || 'upload',
         filePath: req.body.filePath,
         status: 'uploaded'
