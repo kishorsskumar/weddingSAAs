@@ -111,6 +111,7 @@ interface Manager {
 export default function HR() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [mainTab, setMainTab] = useState("current");
   const [approvalTab, setApprovalTab] = useState("leaves");
   const [location] = useLocation();
   const queryClient = useQueryClient();
@@ -122,6 +123,7 @@ export default function HR() {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
     if (tab && ['leaves', 'advances', 'expenses', 'quick-entries', 'approved-payouts'].includes(tab)) {
+      setMainTab('approvals'); // Switch to approvals tab first
       setApprovalTab(tab);
     }
   }, [location]);
@@ -567,7 +569,7 @@ export default function HR() {
         </DialogContent>
       </Dialog>
 
-      <Tabs defaultValue="current" className="space-y-4">
+      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="w-full sm:w-auto flex flex-wrap">
           <TabsTrigger value="current" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
             <Users className="h-4 w-4" />
@@ -640,7 +642,7 @@ export default function HR() {
 
         {(isAdmin || user?.role === 'manager') && (
           <TabsContent value="approvals">
-            <ManagerApprovalsSection isAdmin={isAdmin} />
+            <ManagerApprovalsSection isAdmin={isAdmin} approvalTab={approvalTab} setApprovalTab={setApprovalTab} />
           </TabsContent>
         )}
 
@@ -1313,7 +1315,7 @@ interface PendingRequest {
   description?: string;
 }
 
-function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
+function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isAdmin: boolean; approvalTab: string; setApprovalTab: (tab: string) => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
