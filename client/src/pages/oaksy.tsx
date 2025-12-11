@@ -423,6 +423,7 @@ export default function OaksyPage() {
                               {action.type === "create_daybook_entry" && "Entry Created"}
                               {action.type === "create_meeting" && "Meeting Scheduled"}
                               {action.type === "create_event" && "Event Created"}
+                              {action.type === "create_bank_transfer" && "Transfer Created"}
                             </Badge>
                           ))}
                         </div>

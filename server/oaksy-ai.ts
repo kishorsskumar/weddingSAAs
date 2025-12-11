@@ -146,6 +146,39 @@ const oaksyTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_bank_transfer",
+      description: "Create a bank-to-bank transfer. Use this when the user wants to transfer money from one bank account to another.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: {
+            type: "string",
+            description: "The date of the transfer in YYYY-MM-DD format. Use today's date if not specified.",
+          },
+          fromBank: {
+            type: "string",
+            description: "The name of the source bank account to transfer FROM",
+          },
+          toBank: {
+            type: "string",
+            description: "The name of the destination bank account to transfer TO",
+          },
+          amount: {
+            type: "number",
+            description: "The amount to transfer in Indian Rupees (without currency symbol)",
+          },
+          description: {
+            type: "string",
+            description: "Optional description or reference for the transfer",
+          },
+        },
+        required: ["date", "fromBank", "toBank", "amount"],
+      },
+    },
+  },
 ];
 
 function getDepartmentSystemPrompt(department: string): string {
@@ -221,14 +254,17 @@ You specialize in helping the accounts team with:
 - Payment tracking (receivables and payables)
 - Vendor payments
 - Expense management
+- Bank transfers between accounts
 - Financial reports
 - GST and tax compliance
 
 ACTION CAPABILITIES:
 - You CAN create daybook entries for income and expenses using the create_daybook_entry tool
+- You CAN create bank-to-bank transfers using the create_bank_transfer tool
 - When an accountant wants to record a payment received, vendor payment, or any expense, USE the create_daybook_entry tool
+- When an accountant wants to transfer money between bank accounts, USE the create_bank_transfer tool
 - Always confirm the details before creating the entry
-- After creating an entry, summarize what was created with the amount in ₹`,
+- After creating an entry or transfer, summarize what was created with the amount in ₹`,
 
     general: `${basePrompt}
 
@@ -236,6 +272,7 @@ ACTION CAPABILITIES:
 - You CAN create daybook entries using the create_daybook_entry tool
 - You CAN schedule meetings using the create_meeting tool
 - You CAN create events using the create_event tool
+- You CAN create bank-to-bank transfers using the create_bank_transfer tool
 - When asked to record, create, or add something, USE the appropriate tool`,
   };
 
@@ -336,6 +373,41 @@ async function executeToolCall(toolName: string, args: any): Promise<{ success: 
           success: true,
           message: `Created event: "${args.title}" on ${new Date(args.date).toLocaleDateString('en-IN')} for ${args.customer} at ${args.venue}${args.salesValue ? ` (Value: ₹${Number(args.salesValue).toLocaleString('en-IN')})` : ''}`,
           data: event,
+        };
+      }
+
+      case "create_bank_transfer": {
+        const banks = await storage.getAllBanks();
+        const fromBank = banks.find(b => b.name.toLowerCase().includes(args.fromBank.toLowerCase()));
+        const toBank = banks.find(b => b.name.toLowerCase().includes(args.toBank.toLowerCase()));
+        
+        if (!fromBank) {
+          return { success: false, message: `Source bank "${args.fromBank}" not found. Available banks: ${banks.map(b => b.name).join(', ')}` };
+        }
+        if (!toBank) {
+          return { success: false, message: `Destination bank "${args.toBank}" not found. Available banks: ${banks.map(b => b.name).join(', ')}` };
+        }
+        if (fromBank.id === toBank.id) {
+          return { success: false, message: "Source and destination banks cannot be the same" };
+        }
+        
+        const transfer = await storage.createBankTransfer({
+          date: args.date,
+          fromBankId: fromBank.id,
+          toBankId: toBank.id,
+          amount: args.amount.toString(),
+          description: args.description || null,
+        });
+        
+        const newFromBalance = (parseFloat(fromBank.balance) - args.amount).toString();
+        const newToBalance = (parseFloat(toBank.balance) + args.amount).toString();
+        await storage.updateBank(fromBank.id, { balance: newFromBalance });
+        await storage.updateBank(toBank.id, { balance: newToBalance });
+        
+        return {
+          success: true,
+          message: `Bank transfer created: ₹${Number(args.amount).toLocaleString('en-IN')} from ${fromBank.name} to ${toBank.name}`,
+          data: transfer,
         };
       }
 
