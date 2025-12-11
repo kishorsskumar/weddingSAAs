@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar, UserPlus, Copy, Eye, EyeOff, Users, Phone, Mail, MapPin, Building2 } from "lucide-react";
+import { Shield, Trash2, ChevronDown, ChevronUp, Pencil, Plus, Tag, Calendar, UserPlus, Copy, Eye, EyeOff, Users, Phone, Mail, MapPin, Building2, RefreshCw, CheckCircle2, XCircle, Loader2, CalendarSync } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,241 @@ type Role = {
   isSystem: boolean;
   createdAt: string | null;
 };
+
+type GoogleCalendar = {
+  id: string;
+  summary: string;
+  description?: string;
+  primary?: boolean;
+};
+
+type Event = {
+  id: string;
+  title: string;
+  date: string;
+  time?: string | null;
+  type: string;
+  customer: string;
+  venue: string;
+  planner: string;
+  googleCalendarEventId?: string | null;
+  outlookCalendarEventId?: string | null;
+};
+
+function CalendarIntegrationTab() {
+  const queryClient = useQueryClient();
+  const [selectedCalendar, setSelectedCalendar] = useState<string>('primary');
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const { data: googleStatus, isLoading: statusLoading } = useQuery<{ connected: boolean }>({
+    queryKey: ['/api/calendar/google/status'],
+  });
+
+  const { data: calendars = [], isLoading: calendarsLoading } = useQuery<GoogleCalendar[]>({
+    queryKey: ['/api/calendar/google/calendars'],
+    enabled: googleStatus?.connected === true,
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+  });
+
+  const syncAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/calendar/google/sync-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarId: selectedCalendar }),
+      });
+      if (!res.ok) throw new Error('Failed to sync events');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      alert(`Synced ${data.synced} events to Google Calendar${data.failed > 0 ? ` (${data.failed} failed)` : ''}`);
+    },
+    onError: (error: Error) => {
+      alert('Error syncing events: ' + error.message);
+    },
+  });
+
+  const syncEventMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const res = await fetch(`/api/calendar/google/sync/${eventId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendarId: selectedCalendar }),
+      });
+      if (!res.ok) throw new Error('Failed to sync event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+    },
+  });
+
+  const syncedCount = events.filter(e => e.googleCalendarEventId).length;
+  const unsyncedCount = events.length - syncedCount;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Google Calendar Integration
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {statusLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Checking connection status...
+            </div>
+          ) : googleStatus?.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+                <span className="font-medium">Connected to Google Calendar</span>
+              </div>
+
+              {calendarsLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading calendars...
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Select Calendar for Sync</Label>
+                  <Select value={selectedCalendar} onValueChange={setSelectedCalendar}>
+                    <SelectTrigger data-testid="select-calendar">
+                      <SelectValue placeholder="Select a calendar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {calendars.map((cal) => (
+                        <SelectItem key={cal.id} value={cal.id}>
+                          {cal.summary} {cal.primary && '(Primary)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-green-600">{syncedCount}</div>
+                    <div className="text-sm text-muted-foreground">Synced Events</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-2xl font-bold text-amber-600">{unsyncedCount}</div>
+                    <div className="text-sm text-muted-foreground">Not Synced</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Button 
+                onClick={() => syncAllMutation.mutate()}
+                disabled={syncAllMutation.isPending || events.length === 0}
+                className="w-full gap-2"
+                data-testid="button-sync-all"
+              >
+                {syncAllMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Syncing Events...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Sync All Events to Google Calendar
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-amber-600">
+                <XCircle className="h-5 w-5" />
+                <span className="font-medium">Google Calendar not connected</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                To connect Google Calendar, please set up the integration in your Replit project settings. 
+                Once connected, you'll be able to sync your Oak events with Google Calendar.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {googleStatus?.connected && events.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Individual Event Sync</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {events.slice(0, 20).map((event) => (
+                <div 
+                  key={event.id} 
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{event.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {event.date} • {event.customer}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {event.googleCalendarEventId ? (
+                      <Badge variant="outline" className="text-green-600 border-green-600">
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Synced
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => syncEventMutation.mutate(event.id)}
+                        disabled={syncEventMutation.isPending}
+                        data-testid={`button-sync-event-${event.id}`}
+                      >
+                        {syncEventMutation.isPending ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          'Sync'
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="bg-blue-50 dark:bg-blue-950/30 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Calendar className="h-5 w-5 text-blue-600 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-blue-800 dark:text-blue-200">About Calendar Sync</h4>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                When you sync events, they are created in your Google Calendar with the event details including 
+                customer name, venue, event type, and planner. Updates to events in Oak will sync back to 
+                Google Calendar when you re-sync.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function Admin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -755,13 +990,14 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-6' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-7' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="employees" data-testid="tab-employees">Employees</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="leave" data-testid="tab-leave">Leave</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="calendar" data-testid="tab-calendar">Calendar</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -1688,6 +1924,12 @@ export default function Admin() {
                 </p>
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="calendar" className="mt-4">
+            <CalendarIntegrationTab />
           </TabsContent>
         )}
       </Tabs>
