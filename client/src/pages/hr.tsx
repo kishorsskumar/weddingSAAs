@@ -1549,7 +1549,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const { data: approvedPayouts = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/approved-payouts'],
     queryFn: async () => {
-      const res = await fetch('/api/admin/approved-payouts');
+      const res = await fetch('/api/admin/approved-payouts', { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
@@ -1559,7 +1559,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const { data: pendingLeaves = [] } = useQuery<any[]>({
     queryKey: ['/api/manager/pending-leaves'],
     queryFn: async () => {
-      const res = await fetch('/api/manager/pending-leaves');
+      const res = await fetch('/api/manager/pending-leaves', { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
@@ -1568,7 +1568,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const { data: pendingAdvances = [] } = useQuery<any[]>({
     queryKey: ['/api/manager/pending-advances'],
     queryFn: async () => {
-      const res = await fetch('/api/manager/pending-advances');
+      const res = await fetch('/api/manager/pending-advances', { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
@@ -1577,7 +1577,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const { data: pendingExpenses = [] } = useQuery<any[]>({
     queryKey: ['/api/manager/pending-expenses'],
     queryFn: async () => {
-      const res = await fetch('/api/manager/pending-expenses');
+      const res = await fetch('/api/manager/pending-expenses', { credentials: 'include' });
       if (!res.ok) return [];
       return res.json();
     },
