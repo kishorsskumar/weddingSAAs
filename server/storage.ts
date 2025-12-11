@@ -179,12 +179,18 @@ import {
   eventTransportation,
   eventManpower,
   quickEntries,
+  oaksyConversations,
+  oaksyMessages,
   type EventTransportation,
   type InsertEventTransportation,
   type EventManpower,
   type InsertEventManpower,
   type QuickEntry,
   type InsertQuickEntry,
+  type OaksyConversation,
+  type InsertOaksyConversation,
+  type OaksyMessage,
+  type InsertOaksyMessage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -3007,6 +3013,51 @@ export class DatabaseStorage implements IStorage {
 
   async deleteQuickEntry(id: string): Promise<void> {
     await db.delete(quickEntries).where(eq(quickEntries.id, id));
+  }
+
+  // Oaksy AI Conversations
+  async getOaksyConversations(userId: string): Promise<OaksyConversation[]> {
+    return await db.select().from(oaksyConversations)
+      .where(eq(oaksyConversations.userId, userId))
+      .orderBy(desc(oaksyConversations.updatedAt));
+  }
+
+  async getOaksyConversation(id: string): Promise<OaksyConversation | undefined> {
+    const [conversation] = await db.select().from(oaksyConversations).where(eq(oaksyConversations.id, id));
+    return conversation || undefined;
+  }
+
+  async createOaksyConversation(conversation: InsertOaksyConversation): Promise<OaksyConversation> {
+    const [created] = await db.insert(oaksyConversations).values(conversation).returning();
+    return created;
+  }
+
+  async updateOaksyConversation(id: string, data: Partial<InsertOaksyConversation>): Promise<OaksyConversation | undefined> {
+    const [updated] = await db.update(oaksyConversations)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(oaksyConversations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOaksyConversation(id: string): Promise<void> {
+    await db.delete(oaksyConversations).where(eq(oaksyConversations.id, id));
+  }
+
+  // Oaksy AI Messages
+  async getOaksyMessages(conversationId: string): Promise<OaksyMessage[]> {
+    return await db.select().from(oaksyMessages)
+      .where(eq(oaksyMessages.conversationId, conversationId))
+      .orderBy(oaksyMessages.createdAt);
+  }
+
+  async createOaksyMessage(message: InsertOaksyMessage): Promise<OaksyMessage> {
+    const [created] = await db.insert(oaksyMessages).values(message).returning();
+    return created;
+  }
+
+  async deleteOaksyMessages(conversationId: string): Promise<void> {
+    await db.delete(oaksyMessages).where(eq(oaksyMessages.conversationId, conversationId));
   }
 }
 

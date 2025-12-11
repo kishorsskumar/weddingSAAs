@@ -758,6 +758,7 @@ export async function registerRoutes(
     'oak-inventory',
     'hr',
     'employee-portal',
+    'oaksy',
     'admin',
   ];
 
@@ -6506,7 +6507,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: 'Google Calendar not connected' });
       }
 
-      const events = await storage.getEvents();
+      const events = await storage.getAllEvents();
       const calendarId = req.body.calendarId || 'primary';
       const results = { synced: 0, failed: 0, errors: [] as string[] };
 
@@ -6581,6 +6582,172 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[Calendar] Get events error:', error);
       res.status(500).json({ error: error.message || 'Failed to get calendar events' });
+    }
+  });
+
+  // ==================== OAKSY AI ASSISTANT ====================
+
+  // Get user's conversations
+  app.get('/api/oaksy/conversations', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const conversations = await storage.getOaksyConversations(req.session.userId);
+      res.json(conversations);
+    } catch (error: any) {
+      console.error('[Oaksy] Get conversations error:', error);
+      res.status(500).json({ error: error.message || 'Failed to get conversations' });
+    }
+  });
+
+  // Get single conversation with messages
+  app.get('/api/oaksy/conversations/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const conversation = await storage.getOaksyConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      if (conversation.userId !== req.session.userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const messages = await storage.getOaksyMessages(req.params.id);
+      res.json({ ...conversation, messages });
+    } catch (error: any) {
+      console.error('[Oaksy] Get conversation error:', error);
+      res.status(500).json({ error: error.message || 'Failed to get conversation' });
+    }
+  });
+
+  // Create new conversation
+  app.post('/api/oaksy/conversations', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { department } = req.body;
+      const conversation = await storage.createOaksyConversation({
+        userId: req.session.userId,
+        department: department || 'general',
+      });
+      res.json(conversation);
+    } catch (error: any) {
+      console.error('[Oaksy] Create conversation error:', error);
+      res.status(500).json({ error: error.message || 'Failed to create conversation' });
+    }
+  });
+
+  // Delete conversation
+  app.delete('/api/oaksy/conversations/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const conversation = await storage.getOaksyConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      if (conversation.userId !== req.session.userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      await storage.deleteOaksyConversation(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Oaksy] Delete conversation error:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete conversation' });
+    }
+  });
+
+  // Send message to Oaksy
+  app.post('/api/oaksy/conversations/:id/messages', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { content, inputType } = req.body;
+      if (!content) {
+        return res.status(400).json({ error: 'Message content is required' });
+      }
+
+      const conversation = await storage.getOaksyConversation(req.params.id);
+      if (!conversation) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+      if (conversation.userId !== req.session.userId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      // Save user message
+      await storage.createOaksyMessage({
+        conversationId: req.params.id,
+        role: 'user',
+        content,
+        inputType: inputType || 'text',
+      });
+
+      // Get user info for context
+      const user = await storage.getUser(req.session.userId);
+      
+      // Build context for AI
+      const events = await storage.getAllEvents();
+      const employees = await storage.getAllEmployees();
+      
+      // Calculate daybook summary for current month
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const daybookEntries = await storage.getDaybookEntriesByDateRange(monthStart, monthEnd);
+      
+      const totalIncome = daybookEntries
+        .filter(e => e.type === 'income')
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+      const totalExpense = daybookEntries
+        .filter(e => e.type === 'expense')
+        .reduce((sum, e) => sum + Number(e.amount), 0);
+
+      const context = {
+        userId: req.session.userId,
+        userRole: user?.role || 'employee',
+        department: conversation.department || undefined,
+        events,
+        employees,
+        daybookSummary: {
+          totalIncome,
+          totalExpense,
+          balance: totalIncome - totalExpense,
+        },
+      };
+
+      // Generate AI response
+      const { generateOaksyResponse, generateConversationTitle } = await import('./oaksy-ai');
+      const aiResponse = await generateOaksyResponse(
+        req.params.id,
+        content,
+        context,
+        conversation.department || 'general'
+      );
+
+      // Save AI response
+      const assistantMessage = await storage.createOaksyMessage({
+        conversationId: req.params.id,
+        role: 'assistant',
+        content: aiResponse,
+      });
+
+      // Update conversation title if this is the first message
+      const messages = await storage.getOaksyMessages(req.params.id);
+      if (messages.length <= 2 && !conversation.title) {
+        const title = await generateConversationTitle(content);
+        await storage.updateOaksyConversation(req.params.id, { title });
+      }
+
+      res.json(assistantMessage);
+    } catch (error: any) {
+      console.error('[Oaksy] Send message error:', error);
+      res.status(500).json({ error: error.message || 'Failed to send message' });
     }
   });
 

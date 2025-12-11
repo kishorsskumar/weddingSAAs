@@ -17,7 +17,8 @@ import {
   Receipt,
   Target,
   Package,
-  UserCircle
+  UserCircle,
+  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,6 +37,7 @@ const ALL_PAGES = [
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
+  { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -51,6 +53,7 @@ const ICONS: Record<string, any> = {
   "oak-inventory": Package,
   hr: Briefcase,
   "employee-portal": UserCircle,
+  oaksy: Sparkles,
   admin: Shield,
 };
 

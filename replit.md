@@ -164,3 +164,30 @@ Preferred communication style: Simple, everyday language.
 - POST /api/calendar/google/sync-all - Bulk sync all events
 - DELETE /api/calendar/google/event/:eventId - Remove from calendar
 - GET /api/calendar/google/events - Get calendar events
+
+### Oaksy AI Assistant
+
+**Oaksy** is an AI-powered assistant integrated into the app using OpenAI's GPT-4o model. It provides department-specific support across Sales, Wedding Planning, Operations, and Accounts.
+
+**Features:**
+- Department-specific context and prompts
+- Text and voice input support (Web Speech API)
+- Conversation history with auto-generated titles
+- Context-aware responses with access to events, employees, and daybook data
+- Oak & Gold themed UI matching the app design
+
+**Oaksy API Endpoints**
+- GET /api/oaksy/conversations - Get user's conversations
+- GET /api/oaksy/conversations/:id - Get conversation with messages
+- POST /api/oaksy/conversations - Create new conversation
+- DELETE /api/oaksy/conversations/:id - Delete conversation
+- POST /api/oaksy/conversations/:id/messages - Send message and get AI response
+
+**Database Tables**
+- oaksy_conversations - Stores chat conversations with department context
+- oaksy_messages - Stores individual messages with role (user/assistant)
+
+**Files**
+- client/src/pages/oaksy.tsx - Oaksy chat UI
+- server/oaksy-ai.ts - OpenAI integration and context building
+- server/routes.ts - Oaksy API endpoints
