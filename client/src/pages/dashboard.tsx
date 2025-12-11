@@ -22,7 +22,12 @@ import {
   Shield,
   UserCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Bell,
+  Banknote,
+  FileText,
+  Camera,
+  ArrowRight
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Event } from "@/lib/types";
@@ -78,6 +83,49 @@ export default function Dashboard() {
     },
     enabled: isSuperAdmin,
   });
+
+  // Pending approvals for superadmin dashboard
+  const { data: pendingLeaves = [] } = useQuery<any[]>({
+    queryKey: ['/api/hr/leaves/pending'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/leaves/pending', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: pendingAdvances = [] } = useQuery<any[]>({
+    queryKey: ['/api/hr/salary-advances/pending'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/salary-advances/pending', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: pendingExpenses = [] } = useQuery<any[]>({
+    queryKey: ['/api/hr/expenses/pending'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/expenses/pending', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: pendingQuickEntries = [] } = useQuery<any[]>({
+    queryKey: ['/api/hr/quick-entries/pending'],
+    queryFn: async () => {
+      const res = await fetch('/api/hr/quick-entries/pending', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const totalPendingApprovals = pendingLeaves.length + pendingAdvances.length + pendingExpenses.length + pendingQuickEntries.length;
 
   const queryClient = useQueryClient();
   
@@ -274,6 +322,107 @@ export default function Dashboard() {
           </>
         )}
       </motion.div>
+
+      {/* Pending Approvals Section - for admins */}
+      {isAdmin && totalPendingApprovals > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-serif font-semibold text-primary flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              Pending Approvals
+              <Badge variant="destructive" className="ml-2" data-testid="badge-pending-approvals">
+                {totalPendingApprovals}
+              </Badge>
+            </h2>
+          </div>
+          <motion.div 
+            className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
+            {pendingLeaves.length > 0 && (
+              <motion.div variants={itemVariants} whileHover={{ y: -4 }}>
+                <Link href="/hr?tab=leaves">
+                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-blue-500 bg-blue-50/50 dark:bg-blue-950/20">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/50">
+                        <Calendar className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-lg">{pendingLeaves.length}</p>
+                        <p className="text-xs text-muted-foreground">Leave Requests</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            )}
+
+            {pendingAdvances.length > 0 && (
+              <motion.div variants={itemVariants} whileHover={{ y: -4 }}>
+                <Link href="/hr?tab=advances">
+                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-green-500 bg-green-50/50 dark:bg-green-950/20">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/50">
+                        <Banknote className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-lg">{pendingAdvances.length}</p>
+                        <p className="text-xs text-muted-foreground">Salary Advances</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            )}
+
+            {pendingExpenses.length > 0 && (
+              <motion.div variants={itemVariants} whileHover={{ y: -4 }}>
+                <Link href="/hr?tab=expenses">
+                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-orange-500 bg-orange-50/50 dark:bg-orange-950/20">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-orange-100 dark:bg-orange-900/50">
+                        <FileText className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-lg">{pendingExpenses.length}</p>
+                        <p className="text-xs text-muted-foreground">Expense Claims</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            )}
+
+            {pendingQuickEntries.length > 0 && (
+              <motion.div variants={itemVariants} whileHover={{ y: -4 }}>
+                <Link href="/hr?tab=quick-entries">
+                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/50">
+                        <Camera className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-semibold text-lg">{pendingQuickEntries.length}</p>
+                        <p className="text-xs text-muted-foreground">Quick Entries</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
 
       {/* Quick Access Section */}
       <motion.div

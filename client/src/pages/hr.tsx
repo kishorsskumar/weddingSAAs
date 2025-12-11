@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import type { Employee } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,9 +111,20 @@ interface Manager {
 export default function HR() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [approvalTab, setApprovalTab] = useState("leaves");
+  const [location] = useLocation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+
+  // Handle URL tab parameter for deep linking from dashboard
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['leaves', 'advances', 'expenses', 'quick-entries', 'approved-payouts'].includes(tab)) {
+      setApprovalTab(tab);
+    }
+  }, [location]);
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['/api/employees'],
@@ -1692,8 +1704,8 @@ function ManagerApprovalsSection({ isAdmin }: { isAdmin: boolean }) {
         </Card>
       </div>
 
-      <Tabs defaultValue="leaves" className="space-y-4">
-        <TabsList>
+      <Tabs value={approvalTab} onValueChange={setApprovalTab} className="space-y-4">
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="leaves" className="text-xs sm:text-sm">
             Leave Requests ({pendingLeaves.length})
           </TabsTrigger>
