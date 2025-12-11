@@ -2679,11 +2679,12 @@ export async function registerRoutes(
         return res.status(404).json({ error: 'Quick entry not found' });
       }
       
-      // Only owner or superadmin can delete, and only if not approved
+      // Only owner or superadmin can delete
       if (!isSuperadmin && (!employee || entry.employeeId !== employee.id)) {
         return res.status(403).json({ error: 'Not authorized' });
       }
-      if (entry.status === 'approved') {
+      // Only prevent non-superadmin from deleting approved entries
+      if (!isSuperadmin && entry.status === 'approved') {
         return res.status(400).json({ error: 'Cannot delete approved entries' });
       }
       

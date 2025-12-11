@@ -1334,6 +1334,15 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const [daybookCategory, setDaybookCategory] = useState<string>('');
   const [daybookEventSearch, setDaybookEventSearch] = useState('');
   const [daybookEventOpen, setDaybookEventOpen] = useState(false);
+  const [isEditQuickEntryDialogOpen, setIsEditQuickEntryDialogOpen] = useState(false);
+  const [editingQuickEntry, setEditingQuickEntry] = useState<any>(null);
+  const [editQuickEntryForm, setEditQuickEntryForm] = useState({
+    amount: '',
+    direction: 'paid' as 'paid' | 'received',
+    counterpartyName: '',
+    notes: '',
+    employeeId: ''
+  });
 
   const { data: events = [] } = useQuery<any[]>({
     queryKey: ['/api/events'],
@@ -1348,6 +1357,16 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     queryKey: ['/api/banks'],
     queryFn: async () => {
       const res = await fetch('/api/banks');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: employees = [] } = useQuery<any[]>({
+    queryKey: ['/api/employees'],
+    queryFn: async () => {
+      const res = await fetch('/api/employees');
       if (!res.ok) return [];
       return res.json();
     },
@@ -1627,6 +1646,69 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
       categoryId: quickEntryCategoryId || undefined,
       bankId: quickEntryBankId || undefined,
       notes: quickEntryNotes || undefined,
+    });
+  };
+
+  const openEditQuickEntry = (entry: any) => {
+    setEditingQuickEntry(entry);
+    setEditQuickEntryForm({
+      amount: entry.amount || '',
+      direction: entry.direction || 'paid',
+      counterpartyName: entry.counterpartyName || '',
+      notes: entry.notes || '',
+      employeeId: entry.employeeId || ''
+    });
+    setIsEditQuickEntryDialogOpen(true);
+  };
+
+  const updateQuickEntryMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: any }) => {
+      const res = await fetch(`/api/employee-portal/quick-entries/${data.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data.updates),
+      });
+      if (!res.ok) throw new Error('Failed to update quick entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/hr/quick-entries/pending'] });
+      setIsEditQuickEntryDialogOpen(false);
+      toast({ title: 'Quick entry updated successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update quick entry', variant: 'destructive' });
+    }
+  });
+
+  const deleteQuickEntryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/employee-portal/quick-entries/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete quick entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/hr/quick-entries/pending'] });
+      toast({ title: 'Quick entry deleted successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete quick entry', variant: 'destructive' });
+    }
+  });
+
+  const handleSaveQuickEntry = () => {
+    if (!editingQuickEntry) return;
+    updateQuickEntryMutation.mutate({
+      id: editingQuickEntry.id,
+      updates: {
+        amount: editQuickEntryForm.amount,
+        direction: editQuickEntryForm.direction,
+        counterpartyName: editQuickEntryForm.counterpartyName,
+        notes: editQuickEntryForm.notes,
+        employeeId: editQuickEntryForm.employeeId
+      }
     });
   };
 
@@ -1962,14 +2044,13 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                         <TableHead>Type</TableHead>
                         <TableHead>Counterparty</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Confidence</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {pendingQuickEntries.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                             No pending quick entries to review
                           </TableCell>
                         </TableRow>
@@ -1986,12 +2067,16 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                             <TableCell>{entry.counterpartyName || '-'}</TableCell>
                             <TableCell>{entry.transactionDate ? formatDate(entry.transactionDate) : formatDate(entry.createdAt)}</TableCell>
                             <TableCell>
-                              <Badge variant={Number(entry.confidence) >= 0.8 ? 'default' : Number(entry.confidence) >= 0.5 ? 'secondary' : 'outline'}>
-                                {entry.confidence ? `${Math.round(Number(entry.confidence) * 100)}%` : 'N/A'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
                               <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => openEditQuickEntry(entry)}
+                                  data-testid={`button-edit-quick-entry-${entry.id}`}
+                                >
+                                  <Pencil className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -2006,11 +2091,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                                   size="sm"
                                   variant="outline"
                                   className="text-red-600 hover:text-red-700"
-                                  onClick={() => handleQuickEntryAction(entry, 'reject')}
-                                  data-testid={`button-reject-quick-entry-${entry.id}`}
+                                  onClick={() => deleteQuickEntryMutation.mutate(entry.id)}
+                                  data-testid={`button-delete-quick-entry-${entry.id}`}
                                 >
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Reject
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Delete
                                 </Button>
                               </div>
                             </TableCell>
@@ -2279,6 +2364,107 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
               data-testid="button-confirm-push-daybook"
             >
               {pushToDaybook.isPending ? 'Pushing...' : 'Push to Daybook'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditQuickEntryDialogOpen} onOpenChange={setIsEditQuickEntryDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit Quick Entry
+            </DialogTitle>
+            <DialogDescription>
+              Update the quick entry details or reassign to a different employee
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Reassign to Employee</Label>
+              <Select 
+                value={editQuickEntryForm.employeeId} 
+                onValueChange={(value) => setEditQuickEntryForm({ ...editQuickEntryForm, employeeId: value })}
+              >
+                <SelectTrigger data-testid="select-edit-quick-entry-employee">
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp: any) => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Change which employee this entry belongs to</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Amount (₹)</Label>
+                <Input
+                  type="number"
+                  value={editQuickEntryForm.amount}
+                  onChange={(e) => setEditQuickEntryForm({ ...editQuickEntryForm, amount: e.target.value })}
+                  placeholder="Enter amount"
+                  data-testid="input-edit-quick-entry-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select 
+                  value={editQuickEntryForm.direction} 
+                  onValueChange={(value: 'paid' | 'received') => setEditQuickEntryForm({ ...editQuickEntryForm, direction: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-quick-entry-direction">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">Paid (Expense)</SelectItem>
+                    <SelectItem value="received">Received (Income)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Counterparty / Vendor</Label>
+              <Input
+                value={editQuickEntryForm.counterpartyName}
+                onChange={(e) => setEditQuickEntryForm({ ...editQuickEntryForm, counterpartyName: e.target.value })}
+                placeholder="Vendor or person name"
+                data-testid="input-edit-quick-entry-counterparty"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={editQuickEntryForm.notes}
+                onChange={(e) => setEditQuickEntryForm({ ...editQuickEntryForm, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={2}
+                data-testid="textarea-edit-quick-entry-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditQuickEntryDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSaveQuickEntry} 
+              disabled={updateQuickEntryMutation.isPending}
+              data-testid="button-save-quick-entry"
+            >
+              {updateQuickEntryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
