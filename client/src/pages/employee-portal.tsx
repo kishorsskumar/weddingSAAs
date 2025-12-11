@@ -793,6 +793,10 @@ export default function EmployeePortal() {
   const getTabFromUrl = () => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
+      // Handle share target redirect - go directly to quick-entry tab
+      if (params.get('share-target') === 'quick-entry') {
+        return 'quick-entry';
+      }
       return params.get('tab') || 'overview';
     }
     return 'overview';
