@@ -1,4 +1,5 @@
-const CACHE_NAME = 'oak-street-quick-entry-v1';
+const CACHE_NAME = 'oak-street-quick-entry-v2';
+const CACHE_WHITELIST = [CACHE_NAME];
 
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...');
@@ -7,7 +8,21 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    Promise.all([
+      clients.claim(),
+      caches.keys().then(cacheNames => {
+        return Promise.all(
+          cacheNames.map(cacheName => {
+            if (!CACHE_WHITELIST.includes(cacheName)) {
+              console.log('[SW] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+    ])
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -16,7 +31,11 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method === 'POST' && url.pathname === '/quick-entry-share') {
     console.log('[SW] Handling share target request');
     event.respondWith(handleSharedScreenshot(event.request));
+    return;
   }
+  
+  // Don't cache anything else - let the browser handle it normally
+  // This prevents stale HTML/JS/CSS from being served
 });
 
 async function handleSharedScreenshot(request) {

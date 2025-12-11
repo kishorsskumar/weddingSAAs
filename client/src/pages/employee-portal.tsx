@@ -278,7 +278,7 @@ function QuickEntryTab() {
     const loadFromCache = async (retries = 3): Promise<boolean> => {
       for (let i = 0; i < retries; i++) {
         try {
-          const cache = await caches.open('oak-street-quick-entry-v1');
+          const cache = await caches.open('oak-street-quick-entry-v2');
           const response = await cache.match('shared-screenshot');
           if (response) {
             const blob = await response.blob();
