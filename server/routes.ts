@@ -2612,12 +2612,20 @@ export async function registerRoutes(
         targetEmployeeId = req.body.employeeId;
       }
       
-      // If superadmin has no employee profile and didn't specify one, require employeeId
+      // If superadmin has no employee profile, create a placeholder entry that can be reassigned later
+      // For regular users, require employee profile
       if (!targetEmployeeId) {
         if (isSuperadmin) {
-          return res.status(400).json({ error: 'Please specify an employee for this entry' });
+          // Get first employee to use as placeholder - superadmin can reassign later
+          const allEmployees = await storage.getAllEmployees();
+          if (allEmployees.length > 0) {
+            targetEmployeeId = allEmployees[0].id;
+          } else {
+            return res.status(400).json({ error: 'No employees found. Please create an employee first.' });
+          }
+        } else {
+          return res.status(404).json({ error: 'Employee profile not found' });
         }
-        return res.status(404).json({ error: 'Employee profile not found' });
       }
       
       const entry = await storage.createQuickEntry({
