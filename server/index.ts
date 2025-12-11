@@ -69,11 +69,11 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Redirect non-www to www in production
+// Redirect non-www to www (always, for custom domain)
 app.use((req, res, next) => {
-  const host = req.hostname || req.headers.host || "";
-  // Only redirect in production and if not already www
-  if (process.env.NODE_ENV === "production" && host === "oakstreetevent.com") {
+  const host = (req.hostname || req.headers.host || "").split(':')[0];
+  // Redirect non-www to www for custom domain
+  if (host === "oakstreetevent.com") {
     return res.redirect(301, `https://www.oakstreetevent.com${req.originalUrl}`);
   }
   next();
