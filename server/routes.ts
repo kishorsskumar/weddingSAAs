@@ -6695,7 +6695,7 @@ export async function registerRoutes(
       const events = await storage.getAllEvents();
       const employees = await storage.getAllEmployees();
       const banks = await storage.getAllBanks();
-      const daybookCategories = await storage.getDaybookCategories();
+      const daybookCategories = await storage.getAllDaybookCategories();
       
       // Calculate daybook summary for current month
       const now = new Date();
