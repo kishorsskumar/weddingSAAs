@@ -6406,5 +6406,170 @@ export async function registerRoutes(
     res.redirect(303, '/employee-portal?share-error=true&msg=Service+worker+not+active');
   });
 
+  // =============================================
+  // Calendar Integration Routes
+  // =============================================
+
+  // Check Google Calendar connection status
+  app.get('/api/calendar/google/status', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { isGoogleCalendarConnected } = await import('./google-calendar');
+      const connected = await isGoogleCalendarConnected();
+      res.json({ connected });
+    } catch (error) {
+      res.json({ connected: false });
+    }
+  });
+
+  // List Google Calendars
+  app.get('/api/calendar/google/calendars', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { listCalendars } = await import('./google-calendar');
+      const calendars = await listCalendars();
+      res.json(calendars);
+    } catch (error: any) {
+      console.error('[Calendar] Error listing calendars:', error);
+      res.status(500).json({ error: error.message || 'Failed to list calendars' });
+    }
+  });
+
+  // Sync a single event to Google Calendar
+  app.post('/api/calendar/google/sync/:eventId', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { syncEventToGoogleCalendar } = await import('./google-calendar');
+      const event = await storage.getEvent(req.params.eventId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
+      const calendarId = req.body.calendarId || 'primary';
+      const result = await syncEventToGoogleCalendar({
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        time: event.time,
+        venue: event.venue,
+        customer: event.customer,
+        type: event.type,
+        planner: event.planner,
+        googleCalendarEventId: event.googleCalendarEventId,
+      }, calendarId);
+
+      // Update the event with the Google Calendar event ID
+      await storage.updateEvent(event.id, {
+        googleCalendarEventId: result.googleEventId
+      });
+
+      res.json({ 
+        success: true, 
+        action: result.action,
+        googleEventId: result.googleEventId 
+      });
+    } catch (error: any) {
+      console.error('[Calendar] Sync error:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync event' });
+    }
+  });
+
+  // Bulk sync all events to Google Calendar
+  app.post('/api/calendar/google/sync-all', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { syncEventToGoogleCalendar, isGoogleCalendarConnected } = await import('./google-calendar');
+      
+      const connected = await isGoogleCalendarConnected();
+      if (!connected) {
+        return res.status(400).json({ error: 'Google Calendar not connected' });
+      }
+
+      const events = await storage.getEvents();
+      const calendarId = req.body.calendarId || 'primary';
+      const results = { synced: 0, failed: 0, errors: [] as string[] };
+
+      for (const event of events) {
+        try {
+          const result = await syncEventToGoogleCalendar({
+            id: event.id,
+            title: event.title,
+            date: event.date,
+            time: event.time,
+            venue: event.venue,
+            customer: event.customer,
+            type: event.type,
+            planner: event.planner,
+            googleCalendarEventId: event.googleCalendarEventId,
+          }, calendarId);
+
+          await storage.updateEvent(event.id, {
+            googleCalendarEventId: result.googleEventId
+          });
+          results.synced++;
+        } catch (error: any) {
+          results.failed++;
+          results.errors.push(`${event.title}: ${error.message}`);
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      console.error('[Calendar] Bulk sync error:', error);
+      res.status(500).json({ error: error.message || 'Failed to sync events' });
+    }
+  });
+
+  // Delete event from Google Calendar
+  app.delete('/api/calendar/google/event/:eventId', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const event = await storage.getEvent(req.params.eventId);
+      if (!event || !event.googleCalendarEventId) {
+        return res.status(404).json({ error: 'Event not synced to Google Calendar' });
+      }
+
+      const { deleteGoogleCalendarEvent } = await import('./google-calendar');
+      const calendarId = req.body.calendarId || 'primary';
+      await deleteGoogleCalendarEvent(event.googleCalendarEventId, calendarId);
+
+      // Clear the Google Calendar event ID
+      await storage.updateEvent(event.id, {
+        googleCalendarEventId: null
+      });
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Calendar] Delete error:', error);
+      res.status(500).json({ error: error.message || 'Failed to delete event from calendar' });
+    }
+  });
+
+  // Get Google Calendar events
+  app.get('/api/calendar/google/events', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { getGoogleCalendarEvents } = await import('./google-calendar');
+      const calendarId = (req.query.calendarId as string) || 'primary';
+      const events = await getGoogleCalendarEvents(calendarId);
+      res.json(events);
+    } catch (error: any) {
+      console.error('[Calendar] Get events error:', error);
+      res.status(500).json({ error: error.message || 'Failed to get calendar events' });
+    }
+  });
+
   return httpServer;
 }

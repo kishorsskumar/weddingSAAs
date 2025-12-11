@@ -274,7 +274,7 @@ export async function getGoogleCalendarEvents(
     maxResults,
     singleEvents: true,
     orderBy: 'startTime',
-  });
+  } as any);
 
-  return response.data.items || [];
+  return (response as any).data?.items || [];
 }
