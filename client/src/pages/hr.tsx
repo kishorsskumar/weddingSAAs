@@ -408,12 +408,22 @@ export default function HR() {
         employeeId: employee.employeeId,
         name: employee.name,
         designation: employee.designation,
+        department: employee.department || '',
         salary: employee.salary,
         dateOfBirth: employee.dateOfBirth || '',
         joinDate: employee.joinDate,
+        contractRenewalDate: employee.contractRenewalDate || '',
         leaveDate: employee.leaveDate || '',
         address: employee.address,
         emergencyContact: employee.emergencyContact,
+        phone: employee.phone || '',
+        email: employee.email || '',
+        bankAccountNumber: employee.bankAccountNumber || '',
+        bankIfscCode: employee.bankIfscCode || '',
+        panNumber: employee.panNumber || '',
+        totalLeavesPerYear: employee.totalLeavesPerYear || 24,
+        duties: employee.duties || '',
+        responsibilities: employee.responsibilities || '',
       }
     });
     const [photoUrl, setPhotoUrl] = useState<string | null>(employee.photoUrl || null);
@@ -421,17 +431,24 @@ export default function HR() {
 
     const onSubmit = (data: any) => {
       const submitData = { ...data, photoUrl };
-      if (!submitData.leaveDate) {
-        submitData.leaveDate = null;
-      }
-      if (!submitData.dateOfBirth) {
-        submitData.dateOfBirth = null;
-      }
+      submitData.salary = String(submitData.salary);
+      submitData.totalLeavesPerYear = submitData.totalLeavesPerYear ? Number(submitData.totalLeavesPerYear) : null;
+      if (!submitData.leaveDate) submitData.leaveDate = null;
+      if (!submitData.dateOfBirth) submitData.dateOfBirth = null;
+      if (!submitData.contractRenewalDate) submitData.contractRenewalDate = null;
+      if (!submitData.department) submitData.department = null;
+      if (!submitData.phone) submitData.phone = null;
+      if (!submitData.email) submitData.email = null;
+      if (!submitData.bankAccountNumber) submitData.bankAccountNumber = null;
+      if (!submitData.bankIfscCode) submitData.bankIfscCode = null;
+      if (!submitData.panNumber) submitData.panNumber = null;
+      if (!submitData.duties) submitData.duties = null;
+      if (!submitData.responsibilities) submitData.responsibilities = null;
       updateMutation.mutate({ id: employee.id, data: submitData });
     };
 
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
         <div className="flex justify-center py-2">
           <PhotoUploader 
             currentPhotoUrl={photoUrl} 
@@ -440,44 +457,122 @@ export default function HR() {
           />
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Employee ID</Label>
-            <Input {...register("employeeId")} required data-testid="input-edit-employee-id" />
-          </div>
-          <div className="space-y-2">
-            <Label>Name</Label>
-            <Input {...register("name")} required data-testid="input-edit-name" />
-          </div>
-          <div className="space-y-2">
-            <Label>Date of Birth</Label>
-            <Input type="date" {...register("dateOfBirth")} data-testid="input-edit-date-of-birth" />
-          </div>
-          <div className="space-y-2">
-            <Label>Designation</Label>
-            <Input {...register("designation")} required data-testid="input-edit-designation" />
-          </div>
-          <div className="space-y-2">
-            <Label>Salary (₹)</Label>
-            <Input type="number" {...register("salary")} required data-testid="input-edit-salary" />
-          </div>
-          <div className="space-y-2">
-            <Label>Joining Date</Label>
-            <Input type="date" {...register("joinDate")} required data-testid="input-edit-join-date" />
-          </div>
-          <div className="space-y-2">
-            <Label>Date of Leaving</Label>
-            <Input type="date" {...register("leaveDate")} data-testid="input-edit-leave-date" />
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground border-b pb-2">Basic Information</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Employee ID</Label>
+              <Input {...register("employeeId")} required data-testid="input-edit-employee-id" />
+            </div>
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input {...register("name")} required data-testid="input-edit-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Birth</Label>
+              <Input type="date" {...register("dateOfBirth")} data-testid="input-edit-date-of-birth" />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation</Label>
+              <Input {...register("designation")} required data-testid="input-edit-designation" />
+            </div>
+            <div className="space-y-2">
+              <Label>Department</Label>
+              <Input {...register("department")} data-testid="input-edit-department" placeholder="e.g., Production, Marketing" />
+            </div>
+            <div className="space-y-2">
+              <Label>Salary (₹)</Label>
+              <Input type="number" {...register("salary")} required data-testid="input-edit-salary" />
+            </div>
           </div>
         </div>
-        <div className="space-y-2">
-          <Label>Address</Label>
-          <Input {...register("address")} required data-testid="input-edit-address" />
+
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground border-b pb-2">Employment Dates</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Joining Date</Label>
+              <Input type="date" {...register("joinDate")} required data-testid="input-edit-join-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Contract Renewal Date</Label>
+              <Input type="date" {...register("contractRenewalDate")} data-testid="input-edit-contract-renewal" />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Leaving</Label>
+              <Input type="date" {...register("leaveDate")} data-testid="input-edit-leave-date" />
+            </div>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label>Emergency Contact</Label>
-          <Input {...register("emergencyContact")} required data-testid="input-edit-emergency-contact" />
+
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground border-b pb-2">Contact Information</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input {...register("phone")} data-testid="input-edit-phone" placeholder="Mobile number" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" {...register("email")} data-testid="input-edit-email" placeholder="Email address" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Address</Label>
+              <Input {...register("address")} required data-testid="input-edit-address" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Emergency Contact</Label>
+              <Input {...register("emergencyContact")} required data-testid="input-edit-emergency-contact" />
+            </div>
+          </div>
         </div>
+
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground border-b pb-2">Bank & Tax Details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Bank Account Number</Label>
+              <Input {...register("bankAccountNumber")} data-testid="input-edit-bank-account" />
+            </div>
+            <div className="space-y-2">
+              <Label>IFSC Code</Label>
+              <Input {...register("bankIfscCode")} data-testid="input-edit-ifsc" />
+            </div>
+            <div className="space-y-2">
+              <Label>PAN Number</Label>
+              <Input {...register("panNumber")} data-testid="input-edit-pan" />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h4 className="font-semibold text-sm text-muted-foreground border-b pb-2">Leave & Duties</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Total Leaves Per Year</Label>
+              <Input type="number" {...register("totalLeavesPerYear")} data-testid="input-edit-leaves" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Duties</Label>
+            <textarea 
+              {...register("duties")} 
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="input-edit-duties"
+              placeholder="Job duties..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Responsibilities</Label>
+            <textarea 
+              {...register("responsibilities")} 
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="input-edit-responsibilities"
+              placeholder="Key responsibilities..."
+            />
+          </div>
+        </div>
+
         <Button type="submit" className="w-full" disabled={updateMutation.isPending} data-testid="button-save-employee">
           {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
         </Button>
@@ -531,7 +626,7 @@ export default function HR() {
                               <Pencil className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                          <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Edit Employee</DialogTitle>
                             </DialogHeader>

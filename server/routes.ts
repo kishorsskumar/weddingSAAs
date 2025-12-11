@@ -2239,6 +2239,7 @@ export async function registerRoutes(
         expenses,
       });
     } catch (error) {
+      console.error('[Employee Portal View Error]', error);
       res.status(500).json({ error: 'Failed to get employee data' });
     }
   });
