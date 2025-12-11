@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUploader } from "@/components/PhotoUploader";
@@ -1341,8 +1342,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     direction: 'paid' as 'paid' | 'received',
     counterpartyName: '',
     notes: '',
-    employeeId: ''
+    employeeId: '',
+    eventId: ''
   });
+  const [editEventSearch, setEditEventSearch] = useState('');
+  const [editEventOpen, setEditEventOpen] = useState(false);
 
   const { data: events = [] } = useQuery<any[]>({
     queryKey: ['/api/events'],
@@ -1656,8 +1660,10 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
       direction: entry.direction || 'paid',
       counterpartyName: entry.counterpartyName || '',
       notes: entry.notes || '',
-      employeeId: entry.employeeId || ''
+      employeeId: entry.employeeId || '',
+      eventId: entry.eventId || ''
     });
+    setEditEventSearch('');
     setIsEditQuickEntryDialogOpen(true);
   };
 
@@ -1707,7 +1713,8 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
         direction: editQuickEntryForm.direction,
         counterpartyName: editQuickEntryForm.counterpartyName,
         notes: editQuickEntryForm.notes,
-        employeeId: editQuickEntryForm.employeeId
+        employeeId: editQuickEntryForm.employeeId,
+        eventId: editQuickEntryForm.eventId || null
       }
     });
   };
@@ -2426,6 +2433,70 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Link to Event (Optional)</Label>
+              <Popover open={editEventOpen} onOpenChange={setEditEventOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={editEventOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="combobox-edit-quick-entry-event"
+                  >
+                    {editQuickEntryForm.eventId
+                      ? events.find((e: any) => e.id === editQuickEntryForm.eventId)?.clientName || 'Select event...'
+                      : 'No event linked'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={editEventSearch}
+                      onValueChange={setEditEventSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setEditQuickEntryForm({ ...editQuickEntryForm, eventId: '' });
+                            setEditEventOpen(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", !editQuickEntryForm.eventId ? "opacity-100" : "opacity-0")} />
+                          No event linked
+                        </CommandItem>
+                        {events
+                          .filter((event: any) => 
+                            event.clientName?.toLowerCase().includes(editEventSearch.toLowerCase()) ||
+                            event.venue?.toLowerCase().includes(editEventSearch.toLowerCase())
+                          )
+                          .slice(0, 50)
+                          .map((event: any) => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.id}
+                              onSelect={() => {
+                                setEditQuickEntryForm({ ...editQuickEntryForm, eventId: event.id });
+                                setEditEventOpen(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", editQuickEntryForm.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                              {event.clientName} - {event.venue ? event.venue : 'No venue'}
+                            </CommandItem>
+                          ))
+                        }
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">Link this entry to an event for better tracking</p>
             </div>
             <div className="space-y-2">
               <Label>Counterparty / Vendor</Label>
