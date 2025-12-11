@@ -1502,6 +1502,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const [selectedExpenseForDaybook, setSelectedExpenseForDaybook] = useState<any>(null);
   const [daybookEventId, setDaybookEventId] = useState<string>('');
   const [daybookCategory, setDaybookCategory] = useState<string>('');
+  const [daybookBankId, setDaybookBankId] = useState<string>('');
   const [daybookEventSearch, setDaybookEventSearch] = useState('');
   const [daybookEventOpen, setDaybookEventOpen] = useState(false);
   const [isEditQuickEntryDialogOpen, setIsEditQuickEntryDialogOpen] = useState(false);
@@ -1708,11 +1709,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   });
 
   const pushToDaybook = useMutation({
-    mutationFn: async ({ id, type, eventId, category }: { id: string; type: string; eventId?: string; category?: string }) => {
+    mutationFn: async ({ id, type, eventId, category, bankId }: { id: string; type: string; eventId?: string; category?: string; bankId?: string }) => {
       const res = await fetch(`/api/admin/approved-payouts/${id}/push-to-daybook`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, eventId, category }),
+        body: JSON.stringify({ type, eventId, category, bankId }),
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to push to daybook');
@@ -1721,11 +1722,13 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/approved-payouts'] });
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
       toast({ title: 'Pushed to daybook successfully' });
       setIsDaybookDialogOpen(false);
       setSelectedExpenseForDaybook(null);
       setDaybookEventId('');
       setDaybookCategory('');
+      setDaybookBankId('');
     },
     onError: () => {
       toast({ title: 'Failed to push to daybook', variant: 'destructive' });
@@ -1736,6 +1739,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     setSelectedExpenseForDaybook(payout);
     setDaybookCategory(payout.category || '');
     setDaybookEventId('');
+    setDaybookBankId('');
     setIsDaybookDialogOpen(true);
   };
 
@@ -1746,6 +1750,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
       type: selectedExpenseForDaybook.type,
       eventId: daybookEventId || undefined,
       category: daybookCategory || undefined,
+      bankId: daybookBankId || undefined,
     });
   };
 
@@ -2529,6 +2534,23 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Bank Account (Optional)</Label>
+              <Select value={daybookBankId} onValueChange={setDaybookBankId}>
+                <SelectTrigger data-testid="select-daybook-bank">
+                  <SelectValue placeholder="Select bank for payment..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Cash / No Bank</SelectItem>
+                  {banks.map((bank: any) => (
+                    <SelectItem key={bank.id} value={bank.id}>
+                      {bank.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Bank balance will be deducted if selected</p>
             </div>
           </div>
           <DialogFooter>

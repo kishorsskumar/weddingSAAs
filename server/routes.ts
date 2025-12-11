@@ -3619,7 +3619,7 @@ export async function registerRoutes(
     const auth = await verifyAdminAccess(req, res);
     if (!auth) return;
     try {
-      const { type, eventId, category } = req.body;
+      const { type, eventId, category, bankId } = req.body;
       const recordId = req.params.id;
       
       // Server-side validation: verify the record exists and matches the claimed type
@@ -3652,9 +3652,19 @@ export async function registerRoutes(
           type: 'expense',
           amount: String(expense.amount),
           category: category || expense.category || 'Other Expenses',
-          bankId: null,
+          bankId: bankId || null,
           eventId: eventId || null
         });
+        
+        // Update bank balance if bank is selected
+        if (bankId) {
+          const bank = await storage.getBank(bankId);
+          if (bank) {
+            const amount = parseFloat(String(expense.amount));
+            const newBalance = parseFloat(bank.balance) - amount;
+            await storage.updateBank(bankId, { balance: newBalance.toString() });
+          }
+        }
         
         // Mark as paid after successful daybook entry
         await storage.updateExpenseReimbursement(recordId, {
@@ -3673,9 +3683,19 @@ export async function registerRoutes(
           type: 'expense',
           amount: String(advance.amount),
           category: category || 'Salary Advance',
-          bankId: null,
+          bankId: bankId || null,
           eventId: eventId || null
         });
+        
+        // Update bank balance if bank is selected
+        if (bankId) {
+          const bank = await storage.getBank(bankId);
+          if (bank) {
+            const amount = parseFloat(String(advance.amount));
+            const newBalance = parseFloat(bank.balance) - amount;
+            await storage.updateBank(bankId, { balance: newBalance.toString() });
+          }
+        }
         
         // Mark as paid after successful daybook entry
         await storage.updateSalaryAdvanceRequest(recordId, {
