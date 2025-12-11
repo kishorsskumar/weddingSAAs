@@ -723,14 +723,14 @@ function QuickEntryTab() {
             <div className="space-y-2">
               <Label htmlFor="edit-event">Related Event (Optional)</Label>
               <Select
-                value={editForm.eventId}
-                onValueChange={(value) => setEditForm({ ...editForm, eventId: value })}
+                value={editForm.eventId || "none"}
+                onValueChange={(value) => setEditForm({ ...editForm, eventId: value === "none" ? "" : value })}
               >
                 <SelectTrigger data-testid="select-edit-event">
                   <SelectValue placeholder="Select an event (if applicable)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No event</SelectItem>
+                  <SelectItem value="none">No event</SelectItem>
                   {events.map((event) => (
                     <SelectItem key={event.id} value={event.id}>
                       {event.eventName} - {formatDate(event.eventDate)}
