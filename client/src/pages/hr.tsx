@@ -222,10 +222,22 @@ export default function HR() {
       if (!res.ok) throw new Error('Failed to update employee');
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      const empName = result?.name || editingEmployee?.name || 'Employee';
       setEditingEmployee(null);
+      toast({
+        title: "Employee Updated",
+        description: `${empName} has been updated successfully.`,
+      });
     },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update employee",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const deleteMutation = useMutation({
@@ -249,8 +261,10 @@ export default function HR() {
   };
 
   const AddEmployeeForm = () => {
-    const { register, handleSubmit, watch, setValue } = useForm<Partial<Employee>>();
+    const { register, handleSubmit, watch, setValue, getValues } = useForm<Partial<Employee>>();
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [pendingData, setPendingData] = useState<any>(null);
     const employeeName = watch("name") || "";
     
     const onSubmit = (data: any) => {
@@ -261,71 +275,130 @@ export default function HR() {
       if (!submitData.employeeId) {
         delete submitData.employeeId;
       }
-      createMutation.mutate(submitData);
+      setPendingData(submitData);
+      setShowConfirmDialog(true);
+    };
+
+    const confirmCreate = () => {
+      if (pendingData) {
+        createMutation.mutate(pendingData);
+        setShowConfirmDialog(false);
+        setPendingData(null);
+      }
     };
 
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
-          <p className="text-blue-700 dark:text-blue-300">
-            Employee ID and password will be automatically generated. You can share the login credentials with the employee after creation.
-          </p>
-        </div>
-        
-        <div className="flex justify-center py-2">
-          <PhotoUploader 
-            currentPhotoUrl={photoUrl} 
-            onPhotoChange={setPhotoUrl}
-            name={employeeName}
-          />
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2 sm:col-span-2">
-            <Label>Name *</Label>
-            <Input {...register("name")} required placeholder="Full Name" data-testid="input-name" />
+      <>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
+            <p className="text-blue-700 dark:text-blue-300">
+              Employee ID and password will be automatically generated. You can share the login credentials with the employee after creation.
+            </p>
+          </div>
+          
+          <div className="flex justify-center py-2">
+            <PhotoUploader 
+              currentPhotoUrl={photoUrl} 
+              onPhotoChange={setPhotoUrl}
+              name={employeeName}
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Name *</Label>
+              <Input {...register("name")} required placeholder="Full Name" data-testid="input-name" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email (for portal login)</Label>
+              <Input type="email" {...register("email")} placeholder="employee@example.com (optional)" data-testid="input-email" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input {...register("phone")} placeholder="Phone Number (optional)" data-testid="input-phone" />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Birth</Label>
+              <Input type="date" {...register("dateOfBirth")} data-testid="input-date-of-birth" />
+            </div>
+            <div className="space-y-2">
+              <Label>Designation *</Label>
+              <Input {...register("designation")} required placeholder="e.g. Wedding Planner" data-testid="input-designation" />
+            </div>
+            <div className="space-y-2">
+              <Label>Salary (₹) *</Label>
+              <Input type="number" {...register("salary")} required placeholder="0" data-testid="input-salary" />
+            </div>
+            <div className="space-y-2">
+              <Label>Joining Date *</Label>
+              <Input type="date" {...register("joinDate")} required data-testid="input-join-date" />
+            </div>
+            <div className="space-y-2">
+              <Label>Contract Renewal Date</Label>
+              <Input type="date" {...register("contractRenewalDate")} data-testid="input-contract-renewal" />
+            </div>
           </div>
           <div className="space-y-2">
-            <Label>Email (for portal login)</Label>
-            <Input type="email" {...register("email")} placeholder="employee@example.com (optional)" data-testid="input-email" />
+            <Label>Address *</Label>
+            <Input {...register("address")} required placeholder="Full Address" data-testid="input-address" />
           </div>
           <div className="space-y-2">
-            <Label>Phone</Label>
-            <Input {...register("phone")} placeholder="Phone Number (optional)" data-testid="input-phone" />
+            <Label>Emergency Contact *</Label>
+            <Input {...register("emergencyContact")} required placeholder="Emergency Contact Number" data-testid="input-emergency-contact" />
           </div>
-          <div className="space-y-2">
-            <Label>Date of Birth</Label>
-            <Input type="date" {...register("dateOfBirth")} data-testid="input-date-of-birth" />
-          </div>
-          <div className="space-y-2">
-            <Label>Designation *</Label>
-            <Input {...register("designation")} required placeholder="e.g. Wedding Planner" data-testid="input-designation" />
-          </div>
-          <div className="space-y-2">
-            <Label>Salary (₹) *</Label>
-            <Input type="number" {...register("salary")} required placeholder="0" data-testid="input-salary" />
-          </div>
-          <div className="space-y-2">
-            <Label>Joining Date *</Label>
-            <Input type="date" {...register("joinDate")} required data-testid="input-join-date" />
-          </div>
-          <div className="space-y-2">
-            <Label>Contract Renewal Date</Label>
-            <Input type="date" {...register("contractRenewalDate")} data-testid="input-contract-renewal" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Address *</Label>
-          <Input {...register("address")} required placeholder="Full Address" data-testid="input-address" />
-        </div>
-        <div className="space-y-2">
-          <Label>Emergency Contact *</Label>
-          <Input {...register("emergencyContact")} required placeholder="Emergency Contact Number" data-testid="input-emergency-contact" />
-        </div>
-        <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-employee">
-          {createMutation.isPending ? 'Creating...' : 'Create Employee with Portal Access'}
-        </Button>
-      </form>
+          <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-submit-employee">
+            {createMutation.isPending ? 'Creating...' : 'Create Employee with Portal Access'}
+          </Button>
+        </form>
+
+        {/* Confirmation Dialog */}
+        <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Confirm Employee Creation</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to create this new employee?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Name:</span>
+                <span className="font-medium">{pendingData?.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Designation:</span>
+                <span className="font-medium">{pendingData?.designation}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Salary:</span>
+                <span className="font-medium">₹{Number(pendingData?.salary || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Join Date:</span>
+                <span className="font-medium">{pendingData?.joinDate}</span>
+              </div>
+            </div>
+            <DialogFooter className="flex gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setShowConfirmDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={confirmCreate} disabled={createMutation.isPending} className="gap-2">
+                {createMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Confirm & Create
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   };
 
@@ -462,7 +535,7 @@ export default function HR() {
                             <DialogHeader>
                               <DialogTitle>Edit Employee</DialogTitle>
                             </DialogHeader>
-                            <EditEmployeeForm employee={emp} />
+                            <EditEmployeeForm key={emp.id} employee={emp} />
                           </DialogContent>
                         </Dialog>
                         <Button 
