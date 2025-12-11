@@ -183,6 +183,7 @@ export default function HR() {
       const res = await fetch('/api/employees/with-credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
       if (!res.ok) {

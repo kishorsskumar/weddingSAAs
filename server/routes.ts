@@ -1249,6 +1249,9 @@ export async function registerRoutes(
 
   // Create employee with auto-generated credentials
   app.post('/api/employees/with-credentials', async (req, res) => {
+    const auth = await verifyAdminAccess(req, res);
+    if (!auth) return;
+    
     try {
       const data = insertEmployeeSchema.parse(req.body);
       
