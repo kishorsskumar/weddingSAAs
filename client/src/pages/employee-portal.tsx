@@ -1308,6 +1308,22 @@ export default function EmployeePortal() {
               </CardContent>
             </Card>
 
+            {/* Quick Entry Tab for Admin */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Quick Entry - Upload Expense Screenshots
+                </CardTitle>
+                <CardDescription>
+                  Upload payment screenshots and let AI extract the details automatically
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QuickEntryTab />
+              </CardContent>
+            </Card>
+
             {/* Viewed Employee Dialog */}
             <Dialog open={!!selectedEmployeeId} onOpenChange={(open) => !open && setSelectedEmployeeId(null)}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
