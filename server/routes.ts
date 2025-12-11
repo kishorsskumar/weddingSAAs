@@ -6694,6 +6694,8 @@ export async function registerRoutes(
       // Build context for AI
       const events = await storage.getAllEvents();
       const employees = await storage.getAllEmployees();
+      const banks = await storage.getAllBanks();
+      const daybookCategories = await storage.getDaybookCategories();
       
       // Calculate daybook summary for current month
       const now = new Date();
@@ -6714,6 +6716,8 @@ export async function registerRoutes(
         department: conversation.department || undefined,
         events,
         employees,
+        banks,
+        daybookCategories,
         daybookSummary: {
           totalIncome,
           totalExpense,
@@ -6721,30 +6725,31 @@ export async function registerRoutes(
         },
       };
 
-      // Generate AI response
+      // Generate AI response with potential actions
       const { generateOaksyResponse, generateConversationTitle } = await import('./oaksy-ai');
-      const aiResponse = await generateOaksyResponse(
+      const aiResult = await generateOaksyResponse(
         req.params.id,
         content,
         context,
         conversation.department || 'general'
       );
 
-      // Save AI response
+      // Save AI response with action metadata
       const assistantMessage = await storage.createOaksyMessage({
         conversationId: req.params.id,
         role: 'assistant',
-        content: aiResponse,
+        content: aiResult.response,
+        metadata: aiResult.actions && aiResult.actions.length > 0 ? { actions: aiResult.actions } : null,
       });
 
       // Update conversation title if this is the first message
-      const messages = await storage.getOaksyMessages(req.params.id);
-      if (messages.length <= 2 && !conversation.title) {
+      const allMessages = await storage.getOaksyMessages(req.params.id);
+      if (allMessages.length <= 2 && !conversation.title) {
         const title = await generateConversationTitle(content);
         await storage.updateOaksyConversation(req.params.id, { title });
       }
 
-      res.json(assistantMessage);
+      res.json({ ...assistantMessage, actions: aiResult.actions });
     } catch (error: any) {
       console.error('[Oaksy] Send message error:', error);
       res.status(500).json({ error: error.message || 'Failed to send message' });

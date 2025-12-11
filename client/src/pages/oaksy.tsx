@@ -22,16 +22,28 @@ import {
   Mic,
   MicOff,
   Sparkles,
-  TreeDeciduous
+  TreeDeciduous,
+  CheckCircle2,
+  FileText,
+  Calendar,
+  Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+
+interface OaksyAction {
+  type: string;
+  data: any;
+  success: boolean;
+  message: string;
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   inputType?: string;
+  metadata?: { actions?: OaksyAction[] };
   createdAt: string;
 }
 
@@ -134,10 +146,20 @@ export default function OaksyPage() {
       if (!res.ok) throw new Error("Failed to send message");
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/oaksy/conversations", activeConversationId] });
       queryClient.invalidateQueries({ queryKey: ["/api/oaksy/conversations"] });
       setInputMessage("");
+      
+      if (data.actions && data.actions.length > 0) {
+        const successActions = data.actions.filter((a: any) => a.success);
+        if (successActions.length > 0) {
+          toast({
+            title: "Action Completed",
+            description: successActions.map((a: any) => a.message).join('\n'),
+          });
+        }
+      }
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
@@ -386,6 +408,25 @@ export default function OaksyPage() {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap" data-testid={`text-message-content-${msg.id}`}>{msg.content}</p>
+                      {msg.metadata?.actions && msg.metadata.actions.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1" data-testid={`actions-${msg.id}`}>
+                          {msg.metadata.actions.map((action, idx) => (
+                            <Badge
+                              key={idx}
+                              variant={action.success ? "default" : "destructive"}
+                              className={action.success ? "bg-[#9AAF6C] text-white" : ""}
+                              data-testid={`action-badge-${msg.id}-${idx}`}
+                            >
+                              {action.success ? (
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                              ) : null}
+                              {action.type === "create_daybook_entry" && "Entry Created"}
+                              {action.type === "create_meeting" && "Meeting Scheduled"}
+                              {action.type === "create_event" && "Event Created"}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       <p className={`text-xs mt-1 ${msg.role === "user" ? "text-white/70" : "text-muted-foreground"}`} data-testid={`text-message-time-${msg.id}`}>
                         {format(new Date(msg.createdAt), "h:mm a")}
                       </p>
