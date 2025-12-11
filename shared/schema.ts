@@ -1261,3 +1261,32 @@ export const quickEntries = pgTable("quick_entries", {
 export const insertQuickEntrySchema = createInsertSchema(quickEntries).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertQuickEntry = z.infer<typeof insertQuickEntrySchema>;
 export type QuickEntry = typeof quickEntries.$inferSelect;
+
+// Oaksy AI Assistant - Chat conversations
+export const oaksyConversations = pgTable("oaksy_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text("title"), // Auto-generated from first message
+  department: text("department"), // 'sales', 'wedding_planning', 'operations', 'accounts', 'general'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertOaksyConversationSchema = createInsertSchema(oaksyConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertOaksyConversation = z.infer<typeof insertOaksyConversationSchema>;
+export type OaksyConversation = typeof oaksyConversations.$inferSelect;
+
+// Oaksy AI Assistant - Chat messages
+export const oaksyMessages = pgTable("oaksy_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => oaksyConversations.id, { onDelete: 'cascade' }),
+  role: text("role").notNull(), // 'user' | 'assistant'
+  content: text("content").notNull(),
+  inputType: text("input_type").default('text'), // 'text' | 'voice'
+  metadata: jsonb("metadata"), // Additional data like attached documents, generated files, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOaksyMessageSchema = createInsertSchema(oaksyMessages).omit({ id: true, createdAt: true });
+export type InsertOaksyMessage = z.infer<typeof insertOaksyMessageSchema>;
+export type OaksyMessage = typeof oaksyMessages.$inferSelect;
