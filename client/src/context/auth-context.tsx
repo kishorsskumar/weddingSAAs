@@ -27,9 +27,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [_, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(true);
 
+  // Clear all caches helper
+  const clearAllCaches = async () => {
+    try {
+      queryClient.clear();
+      queryClient.removeQueries();
+      localStorage.clear();
+      sessionStorage.clear();
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+    } catch (e) {
+      console.error('Error clearing caches:', e);
+    }
+  };
+
   // Check if user is already logged in
   useEffect(() => {
-    fetch('/api/auth/me')
+    fetch('/api/auth/me', { credentials: 'include' })
       .then(res => {
         if (res.ok) return res.json();
         throw new Error('Not authenticated');
@@ -38,8 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         setAllowedPages(data.permissions);
       })
-      .catch(() => {
-        // Not logged in, that's fine
+      .catch(async () => {
+        // Not logged in - clear any stale cached data
+        await clearAllCaches();
+        setUser(null);
+        setAllowedPages([]);
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -77,9 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    // Clear all cached queries to prevent data leakage between users
-    queryClient.clear();
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    await clearAllCaches();
     setUser(null);
     setAllowedPages([]);
     setLocation("/login");

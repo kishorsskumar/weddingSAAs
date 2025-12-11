@@ -799,7 +799,14 @@ export async function registerRoutes(
   });
 
   app.post('/api/auth/logout', (req, res) => {
-    req.session.destroy(() => {
+    req.session.destroy((err) => {
+      // Clear the session cookie explicitly
+      res.clearCookie('connect.sid', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+      });
       res.json({ success: true });
     });
   });
