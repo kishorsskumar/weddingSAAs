@@ -342,44 +342,69 @@ function QuickEntryTab() {
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
+      console.log('[QuickEntry] Starting upload, file:', file.name, file.type, file.size);
+      
       // Step 1: Get upload URL
+      console.log('[QuickEntry] Step 1: Getting upload URL...');
       const uploadRes = await fetch('/api/objects/upload', { method: 'POST', credentials: 'include' });
       if (!uploadRes.ok) {
         const errData = await uploadRes.json().catch(() => ({}));
+        console.error('[QuickEntry] Step 1 failed:', uploadRes.status, errData);
         throw new Error(errData.error || 'Failed to get upload URL from server');
       }
       const { uploadURL } = await uploadRes.json();
       if (!uploadURL) throw new Error('Server did not provide upload URL');
+      console.log('[QuickEntry] Step 1 complete, got URL');
       
       // Step 2: Upload file to signed URL with Content-Type
-      const putRes = await fetch(uploadURL, { 
-        method: 'PUT', 
-        body: file,
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      });
-      if (!putRes.ok) {
-        throw new Error(`Failed to upload file to storage (${putRes.status})`);
+      console.log('[QuickEntry] Step 2: Uploading file to storage...');
+      try {
+        const putRes = await fetch(uploadURL, { 
+          method: 'PUT', 
+          body: file,
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        });
+        console.log('[QuickEntry] Step 2 response:', putRes.status, putRes.statusText);
+        if (!putRes.ok) {
+          const errText = await putRes.text().catch(() => '');
+          console.error('[QuickEntry] Step 2 failed:', putRes.status, errText);
+          throw new Error(`Failed to upload file to storage (${putRes.status})`);
+        }
+      } catch (err: any) {
+        console.error('[QuickEntry] Step 2 exception:', err.message);
+        throw new Error(`Failed to upload to storage: ${err.message}`);
       }
+      console.log('[QuickEntry] Step 2 complete');
       
       // Step 3: Finalize upload
+      console.log('[QuickEntry] Step 3: Finalizing upload...');
       const finalizeRes = await fetch('/api/objects/finalize', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uploadURL }),
         credentials: 'include',
       });
-      if (!finalizeRes.ok) throw new Error('Failed to finalize upload');
+      if (!finalizeRes.ok) {
+        console.error('[QuickEntry] Step 3 failed:', finalizeRes.status);
+        throw new Error('Failed to finalize upload');
+      }
       const { objectPath } = await finalizeRes.json();
       if (!objectPath) throw new Error('No file path received');
+      console.log('[QuickEntry] Step 3 complete, path:', objectPath);
       
       // Step 4: Create quick entry record
+      console.log('[QuickEntry] Step 4: Creating quick entry record...');
       const entryRes = await fetch('/api/employee-portal/quick-entries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filePath: objectPath, source: 'upload' }),
         credentials: 'include',
       });
-      if (!entryRes.ok) throw new Error('Failed to create quick entry');
+      if (!entryRes.ok) {
+        console.error('[QuickEntry] Step 4 failed:', entryRes.status);
+        throw new Error('Failed to create quick entry');
+      }
+      console.log('[QuickEntry] Step 4 complete');
       return entryRes.json();
     },
     onSuccess: (entry) => {

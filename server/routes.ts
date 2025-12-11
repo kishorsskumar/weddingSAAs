@@ -6350,5 +6350,12 @@ export async function registerRoutes(
     }
   });
 
+  // PWA Share Target fallback - if service worker doesn't intercept, redirect to employee portal
+  // The service worker should handle this, but this is a fallback
+  app.post("/quick-entry-share", (req, res) => {
+    console.log("[Share Target] Fallback route hit - service worker may not be active");
+    res.redirect(303, '/employee-portal?share-error=true&msg=Service+worker+not+active');
+  });
+
   return httpServer;
 }
