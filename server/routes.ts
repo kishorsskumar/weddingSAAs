@@ -2682,9 +2682,10 @@ export async function registerRoutes(
       }
       
       const updated = await storage.updateQuickEntry(req.params.id, req.body);
-      res.json(updated);
-    } catch (error) {
-      res.status(400).json({ error: 'Failed to update quick entry' });
+      res.json(updated || entry);
+    } catch (error: any) {
+      console.error('Error updating quick entry:', error);
+      res.status(400).json({ error: error.message || 'Failed to update quick entry' });
     }
   });
 

@@ -475,10 +475,15 @@ function QuickEntryTab() {
 
   const updateEntryMutation = useMutation({
     mutationFn: async (data: { id: string; updates: typeof editForm }) => {
+      const payload = {
+        ...data.updates,
+        eventId: data.updates.eventId || null,
+        status: 'awaiting_review',
+      };
       const res = await fetch(`/api/employee-portal/quick-entries/${data.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data.updates),
+        body: JSON.stringify(payload),
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to update entry');
