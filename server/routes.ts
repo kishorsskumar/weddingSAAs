@@ -2636,6 +2636,34 @@ export async function registerRoutes(
     }
   });
 
+  // PUT endpoint (alias for PATCH) for updating quick entries
+  app.put('/api/employee-portal/quick-entries/:id', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      const employee = await storage.getEmployeeByUserId(userId);
+      const isSuperadmin = user?.role === 'superadmin';
+      
+      const entry = await storage.getQuickEntry(req.params.id);
+      if (!entry) {
+        return res.status(404).json({ error: 'Quick entry not found' });
+      }
+      
+      // Only owner or superadmin can edit
+      if (!isSuperadmin && (!employee || entry.employeeId !== employee.id)) {
+        return res.status(403).json({ error: 'Not authorized' });
+      }
+      
+      const updated = await storage.updateQuickEntry(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update quick entry' });
+    }
+  });
+
   app.delete('/api/employee-portal/quick-entries/:id', async (req, res) => {
     const userId = (req.session as any).userId;
     if (!userId) {

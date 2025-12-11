@@ -269,9 +269,28 @@ function QuickEntryTab() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<QuickEntry | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    amount: '',
+    counterpartyName: '',
+    eventId: '',
+    notes: '',
+    direction: 'paid' as 'paid' | 'received',
+  });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Fetch events for the dropdown
+  const { data: events = [] } = useQuery<{ id: string; eventName: string; eventDate: string }[]>({
+    queryKey: ['/api/events'],
+    queryFn: async () => {
+      const res = await fetch('/api/events', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   // Handle shared screenshots from Web Share Target
   React.useEffect(() => {
@@ -427,8 +446,12 @@ function QuickEntryTab() {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to process screenshot');
-      toast({ title: "Success", description: "Screenshot processed successfully!" });
-      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/quick-entries'] });
+      const processedEntry = await res.json();
+      toast({ title: "AI Processed", description: "Review the extracted details and add any additional information" });
+      await queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/quick-entries'] });
+      
+      // Open edit dialog with processed data
+      openEditDialog(processedEntry);
     } catch (error) {
       toast({ title: "Error", description: "Failed to process screenshot. Please try again.", variant: "destructive" });
     } finally {
@@ -436,6 +459,45 @@ function QuickEntryTab() {
       setSelectedFile(null);
       setPreviewUrl(null);
     }
+  };
+
+  const openEditDialog = (entry: QuickEntry) => {
+    setEditingEntry(entry);
+    setEditForm({
+      amount: entry.amount || '',
+      counterpartyName: entry.counterpartyName || '',
+      eventId: entry.eventId || '',
+      notes: entry.notes || '',
+      direction: (entry.direction as 'paid' | 'received') || 'paid',
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const updateEntryMutation = useMutation({
+    mutationFn: async (data: { id: string; updates: typeof editForm }) => {
+      const res = await fetch(`/api/employee-portal/quick-entries/${data.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data.updates),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to update entry');
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Entry Updated", description: "Your entry has been submitted for review" });
+      queryClient.invalidateQueries({ queryKey: ['/api/employee-portal/quick-entries'] });
+      setIsEditDialogOpen(false);
+      setEditingEntry(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSaveEntry = () => {
+    if (!editingEntry) return;
+    updateEntryMutation.mutate({ id: editingEntry.id, updates: editForm });
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -558,33 +620,168 @@ function QuickEntryTab() {
                   <TableHead>Date</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Counterparty</TableHead>
+                  <TableHead>Vendor/Counterparty</TableHead>
+                  <TableHead>Event</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {quickEntries.map((entry) => (
-                  <TableRow key={entry.id} data-testid={`quick-entry-row-${entry.id}`}>
-                    <TableCell>{formatDate(entry.transactionDate || entry.createdAt)}</TableCell>
-                    <TableCell className="font-medium">
-                      {entry.amount ? formatCurrency(entry.amount) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {entry.direction === 'received' ? (
-                        <Badge variant="outline" className="text-green-600">Received</Badge>
-                      ) : entry.direction === 'paid' ? (
-                        <Badge variant="outline" className="text-red-600">Paid</Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{entry.counterpartyName || '-'}</TableCell>
-                    <TableCell>{getStatusBadge(entry.status)}</TableCell>
-                  </TableRow>
-                ))}
+                {quickEntries.map((entry) => {
+                  const eventName = events.find(e => e.id === entry.eventId)?.eventName;
+                  return (
+                    <TableRow key={entry.id} data-testid={`quick-entry-row-${entry.id}`}>
+                      <TableCell>{formatDate(entry.transactionDate || entry.createdAt)}</TableCell>
+                      <TableCell className="font-medium">
+                        {entry.amount ? formatCurrency(entry.amount) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {entry.direction === 'received' ? (
+                          <Badge variant="outline" className="text-green-600">Received</Badge>
+                        ) : entry.direction === 'paid' ? (
+                          <Badge variant="outline" className="text-red-600">Paid</Badge>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>{entry.counterpartyName || '-'}</TableCell>
+                      <TableCell className="max-w-[120px] truncate">{eventName || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(entry.status)}</TableCell>
+                      <TableCell>
+                        {(entry.status === 'awaiting_review' || entry.status === 'uploaded' || entry.status === 'processing') && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(entry)}
+                            data-testid={`button-edit-entry-${entry.id}`}
+                          >
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Entry Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Review & Edit Payment Details
+            </DialogTitle>
+            <DialogDescription>
+              Review the AI-extracted information and add any additional details before submitting for approval
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Amount (₹)</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  placeholder="Enter amount"
+                  value={editForm.amount}
+                  onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                  data-testid="input-edit-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-direction">Payment Type</Label>
+                <Select
+                  value={editForm.direction}
+                  onValueChange={(value: 'paid' | 'received') => setEditForm({ ...editForm, direction: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-direction">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="paid">Paid (Expense)</SelectItem>
+                    <SelectItem value="received">Received (Income)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-counterparty">Vendor / Counterparty Name</Label>
+              <Input
+                id="edit-counterparty"
+                placeholder="Enter vendor or person name"
+                value={editForm.counterpartyName}
+                onChange={(e) => setEditForm({ ...editForm, counterpartyName: e.target.value })}
+                data-testid="input-edit-counterparty"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-event">Related Event (Optional)</Label>
+              <Select
+                value={editForm.eventId}
+                onValueChange={(value) => setEditForm({ ...editForm, eventId: value })}
+              >
+                <SelectTrigger data-testid="select-edit-event">
+                  <SelectValue placeholder="Select an event (if applicable)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No event</SelectItem>
+                  {events.map((event) => (
+                    <SelectItem key={event.id} value={event.id}>
+                      {event.eventName} - {formatDate(event.eventDate)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes / Description</Label>
+              <Textarea
+                id="edit-notes"
+                placeholder="Add any additional notes or context..."
+                value={editForm.notes}
+                onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                rows={3}
+                data-testid="textarea-edit-notes"
+              />
+            </div>
+
+            {editingEntry?.transactionId && (
+              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                Transaction ID: {editingEntry.transactionId}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEntry} 
+              disabled={updateEntryMutation.isPending}
+              data-testid="button-save-entry"
+            >
+              {updateEntryMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Submit for Review
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
