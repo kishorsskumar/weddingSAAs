@@ -139,7 +139,7 @@ export default function HR() {
   });
 
   const currentEmployees = useMemo(() => {
-    return employees.filter(emp => !emp.leaveDate).sort((a, b) => {
+    return employees.filter(emp => emp.isActive !== false).sort((a, b) => {
       const idA = parseInt(a.employeeId.replace(/\D/g, '')) || 0;
       const idB = parseInt(b.employeeId.replace(/\D/g, '')) || 0;
       return idB - idA;
@@ -147,7 +147,7 @@ export default function HR() {
   }, [employees]);
 
   const pastEmployees = useMemo(() => {
-    return employees.filter(emp => emp.leaveDate).sort((a, b) => {
+    return employees.filter(emp => emp.isActive === false).sort((a, b) => {
       const dateA = a.leaveDate ? new Date(a.leaveDate).getTime() : 0;
       const dateB = b.leaveDate ? new Date(b.leaveDate).getTime() : 0;
       return dateB - dateA;
@@ -250,6 +250,36 @@ export default function HR() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
     },
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive, leaveDate }: { id: string; isActive: boolean; leaveDate?: string }) => {
+      const res = await fetch(`/api/admin/employees/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ isActive, leaveDate }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to update status');
+      }
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      toast({
+        title: result.isActive ? "Employee Reactivated" : "Employee Deactivated",
+        description: `${result.name} has been ${result.isActive ? 'reactivated' : 'marked as inactive'}.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update status",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
   });
 
   const formatDate = (dateStr: string | null | undefined) => {
@@ -647,6 +677,27 @@ export default function HR() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
+                        {user?.role === 'superadmin' && (
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className={isPast ? "h-8 w-8 text-green-400 hover:text-green-300 hover:bg-green-400/10" : "h-8 w-8 text-orange-400 hover:text-orange-300 hover:bg-orange-400/10"}
+                            onClick={() => {
+                              const action = isPast ? 'reactivate' : 'deactivate';
+                              if (confirm(`${isPast ? 'Reactivate' : 'Deactivate'} ${emp.name}? ${isPast ? 'They will appear in current employees.' : 'They will be moved to past employees but all data will be preserved.'}`)) {
+                                toggleStatusMutation.mutate({
+                                  id: emp.id,
+                                  isActive: isPast,
+                                  leaveDate: isPast ? undefined : new Date().toISOString().split('T')[0]
+                                });
+                              }
+                            }}
+                            title={isPast ? "Reactivate Employee" : "Deactivate Employee"}
+                            data-testid={`button-toggle-status-${emp.id}`}
+                          >
+                            {isPast ? <CheckCircle className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   )}

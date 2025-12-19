@@ -97,6 +97,7 @@ export const employees = pgTable("employees", {
   panNumber: text("pan_number"),
   totalLeavesPerYear: integer("total_leaves_per_year").default(24),
   leaveDate: date("leave_date"),
+  isActive: boolean("is_active").default(true).notNull(),
   duties: text("duties"),
   responsibilities: text("responsibilities"),
   createdAt: timestamp("created_at").defaultNow(),

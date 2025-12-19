@@ -4018,6 +4018,32 @@ export async function registerRoutes(
     }
   });
 
+  // Superadmin - Toggle employee active status
+  app.patch('/api/admin/employees/:id/status', async (req, res) => {
+    const userId = (req.session as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can change employee status' });
+      }
+      
+      const { isActive, leaveDate } = req.body;
+      const updateData: any = { isActive };
+      if (leaveDate !== undefined) {
+        updateData.leaveDate = leaveDate;
+      }
+      
+      const employee = await storage.updateEmployee(req.params.id, updateData);
+      res.json(employee);
+    } catch (error) {
+      console.error('Error updating employee status:', error);
+      res.status(400).json({ error: 'Failed to update employee status' });
+    }
+  });
+
   // Event Milestones
   app.get('/api/milestones', async (req, res) => {
     const { eventId } = req.query;

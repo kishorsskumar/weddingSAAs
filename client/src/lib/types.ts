@@ -44,6 +44,7 @@ export interface Employee {
   panNumber?: string | null;
   totalLeavesPerYear?: number;
   leaveDate?: string | null;
+  isActive?: boolean;
   duties?: string | null;
   responsibilities?: string | null;
   createdAt?: string;
