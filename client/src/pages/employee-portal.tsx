@@ -817,7 +817,7 @@ export default function EmployeePortal() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | string | null>(null);
   const [editingLeave, setEditingLeave] = useState<LeaveRequest | null>(null);
   const [editingAdvance, setEditingAdvance] = useState<SalaryAdvanceRequest | null>(null);
   const [editingExpense, setEditingExpense] = useState<ExpenseReimbursement | null>(null);
