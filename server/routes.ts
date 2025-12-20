@@ -1040,9 +1040,13 @@ export async function registerRoutes(
         return res.status(403).json({ error: 'Only Super Admin can delete Admin users' });
       }
 
+      // Delete related user permissions first
+      await storage.setUserPermissions(req.params.id, []);
+      
       await storage.deleteUser(req.params.id);
       res.json({ success: true });
     } catch (error) {
+      console.error('[User Delete Error]', error);
       res.status(400).json({ error: 'Failed to delete user' });
     }
   });

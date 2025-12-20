@@ -434,7 +434,7 @@ export default function HR() {
   };
 
   const EditEmployeeForm = ({ employee }: { employee: Employee }) => {
-    const { register, handleSubmit, watch } = useForm<Partial<Employee>>({
+    const { register, handleSubmit, watch, reset } = useForm<Partial<Employee>>({
       defaultValues: {
         employeeId: employee.employeeId,
         name: employee.name,
@@ -459,6 +459,31 @@ export default function HR() {
     });
     const [photoUrl, setPhotoUrl] = useState<string | null>(employee.photoUrl || null);
     const employeeName = watch("name") || employee.name;
+
+    useEffect(() => {
+      reset({
+        employeeId: employee.employeeId,
+        name: employee.name,
+        designation: employee.designation,
+        department: employee.department || '',
+        salary: employee.salary,
+        dateOfBirth: employee.dateOfBirth || '',
+        joinDate: employee.joinDate,
+        contractRenewalDate: employee.contractRenewalDate || '',
+        leaveDate: employee.leaveDate || '',
+        address: employee.address,
+        emergencyContact: employee.emergencyContact,
+        phone: employee.phone || '',
+        email: employee.email || '',
+        bankAccountNumber: employee.bankAccountNumber || '',
+        bankIfscCode: employee.bankIfscCode || '',
+        panNumber: employee.panNumber || '',
+        totalLeavesPerYear: employee.totalLeavesPerYear || 24,
+        duties: employee.duties || '',
+        responsibilities: employee.responsibilities || '',
+      });
+      setPhotoUrl(employee.photoUrl || null);
+    }, [employee, reset]);
 
     const onSubmit = (data: any) => {
       const submitData = { ...data, photoUrl };
