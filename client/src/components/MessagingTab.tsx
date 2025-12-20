@@ -42,6 +42,7 @@ type Employee = {
   id: string;
   name: string;
   phone: string | null;
+  whatsappNumber: string | null;
   department: string | null;
   whatsappOptIn: boolean;
 };
