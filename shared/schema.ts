@@ -100,6 +100,8 @@ export const employees = pgTable("employees", {
   isActive: boolean("is_active").default(true).notNull(),
   duties: text("duties"),
   responsibilities: text("responsibilities"),
+  whatsappOptIn: boolean("whatsapp_opt_in").default(false),
+  whatsappLastOptInAt: timestamp("whatsapp_last_opt_in_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1292,3 +1294,66 @@ export const oaksyMessages = pgTable("oaksy_messages", {
 export const insertOaksyMessageSchema = createInsertSchema(oaksyMessages).omit({ id: true, createdAt: true });
 export type InsertOaksyMessage = z.infer<typeof insertOaksyMessageSchema>;
 export type OaksyMessage = typeof oaksyMessages.$inferSelect;
+
+// WhatsApp Message Templates
+export const whatsappMessageTemplates = pgTable("whatsapp_message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+  variables: text("variables").array(), // Placeholders like {{employee_name}}, {{event_name}}, etc.
+  category: text("category").default('reminder'), // 'reminder', 'notification', 'announcement', 'custom'
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertWhatsappMessageTemplateSchema = createInsertSchema(whatsappMessageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWhatsappMessageTemplate = z.infer<typeof insertWhatsappMessageTemplateSchema>;
+export type WhatsappMessageTemplate = typeof whatsappMessageTemplates.$inferSelect;
+
+// WhatsApp Message Jobs - Scheduled or immediate message requests
+export const whatsappMessageJobs = pgTable("whatsapp_message_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").references(() => whatsappMessageTemplates.id),
+  customMessage: text("custom_message"), // For custom messages not using a template
+  targetMode: text("target_mode").notNull().default('selected'), // 'selected', 'department', 'all'
+  targetEmployeeIds: text("target_employee_ids").array(), // Array of employee IDs
+  targetDepartments: text("target_departments").array(), // Array of department names
+  variableValues: jsonb("variable_values"), // Object mapping variable names to values
+  scheduledFor: timestamp("scheduled_for"), // null means send immediately
+  status: text("status").notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed', 'cancelled'
+  requestedBy: varchar("requested_by").references(() => users.id),
+  requestedByOaksy: boolean("requested_by_oaksy").default(false),
+  oaksyConversationId: varchar("oaksy_conversation_id").references(() => oaksyConversations.id),
+  totalRecipients: integer("total_recipients").default(0),
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertWhatsappMessageJobSchema = createInsertSchema(whatsappMessageJobs).omit({ id: true, createdAt: true, processedAt: true });
+export type InsertWhatsappMessageJob = z.infer<typeof insertWhatsappMessageJobSchema>;
+export type WhatsappMessageJob = typeof whatsappMessageJobs.$inferSelect;
+
+// WhatsApp Message Logs - Individual message delivery records
+export const whatsappMessageLogs = pgTable("whatsapp_message_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => whatsappMessageJobs.id, { onDelete: 'cascade' }),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  phoneNumber: text("phone_number").notNull(),
+  messageContent: text("message_content").notNull(),
+  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'failed'
+  providerMessageId: text("provider_message_id"), // Twilio message SID
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  failedAt: timestamp("failed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWhatsappMessageLogSchema = createInsertSchema(whatsappMessageLogs).omit({ id: true, createdAt: true });
+export type InsertWhatsappMessageLog = z.infer<typeof insertWhatsappMessageLogSchema>;
+export type WhatsappMessageLog = typeof whatsappMessageLogs.$inferSelect;
