@@ -461,8 +461,16 @@ export default function Daybook() {
     const [newVendorContact, setNewVendorContact] = useState("");
     const [showNewCategory, setShowNewCategory] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState("");
+    const [categorySearchOpen, setCategorySearchOpen] = useState(false);
+    const [categorySearch, setCategorySearch] = useState("");
     
     const typeCategories = type === 'income' ? incomeCategories : expenseCategories;
+    const watchedCategory = watch("category");
+    const selectedCategory = typeCategories.find(c => c.name === watchedCategory) || null;
+    
+    const filteredCategories = typeCategories.filter(cat =>
+      cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+    );
     
     const filteredEvents = events.filter(e => 
       e.title.toLowerCase().includes(eventSearch.toLowerCase()) ||
@@ -470,6 +478,14 @@ export default function Daybook() {
     );
     
     const onSubmit = (data: any) => {
+      if (!data.category) {
+        toast({
+          title: "Category Required",
+          description: "Please select a category before submitting.",
+          variant: "destructive",
+        });
+        return;
+      }
       const submitData = {
         ...data,
         type,
@@ -570,6 +586,7 @@ export default function Daybook() {
         </div>
 
         <div className="space-y-2">
+          <input type="hidden" {...register("category", { required: true })} />
           <div className="flex items-center justify-between">
             <Label>Category *</Label>
             <Button 
@@ -608,16 +625,59 @@ export default function Daybook() {
               </Button>
             </div>
           ) : (
-            <Select onValueChange={(v) => setValue("category", v)} required>
-              <SelectTrigger data-testid="select-category">
-                <SelectValue placeholder="Select a category..." />
-              </SelectTrigger>
-              <SelectContent>
-                {typeCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={categorySearchOpen}
+                  className="w-full justify-between font-normal"
+                  data-testid="select-category"
+                >
+                  {selectedCategory ? (
+                    <span>{selectedCategory.name}</span>
+                  ) : watchedCategory ? (
+                    <span>{watchedCategory}</span>
+                  ) : (
+                    <span className="text-muted-foreground">Search categories...</span>
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search categories..." 
+                    value={categorySearch}
+                    onValueChange={setCategorySearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No categories found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredCategories.map((cat) => (
+                        <CommandItem
+                          key={cat.id}
+                          value={cat.name}
+                          onSelect={() => {
+                            setValue("category", cat.name);
+                            setCategorySearchOpen(false);
+                            setCategorySearch("");
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedCategory?.id === cat.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {cat.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 
@@ -934,6 +994,7 @@ export default function Daybook() {
     onCancel: () => void;
     isPending: boolean;
   }) => {
+    const { toast: editToast } = useToast();
     const { register, handleSubmit, setValue, watch } = useForm<any>({
       defaultValues: {
         amount: entry.amount,
@@ -950,13 +1011,30 @@ export default function Daybook() {
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(
       entry.eventId ? events.find(e => e.id === entry.eventId) || null : null
     );
+    const [categorySearchOpen, setCategorySearchOpen] = useState(false);
+    const [categorySearch, setCategorySearch] = useState("");
+    
+    const watchedCategory = watch("category");
+    const selectedCategory = categories.find(c => c.name === watchedCategory) || null;
     
     const filteredEvents = events.filter(e => 
       e.title.toLowerCase().includes(eventSearch.toLowerCase()) ||
       e.customer?.toLowerCase().includes(eventSearch.toLowerCase())
     );
     
+    const filteredCategories = categories.filter(cat =>
+      cat.name.toLowerCase().includes(categorySearch.toLowerCase())
+    );
+    
     const handleFormSubmit = (data: any) => {
+      if (!data.category) {
+        editToast({
+          title: "Category Required",
+          description: "Please select a category before saving.",
+          variant: "destructive",
+        });
+        return;
+      }
       onSubmit({
         amount: data.amount,
         date: data.date,
@@ -1008,17 +1086,61 @@ export default function Daybook() {
         </div>
 
         <div className="space-y-2">
+          <input type="hidden" {...register("category", { required: true })} />
           <Label>Category *</Label>
-          <Select defaultValue={entry.category || ''} onValueChange={(v) => setValue("category", v)}>
-            <SelectTrigger data-testid="select-edit-category">
-              <SelectValue placeholder="Select a category..." />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={categorySearchOpen} onOpenChange={setCategorySearchOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={categorySearchOpen}
+                className="w-full justify-between font-normal"
+                data-testid="select-edit-category"
+              >
+                {selectedCategory ? (
+                  <span>{selectedCategory.name}</span>
+                ) : watchedCategory ? (
+                  <span>{watchedCategory}</span>
+                ) : (
+                  <span className="text-muted-foreground">Search categories...</span>
+                )}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command>
+                <CommandInput 
+                  placeholder="Search categories..." 
+                  value={categorySearch}
+                  onValueChange={setCategorySearch}
+                />
+                <CommandList>
+                  <CommandEmpty>No categories found.</CommandEmpty>
+                  <CommandGroup>
+                    {filteredCategories.map((cat) => (
+                      <CommandItem
+                        key={cat.id}
+                        value={cat.name}
+                        onSelect={() => {
+                          setValue("category", cat.name);
+                          setCategorySearchOpen(false);
+                          setCategorySearch("");
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedCategory?.id === cat.id ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        {cat.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="space-y-2">
