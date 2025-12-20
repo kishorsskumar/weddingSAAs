@@ -6973,7 +6973,7 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     const employees = await storage.getAllEmployees();
-    const optedInEmployees = employees.filter(e => e.phone && e.whatsappOptIn);
+    const optedInEmployees = employees.filter(e => (e.whatsappNumber || e.phone) && e.whatsappOptIn);
     res.json(optedInEmployees);
   });
 

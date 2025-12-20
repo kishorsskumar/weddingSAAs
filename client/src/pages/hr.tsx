@@ -366,6 +366,10 @@ export default function HR() {
               <Input {...register("phone")} placeholder="Phone Number (optional)" data-testid="input-phone" />
             </div>
             <div className="space-y-2">
+              <Label>WhatsApp Number</Label>
+              <Input {...register("whatsappNumber")} placeholder="e.g. +919876543210" data-testid="input-whatsapp" />
+            </div>
+            <div className="space-y-2">
               <Label>Date of Birth</Label>
               <Input type="date" {...register("dateOfBirth")} data-testid="input-date-of-birth" />
             </div>
@@ -465,6 +469,7 @@ export default function HR() {
         address: employee.address,
         emergencyContact: employee.emergencyContact,
         phone: employee.phone || '',
+        whatsappNumber: employee.whatsappNumber || '',
         email: employee.email || '',
         bankAccountNumber: employee.bankAccountNumber || '',
         bankIfscCode: employee.bankIfscCode || '',
@@ -491,6 +496,7 @@ export default function HR() {
         address: employee.address,
         emergencyContact: employee.emergencyContact,
         phone: employee.phone || '',
+        whatsappNumber: employee.whatsappNumber || '',
         email: employee.email || '',
         bankAccountNumber: employee.bankAccountNumber || '',
         bankIfscCode: employee.bankIfscCode || '',
@@ -511,6 +517,7 @@ export default function HR() {
       if (!submitData.contractRenewalDate) submitData.contractRenewalDate = null;
       if (!submitData.department) submitData.department = null;
       if (!submitData.phone) submitData.phone = null;
+      if (!submitData.whatsappNumber) submitData.whatsappNumber = null;
       if (!submitData.email) submitData.email = null;
       if (!submitData.bankAccountNumber) submitData.bankAccountNumber = null;
       if (!submitData.bankIfscCode) submitData.bankIfscCode = null;
@@ -584,6 +591,10 @@ export default function HR() {
             <div className="space-y-2">
               <Label>Phone</Label>
               <Input {...register("phone")} data-testid="input-edit-phone" placeholder="Mobile number" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp Number</Label>
+              <Input {...register("whatsappNumber")} data-testid="input-edit-whatsapp" placeholder="e.g. +919876543210" />
             </div>
             <div className="space-y-2">
               <Label>Email</Label>

@@ -91,6 +91,7 @@ export const employees = pgTable("employees", {
   address: text("address").notNull(),
   emergencyContact: text("emergency_contact").notNull(),
   phone: text("phone"),
+  whatsappNumber: text("whatsapp_number"),
   email: text("email"),
   bankAccountNumber: text("bank_account_number"),
   bankIfscCode: text("bank_ifsc_code"),

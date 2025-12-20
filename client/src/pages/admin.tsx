@@ -347,6 +347,7 @@ export default function Admin() {
     name: '',
     email: '',
     phone: '',
+    whatsappNumber: '',
     dateOfBirth: '',
     photoUrl: null as string | null,
     joinDate: new Date().toISOString().split('T')[0],
@@ -369,6 +370,7 @@ export default function Admin() {
       name: '',
       email: '',
       phone: '',
+      whatsappNumber: '',
       dateOfBirth: '',
       photoUrl: null,
       joinDate: new Date().toISOString().split('T')[0],
@@ -518,6 +520,7 @@ export default function Admin() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [linkEmployeeData, setLinkEmployeeData] = useState({
     phone: '',
+    whatsappNumber: '',
     dateOfBirth: '',
     photoUrl: null as string | null,
     joinDate: new Date().toISOString().split('T')[0],
@@ -539,6 +542,7 @@ export default function Admin() {
     setSelectedUserId('');
     setLinkEmployeeData({
       phone: '',
+      whatsappNumber: '',
       dateOfBirth: '',
       photoUrl: null,
       joinDate: new Date().toISOString().split('T')[0],
@@ -1734,6 +1738,16 @@ export default function Admin() {
                               value={newEmployee.phone}
                               onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
                               data-testid="input-emp-phone"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label>WhatsApp Number</Label>
+                            <Input 
+                              value={newEmployee.whatsappNumber}
+                              onChange={(e) => setNewEmployee({...newEmployee, whatsappNumber: e.target.value})}
+                              placeholder="e.g. +919876543210"
+                              data-testid="input-emp-whatsapp"
                             />
                           </div>
                           
