@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Plus, Send, Users, Trash2, Eye, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, Trash2, Eye, CheckCircle2, XCircle, Clock, Loader2, Search } from "lucide-react";
 import { format } from "date-fns";
 
 type WhatsappTemplate = {
@@ -62,6 +62,8 @@ export function MessagingTab() {
   const [targetMode, setTargetMode] = useState<'selected' | 'department' | 'all'>('selected');
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [departmentSearch, setDepartmentSearch] = useState('');
 
   const { data: status } = useQuery<{ configured: boolean; fromNumber: string }>({
     queryKey: ['/api/whatsapp/status'],
@@ -81,6 +83,20 @@ export function MessagingTab() {
 
   const optedInEmployees = employees;
   const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
+
+  const filteredEmployees = optedInEmployees.filter(emp => 
+    emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    (emp.department || '').toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+
+  const filteredDepartments = departments.filter(dept =>
+    dept.toLowerCase().includes(departmentSearch.toLowerCase())
+  );
+
+  const departmentCounts = departments.reduce((acc, dept) => {
+    acc[dept] = optedInEmployees.filter(e => e.department === dept).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   const createTemplateMutation = useMutation({
     mutationFn: async (data: { name: string; body: string; category: string }) => {
@@ -142,6 +158,8 @@ export function MessagingTab() {
     setTargetMode('selected');
     setSelectedEmployees([]);
     setSelectedDepartments([]);
+    setEmployeeSearch('');
+    setDepartmentSearch('');
   };
 
   const handleSendMessage = () => {
@@ -349,11 +367,43 @@ export function MessagingTab() {
                     </div>
 
                     {targetMode === 'selected' && (
-                      <div className="space-y-2">
-                        <Label>Select Employees ({selectedEmployees.length} selected)</Label>
-                        <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
-                          {optedInEmployees.map(emp => (
-                            <div key={emp.id} className="flex items-center gap-2">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Select Employees ({selectedEmployees.length} of {optedInEmployees.length} selected)</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedEmployees(filteredEmployees.map(e => e.id))}
+                              data-testid="button-select-all-employees"
+                            >
+                              Select All
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedEmployees([])}
+                              data-testid="button-clear-employees"
+                            >
+                              Clear
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search by name or department..."
+                            value={employeeSearch}
+                            onChange={(e) => setEmployeeSearch(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-employee-search"
+                          />
+                        </div>
+                        <div className="max-h-56 overflow-y-auto border rounded-md p-2 space-y-1">
+                          {filteredEmployees.map(emp => (
+                            <div key={emp.id} className="flex items-center gap-2 p-1.5 hover:bg-muted rounded">
                               <Checkbox
                                 id={`emp-${emp.id}`}
                                 checked={selectedEmployees.includes(emp.id)}
@@ -366,11 +416,17 @@ export function MessagingTab() {
                                 }}
                                 data-testid={`checkbox-employee-${emp.id}`}
                               />
-                              <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer flex-1">
-                                {emp.name} <span className="text-muted-foreground">({emp.department || 'No dept'})</span>
+                              <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer flex-1 flex items-center justify-between">
+                                <span>{emp.name}</span>
+                                <Badge variant="secondary" className="text-xs">{emp.department || 'No dept'}</Badge>
                               </label>
                             </div>
                           ))}
+                          {filteredEmployees.length === 0 && employeeSearch && (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              No employees match "{employeeSearch}"
+                            </p>
+                          )}
                           {optedInEmployees.length === 0 && (
                             <p className="text-sm text-muted-foreground text-center py-2">
                               No employees with WhatsApp opt-in
@@ -381,10 +437,42 @@ export function MessagingTab() {
                     )}
 
                     {targetMode === 'department' && (
-                      <div className="space-y-2">
-                        <Label>Select Departments</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label>Select Departments ({selectedDepartments.length} selected)</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedDepartments([...departments])}
+                              data-testid="button-select-all-departments"
+                            >
+                              Select All
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedDepartments([])}
+                              data-testid="button-clear-departments"
+                            >
+                              Clear
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search departments..."
+                            value={departmentSearch}
+                            onChange={(e) => setDepartmentSearch(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-department-search"
+                          />
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {departments.map(dept => (
+                          {filteredDepartments.map(dept => (
                             <Button
                               key={dept}
                               type="button"
@@ -398,10 +486,17 @@ export function MessagingTab() {
                                 }
                               }}
                               data-testid={`button-department-${dept}`}
+                              className="flex items-center gap-1.5"
                             >
                               {dept}
+                              <Badge variant="secondary" className="ml-1 text-xs h-5 px-1.5">
+                                {departmentCounts[dept] || 0}
+                              </Badge>
                             </Button>
                           ))}
+                          {filteredDepartments.length === 0 && departmentSearch && (
+                            <p className="text-sm text-muted-foreground">No departments match "{departmentSearch}"</p>
+                          )}
                         </div>
                       </div>
                     )}
