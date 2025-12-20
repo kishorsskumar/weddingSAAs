@@ -698,7 +698,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: string): Promise<void> {
-    await db.delete(users).where(eq(users.id, id));
+    // Clean up foreign key references before deleting user
+    // Wrap in transaction to ensure consistency
+    await db.transaction(async (tx) => {
+      // Event manpower submissions
+      await tx.update(eventManpower).set({ submittedBy: null }).where(eq(eventManpower.submittedBy, id));
+      await tx.update(eventManpower).set({ approvedBy: null }).where(eq(eventManpower.approvedBy, id));
+      
+      // Event transportation
+      await tx.update(eventTransportation).set({ submittedBy: null }).where(eq(eventTransportation.submittedBy, id));
+      await tx.update(eventTransportation).set({ approvedBy: null }).where(eq(eventTransportation.approvedBy, id));
+      
+      // Employees
+      await tx.update(employees).set({ userId: null }).where(eq(employees.userId, id));
+      await tx.update(employees).set({ managerUserId: null }).where(eq(employees.managerUserId, id));
+      
+      // Employee increments
+      await tx.update(employeeIncrements).set({ approvedBy: null }).where(eq(employeeIncrements.approvedBy, id));
+      
+      // Employee appraisals
+      await tx.update(employeeAppraisals).set({ reviewedBy: null }).where(eq(employeeAppraisals.reviewedBy, id));
+      
+      // Salary advance requests
+      await tx.update(salaryAdvanceRequests).set({ approvedBy: null }).where(eq(salaryAdvanceRequests.approvedBy, id));
+      
+      // Expense reimbursements
+      await tx.update(expenseReimbursements).set({ approvedBy: null }).where(eq(expenseReimbursements.approvedBy, id));
+      
+      // Employee incentives
+      await tx.update(employeeIncentives).set({ approvedBy: null }).where(eq(employeeIncentives.approvedBy, id));
+      
+      // Public holidays
+      await tx.update(publicHolidays).set({ createdBy: null }).where(eq(publicHolidays.createdBy, id));
+      
+      // Leave balance adjustments - adjustedBy is NOT NULL, so delete records
+      await tx.delete(leaveBalanceAdjustments).where(eq(leaveBalanceAdjustments.adjustedBy, id));
+      
+      // Inventory transactions
+      await tx.update(inventoryTransactions).set({ performedBy: null }).where(eq(inventoryTransactions.performedBy, id));
+      
+      // Sales contacts
+      await tx.update(salesContacts).set({ ownerId: null }).where(eq(salesContacts.ownerId, id));
+      
+      // Sales companies
+      await tx.update(salesCompanies).set({ ownerId: null }).where(eq(salesCompanies.ownerId, id));
+      
+      // Sales deals
+      await tx.update(salesDeals).set({ ownerId: null }).where(eq(salesDeals.ownerId, id));
+      
+      // Sales activities
+      await tx.update(salesActivities).set({ ownerId: null }).where(eq(salesActivities.ownerId, id));
+      
+      // Now delete the user
+      await tx.delete(users).where(eq(users.id, id));
+    });
   }
 
   async getAllUsers(): Promise<User[]> {
