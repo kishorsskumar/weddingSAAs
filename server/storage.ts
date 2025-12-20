@@ -2856,10 +2856,14 @@ export class DatabaseStorage implements IStorage {
       return updated;
     } else {
       const category = await this.getLeaveCategory(categoryId);
+      // Generate fiscal year string in format "FY2025-26" to match existing data
+      const nextYearShort = (year + 1).toString().slice(-2);
+      const fiscalYear = `FY${year}-${nextYearShort}`;
       const [created] = await db.insert(employeeLeaveBalances).values({
         employeeId,
         categoryId,
         year,
+        fiscalYear,
         allocated: data.allocated ?? category?.defaultAnnualAllowance ?? 12,
         used: data.used ?? 0,
         manuallyAdjusted: data.manuallyAdjusted ?? 0,

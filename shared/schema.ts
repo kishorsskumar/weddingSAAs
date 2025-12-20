@@ -1095,8 +1095,9 @@ export type SalaryAdvanceRequest = typeof salaryAdvanceRequests.$inferSelect;
 export const employeeLeaveBalances = pgTable("employee_leave_balances", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
-  categoryId: varchar("category_id").notNull().references(() => leaveCategories.id, { onDelete: 'cascade' }),
-  year: integer("year").notNull(), // Calendar year e.g., 2025
+  fiscalYear: text("fiscal_year").notNull(), // e.g., "2025-2026"
+  categoryId: varchar("category_id").references(() => leaveCategories.id, { onDelete: 'cascade' }),
+  year: integer("year"), // Calendar year e.g., 2025
   allocated: integer("allocated").notNull().default(12), // Total allocated for this category
   used: integer("used").notNull().default(0),
   manuallyAdjusted: integer("manually_adjusted").notNull().default(0), // Superadmin adjustments
