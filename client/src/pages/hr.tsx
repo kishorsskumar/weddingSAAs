@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -112,6 +113,7 @@ interface Manager {
 export default function HR() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [mainTab, setMainTab] = useState("current");
   const [approvalTab, setApprovalTab] = useState("leaves");
   const [location] = useLocation();
@@ -243,12 +245,27 @@ export default function HR() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/employees/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
       if (!res.ok) throw new Error('Failed to delete employee');
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      setEmployeeToDelete(null);
+      toast({
+        title: "Employee Deleted",
+        description: "The employee has been permanently deleted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete employee",
+        description: error.message,
+        variant: "destructive"
+      });
     },
   });
 
@@ -693,11 +710,7 @@ export default function HR() {
                           size="icon" 
                           variant="ghost" 
                           className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                          onClick={() => {
-                            if (confirm(`Delete ${emp.name}? This action cannot be undone.`)) {
-                              deleteMutation.mutate(emp.id);
-                            }
-                          }}
+                          onClick={() => setEmployeeToDelete(emp)}
                           data-testid={`button-delete-employee-${emp.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -763,6 +776,27 @@ export default function HR() {
           </Dialog>
         )}
       </div>
+
+      {/* Delete Employee Confirmation Dialog */}
+      <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Do you want to delete this employee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {employeeToDelete?.name} ({employeeToDelete?.employeeId}). This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => employeeToDelete && deleteMutation.mutate(employeeToDelete.id)}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Credentials Dialog */}
       <Dialog open={showCredentials} onOpenChange={setShowCredentials}>
