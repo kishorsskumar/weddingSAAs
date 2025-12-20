@@ -50,7 +50,7 @@ export default function Daybook() {
   const { toast } = useToast();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdmin = user?.role === 'superadmin';
-  const canEditEntries = isAdmin || user?.role === 'manager' || user?.role === 'wedding_planner' || user?.role === 'accountant';
+  const canEditEntries = true; // All users can edit entries
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -1500,14 +1500,18 @@ export default function Daybook() {
                 <ArrowRightLeft className="h-5 w-5 text-primary" />
                 <CardTitle className="font-serif text-lg">Bank Transfers</CardTitle>
               </div>
-              {isAdmin && banks.length >= 2 && (
+              {banks.length >= 2 && (
                 <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="gap-1 h-8" data-testid="button-add-transfer">
                       <Plus className="h-3 w-3" /> Transfer
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] sm:max-w-md">
+                  <DialogContent 
+                    className="max-w-[95vw] sm:max-w-md"
+                    onPointerDownOutside={(e) => e.preventDefault()}
+                    onInteractOutside={(e) => e.preventDefault()}
+                  >
                     <DialogHeader>
                       <DialogTitle>Transfer Between Banks</DialogTitle>
                     </DialogHeader>
@@ -1877,7 +1881,11 @@ export default function Daybook() {
       </Tabs>
 
       <Dialog open={isIncomeDialogOpen} onOpenChange={setIsIncomeDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent 
+          className="max-w-[95vw] sm:max-w-lg"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-lg font-serif text-green-700">Add Income</DialogTitle>
           </DialogHeader>
@@ -1886,7 +1894,11 @@ export default function Daybook() {
       </Dialog>
 
       <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent 
+          className="max-w-[95vw] sm:max-w-lg"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="text-lg font-serif text-red-700">Add Expense</DialogTitle>
           </DialogHeader>
@@ -1898,7 +1910,11 @@ export default function Daybook() {
         setIsEditDialogOpen(open);
         if (!open) setEditingEntry(null);
       }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+        <DialogContent 
+          className="max-w-[95vw] sm:max-w-lg"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className={`text-lg font-serif ${editingEntry?.type === 'income' ? 'text-green-700' : 'text-red-700'}`}>
               Edit {editingEntry?.type === 'income' ? 'Income' : 'Expense'}
