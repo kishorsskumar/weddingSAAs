@@ -1,0 +1,524 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare, Plus, Send, Users, Trash2, Eye, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+
+type WhatsappTemplate = {
+  id: string;
+  name: string;
+  body: string;
+  variables: string[] | null;
+  category: string | null;
+  isActive: boolean;
+  createdBy: string | null;
+  createdAt: string | null;
+};
+
+type WhatsappJob = {
+  id: string;
+  templateId: string | null;
+  customMessage: string | null;
+  targetMode: string;
+  targetEmployeeIds: string[] | null;
+  targetDepartments: string[] | null;
+  status: string;
+  totalRecipients: number | null;
+  successCount: number | null;
+  failureCount: number | null;
+  createdAt: string | null;
+  processedAt: string | null;
+};
+
+type Employee = {
+  id: string;
+  name: string;
+  phone: string | null;
+  department: string | null;
+  whatsappOptIn: boolean;
+};
+
+export function MessagingTab() {
+  const queryClient = useQueryClient();
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isComposeDialogOpen, setIsComposeDialogOpen] = useState(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const [templateName, setTemplateName] = useState('');
+  const [templateBody, setTemplateBody] = useState('');
+  const [templateCategory, setTemplateCategory] = useState('notification');
+
+  const [composeMode, setComposeMode] = useState<'template' | 'custom'>('custom');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [targetMode, setTargetMode] = useState<'selected' | 'department' | 'all'>('selected');
+  const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
+
+  const { data: status } = useQuery<{ configured: boolean; fromNumber: string }>({
+    queryKey: ['/api/whatsapp/status'],
+  });
+
+  const { data: templates = [] } = useQuery<WhatsappTemplate[]>({
+    queryKey: ['/api/whatsapp/templates'],
+  });
+
+  const { data: jobs = [] } = useQuery<WhatsappJob[]>({
+    queryKey: ['/api/whatsapp/jobs'],
+  });
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ['/api/whatsapp/employees'],
+  });
+
+  const optedInEmployees = employees;
+  const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: { name: string; body: string; category: string }) => {
+      const res = await fetch('/api/whatsapp/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/templates'] });
+      setIsTemplateDialogOpen(false);
+      setTemplateName('');
+      setTemplateBody('');
+      setTemplateCategory('notification');
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/whatsapp/templates/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/templates'] });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (data: {
+      templateId?: string;
+      customMessage?: string;
+      targetMode: string;
+      targetEmployeeIds?: string[];
+      targetDepartments?: string[];
+    }) => {
+      const res = await fetch('/api/whatsapp/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to send message');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/whatsapp/jobs'] });
+      setIsComposeDialogOpen(false);
+      resetComposeForm();
+    },
+  });
+
+  const resetComposeForm = () => {
+    setComposeMode('custom');
+    setSelectedTemplateId('');
+    setCustomMessage('');
+    setTargetMode('selected');
+    setSelectedEmployees([]);
+    setSelectedDepartments([]);
+  };
+
+  const handleSendMessage = () => {
+    const data: any = { targetMode };
+    if (composeMode === 'template' && selectedTemplateId) {
+      data.templateId = selectedTemplateId;
+    } else {
+      data.customMessage = customMessage;
+    }
+    if (targetMode === 'selected') {
+      data.targetEmployeeIds = selectedEmployees;
+    } else if (targetMode === 'department') {
+      data.targetDepartments = selectedDepartments;
+    }
+    sendMessageMutation.mutate(data);
+  };
+
+  const getStatusBadge = (jobStatus: string) => {
+    switch (jobStatus) {
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>;
+      case 'failed':
+        return <Badge className="bg-red-100 text-red-800"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>;
+      case 'processing':
+        return <Badge className="bg-blue-100 text-blue-800"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Processing</Badge>;
+      default:
+        return <Badge className="bg-yellow-100 text-yellow-800"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+    }
+  };
+
+  if (!status?.configured) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            WhatsApp Messaging
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">WhatsApp Not Configured</h3>
+            <p className="text-muted-foreground text-sm mb-4">
+              To enable WhatsApp messaging, please add your Twilio credentials as environment secrets:
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              <li>TWILIO_ACCOUNT_SID</li>
+              <li>TWILIO_AUTH_TOKEN</li>
+              <li>TWILIO_WHATSAPP_NUMBER</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                WhatsApp Messaging
+              </CardTitle>
+              <CardDescription>
+                Send messages to employees via WhatsApp. From: {status.fromNumber}
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" data-testid="button-new-template">
+                    <Plus className="h-4 w-4 mr-1" /> Template
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Message Template</DialogTitle>
+                    <DialogDescription>Create a reusable message template</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Template Name</Label>
+                      <Input
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        placeholder="e.g., Event Reminder"
+                        data-testid="input-template-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                        <SelectTrigger data-testid="select-template-category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="reminder">Reminder</SelectItem>
+                          <SelectItem value="notification">Notification</SelectItem>
+                          <SelectItem value="announcement">Announcement</SelectItem>
+                          <SelectItem value="custom">Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Message Body</Label>
+                      <Textarea
+                        value={templateBody}
+                        onChange={(e) => setTemplateBody(e.target.value)}
+                        placeholder="Hi {{employee_name}}, this is a reminder..."
+                        rows={4}
+                        data-testid="input-template-body"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use {"{{employee_name}}"}, {"{{department}}"}, {"{{designation}}"} for personalization
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => createTemplateMutation.mutate({ name: templateName, body: templateBody, category: templateCategory })}
+                      disabled={!templateName || !templateBody || createTemplateMutation.isPending}
+                      className="w-full"
+                      data-testid="button-create-template"
+                    >
+                      {createTemplateMutation.isPending ? 'Creating...' : 'Create Template'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isComposeDialogOpen} onOpenChange={(open) => {
+                setIsComposeDialogOpen(open);
+                if (!open) resetComposeForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" data-testid="button-compose-message">
+                    <Send className="h-4 w-4 mr-1" /> Compose
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Compose WhatsApp Message</DialogTitle>
+                    <DialogDescription>Send a message to selected employees</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Message Type</Label>
+                      <Select value={composeMode} onValueChange={(v) => setComposeMode(v as 'template' | 'custom')}>
+                        <SelectTrigger data-testid="select-compose-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="custom">Custom Message</SelectItem>
+                          <SelectItem value="template">Use Template</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {composeMode === 'template' ? (
+                      <div className="space-y-2">
+                        <Label>Select Template</Label>
+                        <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                          <SelectTrigger data-testid="select-template">
+                            <SelectValue placeholder="Choose a template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {templates.filter(t => t.isActive).map(t => (
+                              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {selectedTemplateId && (
+                          <div className="p-3 bg-muted rounded-md text-sm">
+                            {templates.find(t => t.id === selectedTemplateId)?.body}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Message</Label>
+                        <Textarea
+                          value={customMessage}
+                          onChange={(e) => setCustomMessage(e.target.value)}
+                          placeholder="Type your message here..."
+                          rows={4}
+                          data-testid="input-custom-message"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label>Recipients</Label>
+                      <Select value={targetMode} onValueChange={(v) => setTargetMode(v as any)}>
+                        <SelectTrigger data-testid="select-target-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="selected">Select Employees</SelectItem>
+                          <SelectItem value="department">By Department</SelectItem>
+                          <SelectItem value="all">All Opted-In Employees</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {targetMode === 'selected' && (
+                      <div className="space-y-2">
+                        <Label>Select Employees ({selectedEmployees.length} selected)</Label>
+                        <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-2">
+                          {optedInEmployees.map(emp => (
+                            <div key={emp.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`emp-${emp.id}`}
+                                checked={selectedEmployees.includes(emp.id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedEmployees([...selectedEmployees, emp.id]);
+                                  } else {
+                                    setSelectedEmployees(selectedEmployees.filter(id => id !== emp.id));
+                                  }
+                                }}
+                                data-testid={`checkbox-employee-${emp.id}`}
+                              />
+                              <label htmlFor={`emp-${emp.id}`} className="text-sm cursor-pointer flex-1">
+                                {emp.name} <span className="text-muted-foreground">({emp.department || 'No dept'})</span>
+                              </label>
+                            </div>
+                          ))}
+                          {optedInEmployees.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              No employees with WhatsApp opt-in
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {targetMode === 'department' && (
+                      <div className="space-y-2">
+                        <Label>Select Departments</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {departments.map(dept => (
+                            <Button
+                              key={dept}
+                              type="button"
+                              variant={selectedDepartments.includes(dept!) ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => {
+                                if (selectedDepartments.includes(dept!)) {
+                                  setSelectedDepartments(selectedDepartments.filter(d => d !== dept));
+                                } else {
+                                  setSelectedDepartments([...selectedDepartments, dept!]);
+                                }
+                              }}
+                              data-testid={`button-department-${dept}`}
+                            >
+                              {dept}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {targetMode === 'all' && (
+                      <p className="text-sm text-muted-foreground">
+                        Message will be sent to all {optedInEmployees.length} employees who have opted in
+                      </p>
+                    )}
+
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={
+                        sendMessageMutation.isPending ||
+                        (composeMode === 'template' && !selectedTemplateId) ||
+                        (composeMode === 'custom' && !customMessage) ||
+                        (targetMode === 'selected' && selectedEmployees.length === 0) ||
+                        (targetMode === 'department' && selectedDepartments.length === 0)
+                      }
+                      className="w-full"
+                      data-testid="button-send-message"
+                    >
+                      {sendMessageMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          Send Message
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <h3 className="font-medium mb-3">Message Templates</h3>
+            {templates.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No templates created yet</p>
+            ) : (
+              <div className="grid gap-3">
+                {templates.map(template => (
+                  <div key={template.id} className="flex items-start justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{template.name}</span>
+                        <Badge variant="secondary">{template.category}</Badge>
+                        {!template.isActive && <Badge variant="destructive">Inactive</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">{template.body}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (confirm('Delete this template?')) {
+                          deleteTemplateMutation.mutate(template.id);
+                        }
+                      }}
+                      data-testid={`button-delete-template-${template.id}`}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-3">Message History</h3>
+            {jobs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No messages sent yet</p>
+            ) : (
+              <div className="space-y-3">
+                {jobs.slice(0, 10).map(job => (
+                  <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {getStatusBadge(job.status)}
+                        <span className="text-sm text-muted-foreground">
+                          {job.createdAt ? format(new Date(job.createdAt), 'MMM d, yyyy h:mm a') : ''}
+                        </span>
+                      </div>
+                      <p className="text-sm">
+                        {job.targetMode === 'all' ? 'All employees' : 
+                         job.targetMode === 'department' ? `Departments: ${job.targetDepartments?.join(', ')}` :
+                         `${job.targetEmployeeIds?.length || 0} employees`}
+                      </p>
+                      {job.status === 'completed' && (
+                        <p className="text-xs text-muted-foreground">
+                          Delivered: {job.successCount}/{job.totalRecipients}
+                          {(job.failureCount ?? 0) > 0 && <span className="text-destructive"> ({job.failureCount} failed)</span>}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-3">Opted-In Employees</h3>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>{optedInEmployees.length} employees have opted in to receive WhatsApp messages</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

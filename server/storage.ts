@@ -194,6 +194,12 @@ import {
   type InsertOaksyConversation,
   type OaksyMessage,
   type InsertOaksyMessage,
+  type WhatsappMessageTemplate,
+  type InsertWhatsappMessageTemplate,
+  type WhatsappMessageJob,
+  type InsertWhatsappMessageJob,
+  type WhatsappMessageLog,
+  type InsertWhatsappMessageLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -676,6 +682,28 @@ export interface IStorage {
   createQuickEntry(entry: InsertQuickEntry): Promise<QuickEntry>;
   updateQuickEntry(id: string, entry: Partial<InsertQuickEntry>): Promise<QuickEntry | undefined>;
   deleteQuickEntry(id: string): Promise<void>;
+
+  // WhatsApp Message Templates
+  getAllWhatsappTemplates(): Promise<WhatsappMessageTemplate[]>;
+  getWhatsappTemplate(id: string): Promise<WhatsappMessageTemplate | undefined>;
+  createWhatsappTemplate(template: InsertWhatsappMessageTemplate): Promise<WhatsappMessageTemplate>;
+  updateWhatsappTemplate(id: string, template: Partial<InsertWhatsappMessageTemplate>): Promise<WhatsappMessageTemplate | undefined>;
+  deleteWhatsappTemplate(id: string): Promise<void>;
+
+  // WhatsApp Message Jobs
+  getAllWhatsappJobs(): Promise<WhatsappMessageJob[]>;
+  getWhatsappJob(id: string): Promise<WhatsappMessageJob | undefined>;
+  getPendingWhatsappJobs(): Promise<WhatsappMessageJob[]>;
+  createWhatsappJob(job: InsertWhatsappMessageJob): Promise<WhatsappMessageJob>;
+  updateWhatsappJob(id: string, job: Partial<InsertWhatsappMessageJob>): Promise<WhatsappMessageJob | undefined>;
+  deleteWhatsappJob(id: string): Promise<void>;
+
+  // WhatsApp Message Logs
+  getWhatsappLogsByJob(jobId: string): Promise<WhatsappMessageLog[]>;
+  getWhatsappLog(id: string): Promise<WhatsappMessageLog | undefined>;
+  createWhatsappLog(log: InsertWhatsappMessageLog): Promise<WhatsappMessageLog>;
+  updateWhatsappLog(id: string, log: Partial<InsertWhatsappMessageLog>): Promise<WhatsappMessageLog | undefined>;
+  getEmployeesWithWhatsappOptIn(): Promise<Employee[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3118,6 +3146,96 @@ export class DatabaseStorage implements IStorage {
 
   async deleteOaksyMessages(conversationId: string): Promise<void> {
     await db.delete(oaksyMessages).where(eq(oaksyMessages.conversationId, conversationId));
+  }
+
+  // WhatsApp Message Templates
+  async getAllWhatsappTemplates(): Promise<WhatsappMessageTemplate[]> {
+    return await db.select().from(whatsappMessageTemplates).orderBy(desc(whatsappMessageTemplates.createdAt));
+  }
+
+  async getWhatsappTemplate(id: string): Promise<WhatsappMessageTemplate | undefined> {
+    const [template] = await db.select().from(whatsappMessageTemplates).where(eq(whatsappMessageTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createWhatsappTemplate(template: InsertWhatsappMessageTemplate): Promise<WhatsappMessageTemplate> {
+    const [created] = await db.insert(whatsappMessageTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateWhatsappTemplate(id: string, template: Partial<InsertWhatsappMessageTemplate>): Promise<WhatsappMessageTemplate | undefined> {
+    const [updated] = await db.update(whatsappMessageTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(whatsappMessageTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWhatsappTemplate(id: string): Promise<void> {
+    await db.delete(whatsappMessageTemplates).where(eq(whatsappMessageTemplates.id, id));
+  }
+
+  // WhatsApp Message Jobs
+  async getAllWhatsappJobs(): Promise<WhatsappMessageJob[]> {
+    return await db.select().from(whatsappMessageJobs).orderBy(desc(whatsappMessageJobs.createdAt));
+  }
+
+  async getWhatsappJob(id: string): Promise<WhatsappMessageJob | undefined> {
+    const [job] = await db.select().from(whatsappMessageJobs).where(eq(whatsappMessageJobs.id, id));
+    return job || undefined;
+  }
+
+  async getPendingWhatsappJobs(): Promise<WhatsappMessageJob[]> {
+    return await db.select().from(whatsappMessageJobs)
+      .where(eq(whatsappMessageJobs.status, 'pending'))
+      .orderBy(whatsappMessageJobs.scheduledFor);
+  }
+
+  async createWhatsappJob(job: InsertWhatsappMessageJob): Promise<WhatsappMessageJob> {
+    const [created] = await db.insert(whatsappMessageJobs).values(job).returning();
+    return created;
+  }
+
+  async updateWhatsappJob(id: string, job: Partial<InsertWhatsappMessageJob>): Promise<WhatsappMessageJob | undefined> {
+    const [updated] = await db.update(whatsappMessageJobs)
+      .set(job)
+      .where(eq(whatsappMessageJobs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWhatsappJob(id: string): Promise<void> {
+    await db.delete(whatsappMessageJobs).where(eq(whatsappMessageJobs.id, id));
+  }
+
+  // WhatsApp Message Logs
+  async getWhatsappLogsByJob(jobId: string): Promise<WhatsappMessageLog[]> {
+    return await db.select().from(whatsappMessageLogs)
+      .where(eq(whatsappMessageLogs.jobId, jobId))
+      .orderBy(desc(whatsappMessageLogs.createdAt));
+  }
+
+  async getWhatsappLog(id: string): Promise<WhatsappMessageLog | undefined> {
+    const [log] = await db.select().from(whatsappMessageLogs).where(eq(whatsappMessageLogs.id, id));
+    return log || undefined;
+  }
+
+  async createWhatsappLog(log: InsertWhatsappMessageLog): Promise<WhatsappMessageLog> {
+    const [created] = await db.insert(whatsappMessageLogs).values(log).returning();
+    return created;
+  }
+
+  async updateWhatsappLog(id: string, log: Partial<InsertWhatsappMessageLog>): Promise<WhatsappMessageLog | undefined> {
+    const [updated] = await db.update(whatsappMessageLogs)
+      .set(log)
+      .where(eq(whatsappMessageLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getEmployeesWithWhatsappOptIn(): Promise<Employee[]> {
+    return await db.select().from(employees)
+      .where(eq(employees.whatsappOptIn, true));
   }
 }
 

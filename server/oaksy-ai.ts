@@ -179,6 +179,38 @@ const oaksyTools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "send_whatsapp_message",
+      description: "Send a WhatsApp message to employees. Use this when the superadmin wants to send a message to team members. Only available for superadmin users.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description: "The message content to send",
+          },
+          targetMode: {
+            type: "string",
+            enum: ["selected", "department", "all"],
+            description: "How to select recipients: 'selected' for specific employees, 'department' for all in a department, 'all' for everyone opted in",
+          },
+          employeeNames: {
+            type: "array",
+            items: { type: "string" },
+            description: "Names of specific employees to message (when targetMode is 'selected')",
+          },
+          departments: {
+            type: "array",
+            items: { type: "string" },
+            description: "Department names to message (when targetMode is 'department')",
+          },
+        },
+        required: ["message", "targetMode"],
+      },
+    },
+  },
 ];
 
 function getDepartmentSystemPrompt(department: string): string {
@@ -409,6 +441,51 @@ async function executeToolCall(toolName: string, args: any): Promise<{ success: 
           message: `Bank transfer created: ₹${Number(args.amount).toLocaleString('en-IN')} from ${fromBank.name} to ${toBank.name}`,
           data: transfer,
         };
+      }
+
+      case "send_whatsapp_message": {
+        const { sendQuickWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
+        
+        if (!isWhatsAppConfigured()) {
+          return { success: false, message: "WhatsApp is not configured. Please add Twilio credentials." };
+        }
+        
+        const allEmployees = await storage.getAllEmployees();
+        const optedInEmployees = allEmployees.filter(e => e.phone && e.whatsappOptIn);
+        
+        let targetEmployeeIds: string[] = [];
+        
+        if (args.targetMode === 'all') {
+          targetEmployeeIds = optedInEmployees.map(e => e.id);
+        } else if (args.targetMode === 'department' && args.departments) {
+          targetEmployeeIds = optedInEmployees
+            .filter(e => e.department && args.departments.some((d: string) => 
+              e.department!.toLowerCase().includes(d.toLowerCase())
+            ))
+            .map(e => e.id);
+        } else if (args.targetMode === 'selected' && args.employeeNames) {
+          targetEmployeeIds = optedInEmployees
+            .filter(e => args.employeeNames.some((name: string) => 
+              e.name.toLowerCase().includes(name.toLowerCase())
+            ))
+            .map(e => e.id);
+        }
+        
+        if (targetEmployeeIds.length === 0) {
+          return { success: false, message: "No matching employees found with WhatsApp opt-in." };
+        }
+        
+        const result = await sendQuickWhatsAppMessage(targetEmployeeIds, args.message, 'oaksy-ai');
+        
+        if (result.success) {
+          return {
+            success: true,
+            message: `WhatsApp message sent to ${targetEmployeeIds.length} employee(s).`,
+            data: { jobId: result.jobId, recipientCount: targetEmployeeIds.length },
+          };
+        } else {
+          return { success: false, message: result.error || "Failed to send WhatsApp message." };
+        }
       }
 
       default:

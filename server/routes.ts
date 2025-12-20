@@ -6806,5 +6806,176 @@ export async function registerRoutes(
     }
   });
 
+  // WhatsApp Messaging Routes
+  app.get('/api/whatsapp/status', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { isWhatsAppConfigured, getWhatsAppFromNumber } = await import('./whatsapp-service');
+    res.json({
+      configured: isWhatsAppConfigured(),
+      fromNumber: getWhatsAppFromNumber(),
+    });
+  });
+
+  app.get('/api/whatsapp/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const templates = await storage.getAllWhatsappTemplates();
+    res.json(templates);
+  });
+
+  app.get('/api/whatsapp/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const template = await storage.getWhatsappTemplate(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  });
+
+  app.post('/api/whatsapp/templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Only admins can create templates' });
+    }
+    const { name, body, category } = req.body;
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      return res.status(400).json({ error: 'Template name is required' });
+    }
+    if (!body || typeof body !== 'string' || body.trim().length === 0) {
+      return res.status(400).json({ error: 'Template body is required' });
+    }
+    const template = await storage.createWhatsappTemplate({
+      name: name.trim(),
+      body: body.trim(),
+      category: category || 'custom',
+      createdBy: req.session.userId,
+    });
+    res.json(template);
+  });
+
+  app.put('/api/whatsapp/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Only admins can update templates' });
+    }
+    const template = await storage.updateWhatsappTemplate(req.params.id, req.body);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  });
+
+  app.delete('/api/whatsapp/templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Only admins can delete templates' });
+    }
+    await storage.deleteWhatsappTemplate(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.get('/api/whatsapp/jobs', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const jobs = await storage.getAllWhatsappJobs();
+    res.json(jobs);
+  });
+
+  app.get('/api/whatsapp/jobs/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const job = await storage.getWhatsappJob(req.params.id);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+    const logs = await storage.getWhatsappLogsByJob(job.id);
+    res.json({ ...job, logs });
+  });
+
+  app.post('/api/whatsapp/jobs', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Only admins can send messages' });
+    }
+    
+    const { templateId, customMessage, targetMode, targetEmployeeIds, targetDepartments } = req.body;
+    
+    if (!templateId && !customMessage) {
+      return res.status(400).json({ error: 'Either templateId or customMessage is required' });
+    }
+    if (!targetMode || !['selected', 'department', 'all'].includes(targetMode)) {
+      return res.status(400).json({ error: 'Invalid targetMode. Must be: selected, department, or all' });
+    }
+    if (targetMode === 'selected' && (!targetEmployeeIds || targetEmployeeIds.length === 0)) {
+      return res.status(400).json({ error: 'At least one employee must be selected' });
+    }
+    if (targetMode === 'department' && (!targetDepartments || targetDepartments.length === 0)) {
+      return res.status(400).json({ error: 'At least one department must be selected' });
+    }
+    
+    try {
+      const job = await storage.createWhatsappJob({
+        templateId: templateId || null,
+        customMessage: customMessage || null,
+        targetMode,
+        targetEmployeeIds: targetEmployeeIds || null,
+        targetDepartments: targetDepartments || null,
+        requestedBy: req.session.userId,
+        status: 'pending',
+      });
+      
+      if (!req.body.scheduledFor) {
+        const { processWhatsAppJob } = await import('./whatsapp-service');
+        await processWhatsAppJob(job.id);
+        const updatedJob = await storage.getWhatsappJob(job.id);
+        res.json(updatedJob);
+      } else {
+        res.json(job);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/whatsapp/jobs/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Only admins can delete jobs' });
+    }
+    await storage.deleteWhatsappJob(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.get('/api/whatsapp/employees', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const employees = await storage.getAllEmployees();
+    const optedInEmployees = employees.filter(e => e.phone && e.whatsappOptIn);
+    res.json(optedInEmployees);
+  });
+
   return httpServer;
 }

@@ -15,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { format } from "date-fns";
 import { PhotoUploader } from "@/components/PhotoUploader";
+import { MessagingTab } from "@/components/MessagingTab";
 
 type PublicHoliday = {
   id: string;
@@ -990,7 +991,7 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-7' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-8' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="employees" data-testid="tab-employees">Employees</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
@@ -998,6 +999,7 @@ export default function Admin() {
           {isSuperAdmin && <TabsTrigger value="leave" data-testid="tab-leave">Leave</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="calendar" data-testid="tab-calendar">Calendar</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="messaging" data-testid="tab-messaging">Messaging</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -1930,6 +1932,12 @@ export default function Admin() {
         {isSuperAdmin && (
           <TabsContent value="calendar" className="mt-4">
             <CalendarIntegrationTab />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="messaging" className="mt-4">
+            <MessagingTab />
           </TabsContent>
         )}
       </Tabs>
