@@ -17,6 +17,7 @@ import HR from "@/pages/hr";
 import Admin from "@/pages/admin";
 import OakSales from "@/pages/oak-sales";
 import OakInventory from "@/pages/oak-inventory";
+import ExecutionPlan from "@/pages/execution-plan";
 import CustomerPortal from "@/pages/customer-portal";
 import PrintDocument from "@/pages/print-document";
 import EmployeePortal from "@/pages/employee-portal";
@@ -76,6 +77,9 @@ function AppRoutes() {
         </Route>
         <Route path="/oak-inventory">
            <PrivateRoute component={OakInventory} path="/oak-inventory" />
+        </Route>
+        <Route path="/execution-plan">
+           <PrivateRoute component={ExecutionPlan} path="/execution-plan" />
         </Route>
         <Route path="/employee-portal">
            <PrivateRoute component={EmployeePortal} path="/employee-portal" />

@@ -756,6 +756,7 @@ export async function registerRoutes(
     'oak-book',
     'oak-sales',
     'oak-inventory',
+    'execution-plan',
     'hr',
     'employee-portal',
     'oaksy',

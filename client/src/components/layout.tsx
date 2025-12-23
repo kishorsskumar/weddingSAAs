@@ -18,7 +18,8 @@ import {
   Target,
   Package,
   UserCircle,
-  Sparkles
+  Sparkles,
+  ClipboardList
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,6 +36,7 @@ const ALL_PAGES = [
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
+  { id: "execution-plan", label: "Execution Plan", path: "/execution-plan" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
@@ -51,6 +53,7 @@ const ICONS: Record<string, any> = {
   "oak-book": Receipt,
   "oak-sales": Target,
   "oak-inventory": Package,
+  "execution-plan": ClipboardList,
   hr: Briefcase,
   "employee-portal": UserCircle,
   oaksy: Sparkles,

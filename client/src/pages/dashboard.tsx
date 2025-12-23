@@ -37,7 +37,8 @@ import {
   Loader2,
   CheckCircle2,
   Pencil,
-  Sparkles
+  Sparkles,
+  ClipboardList
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -58,6 +59,7 @@ const ALL_PAGES = [
   { id: "oak-book", label: "Oak Book", path: "/oak-book", icon: Receipt, description: "Invoices & estimates" },
   { id: "oak-sales", label: "Oak Sales", path: "/oak-sales", icon: Target, description: "CRM & pipeline" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory", icon: Package, description: "Inventory & rentals" },
+  { id: "execution-plan", label: "Execution Plan", path: "/execution-plan", icon: ClipboardList, description: "Event production planning" },
   { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal", icon: UserCircle, description: "Your profile & requests" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
