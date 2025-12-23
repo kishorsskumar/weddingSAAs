@@ -60,6 +60,15 @@ import {
   whatsappMessageTemplates,
   whatsappMessageJobs,
   whatsappMessageLogs,
+  executionPlans,
+  executionPlanChecklist,
+  executionPlanItems,
+  executionPlanActivities,
+  executionPlanManpower,
+  executionPlanGodownItems,
+  executionPlanRentals,
+  executionPlanPurchases,
+  executionPlanPrints,
   type User, 
   type InsertUser,
   type UserPermission,
@@ -200,6 +209,24 @@ import {
   type InsertWhatsappMessageJob,
   type WhatsappMessageLog,
   type InsertWhatsappMessageLog,
+  type ExecutionPlan,
+  type InsertExecutionPlan,
+  type ExecutionPlanChecklist,
+  type InsertExecutionPlanChecklist,
+  type ExecutionPlanItem,
+  type InsertExecutionPlanItem,
+  type ExecutionPlanActivity,
+  type InsertExecutionPlanActivity,
+  type ExecutionPlanManpower,
+  type InsertExecutionPlanManpower,
+  type ExecutionPlanGodownItem,
+  type InsertExecutionPlanGodownItem,
+  type ExecutionPlanRental,
+  type InsertExecutionPlanRental,
+  type ExecutionPlanPurchase,
+  type InsertExecutionPlanPurchase,
+  type ExecutionPlanPrint,
+  type InsertExecutionPlanPrint,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -3236,6 +3263,261 @@ export class DatabaseStorage implements IStorage {
   async getEmployeesWithWhatsappOptIn(): Promise<Employee[]> {
     return await db.select().from(employees)
       .where(eq(employees.whatsappOptIn, true));
+  }
+
+  // ===========================
+  // EXECUTION PLAN METHODS
+  // ===========================
+
+  // Main Execution Plans
+  async getAllExecutionPlans(): Promise<ExecutionPlan[]> {
+    return await db.select().from(executionPlans).orderBy(desc(executionPlans.createdAt));
+  }
+
+  async getExecutionPlansByEvent(eventId: string): Promise<ExecutionPlan[]> {
+    return await db.select().from(executionPlans)
+      .where(eq(executionPlans.eventId, eventId))
+      .orderBy(desc(executionPlans.createdAt));
+  }
+
+  async getExecutionPlan(id: string): Promise<ExecutionPlan | undefined> {
+    const [plan] = await db.select().from(executionPlans).where(eq(executionPlans.id, id));
+    return plan || undefined;
+  }
+
+  async createExecutionPlan(plan: InsertExecutionPlan): Promise<ExecutionPlan> {
+    const [created] = await db.insert(executionPlans).values(plan).returning();
+    return created;
+  }
+
+  async updateExecutionPlan(id: string, plan: Partial<InsertExecutionPlan>): Promise<ExecutionPlan | undefined> {
+    const [updated] = await db.update(executionPlans)
+      .set({ ...plan, updatedAt: new Date() })
+      .where(eq(executionPlans.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlan(id: string): Promise<void> {
+    await db.delete(executionPlans).where(eq(executionPlans.id, id));
+  }
+
+  // Checklist Items
+  async getExecutionPlanChecklist(planId: string): Promise<ExecutionPlanChecklist[]> {
+    return await db.select().from(executionPlanChecklist)
+      .where(eq(executionPlanChecklist.planId, planId))
+      .orderBy(executionPlanChecklist.sortOrder);
+  }
+
+  async createExecutionPlanChecklistItem(item: InsertExecutionPlanChecklist): Promise<ExecutionPlanChecklist> {
+    const [created] = await db.insert(executionPlanChecklist).values(item).returning();
+    return created;
+  }
+
+  async updateExecutionPlanChecklistItem(id: string, item: Partial<InsertExecutionPlanChecklist>): Promise<ExecutionPlanChecklist | undefined> {
+    const [updated] = await db.update(executionPlanChecklist)
+      .set(item)
+      .where(eq(executionPlanChecklist.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanChecklistItem(id: string): Promise<void> {
+    await db.delete(executionPlanChecklist).where(eq(executionPlanChecklist.id, id));
+  }
+
+  // Item List
+  async getExecutionPlanItems(planId: string): Promise<ExecutionPlanItem[]> {
+    return await db.select().from(executionPlanItems)
+      .where(eq(executionPlanItems.planId, planId))
+      .orderBy(executionPlanItems.sortOrder);
+  }
+
+  async createExecutionPlanItem(item: InsertExecutionPlanItem): Promise<ExecutionPlanItem> {
+    const [created] = await db.insert(executionPlanItems).values(item).returning();
+    return created;
+  }
+
+  async updateExecutionPlanItem(id: string, item: Partial<InsertExecutionPlanItem>): Promise<ExecutionPlanItem | undefined> {
+    const [updated] = await db.update(executionPlanItems)
+      .set(item)
+      .where(eq(executionPlanItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanItem(id: string): Promise<void> {
+    await db.delete(executionPlanItems).where(eq(executionPlanItems.id, id));
+  }
+
+  // Activities (Production Plan)
+  async getExecutionPlanActivities(planId: string): Promise<ExecutionPlanActivity[]> {
+    return await db.select().from(executionPlanActivities)
+      .where(eq(executionPlanActivities.planId, planId))
+      .orderBy(executionPlanActivities.sortOrder);
+  }
+
+  async createExecutionPlanActivity(activity: InsertExecutionPlanActivity): Promise<ExecutionPlanActivity> {
+    const [created] = await db.insert(executionPlanActivities).values(activity).returning();
+    return created;
+  }
+
+  async updateExecutionPlanActivity(id: string, activity: Partial<InsertExecutionPlanActivity>): Promise<ExecutionPlanActivity | undefined> {
+    const [updated] = await db.update(executionPlanActivities)
+      .set(activity)
+      .where(eq(executionPlanActivities.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanActivity(id: string): Promise<void> {
+    await db.delete(executionPlanActivities).where(eq(executionPlanActivities.id, id));
+  }
+
+  // Manpower
+  async getExecutionPlanManpower(planId: string): Promise<ExecutionPlanManpower[]> {
+    return await db.select().from(executionPlanManpower)
+      .where(eq(executionPlanManpower.planId, planId))
+      .orderBy(executionPlanManpower.sortOrder);
+  }
+
+  async createExecutionPlanManpowerItem(item: InsertExecutionPlanManpower): Promise<ExecutionPlanManpower> {
+    const [created] = await db.insert(executionPlanManpower).values(item).returning();
+    return created;
+  }
+
+  async updateExecutionPlanManpowerItem(id: string, item: Partial<InsertExecutionPlanManpower>): Promise<ExecutionPlanManpower | undefined> {
+    const [updated] = await db.update(executionPlanManpower)
+      .set(item)
+      .where(eq(executionPlanManpower.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanManpowerItem(id: string): Promise<void> {
+    await db.delete(executionPlanManpower).where(eq(executionPlanManpower.id, id));
+  }
+
+  // Godown Items
+  async getExecutionPlanGodownItems(planId: string): Promise<ExecutionPlanGodownItem[]> {
+    return await db.select().from(executionPlanGodownItems)
+      .where(eq(executionPlanGodownItems.planId, planId))
+      .orderBy(executionPlanGodownItems.sortOrder);
+  }
+
+  async createExecutionPlanGodownItem(item: InsertExecutionPlanGodownItem): Promise<ExecutionPlanGodownItem> {
+    const [created] = await db.insert(executionPlanGodownItems).values(item).returning();
+    return created;
+  }
+
+  async updateExecutionPlanGodownItem(id: string, item: Partial<InsertExecutionPlanGodownItem>): Promise<ExecutionPlanGodownItem | undefined> {
+    const [updated] = await db.update(executionPlanGodownItems)
+      .set(item)
+      .where(eq(executionPlanGodownItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanGodownItem(id: string): Promise<void> {
+    await db.delete(executionPlanGodownItems).where(eq(executionPlanGodownItems.id, id));
+  }
+
+  // Rentals
+  async getExecutionPlanRentals(planId: string): Promise<ExecutionPlanRental[]> {
+    return await db.select().from(executionPlanRentals)
+      .where(eq(executionPlanRentals.planId, planId))
+      .orderBy(executionPlanRentals.sortOrder);
+  }
+
+  async createExecutionPlanRental(rental: InsertExecutionPlanRental): Promise<ExecutionPlanRental> {
+    const [created] = await db.insert(executionPlanRentals).values(rental).returning();
+    return created;
+  }
+
+  async updateExecutionPlanRental(id: string, rental: Partial<InsertExecutionPlanRental>): Promise<ExecutionPlanRental | undefined> {
+    const [updated] = await db.update(executionPlanRentals)
+      .set(rental)
+      .where(eq(executionPlanRentals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanRental(id: string): Promise<void> {
+    await db.delete(executionPlanRentals).where(eq(executionPlanRentals.id, id));
+  }
+
+  // Purchases
+  async getExecutionPlanPurchases(planId: string): Promise<ExecutionPlanPurchase[]> {
+    return await db.select().from(executionPlanPurchases)
+      .where(eq(executionPlanPurchases.planId, planId))
+      .orderBy(executionPlanPurchases.sortOrder);
+  }
+
+  async createExecutionPlanPurchase(purchase: InsertExecutionPlanPurchase): Promise<ExecutionPlanPurchase> {
+    const [created] = await db.insert(executionPlanPurchases).values(purchase).returning();
+    return created;
+  }
+
+  async updateExecutionPlanPurchase(id: string, purchase: Partial<InsertExecutionPlanPurchase>): Promise<ExecutionPlanPurchase | undefined> {
+    const [updated] = await db.update(executionPlanPurchases)
+      .set(purchase)
+      .where(eq(executionPlanPurchases.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanPurchase(id: string): Promise<void> {
+    await db.delete(executionPlanPurchases).where(eq(executionPlanPurchases.id, id));
+  }
+
+  // Prints
+  async getExecutionPlanPrints(planId: string): Promise<ExecutionPlanPrint[]> {
+    return await db.select().from(executionPlanPrints)
+      .where(eq(executionPlanPrints.planId, planId))
+      .orderBy(executionPlanPrints.sortOrder);
+  }
+
+  async createExecutionPlanPrint(print: InsertExecutionPlanPrint): Promise<ExecutionPlanPrint> {
+    const [created] = await db.insert(executionPlanPrints).values(print).returning();
+    return created;
+  }
+
+  async updateExecutionPlanPrint(id: string, print: Partial<InsertExecutionPlanPrint>): Promise<ExecutionPlanPrint | undefined> {
+    const [updated] = await db.update(executionPlanPrints)
+      .set(print)
+      .where(eq(executionPlanPrints.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteExecutionPlanPrint(id: string): Promise<void> {
+    await db.delete(executionPlanPrints).where(eq(executionPlanPrints.id, id));
+  }
+
+  // Get full execution plan with all sections
+  async getFullExecutionPlan(planId: string): Promise<{
+    plan: ExecutionPlan | undefined;
+    checklist: ExecutionPlanChecklist[];
+    items: ExecutionPlanItem[];
+    activities: ExecutionPlanActivity[];
+    manpower: ExecutionPlanManpower[];
+    godownItems: ExecutionPlanGodownItem[];
+    rentals: ExecutionPlanRental[];
+    purchases: ExecutionPlanPurchase[];
+    prints: ExecutionPlanPrint[];
+  }> {
+    const [plan, checklist, items, activities, manpower, godownItems, rentals, purchases, prints] = await Promise.all([
+      this.getExecutionPlan(planId),
+      this.getExecutionPlanChecklist(planId),
+      this.getExecutionPlanItems(planId),
+      this.getExecutionPlanActivities(planId),
+      this.getExecutionPlanManpower(planId),
+      this.getExecutionPlanGodownItems(planId),
+      this.getExecutionPlanRentals(planId),
+      this.getExecutionPlanPurchases(planId),
+      this.getExecutionPlanPrints(planId),
+    ]);
+    return { plan, checklist, items, activities, manpower, godownItems, rentals, purchases, prints };
   }
 }
 

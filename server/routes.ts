@@ -6978,5 +6978,394 @@ export async function registerRoutes(
     res.json(optedInEmployees);
   });
 
+  // ===========================
+  // EXECUTION PLAN ROUTES
+  // ===========================
+
+  // Main Execution Plans
+  app.get('/api/execution-plans', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { eventId } = req.query;
+    if (eventId && typeof eventId === 'string') {
+      const plans = await storage.getExecutionPlansByEvent(eventId);
+      return res.json(plans);
+    }
+    const plans = await storage.getAllExecutionPlans();
+    res.json(plans);
+  });
+
+  app.get('/api/execution-plans/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const plan = await storage.getExecutionPlan(req.params.id);
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    res.json(plan);
+  });
+
+  app.get('/api/execution-plans/:id/full', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const fullPlan = await storage.getFullExecutionPlan(req.params.id);
+    if (!fullPlan.plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    res.json(fullPlan);
+  });
+
+  app.post('/api/execution-plans', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { eventId, title, description, status } = req.body;
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return res.status(400).json({ error: 'Plan title is required' });
+    }
+    const plan = await storage.createExecutionPlan({
+      eventId: eventId || null,
+      title: title.trim(),
+      description: description || null,
+      status: status || 'draft',
+      createdBy: req.session.userId,
+    });
+    res.json(plan);
+  });
+
+  app.put('/api/execution-plans/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const plan = await storage.updateExecutionPlan(req.params.id, req.body);
+    if (!plan) {
+      return res.status(404).json({ error: 'Plan not found' });
+    }
+    res.json(plan);
+  });
+
+  app.delete('/api/execution-plans/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlan(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Checklist Items
+  app.get('/api/execution-plans/:planId/checklist', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const items = await storage.getExecutionPlanChecklist(req.params.planId);
+    res.json(items);
+  });
+
+  app.post('/api/execution-plans/:planId/checklist', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.createExecutionPlanChecklistItem({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(item);
+  });
+
+  app.put('/api/execution-plan-checklist/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.updateExecutionPlanChecklistItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/execution-plan-checklist/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanChecklistItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Item List
+  app.get('/api/execution-plans/:planId/items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const items = await storage.getExecutionPlanItems(req.params.planId);
+    res.json(items);
+  });
+
+  app.post('/api/execution-plans/:planId/items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.createExecutionPlanItem({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(item);
+  });
+
+  app.put('/api/execution-plan-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.updateExecutionPlanItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/execution-plan-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Activities (Production Plan)
+  app.get('/api/execution-plans/:planId/activities', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const activities = await storage.getExecutionPlanActivities(req.params.planId);
+    res.json(activities);
+  });
+
+  app.post('/api/execution-plans/:planId/activities', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const activity = await storage.createExecutionPlanActivity({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(activity);
+  });
+
+  app.put('/api/execution-plan-activities/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const activity = await storage.updateExecutionPlanActivity(req.params.id, req.body);
+    if (!activity) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+    res.json(activity);
+  });
+
+  app.delete('/api/execution-plan-activities/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanActivity(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Manpower
+  app.get('/api/execution-plans/:planId/manpower', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const items = await storage.getExecutionPlanManpower(req.params.planId);
+    res.json(items);
+  });
+
+  app.post('/api/execution-plans/:planId/manpower', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.createExecutionPlanManpowerItem({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(item);
+  });
+
+  app.put('/api/execution-plan-manpower/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.updateExecutionPlanManpowerItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/execution-plan-manpower/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanManpowerItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Godown Items
+  app.get('/api/execution-plans/:planId/godown-items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const items = await storage.getExecutionPlanGodownItems(req.params.planId);
+    res.json(items);
+  });
+
+  app.post('/api/execution-plans/:planId/godown-items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.createExecutionPlanGodownItem({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(item);
+  });
+
+  app.put('/api/execution-plan-godown-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const item = await storage.updateExecutionPlanGodownItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/execution-plan-godown-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanGodownItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Rentals
+  app.get('/api/execution-plans/:planId/rentals', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const rentals = await storage.getExecutionPlanRentals(req.params.planId);
+    res.json(rentals);
+  });
+
+  app.post('/api/execution-plans/:planId/rentals', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const rental = await storage.createExecutionPlanRental({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(rental);
+  });
+
+  app.put('/api/execution-plan-rentals/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const rental = await storage.updateExecutionPlanRental(req.params.id, req.body);
+    if (!rental) {
+      return res.status(404).json({ error: 'Rental not found' });
+    }
+    res.json(rental);
+  });
+
+  app.delete('/api/execution-plan-rentals/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanRental(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Purchases
+  app.get('/api/execution-plans/:planId/purchases', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const purchases = await storage.getExecutionPlanPurchases(req.params.planId);
+    res.json(purchases);
+  });
+
+  app.post('/api/execution-plans/:planId/purchases', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const purchase = await storage.createExecutionPlanPurchase({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(purchase);
+  });
+
+  app.put('/api/execution-plan-purchases/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const purchase = await storage.updateExecutionPlanPurchase(req.params.id, req.body);
+    if (!purchase) {
+      return res.status(404).json({ error: 'Purchase not found' });
+    }
+    res.json(purchase);
+  });
+
+  app.delete('/api/execution-plan-purchases/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanPurchase(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Prints
+  app.get('/api/execution-plans/:planId/prints', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const prints = await storage.getExecutionPlanPrints(req.params.planId);
+    res.json(prints);
+  });
+
+  app.post('/api/execution-plans/:planId/prints', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const print = await storage.createExecutionPlanPrint({
+      planId: req.params.planId,
+      ...req.body,
+    });
+    res.json(print);
+  });
+
+  app.put('/api/execution-plan-prints/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const print = await storage.updateExecutionPlanPrint(req.params.id, req.body);
+    if (!print) {
+      return res.status(404).json({ error: 'Print not found' });
+    }
+    res.json(print);
+  });
+
+  app.delete('/api/execution-plan-prints/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteExecutionPlanPrint(req.params.id);
+    res.json({ success: true });
+  });
+
   return httpServer;
 }
