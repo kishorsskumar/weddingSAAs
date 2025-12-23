@@ -63,9 +63,10 @@ import { cn } from "@/lib/utils";
 
 type Event = {
   id: string;
-  customerName: string;
-  eventType: string;
-  eventDate: string;
+  title: string;
+  customer: string;
+  type: string;
+  date: string;
   venue: string | null;
 };
 
@@ -147,9 +148,10 @@ export default function ExecutionPlanPage() {
   const selectedEvent = selectedPlan?.eventId ? events.find(e => e.id === selectedPlan.eventId) : null;
 
   const filteredEvents = events.filter(event =>
-    event.customerName.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
-    event.eventType.toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
-    event.venue?.toLowerCase().includes(eventSearchQuery.toLowerCase())
+    (event.customer || "").toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+    (event.title || "").toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+    (event.type || "").toLowerCase().includes(eventSearchQuery.toLowerCase()) ||
+    (event.venue || "").toLowerCase().includes(eventSearchQuery.toLowerCase())
   );
 
   const createPlanMutation = useMutation({
@@ -218,7 +220,7 @@ export default function ExecutionPlanPage() {
               <h1 className="text-xl font-semibold">{selectedPlan.title}</h1>
               {selectedEvent && (
                 <p className="text-sm text-muted-foreground">
-                  {selectedEvent.customerName} - {selectedEvent.eventType} ({format(new Date(selectedEvent.eventDate), "MMM d, yyyy")})
+                  {selectedEvent.customer} - {selectedEvent.type} ({selectedEvent.date ? format(new Date(selectedEvent.date), "MMM d, yyyy") : "No date"})
                 </p>
               )}
             </div>
@@ -315,7 +317,7 @@ export default function ExecutionPlanPage() {
                       data-testid="button-select-event"
                     >
                       {newPlanEventId
-                        ? events.find(e => e.id === newPlanEventId)?.customerName || "Select event..."
+                        ? events.find(e => e.id === newPlanEventId)?.title || "Select event..."
                         : "Select event..."}
                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -340,9 +342,9 @@ export default function ExecutionPlanPage() {
                               }}
                             >
                               <div className="flex flex-col">
-                                <span className="font-medium">{event.customerName}</span>
+                                <span className="font-medium">{event.title}</span>
                                 <span className="text-xs text-muted-foreground">
-                                  {event.eventType} - {format(new Date(event.eventDate), "MMM d, yyyy")}
+                                  {event.customer} - {event.date ? format(new Date(event.date), "MMM d, yyyy") : "No date"}
                                 </span>
                               </div>
                             </CommandItem>
@@ -399,11 +401,11 @@ export default function ExecutionPlanPage() {
                   <div className="text-sm text-muted-foreground mb-2">
                     <div className="flex items-center gap-1">
                       <User className="h-3.5 w-3.5" />
-                      {event.customerName}
+                      {event.customer}
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="h-3.5 w-3.5" />
-                      {format(new Date(event.eventDate), "MMM d, yyyy")}
+                      {event.date ? format(new Date(event.date), "MMM d, yyyy") : "No date"}
                     </div>
                   </div>
                 )}
