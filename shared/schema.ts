@@ -1358,3 +1358,198 @@ export const whatsappMessageLogs = pgTable("whatsapp_message_logs", {
 export const insertWhatsappMessageLogSchema = createInsertSchema(whatsappMessageLogs).omit({ id: true, createdAt: true });
 export type InsertWhatsappMessageLog = z.infer<typeof insertWhatsappMessageLogSchema>;
 export type WhatsappMessageLog = typeof whatsappMessageLogs.$inferSelect;
+
+// ===========================
+// EVENT EXECUTION PLAN TABLES
+// ===========================
+
+// Execution Plans - Main container linked to events
+export const executionPlans = pgTable("execution_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default('draft'), // 'draft', 'active', 'completed'
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertExecutionPlanSchema = createInsertSchema(executionPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertExecutionPlan = z.infer<typeof insertExecutionPlanSchema>;
+export type ExecutionPlan = typeof executionPlans.$inferSelect;
+
+// Execution Plan Checklist Items - Items needed with qty, vendor, check status
+export const executionPlanChecklist = pgTable("execution_plan_checklist", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  sectionLabel: text("section_label"), // Group label like "COMMON LIGHTING", "21st Nov - HALDI", etc.
+  isSection: boolean("is_section").default(false), // True if this is a section header
+  itemDescription: text("item_description").notNull(),
+  quantity: integer("quantity").default(1),
+  unit: text("unit").default('Nos'),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"),
+  isChecked: boolean("is_checked").default(false),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanChecklistSchema = createInsertSchema(executionPlanChecklist).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanChecklist = z.infer<typeof insertExecutionPlanChecklistSchema>;
+export type ExecutionPlanChecklist = typeof executionPlanChecklist.$inferSelect;
+
+// Execution Plan Item List - Detailed items organized by day
+export const executionPlanItems = pgTable("execution_plan_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  dayLabel: text("day_label"), // "Day 1 : 29th November - Ring Exchange"
+  sectionLabel: text("section_label"), // Sub-section like "SHADES, FURNITURES"
+  isSection: boolean("is_section").default(false),
+  itemDescription: text("item_description").notNull(),
+  quantity: integer("quantity").default(1),
+  unit: text("unit").default('Nos'),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanItemSchema = createInsertSchema(executionPlanItems).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanItem = z.infer<typeof insertExecutionPlanItemSchema>;
+export type ExecutionPlanItem = typeof executionPlanItems.$inferSelect;
+
+// Execution Plan Activities - Production timeline with date, activity, times, responsible persons
+export const executionPlanActivities = pgTable("execution_plan_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  activityDate: date("activity_date"),
+  dateLabel: text("date_label"), // "18 Nov, Tuesday"
+  slNo: integer("sl_no"),
+  activity: text("activity").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  responsiblePersonId: varchar("responsible_person_id").references(() => users.id),
+  responsiblePersonName: text("responsible_person_name"),
+  status: text("status").notNull().default('pending'), // 'pending', 'in_progress', 'completed'
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanActivitySchema = createInsertSchema(executionPlanActivities).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanActivity = z.infer<typeof insertExecutionPlanActivitySchema>;
+export type ExecutionPlanActivity = typeof executionPlanActivities.$inferSelect;
+
+// Execution Plan Manpower - Staff assignments per activity/date
+export const executionPlanManpower = pgTable("execution_plan_manpower", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  activityDate: date("activity_date"),
+  dateLabel: text("date_label"),
+  slNo: integer("sl_no"),
+  role: text("role").notNull(),
+  personName: text("person_name"),
+  personId: varchar("person_id").references(() => users.id),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanManpowerSchema = createInsertSchema(executionPlanManpower).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanManpower = z.infer<typeof insertExecutionPlanManpowerSchema>;
+export type ExecutionPlanManpower = typeof executionPlanManpower.$inferSelect;
+
+// Execution Plan Godown Items - Warehouse items to be used
+export const executionPlanGodownItems = pgTable("execution_plan_godown_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  itemDescription: text("item_description").notNull(),
+  quantity: integer("quantity").default(1),
+  unit: text("unit").default('Nos'),
+  linkedInventoryItemId: varchar("linked_inventory_item_id").references(() => inventoryItems.id),
+  issuedDate: date("issued_date"),
+  returnedDate: date("returned_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanGodownItemSchema = createInsertSchema(executionPlanGodownItems).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanGodownItem = z.infer<typeof insertExecutionPlanGodownItemSchema>;
+export type ExecutionPlanGodownItem = typeof executionPlanGodownItems.$inferSelect;
+
+// Execution Plan Rentals - Rental items from vendors
+export const executionPlanRentals = pgTable("execution_plan_rentals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  itemDescription: text("item_description").notNull(),
+  quantity: integer("quantity").default(1),
+  unit: text("unit").default('Nos'),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"),
+  rentalDate: date("rental_date"),
+  returnDate: date("return_date"),
+  unitRate: decimal("unit_rate", { precision: 12, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }),
+  status: text("status").default('pending'), // 'pending', 'rented', 'returned'
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanRentalSchema = createInsertSchema(executionPlanRentals).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanRental = z.infer<typeof insertExecutionPlanRentalSchema>;
+export type ExecutionPlanRental = typeof executionPlanRentals.$inferSelect;
+
+// Execution Plan Purchases - Items to buy
+export const executionPlanPurchases = pgTable("execution_plan_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  sectionLabel: text("section_label"), // "GODOWN", "MARKET", etc.
+  itemDescription: text("item_description").notNull(),
+  quantity: text("quantity"), // Can be "30 m", "1 packet", etc.
+  unit: text("unit"),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"),
+  estimatedCost: decimal("estimated_cost", { precision: 12, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 12, scale: 2 }),
+  isPurchased: boolean("is_purchased").default(false),
+  purchasedDate: date("purchased_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanPurchaseSchema = createInsertSchema(executionPlanPurchases).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanPurchase = z.infer<typeof insertExecutionPlanPurchaseSchema>;
+export type ExecutionPlanPurchase = typeof executionPlanPurchases.$inferSelect;
+
+// Execution Plan Prints - Print materials needed
+export const executionPlanPrints = pgTable("execution_plan_prints", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planId: varchar("plan_id").notNull().references(() => executionPlans.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  itemDescription: text("item_description").notNull(),
+  size: text("size"), // "24x12ft", "5x2ft"
+  quantity: integer("quantity").default(1),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"),
+  estimatedCost: decimal("estimated_cost", { precision: 12, scale: 2 }),
+  isPrinted: boolean("is_printed").default(false),
+  printedDate: date("printed_date"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertExecutionPlanPrintSchema = createInsertSchema(executionPlanPrints).omit({ id: true, createdAt: true });
+export type InsertExecutionPlanPrint = z.infer<typeof insertExecutionPlanPrintSchema>;
+export type ExecutionPlanPrint = typeof executionPlanPrints.$inferSelect;
