@@ -229,7 +229,7 @@ export default function ExecutionPlanPage() {
             </Badge>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4 flex-1 flex flex-col">
             <TabsList className="grid grid-cols-8 w-full max-w-4xl">
               {SECTION_TABS.map((tab) => (
                 <TabsTrigger
@@ -243,34 +243,34 @@ export default function ExecutionPlanPage() {
                 </TabsTrigger>
               ))}
             </TabsList>
-          </Tabs>
-        </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          <TabsContent value="checklist" className="m-0 h-full">
-            <ChecklistSection planId={selectedPlan.id} employees={employees} />
-          </TabsContent>
-          <TabsContent value="items" className="m-0 h-full">
-            <ItemListSection planId={selectedPlan.id} inventory={inventory} />
-          </TabsContent>
-          <TabsContent value="activities" className="m-0 h-full">
-            <ActivitiesSection planId={selectedPlan.id} employees={employees} />
-          </TabsContent>
-          <TabsContent value="manpower" className="m-0 h-full">
-            <ManpowerSection planId={selectedPlan.id} employees={employees} />
-          </TabsContent>
-          <TabsContent value="godown-items" className="m-0 h-full">
-            <GodownItemsSection planId={selectedPlan.id} inventory={inventory} />
-          </TabsContent>
-          <TabsContent value="rentals" className="m-0 h-full">
-            <RentalsSection planId={selectedPlan.id} vendors={vendors} />
-          </TabsContent>
-          <TabsContent value="purchases" className="m-0 h-full">
-            <PurchasesSection planId={selectedPlan.id} vendors={vendors} />
-          </TabsContent>
-          <TabsContent value="prints" className="m-0 h-full">
-            <PrintsSection planId={selectedPlan.id} />
-          </TabsContent>
+            <div className="flex-1 overflow-auto p-4">
+              <TabsContent value="checklist" className="m-0 h-full">
+                <ChecklistSection planId={selectedPlan.id} employees={employees} />
+              </TabsContent>
+              <TabsContent value="items" className="m-0 h-full">
+                <ItemListSection planId={selectedPlan.id} inventory={inventory} />
+              </TabsContent>
+              <TabsContent value="activities" className="m-0 h-full">
+                <ActivitiesSection planId={selectedPlan.id} employees={employees} />
+              </TabsContent>
+              <TabsContent value="manpower" className="m-0 h-full">
+                <ManpowerSection planId={selectedPlan.id} employees={employees} />
+              </TabsContent>
+              <TabsContent value="godown-items" className="m-0 h-full">
+                <GodownItemsSection planId={selectedPlan.id} inventory={inventory} />
+              </TabsContent>
+              <TabsContent value="rentals" className="m-0 h-full">
+                <RentalsSection planId={selectedPlan.id} vendors={vendors} />
+              </TabsContent>
+              <TabsContent value="purchases" className="m-0 h-full">
+                <PurchasesSection planId={selectedPlan.id} vendors={vendors} />
+              </TabsContent>
+              <TabsContent value="prints" className="m-0 h-full">
+                <PrintsSection planId={selectedPlan.id} />
+              </TabsContent>
+            </div>
+          </Tabs>
         </div>
       </div>
     );
