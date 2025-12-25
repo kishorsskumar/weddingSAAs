@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ChevronLeft, Pencil, Trash2, RefreshCw, CheckCircle2, Clock, AlertTriangle, Calendar, MapPin, User } from "lucide-react";
+import { Plus, ChevronLeft, Pencil, Trash2, RefreshCw, CheckCircle2, Clock, AlertTriangle, Calendar, MapPin, User, ChevronDown, ChevronUp, Rocket, Palette, ShoppingCart, Truck, CalendarDays, PartyPopper, PackageCheck } from "lucide-react";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { Link } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface PendingMilestone extends EventMilestone {
   event?: Event;
@@ -222,54 +223,620 @@ export default function EventMilestones() {
     );
   };
 
-  const MilestoneRow = ({ milestone }: { milestone: EventMilestone }) => {
+  // Phase icons and colors
+  const phaseConfig: Record<number, { icon: any; color: string; bgColor: string }> = {
+    1: { icon: Rocket, color: 'text-blue-400', bgColor: 'bg-blue-500' },
+    2: { icon: Palette, color: 'text-purple-400', bgColor: 'bg-purple-500' },
+    3: { icon: ShoppingCart, color: 'text-amber-400', bgColor: 'bg-amber-500' },
+    4: { icon: Truck, color: 'text-teal-400', bgColor: 'bg-teal-500' },
+    5: { icon: CalendarDays, color: 'text-pink-400', bgColor: 'bg-pink-500' },
+    6: { icon: PartyPopper, color: 'text-green-400', bgColor: 'bg-green-500' },
+    7: { icon: PackageCheck, color: 'text-indigo-400', bgColor: 'bg-indigo-500' },
+  };
+
+  // Visual Flow Diagram Component
+  const MilestoneFlowDiagram = () => {
+    const [expandedPhase, setExpandedPhase] = useState<number | null>(null);
+    
+    const phases = [1, 2, 3, 4, 5, 6, 7];
+    
+    const getPhaseStats = (phase: number) => {
+      const phaseData = groupedMilestones[phase];
+      const total = phaseData.milestones.length;
+      const completed = phaseData.milestones.filter(m => m.status === 'completed').length;
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+      const isComplete = total > 0 && completed === total;
+      const hasOverdue = phaseData.milestones.some(m => 
+        m.status !== 'completed' && isBefore(parseISO(m.date), startOfDay(new Date()))
+      );
+      return { total, completed, progress, isComplete, hasOverdue, phaseName: phaseData.phaseName };
+    };
+
+    // Calculate overall progress
+    const overallProgress = useMemo(() => {
+      const allMilestones = Object.values(groupedMilestones).flatMap(p => p.milestones);
+      const total = allMilestones.length;
+      const completed = allMilestones.filter(m => m.status === 'completed').length;
+      return total > 0 ? Math.round((completed / total) * 100) : 0;
+    }, [groupedMilestones]);
+
     return (
-      <div className="flex items-center justify-between py-3 px-4 border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className={cn(
-            "w-2 h-2 rounded-full flex-shrink-0",
-            milestone.status === 'completed' ? "bg-green-500" : "bg-slate-500"
-          )} />
-          <span className="text-sm truncate">{milestone.name}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted-foreground whitespace-nowrap">
-            {formatDate(milestone.date)}{milestone.time ? `, ${milestone.time}` : ''}
-          </span>
-          <Select
-            value={milestone.status}
-            onValueChange={(value) => updateMilestoneMutation.mutate({ id: milestone.id, data: { status: value as any } })}
-          >
-            <SelectTrigger className={cn(
-              "w-[120px] h-8 text-xs",
-              milestone.status === 'completed' 
-                ? "bg-green-900/30 border-green-700 text-green-400" 
-                : "bg-red-900/30 border-red-700 text-red-400"
-            )} data-testid={`select-status-${milestone.id}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          {isAdmin && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-              onClick={() => {
-                if (confirm('Delete this milestone?')) {
-                  deleteMilestoneMutation.mutate(milestone.id);
-                }
-              }}
-              data-testid={`button-delete-milestone-${milestone.id}`}
+      <div className="space-y-6">
+        {/* Overall Progress Header */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-r from-green-900/30 via-emerald-900/20 to-green-900/30 rounded-2xl p-6 border border-green-700/30"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-white">Project Progress</h3>
+              <p className="text-sm text-muted-foreground">{selectedEvent?.customer} - {selectedEvent?.venue}</p>
+            </div>
+            <div className="text-right">
+              <motion.div 
+                className="text-4xl font-bold text-green-400"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+              >
+                {overallProgress}%
+              </motion.div>
+              <p className="text-xs text-muted-foreground">Complete</p>
+            </div>
+          </div>
+          <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-gradient-to-r from-green-600 to-emerald-400 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${overallProgress}%` }}
+              transition={{ duration: 1, ease: "easeOut", delay: 0.3 }}
+            />
+          </div>
+        </motion.div>
+
+        {/* S-Curve Flow Diagram */}
+        <div className="relative py-8">
+          {/* Flow Path Background */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#6b9937" stopOpacity="0.3" />
+                <stop offset="50%" stopColor="#22c55e" stopOpacity="0.5" />
+                <stop offset="100%" stopColor="#6b9937" stopOpacity="0.3" />
+              </linearGradient>
+            </defs>
+          </svg>
+
+          {/* Phase Cards in S-Curve Layout */}
+          <div className="space-y-4">
+            {/* Row 1: Phases 1-3 (left to right) */}
+            <motion.div 
+              className="grid grid-cols-3 gap-4"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <Trash2 className="h-3 w-3" />
-            </Button>
+              {phases.slice(0, 3).map((phase, idx) => {
+                const stats = getPhaseStats(phase);
+                const config = phaseConfig[phase];
+                const Icon = config.icon;
+                
+                return (
+                  <motion.div
+                    key={phase}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)}
+                    className={cn(
+                      "relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-300",
+                      stats.isComplete 
+                        ? "bg-green-900/30 border-green-500/50 shadow-lg shadow-green-500/20" 
+                        : stats.hasOverdue
+                        ? "bg-red-900/20 border-red-500/50"
+                        : "bg-slate-900/50 border-slate-700/50 hover:border-slate-600",
+                      expandedPhase === phase && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    )}
+                    data-testid={`phase-card-${phase}`}
+                  >
+                    {/* Connector Arrow */}
+                    {idx < 2 && (
+                      <div className="absolute -right-4 top-1/2 -translate-y-1/2 z-10">
+                        <motion.div 
+                          className={cn(
+                            "w-8 h-1 rounded",
+                            stats.isComplete ? "bg-green-500" : "bg-slate-600"
+                          )}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ delay: 0.5 + idx * 0.1 }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        stats.isComplete ? "bg-green-500/20" : "bg-slate-800"
+                      )}>
+                        <Icon className={cn("w-6 h-6", stats.isComplete ? "text-green-400" : config.color)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-muted-foreground">Phase {phase}</span>
+                          {stats.isComplete && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 500 }}
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            </motion.div>
+                          )}
+                          {stats.hasOverdue && (
+                            <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+                          )}
+                        </div>
+                        <h4 className="text-sm font-semibold truncate">{stats.phaseName}</h4>
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                            <span>{stats.completed}/{stats.total} tasks</span>
+                            <span>{stats.progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              className={cn(
+                                "h-full rounded-full",
+                                stats.isComplete ? "bg-green-500" : stats.hasOverdue ? "bg-red-500" : "bg-amber-500"
+                              )}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${stats.progress}%` }}
+                              transition={{ duration: 0.8, delay: 0.2 + idx * 0.1 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Expand indicator */}
+                    <div className="absolute bottom-2 right-2">
+                      {expandedPhase === phase ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            {/* Expanded Phase Details for Row 1 */}
+            <AnimatePresence>
+              {expandedPhase && expandedPhase <= 3 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <PhaseDetails phase={expandedPhase} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Curved Connector */}
+            <div className="flex justify-end pr-8">
+              <motion.div 
+                className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-700 rounded-full"
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ delay: 0.6 }}
+              />
+            </div>
+
+            {/* Row 2: Phases 4-5 (right to left) */}
+            <motion.div 
+              className="grid grid-cols-3 gap-4"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <div /> {/* Empty space */}
+              {phases.slice(3, 5).reverse().map((phase, idx) => {
+                const stats = getPhaseStats(phase);
+                const config = phaseConfig[phase];
+                const Icon = config.icon;
+                
+                return (
+                  <motion.div
+                    key={phase}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 + idx * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)}
+                    className={cn(
+                      "relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-300",
+                      stats.isComplete 
+                        ? "bg-green-900/30 border-green-500/50 shadow-lg shadow-green-500/20" 
+                        : stats.hasOverdue
+                        ? "bg-red-900/20 border-red-500/50"
+                        : "bg-slate-900/50 border-slate-700/50 hover:border-slate-600",
+                      expandedPhase === phase && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    )}
+                    data-testid={`phase-card-${phase}`}
+                  >
+                    {/* Connector Arrow */}
+                    {idx === 0 && (
+                      <div className="absolute -left-4 top-1/2 -translate-y-1/2 z-10">
+                        <motion.div 
+                          className={cn(
+                            "w-8 h-1 rounded",
+                            stats.isComplete ? "bg-green-500" : "bg-slate-600"
+                          )}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ delay: 0.7 }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        stats.isComplete ? "bg-green-500/20" : "bg-slate-800"
+                      )}>
+                        <Icon className={cn("w-6 h-6", stats.isComplete ? "text-green-400" : config.color)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-muted-foreground">Phase {phase}</span>
+                          {stats.isComplete && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 500 }}
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            </motion.div>
+                          )}
+                          {stats.hasOverdue && (
+                            <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+                          )}
+                        </div>
+                        <h4 className="text-sm font-semibold truncate">{stats.phaseName}</h4>
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                            <span>{stats.completed}/{stats.total} tasks</span>
+                            <span>{stats.progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              className={cn(
+                                "h-full rounded-full",
+                                stats.isComplete ? "bg-green-500" : stats.hasOverdue ? "bg-red-500" : "bg-amber-500"
+                              )}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${stats.progress}%` }}
+                              transition={{ duration: 0.8, delay: 0.5 + idx * 0.1 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="absolute bottom-2 right-2">
+                      {expandedPhase === phase ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            {/* Expanded Phase Details for Row 2 */}
+            <AnimatePresence>
+              {expandedPhase && expandedPhase >= 4 && expandedPhase <= 5 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <PhaseDetails phase={expandedPhase} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Curved Connector */}
+            <div className="flex justify-start pl-8">
+              <motion.div 
+                className="w-1 h-8 bg-gradient-to-b from-slate-700 to-slate-600 rounded-full"
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ delay: 0.8 }}
+              />
+            </div>
+
+            {/* Row 3: Phases 6-7 (left to right) */}
+            <motion.div 
+              className="grid grid-cols-3 gap-4"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+            >
+              {phases.slice(5, 7).map((phase, idx) => {
+                const stats = getPhaseStats(phase);
+                const config = phaseConfig[phase];
+                const Icon = config.icon;
+                
+                return (
+                  <motion.div
+                    key={phase}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.7 + idx * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)}
+                    className={cn(
+                      "relative cursor-pointer rounded-xl p-4 border-2 transition-all duration-300",
+                      stats.isComplete 
+                        ? "bg-green-900/30 border-green-500/50 shadow-lg shadow-green-500/20" 
+                        : stats.hasOverdue
+                        ? "bg-red-900/20 border-red-500/50"
+                        : "bg-slate-900/50 border-slate-700/50 hover:border-slate-600",
+                      expandedPhase === phase && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    )}
+                    data-testid={`phase-card-${phase}`}
+                  >
+                    {/* Connector Arrow */}
+                    {idx === 0 && (
+                      <div className="absolute -right-4 top-1/2 -translate-y-1/2 z-10">
+                        <motion.div 
+                          className={cn(
+                            "w-8 h-1 rounded",
+                            stats.isComplete ? "bg-green-500" : "bg-slate-600"
+                          )}
+                          initial={{ scaleX: 0 }}
+                          animate={{ scaleX: 1 }}
+                          transition={{ delay: 0.9 }}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center",
+                        stats.isComplete ? "bg-green-500/20" : "bg-slate-800"
+                      )}>
+                        <Icon className={cn("w-6 h-6", stats.isComplete ? "text-green-400" : config.color)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-muted-foreground">Phase {phase}</span>
+                          {stats.isComplete && (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 500 }}
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-green-400" />
+                            </motion.div>
+                          )}
+                          {stats.hasOverdue && (
+                            <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
+                          )}
+                        </div>
+                        <h4 className="text-sm font-semibold truncate">{stats.phaseName}</h4>
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                            <span>{stats.completed}/{stats.total} tasks</span>
+                            <span>{stats.progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <motion.div 
+                              className={cn(
+                                "h-full rounded-full",
+                                stats.isComplete ? "bg-green-500" : stats.hasOverdue ? "bg-red-500" : "bg-amber-500"
+                              )}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${stats.progress}%` }}
+                              transition={{ duration: 0.8, delay: 0.8 + idx * 0.1 }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="absolute bottom-2 right-2">
+                      {expandedPhase === phase ? (
+                        <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+              <div /> {/* Empty space */}
+            </motion.div>
+
+            {/* Expanded Phase Details for Row 3 */}
+            <AnimatePresence>
+              {expandedPhase && expandedPhase >= 6 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden"
+                >
+                  <PhaseDetails phase={expandedPhase} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <motion.div 
+          className="flex items-center justify-center gap-6 text-xs text-muted-foreground"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span>Completed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-amber-500" />
+            <span>In Progress</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+            <span>Overdue</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-slate-600" />
+            <span>Pending</span>
+          </div>
+        </motion.div>
+      </div>
+    );
+  };
+
+  // Phase Details Component (shows individual milestones)
+  const PhaseDetails = ({ phase }: { phase: number }) => {
+    const phaseData = groupedMilestones[phase];
+    
+    return (
+      <motion.div 
+        className="bg-slate-900/50 rounded-xl border border-slate-700/50 p-4 mt-2"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-semibold text-amber-400">
+            Phase {phase} - {phaseData.phaseName} Tasks
+          </h4>
+          {isAdmin && (
+            <Dialog open={addingToPhase === phase} onOpenChange={(open) => !open && setAddingToPhase(null)}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => setAddingToPhase(phase)}
+                >
+                  <Plus className="h-3 w-3" /> Add Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Add Milestone to Phase {phase}</DialogTitle>
+                </DialogHeader>
+                <AddMilestoneForm phase={phase} phaseName={phaseData.phaseName} />
+              </DialogContent>
+            </Dialog>
           )}
         </div>
-      </div>
+        
+        {phaseData.milestones.length === 0 ? (
+          <p className="text-center text-muted-foreground text-sm py-4">No tasks in this phase</p>
+        ) : (
+          <div className="space-y-2">
+            {phaseData.milestones.map((milestone, idx) => (
+              <motion.div
+                key={milestone.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className={cn(
+                  "flex items-center justify-between p-3 rounded-lg border transition-all",
+                  milestone.status === 'completed' 
+                    ? "bg-green-900/20 border-green-700/30" 
+                    : isBefore(parseISO(milestone.date), startOfDay(new Date()))
+                    ? "bg-red-900/20 border-red-700/30"
+                    : "bg-slate-800/50 border-slate-700/30"
+                )}
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <motion.div 
+                    className={cn(
+                      "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
+                      milestone.status === 'completed' ? "bg-green-500" : "bg-slate-700"
+                    )}
+                    whileHover={{ scale: 1.1 }}
+                  >
+                    {milestone.status === 'completed' ? (
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    ) : (
+                      <Clock className="w-3 h-3 text-slate-400" />
+                    )}
+                  </motion.div>
+                  <div className="min-w-0">
+                    <p className={cn(
+                      "text-sm truncate",
+                      milestone.status === 'completed' && "line-through text-muted-foreground"
+                    )}>
+                      {milestone.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(milestone.date)}{milestone.time ? ` at ${milestone.time}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={milestone.status}
+                    onValueChange={(value) => updateMilestoneMutation.mutate({ id: milestone.id, data: { status: value as any } })}
+                  >
+                    <SelectTrigger 
+                      className={cn(
+                        "w-[110px] h-8 text-xs",
+                        milestone.status === 'completed' 
+                          ? "bg-green-900/30 border-green-700 text-green-400" 
+                          : "bg-slate-800 border-slate-600"
+                      )}
+                      data-testid={`select-status-${milestone.id}`}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {isAdmin && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (confirm('Delete this milestone?')) {
+                          deleteMilestoneMutation.mutate(milestone.id);
+                        }
+                      }}
+                      data-testid={`button-delete-milestone-${milestone.id}`}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
     );
   };
 
@@ -462,79 +1029,7 @@ export default function EventMilestones() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {selectedEvent && (
-            <Card className="bg-slate-900/50 border-slate-700">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Pencil className="h-4 w-4 text-primary" />
-                    <span className="font-medium">{selectedEvent.customer}</span>
-                  </div>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-muted-foreground">{selectedEvent.venue}</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-muted-foreground">{formatDate(selectedEvent.date)}</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {[1, 2, 3, 4, 5, 6, 7].map((phase) => {
-            const phaseData = groupedMilestones[phase];
-            const completedCount = phaseData.milestones.filter(m => m.status === 'completed').length;
-            const totalCount = phaseData.milestones.length;
-
-            return (
-              <Card key={phase} className="bg-slate-900/30 border-slate-700/50 overflow-hidden">
-                <CardHeader className="py-3 px-4 bg-slate-800/50 border-b border-slate-700/50">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-amber-400 flex items-center gap-2">
-                      Phase {phase} - {phaseData.phaseName}
-                      {totalCount > 0 && (
-                        <span className="text-xs text-muted-foreground font-normal">
-                          ({completedCount}/{totalCount})
-                        </span>
-                      )}
-                    </CardTitle>
-                    {isAdmin && (
-                      <Dialog open={addingToPhase === phase} onOpenChange={(open) => !open && setAddingToPhase(null)}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 gap-1 text-xs text-muted-foreground hover:text-white"
-                            onClick={() => setAddingToPhase(phase)}
-                            data-testid={`button-add-to-phase-${phase}`}
-                          >
-                            <Plus className="h-3 w-3" /> Add
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-[95vw] sm:max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Add Milestone to Phase {phase}</DialogTitle>
-                          </DialogHeader>
-                          <AddMilestoneForm phase={phase} phaseName={phaseData.phaseName} />
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {phaseData.milestones.length === 0 ? (
-                    <div className="py-4 text-center text-muted-foreground text-sm">
-                      No milestones in this phase
-                    </div>
-                  ) : (
-                    phaseData.milestones.map((milestone) => (
-                      <MilestoneRow key={milestone.id} milestone={milestone} />
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <MilestoneFlowDiagram />
       )}
     </div>
   );
