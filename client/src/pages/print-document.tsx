@@ -4,8 +4,7 @@ import { format } from "date-fns";
 import logo from "@assets/OAK_1_1766646679471.jpg";
 
 // Oakstreet brand colors
-const BRAND_GREEN = '#2f6a31';  // Olive green from logo
-const BRAND_DARK_GREEN = '#1a4a1c';  // Darker shade for accents
+const BRAND_COLOR = '#2596be';  // Oakstreet brand color
 
 interface LineItem {
   slNo?: number;
@@ -217,10 +216,10 @@ const baseStyles = `
   .company-info { flex: 1; }
   .company-logo { width: 180px; height: 60px; background: white; padding: 4px; border-radius: 4px; margin-bottom: 8px; }
   .company-logo img { width: 100%; height: 100%; object-fit: contain; }
-  .company-name { font-size: 22px; font-weight: bold; color: #2f6a31; margin-bottom: 4px; }
+  .company-name { display: none; }
   .company-address { font-size: 11px; color: #444; line-height: 1.5; }
   .doc-type-box { text-align: right; }
-  .doc-type { font-size: 28px; font-weight: bold; color: #2f6a31; }
+  .doc-type { font-size: 28px; font-weight: bold; color: #2596be; }
   
   /* Document Info */
   .doc-info { margin-bottom: 15px; }
@@ -259,7 +258,7 @@ const baseStyles = `
   .totals-section { display: flex; justify-content: flex-end; margin-bottom: 15px; }
   .totals-table { width: 280px; }
   .totals-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
-  .totals-row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #2f6a31; border-bottom: none; padding-top: 8px; margin-top: 5px; }
+  .totals-row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #2596be; border-bottom: none; padding-top: 8px; margin-top: 5px; }
   .totals-label { }
   .totals-value { text-align: right; min-width: 100px; }
   
@@ -304,7 +303,7 @@ function QuotePrint({ estimate, customer, companySettings }: any) {
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#2f6a31' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-name" style={{ color: '#2596be' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
           <div className="company-address">
             {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
@@ -315,7 +314,7 @@ function QuotePrint({ estimate, customer, companySettings }: any) {
           </div>
         </div>
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#2f6a31' }}>Quote</div>
+          <div className="doc-type" style={{ color: '#2596be' }}>Quote</div>
         </div>
       </div>
 
@@ -470,7 +469,7 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#2f6a31' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-name" style={{ color: '#2596be' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
           <div className="company-address">
             {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
@@ -481,7 +480,7 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
           </div>
         </div>
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#2f6a31' }}>Tax Invoice</div>
+          <div className="doc-type" style={{ color: '#2596be' }}>Tax Invoice</div>
         </div>
       </div>
 
@@ -584,7 +583,7 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
               <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
             </div>
           )}
-          <div className="totals-row total-row" style={{ borderTopColor: '#2f6a31' }}>
+          <div className="totals-row total-row" style={{ borderTopColor: '#2596be' }}>
             <span className="totals-label">Total</span>
             <span className="totals-value">₹{formatIndianCurrency(parseFloat(invoice.total))}</span>
           </div>
@@ -670,7 +669,7 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#2f6a31' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-name" style={{ color: '#2596be' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
           <div className="company-address">
             {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
@@ -680,7 +679,7 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any
           </div>
         </div>
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#2f6a31' }}>Payment Receipt</div>
+          <div className="doc-type" style={{ color: '#2596be' }}>Payment Receipt</div>
         </div>
       </div>
 
@@ -716,12 +715,12 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any
         margin: '20px 0', 
         padding: '25px', 
         background: '#f0fdf4', 
-        border: '2px solid #2f6a31', 
+        border: '2px solid #2596be', 
         borderRadius: '8px',
         textAlign: 'center'
       }}>
         <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>Amount Received</div>
-        <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2f6a31' }}>
+        <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#2596be' }}>
           ₹{formatIndianCurrency(parseFloat(payment.amount))}
         </div>
         <div style={{ fontSize: '11px', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>
@@ -790,19 +789,19 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
     .checklist-table td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
     .checklist-table td.text-right { text-align: right; }
     .checklist-table td.text-center { text-align: center; }
-    .checklist-table .section-row td { background: #2f6a31; color: white; font-weight: bold; padding: 8px 6px; }
+    .checklist-table .section-row td { background: #2596be; color: white; font-weight: bold; padding: 8px 6px; }
     .checklist-table .sl-no { width: 35px; text-align: center; }
     .checklist-table .qty-col { width: 50px; text-align: center; }
     .checklist-table .vendor-col { width: 100px; }
     .checklist-table .status-col { width: 80px; text-align: center; }
-    .status-completed { color: #2f6a31; font-weight: bold; }
+    .status-completed { color: #2596be; font-weight: bold; }
     .status-pending { color: #666; }
     .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 8px; }
-    .progress-fill { height: 100%; background: #2f6a31; }
+    .progress-fill { height: 100%; background: #2596be; }
     .summary-box { display: flex; gap: 20px; margin-bottom: 20px; }
     .summary-item { padding: 10px 15px; background: #f0fdf4; border-radius: 6px; }
     .summary-label { font-size: 9px; color: #666; }
-    .summary-value { font-size: 16px; font-weight: bold; color: #2f6a31; }
+    .summary-value { font-size: 16px; font-weight: bold; color: #2596be; }
   `;
 
   const sortedItems = (checklist || []).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
@@ -820,7 +819,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#2f6a31' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-name" style={{ color: '#2596be' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
           <div className="company-address">
             {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
@@ -830,7 +829,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
           </div>
         </div>
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#2f6a31' }}>Production Checklist</div>
+          <div className="doc-type" style={{ color: '#2596be' }}>Production Checklist</div>
         </div>
       </div>
 
@@ -866,7 +865,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
         </div>
         <div className="summary-item">
           <div className="summary-label">Completed</div>
-          <div className="summary-value" style={{ color: '#2f6a31' }}>{completedItems}</div>
+          <div className="summary-value" style={{ color: '#2596be' }}>{completedItems}</div>
         </div>
         <div className="summary-item">
           <div className="summary-label">Pending</div>
