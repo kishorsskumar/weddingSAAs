@@ -1031,96 +1031,68 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true);
     try {
+      toast({ title: "Generating PDF...", description: "Please wait" });
+      
+      const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
-      await import("jspdf-autotable");
       
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
+      const printUrl = `/print/checklist/${planId}`;
+      const response = await fetch(printUrl);
+      const html = await response.text();
       
-      // Header with gradient effect
-      doc.setFillColor(139, 90, 43); // Oak brown
-      doc.rect(0, 0, pageWidth, 35, "F");
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '794px';
+      container.style.backgroundColor = '#ffffff';
+      document.body.appendChild(container);
       
-      // Company name
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.text("OAK & GOLD", 14, 18);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text("Event Management", 14, 25);
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Title
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.text("PRODUCTION CHECKLIST", pageWidth - 14, 18, { align: "right" });
-      if (eventTitle) {
-        doc.setFontSize(10);
-        doc.text(eventTitle, pageWidth - 14, 25, { align: "right" });
-      }
+      const docElement = container.querySelector('.document') as HTMLElement || container;
       
-      // Date
-      doc.setFontSize(8);
-      doc.text(`Generated: ${format(new Date(), "PPP")}`, pageWidth - 14, 32, { align: "right" });
-      
-      // Table data
-      const sortedItems = (items as any[]).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-      const tableData: any[] = [];
-      
-      sortedItems.forEach((item: any) => {
-        if (item.isSection) {
-          tableData.push([{ content: item.itemDescription, colSpan: 5, styles: { fillColor: [139, 90, 43], textColor: [255, 255, 255], fontStyle: "bold", halign: "left" } }]);
-        } else {
-          tableData.push([
-            item.slNo || "",
-            item.itemDescription || "",
-            item.quantity || "",
-            item.vendorName || "-",
-            item.isChecked ? "✓ Completed" : "○ Pending"
-          ]);
-        }
+      const canvas = await html2canvas(docElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
       });
       
-      (doc as any).autoTable({
-        startY: 42,
-        head: [["Sl No", "Item & Description", "Qty", "Vendor", "Status"]],
-        body: tableData,
-        theme: "grid",
-        headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255], fontStyle: "bold" },
-        styles: { fontSize: 9, cellPadding: 3 },
-        columnStyles: {
-          0: { cellWidth: 15, halign: "center" },
-          1: { cellWidth: "auto" },
-          2: { cellWidth: 15, halign: "center" },
-          3: { cellWidth: 35 },
-          4: { cellWidth: 30, halign: "center" }
-        },
-        alternateRowStyles: { fillColor: [248, 248, 248] },
-        didParseCell: function(data: any) {
-          if (data.section === "body" && data.column.index === 4) {
-            if (data.cell.raw === "✓ Completed") {
-              data.cell.styles.textColor = [34, 139, 34];
-              data.cell.styles.fontStyle = "bold";
-            } else {
-              data.cell.styles.textColor = [200, 150, 50];
-            }
-          }
-        }
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
       });
       
-      // Footer
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: "center" });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      
+      if (pdfHeight <= pageHeight) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      } else {
+        let yPos = 0;
+        let remainingHeight = pdfHeight;
+        
+        while (remainingHeight > 0) {
+          if (yPos > 0) pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, -yPos, pdfWidth, pdfHeight);
+          yPos += pageHeight;
+          remainingHeight -= pageHeight;
+        }
       }
       
-      doc.save(`Checklist_${eventTitle || "Production"}_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`Checklist_${eventTitle || "Production"}_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      document.body.removeChild(container);
       toast({ title: "PDF downloaded successfully" });
     } catch (error) {
+      console.error('PDF generation error:', error);
       toast({ title: "Failed to generate PDF", variant: "destructive" });
+      window.open(`/print/checklist/${planId}`, '_blank');
     } finally {
       setIsGeneratingPdf(false);
     }

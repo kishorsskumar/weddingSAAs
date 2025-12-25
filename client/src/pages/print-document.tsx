@@ -26,6 +26,9 @@ interface DocumentData {
   customer?: any;
   bank?: any;
   companySettings?: any;
+  checklist?: any;
+  event?: any;
+  plan?: any;
 }
 
 const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -134,6 +137,21 @@ export default function PrintDocument() {
             docData.invoice = invoices.find((i: any) => i.id === payment.invoiceId);
             docData.bank = banks.find((b: any) => b.id === payment.bankId);
           }
+        } else if (type === 'checklist') {
+          const [planRes, checklistRes, eventsRes] = await Promise.all([
+            fetch(`/api/execution-plans`),
+            fetch(`/api/execution-plans/${id}/checklist`),
+            fetch('/api/events'),
+          ]);
+          const plans = await planRes.json();
+          const checklist = await checklistRes.json();
+          const events = await eventsRes.json();
+          const plan = plans.find((p: any) => p.id === id);
+          if (plan) {
+            docData.plan = plan;
+            docData.checklist = checklist;
+            docData.event = events.find((e: any) => e.id === plan.eventId);
+          }
         }
 
         setData(docData);
@@ -171,6 +189,10 @@ export default function PrintDocument() {
 
   if (params.type === 'receipt' && payment) {
     return <ReceiptPrint payment={payment} customer={customer} invoice={invoice} bank={bank} companySettings={companySettings} />;
+  }
+
+  if (params.type === 'checklist' && data?.checklist) {
+    return <ChecklistPrint checklist={data.checklist} plan={data.plan} event={data.event} companySettings={companySettings} />;
   }
 
   return <div className="p-8 text-center">Document not found</div>;
@@ -745,6 +767,154 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any
       <div className="footer">
         Thank you for your payment!
       </div>
+    </div>
+  );
+}
+
+function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
+  const checklistStyles = baseStyles.replace(/#2c5530/g, '#8b5a2b') + `
+    .checklist-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 10px; }
+    .checklist-table th { background: #f5f5f5; padding: 8px 6px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
+    .checklist-table th.text-right { text-align: right; }
+    .checklist-table th.text-center { text-align: center; }
+    .checklist-table td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
+    .checklist-table td.text-right { text-align: right; }
+    .checklist-table td.text-center { text-align: center; }
+    .checklist-table .section-row td { background: #8b5a2b; color: white; font-weight: bold; padding: 8px 6px; }
+    .checklist-table .sl-no { width: 35px; text-align: center; }
+    .checklist-table .qty-col { width: 50px; text-align: center; }
+    .checklist-table .vendor-col { width: 100px; }
+    .checklist-table .status-col { width: 80px; text-align: center; }
+    .status-completed { color: #16a34a; font-weight: bold; }
+    .status-pending { color: #d97706; }
+    .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+    .progress-fill { height: 100%; background: #8b5a2b; }
+    .summary-box { display: flex; gap: 20px; margin-bottom: 20px; }
+    .summary-item { padding: 10px 15px; background: #fef3c7; border-radius: 6px; }
+    .summary-label { font-size: 9px; color: #666; }
+    .summary-value { font-size: 16px; font-weight: bold; color: #8b5a2b; }
+  `;
+
+  const sortedItems = (checklist || []).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const totalItems = sortedItems.filter((i: any) => !i.isSection).length;
+  const completedItems = sortedItems.filter((i: any) => !i.isSection && i.isChecked).length;
+  const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  return (
+    <div className="document">
+      <style>{checklistStyles}</style>
+
+      {/* Header */}
+      <div className="header">
+        <div className="company-info">
+          <div className="company-logo" style={{ background: '#8b5a2b' }}>
+            <img src={logo} alt="Logo" />
+          </div>
+          <div className="company-name" style={{ color: '#8b5a2b' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-address">
+            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              <div key={i}>{line}</div>
+            ))}
+            <div>{companySettings?.phone || '7902373354'}</div>
+            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+          </div>
+        </div>
+        <div className="doc-type-box">
+          <div className="doc-type" style={{ color: '#8b5a2b' }}>Production Checklist</div>
+        </div>
+      </div>
+
+      {/* Document Info */}
+      <div className="doc-info">
+        <div className="doc-info-row">
+          <span className="doc-info-label">Event</span>
+          <span>: {plan?.title || event?.customerName || 'Event'}</span>
+        </div>
+        {event?.eventDate && (
+          <div className="doc-info-row">
+            <span className="doc-info-label">Event Date</span>
+            <span>: {format(new Date(event.eventDate), 'dd/MM/yyyy')}</span>
+          </div>
+        )}
+        {event?.venue && (
+          <div className="doc-info-row">
+            <span className="doc-info-label">Venue</span>
+            <span>: {event.venue}</span>
+          </div>
+        )}
+        <div className="doc-info-row">
+          <span className="doc-info-label">Generated</span>
+          <span>: {format(new Date(), 'dd/MM/yyyy')}</span>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="summary-box">
+        <div className="summary-item">
+          <div className="summary-label">Total Items</div>
+          <div className="summary-value">{totalItems}</div>
+        </div>
+        <div className="summary-item">
+          <div className="summary-label">Completed</div>
+          <div className="summary-value" style={{ color: '#16a34a' }}>{completedItems}</div>
+        </div>
+        <div className="summary-item">
+          <div className="summary-label">Pending</div>
+          <div className="summary-value" style={{ color: '#d97706' }}>{totalItems - completedItems}</div>
+        </div>
+        <div className="summary-item" style={{ flex: 1 }}>
+          <div className="summary-label">Progress</div>
+          <div className="summary-value">{progressPercent}%</div>
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progressPercent}%` }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* Checklist Table */}
+      <table className="checklist-table">
+        <thead>
+          <tr>
+            <th className="sl-no">Sl No</th>
+            <th>Item & Description</th>
+            <th className="qty-col">Qty</th>
+            <th className="vendor-col">Vendor</th>
+            <th className="status-col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedItems.map((item: any, index: number) => {
+            if (item.isSection) {
+              return (
+                <tr key={index} className="section-row">
+                  <td colSpan={5}>{item.itemDescription}</td>
+                </tr>
+              );
+            }
+            return (
+              <tr key={index}>
+                <td className="sl-no">{item.slNo || ''}</td>
+                <td>{item.itemDescription}</td>
+                <td className="qty-col">{item.quantity || ''}</td>
+                <td className="vendor-col">{item.vendorName || '-'}</td>
+                <td className={`status-col ${item.isChecked ? 'status-completed' : 'status-pending'}`}>
+                  {item.isChecked ? '✓ Done' : '○ Pending'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Signature */}
+      <div className="signature-section">
+        <div className="signature-box">
+          <div className="signature-line">Prepared By</div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="footer">Oak & Gold Event Management</div>
     </div>
   );
 }
