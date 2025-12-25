@@ -132,11 +132,17 @@ export default function ExecutionPlanPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("checklist");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [newPlanTitle, setNewPlanTitle] = useState("");
   const [newPlanEventId, setNewPlanEventId] = useState<string>("");
   const [newPlanDescription, setNewPlanDescription] = useState("");
+  const [editPlanTitle, setEditPlanTitle] = useState("");
+  const [editPlanEventId, setEditPlanEventId] = useState<string>("");
+  const [editPlanDescription, setEditPlanDescription] = useState("");
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
   const [eventSearchQuery, setEventSearchQuery] = useState("");
+  const [editEventSearchOpen, setEditEventSearchOpen] = useState(false);
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ["/api/events"],
@@ -200,9 +206,55 @@ export default function ExecutionPlanPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/execution-plans"] });
       setSelectedPlanId(null);
-      toast({ title: "Plan deleted" });
+      setIsDeleteDialogOpen(false);
+      toast({ title: "Plan deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete plan", variant: "destructive" });
     },
   });
+
+  const updatePlanMutation = useMutation({
+    mutationFn: async (data: { id: string; title: string; eventId: string | null; description: string | null }) => {
+      const res = await fetch(`/api/execution-plans/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: data.title, eventId: data.eventId, description: data.description }),
+      });
+      if (!res.ok) throw new Error("Failed to update plan");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/execution-plans"] });
+      setIsEditDialogOpen(false);
+      toast({ title: "Plan updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update plan", variant: "destructive" });
+    },
+  });
+
+  const openEditDialog = () => {
+    if (selectedPlan) {
+      setEditPlanTitle(selectedPlan.title);
+      setEditPlanEventId(selectedPlan.eventId || "");
+      setEditPlanDescription(selectedPlan.description || "");
+      setIsEditDialogOpen(true);
+    }
+  };
+
+  const handleUpdatePlan = () => {
+    if (!editPlanTitle.trim() || !selectedPlan) {
+      toast({ title: "Please enter a plan title", variant: "destructive" });
+      return;
+    }
+    updatePlanMutation.mutate({
+      id: selectedPlan.id,
+      title: editPlanTitle.trim(),
+      eventId: editPlanEventId || null,
+      description: editPlanDescription || null,
+    });
+  };
 
   const handleCreatePlan = () => {
     if (!newPlanTitle.trim()) {
@@ -238,9 +290,29 @@ export default function ExecutionPlanPage() {
                 </p>
               )}
             </div>
-            <Badge variant={selectedPlan.status === "active" ? "default" : "secondary"}>
-              {selectedPlan.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={selectedPlan.status === "active" ? "default" : "secondary"}>
+                {selectedPlan.status}
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openEditDialog}
+                data-testid="button-edit-plan"
+              >
+                <Edit2 className="h-4 w-4 mr-1" />
+                Edit Plan
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                data-testid="button-delete-plan"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            </div>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4 flex-1 flex flex-col">
@@ -386,6 +458,131 @@ export default function ExecutionPlanPage() {
               </Button>
               <Button onClick={handleCreatePlan} disabled={createPlanMutation.isPending}>
                 Create Plan
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Plan Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Execution Plan</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Plan Title *</Label>
+                <Input
+                  value={editPlanTitle}
+                  onChange={(e) => setEditPlanTitle(e.target.value)}
+                  placeholder="e.g., Wedding Production Plan"
+                  data-testid="input-edit-plan-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Link to Event (Optional)</Label>
+                <Popover open={editEventSearchOpen} onOpenChange={setEditEventSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                      data-testid="button-edit-select-event"
+                    >
+                      {editPlanEventId
+                        ? events.find(e => e.id === editPlanEventId)?.title || "Select event..."
+                        : "Select event..."}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search events..."
+                        value={eventSearchQuery}
+                        onValueChange={setEventSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No events found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="none"
+                            onSelect={() => {
+                              setEditPlanEventId("");
+                              setEditEventSearchOpen(false);
+                            }}
+                          >
+                            <span className="text-muted-foreground">No event linked</span>
+                          </CommandItem>
+                          {filteredEvents.slice(0, 10).map((event) => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.id}
+                              onSelect={() => {
+                                setEditPlanEventId(event.id);
+                                setEditEventSearchOpen(false);
+                              }}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium">{event.title}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {event.customer} - {event.date ? format(new Date(event.date), "MMM d, yyyy") : "No date"}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={editPlanDescription}
+                  onChange={(e) => setEditPlanDescription(e.target.value)}
+                  placeholder="Optional notes about this plan..."
+                  rows={3}
+                  data-testid="input-edit-plan-description"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdatePlan} disabled={updatePlanMutation.isPending}>
+                {updatePlanMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Execution Plan</DialogTitle>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-muted-foreground">
+                Are you sure you want to delete "<strong>{selectedPlan?.title}</strong>"? This will permanently remove the plan and all its checklist items, activities, and other data.
+              </p>
+              <p className="text-destructive text-sm mt-2 font-medium">
+                This action cannot be undone.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => selectedPlan && deletePlanMutation.mutate(selectedPlan.id)}
+                disabled={deletePlanMutation.isPending}
+              >
+                {deletePlanMutation.isPending ? "Deleting..." : "Delete Plan"}
               </Button>
             </DialogFooter>
           </DialogContent>
