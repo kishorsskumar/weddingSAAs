@@ -7388,5 +7388,146 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Bulk insert checklist items
+  app.post('/api/execution-plan-checklist/bulk', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const items = req.body.items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Items must be an array' });
+    }
+    const created = await storage.bulkCreateChecklistItems(items);
+    res.json(created);
+  });
+
+  // Checklist Templates - Read for all users
+  app.get('/api/checklist-templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const templates = await storage.getChecklistTemplates();
+    res.json(templates);
+  });
+
+  app.get('/api/checklist-templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { template, items } = await storage.getChecklistTemplateWithItems(req.params.id);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json({ template, items });
+  });
+
+  // Checklist Templates - Superadmin only for write operations
+  app.post('/api/checklist-templates', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    const template = await storage.createChecklistTemplate({ ...req.body, createdBy: req.session.userId });
+    res.json(template);
+  });
+
+  app.put('/api/checklist-templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    const template = await storage.updateChecklistTemplate(req.params.id, req.body);
+    if (!template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+    res.json(template);
+  });
+
+  app.delete('/api/checklist-templates/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    await storage.deleteChecklistTemplate(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Checklist Template Items - Superadmin only
+  app.post('/api/checklist-template-items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    const item = await storage.createChecklistTemplateItem(req.body);
+    res.json(item);
+  });
+
+  app.post('/api/checklist-template-items/bulk', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    const items = req.body.items;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Items must be an array' });
+    }
+    const created = await storage.bulkCreateChecklistTemplateItems(items);
+    res.json(created);
+  });
+
+  app.put('/api/checklist-template-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    const item = await storage.updateChecklistTemplateItem(req.params.id, req.body);
+    if (!item) {
+      return res.status(404).json({ error: 'Item not found' });
+    }
+    res.json(item);
+  });
+
+  app.delete('/api/checklist-template-items/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    await storage.deleteChecklistTemplateItem(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.delete('/api/checklist-templates/:id/items', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    await storage.deleteAllChecklistTemplateItems(req.params.id);
+    res.json({ success: true });
+  });
+
   return httpServer;
 }

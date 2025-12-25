@@ -3332,6 +3332,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(executionPlanChecklist).where(eq(executionPlanChecklist.id, id));
   }
 
+  async bulkCreateChecklistItems(items: InsertExecutionPlanChecklist[]): Promise<ExecutionPlanChecklist[]> {
+    if (items.length === 0) return [];
+    return await db.insert(executionPlanChecklist).values(items).returning();
+  }
+
   // Item List
   async getExecutionPlanItems(planId: string): Promise<ExecutionPlanItem[]> {
     return await db.select().from(executionPlanItems)
