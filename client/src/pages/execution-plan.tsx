@@ -487,6 +487,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCloneDialog, setShowCloneDialog] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -505,6 +506,10 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
 
   const { data: allPlans = [] } = useQuery({
     queryKey: ['/api/execution-plans'],
+  });
+
+  const { data: checklistTemplates = [] } = useQuery<{ id: string; name: string; description: string | null; category: string | null }[]>({
+    queryKey: ['/api/checklist-templates'],
   });
 
   const addItemMutation = useMutation({
@@ -572,18 +577,37 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   };
 
   const loadTemplateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (templateId: string) => {
+      const templateRes = await fetch(`/api/checklist-templates/${templateId}`);
+      if (!templateRes.ok) throw new Error("Failed to fetch template");
+      const { items: templateItems } = await templateRes.json();
+      
+      if (templateItems.length === 0) throw new Error("Template is empty");
+      
       let sortOrder = (items as any[]).length;
-      const templateItems = CHECKLIST_TEMPLATE.map((item, index) => ({
-        ...item,
-        isSection: item.isSection || false,
-        isChecked: false,
-        sortOrder: sortOrder + index
-      }));
+      let slNoCounter = (items as any[]).filter((i: any) => !i.isSection).length;
+      
+      const mappedItems = templateItems.map((item: any, index: number) => {
+        const isSection = item.isSection || false;
+        if (!isSection) {
+          slNoCounter++;
+        }
+        return {
+          itemDescription: item.itemDescription,
+          quantity: item.quantity || 1,
+          vendorName: item.vendorName || "",
+          isSection: isSection,
+          sectionLabel: item.sectionLabel || "",
+          slNo: isSection ? null : slNoCounter,
+          isChecked: false,
+          sortOrder: sortOrder + index
+        };
+      });
+      
       const res = await fetch(`/api/execution-plans/${planId}/checklist/bulk`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: templateItems }),
+        body: JSON.stringify({ items: mappedItems }),
       });
       if (!res.ok) throw new Error("Failed to load template");
       return res.json();
@@ -591,6 +615,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/execution-plans/${planId}/checklist`] });
       setShowTemplateDialog(false);
+      setSelectedTemplateId(null);
       toast({ title: "Template loaded successfully", description: `${data.count} items added` });
     },
     onError: () => {
@@ -599,7 +624,9 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   });
 
   const handleLoadTemplate = () => {
-    loadTemplateMutation.mutate();
+    if (selectedTemplateId) {
+      loadTemplateMutation.mutate(selectedTemplateId);
+    }
   };
 
   const cloneFromPlanMutation = useMutation({
@@ -903,30 +930,53 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
       </div>
 
       {/* Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
-        <DialogContent>
+      <Dialog open={showTemplateDialog} onOpenChange={(open) => { setShowTemplateDialog(open); if (!open) setSelectedTemplateId(null); }}>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Load Checklist Template</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground mb-4">
-              This will add a pre-made template with common wedding/event items to your checklist. 
-              Existing items will not be affected.
+          <div className="py-4 space-y-4">
+            <p className="text-muted-foreground text-sm">
+              Select a template to add to your checklist. Existing items will not be affected.
             </p>
-            <div className="bg-muted/50 rounded-lg p-3 max-h-48 overflow-y-auto text-sm">
-              <p className="font-semibold mb-2">Template includes:</p>
-              <ul className="space-y-1">
-                <li>• Common Lighting & Floating Decor (4 items)</li>
-                <li>• Haldi Courtyard Setup (6 items)</li>
-                <li>• Haldi Stage (2 items)</li>
-                <li>• Seating Arrangements (4 items)</li>
-                <li>• Entertainment Setup (3 items)</li>
-              </ul>
-            </div>
+            {checklistTemplates.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No templates available</p>
+                <p className="text-xs">Ask an admin to create templates in the Admin Panel</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {checklistTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    onClick={() => setSelectedTemplateId(template.id)}
+                    className={cn(
+                      "p-3 border rounded-lg cursor-pointer transition-colors",
+                      selectedTemplateId === template.id 
+                        ? "border-primary bg-primary/10" 
+                        : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
+                    )}
+                    data-testid={`template-option-${template.id}`}
+                  >
+                    <div className="font-medium">{template.name}</div>
+                    {template.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                    )}
+                    {template.category && (
+                      <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-muted rounded">{template.category}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancel</Button>
-            <Button onClick={handleLoadTemplate} disabled={loadTemplateMutation.isPending}>
+            <Button variant="outline" onClick={() => { setShowTemplateDialog(false); setSelectedTemplateId(null); }}>Cancel</Button>
+            <Button 
+              onClick={handleLoadTemplate} 
+              disabled={!selectedTemplateId || loadTemplateMutation.isPending}
+            >
               {loadTemplateMutation.isPending ? "Loading..." : "Load Template"}
             </Button>
           </DialogFooter>
