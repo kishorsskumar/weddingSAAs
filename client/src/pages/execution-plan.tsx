@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { useAuth } from "@/context/auth-context";
 import oakstreetLogo from "@assets/Oakstreet_1765077046310.png";
 import {
   ClipboardList,
@@ -485,15 +484,9 @@ const CHECKLIST_TEMPLATE = [
 function ChecklistSection({ planId, employees, eventTitle }: { planId: string; employees: Employee[]; eventTitle?: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const isSuperAdmin = user?.role === 'superadmin';
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [isAddingSection, setIsAddingSection] = useState(false);
-  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [showCloneDialog, setShowCloneDialog] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [showCreateTemplateDialog, setShowCreateTemplateDialog] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -512,10 +505,6 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
 
   const { data: allPlans = [] } = useQuery({
     queryKey: ['/api/execution-plans'],
-  });
-
-  const { data: checklistTemplates = [] } = useQuery<{ id: string; name: string; description: string | null; category: string | null }[]>({
-    queryKey: ['/api/checklist-templates'],
   });
 
   const addItemMutation = useMutation({
@@ -583,17 +572,11 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   };
 
   const loadTemplateMutation = useMutation({
-    mutationFn: async (templateId: string) => {
-      const templateRes = await fetch(`/api/checklist-templates/${templateId}`);
-      if (!templateRes.ok) throw new Error("Failed to fetch template");
-      const { items: templateItems } = await templateRes.json();
-      
-      if (templateItems.length === 0) throw new Error("Template is empty");
-      
+    mutationFn: async () => {
       let sortOrder = (items as any[]).length;
       let slNoCounter = (items as any[]).filter((i: any) => !i.isSection).length;
       
-      const mappedItems = templateItems.map((item: any, index: number) => {
+      const mappedItems = CHECKLIST_TEMPLATE.map((item: any, index: number) => {
         const isSection = item.isSection || false;
         if (!isSection) {
           slNoCounter++;
@@ -601,9 +584,9 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
         return {
           itemDescription: item.itemDescription,
           quantity: item.quantity || 1,
-          vendorName: item.vendorName || "",
+          vendorName: "",
           isSection: isSection,
-          sectionLabel: item.sectionLabel || "",
+          sectionLabel: "",
           slNo: isSection ? null : slNoCounter,
           isChecked: false,
           sortOrder: sortOrder + index
@@ -620,39 +603,10 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/execution-plans/${planId}/checklist`] });
-      setShowTemplateDialog(false);
-      setSelectedTemplateId(null);
-      toast({ title: "Template loaded successfully", description: `${data.count} items added` });
+      toast({ title: "Template loaded successfully", description: `${data.count} items added - all items are editable` });
     },
     onError: () => {
       toast({ title: "Failed to load template", variant: "destructive" });
-    }
-  });
-
-  const handleLoadTemplate = () => {
-    if (selectedTemplateId) {
-      loadTemplateMutation.mutate(selectedTemplateId);
-    }
-  };
-
-  const createTemplateMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await fetch('/api/checklist-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description: '', category: '' }),
-      });
-      if (!res.ok) throw new Error('Failed to create template');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
-      setShowCreateTemplateDialog(false);
-      setNewTemplateName("");
-      toast({ title: "Template created", description: "You can edit it in Admin Panel > Templates" });
-    },
-    onError: () => {
-      toast({ title: "Failed to create template", variant: "destructive" });
     }
   });
 
@@ -864,7 +818,8 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
             <Button 
               size="sm" 
               variant="outline" 
-              onClick={() => setShowTemplateDialog(true)}
+              onClick={() => loadTemplateMutation.mutate()}
+              disabled={loadTemplateMutation.isPending}
               className="border-amber-300 hover:bg-amber-100"
               data-testid="button-load-template"
             >
@@ -953,116 +908,6 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
           </Button>
         </div>
       </div>
-
-      {/* Template Dialog */}
-      <Dialog open={showTemplateDialog} onOpenChange={(open) => { setShowTemplateDialog(open); if (!open) setSelectedTemplateId(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Load Checklist Template</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-muted-foreground text-sm">
-              Select a template to add to your checklist. Existing items will not be affected.
-            </p>
-            {checklistTemplates.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>No templates available</p>
-                {isSuperAdmin ? (
-                  <Button 
-                    variant="link" 
-                    className="text-xs p-0 h-auto"
-                    onClick={() => { setShowTemplateDialog(false); setShowCreateTemplateDialog(true); }}
-                  >
-                    Create your first template
-                  </Button>
-                ) : (
-                  <p className="text-xs">Ask an admin to create templates in the Admin Panel</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {checklistTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    onClick={() => setSelectedTemplateId(template.id)}
-                    className={cn(
-                      "p-3 border rounded-lg cursor-pointer transition-colors",
-                      selectedTemplateId === template.id 
-                        ? "border-primary bg-primary/10" 
-                        : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
-                    )}
-                    data-testid={`template-option-${template.id}`}
-                  >
-                    <div className="font-medium">{template.name}</div>
-                    {template.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
-                    )}
-                    {template.category && (
-                      <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-muted rounded">{template.category}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {isSuperAdmin && checklistTemplates.length > 0 && (
-              <Button 
-                variant="outline" 
-                onClick={() => { setShowTemplateDialog(false); setShowCreateTemplateDialog(true); }}
-                className="w-full sm:w-auto"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                New Template
-              </Button>
-            )}
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" onClick={() => { setShowTemplateDialog(false); setSelectedTemplateId(null); }}>Cancel</Button>
-              <Button 
-                onClick={handleLoadTemplate} 
-                disabled={!selectedTemplateId || loadTemplateMutation.isPending}
-              >
-                {loadTemplateMutation.isPending ? "Loading..." : "Load Template"}
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Template Dialog (Superadmin only) */}
-      {isSuperAdmin && (
-        <Dialog open={showCreateTemplateDialog} onOpenChange={setShowCreateTemplateDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Template</DialogTitle>
-            </DialogHeader>
-            <div className="py-4 space-y-4">
-              <p className="text-muted-foreground text-sm">
-                Create a new template. You can add items to it later in Admin Panel &gt; Templates.
-              </p>
-              <div className="space-y-2">
-                <Label>Template Name</Label>
-                <Input 
-                  value={newTemplateName}
-                  onChange={(e) => setNewTemplateName(e.target.value)}
-                  placeholder="e.g., Ramada Wedding Setup"
-                  data-testid="input-new-template-name"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setShowCreateTemplateDialog(false); setNewTemplateName(""); }}>Cancel</Button>
-              <Button 
-                onClick={() => newTemplateName && createTemplateMutation.mutate(newTemplateName)}
-                disabled={!newTemplateName || createTemplateMutation.isPending}
-              >
-                {createTemplateMutation.isPending ? "Creating..." : "Create Template"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Clone Dialog */}
       <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
@@ -1192,9 +1037,9 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
                     <h3 className="font-semibold text-lg mb-1">No checklist items yet</h3>
                     <p className="text-sm mb-4">Load a template or add items manually to get started</p>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setShowTemplateDialog(true)}>
+                      <Button size="sm" variant="outline" onClick={() => loadTemplateMutation.mutate()} disabled={loadTemplateMutation.isPending}>
                         <FileText className="h-4 w-4 mr-1" />
-                        Load Template
+                        {loadTemplateMutation.isPending ? "Loading..." : "Load Template"}
                       </Button>
                       <Button size="sm" onClick={() => setIsAddingItem(true)}>
                         <Plus className="h-4 w-4 mr-1" />
