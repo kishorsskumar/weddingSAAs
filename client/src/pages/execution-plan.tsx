@@ -39,6 +39,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -358,6 +359,136 @@ export default function ExecutionPlanPage() {
             </div>
           </Tabs>
         </div>
+
+        {/* Edit Plan Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Execution Plan</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Plan Title</Label>
+                <Input
+                  value={editPlanTitle}
+                  onChange={(e) => setEditPlanTitle(e.target.value)}
+                  placeholder="e.g., Wedding Reception Plan"
+                  data-testid="input-edit-plan-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Link to Event</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                      data-testid="select-edit-plan-event"
+                    >
+                      {editPlanEventId
+                        ? events.find((e) => e.id === editPlanEventId)?.title || "Select event..."
+                        : "Select event..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search events..." />
+                      <CommandList>
+                        <CommandEmpty>No events found.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value=""
+                            onSelect={() => setEditPlanEventId("")}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                !editPlanEventId ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            No event (standalone plan)
+                          </CommandItem>
+                          {events.map((event) => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.title}
+                              onSelect={() => setEditPlanEventId(event.id)}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  editPlanEventId === event.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span>{event.title}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {event.customer} - {event.date ? format(new Date(event.date), "MMM d, yyyy") : "No date"}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={editPlanDescription}
+                  onChange={(e) => setEditPlanDescription(e.target.value)}
+                  placeholder="Optional notes about this plan..."
+                  rows={3}
+                  data-testid="input-edit-plan-description"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdatePlan} disabled={updatePlanMutation.isPending}>
+                {updatePlanMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Execution Plan</DialogTitle>
+              <DialogDescription>
+                This action will permanently delete the plan.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <p className="text-muted-foreground">
+                Are you sure you want to delete "<strong>{selectedPlan?.title}</strong>"? This will permanently remove the plan and all its checklist items, activities, and other data.
+              </p>
+              <p className="text-destructive text-sm mt-2 font-medium">
+                This action cannot be undone.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => selectedPlan && deletePlanMutation.mutate(selectedPlan.id)}
+                disabled={deletePlanMutation.isPending}
+              >
+                {deletePlanMutation.isPending ? "Deleting..." : "Delete Plan"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
