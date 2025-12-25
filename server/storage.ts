@@ -3305,6 +3305,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteExecutionPlan(id: string): Promise<void> {
+    // Delete all related items first to avoid foreign key constraint errors
+    await Promise.all([
+      db.delete(executionPlanChecklist).where(eq(executionPlanChecklist.planId, id)),
+      db.delete(executionPlanItems).where(eq(executionPlanItems.planId, id)),
+      db.delete(executionPlanActivities).where(eq(executionPlanActivities.planId, id)),
+      db.delete(executionPlanManpower).where(eq(executionPlanManpower.planId, id)),
+      db.delete(executionPlanGodownItems).where(eq(executionPlanGodownItems.planId, id)),
+      db.delete(executionPlanRentals).where(eq(executionPlanRentals.planId, id)),
+      db.delete(executionPlanPurchases).where(eq(executionPlanPurchases.planId, id)),
+      db.delete(executionPlanPrints).where(eq(executionPlanPrints.planId, id)),
+    ]);
+    // Now delete the plan itself
     await db.delete(executionPlans).where(eq(executionPlans.id, id));
   }
 
