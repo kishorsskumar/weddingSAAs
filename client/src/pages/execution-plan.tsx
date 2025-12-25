@@ -1036,22 +1036,52 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
       const html2canvas = (await import("html2canvas")).default;
       const { jsPDF } = await import("jspdf");
       
+      // Create iframe to load the print page properly
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '0';
+      iframe.style.width = '794px';
+      iframe.style.height = '1200px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+      
       const printUrl = `/print/checklist/${planId}`;
-      const response = await fetch(printUrl);
-      const html = await response.text();
+      iframe.src = printUrl;
       
-      const container = document.createElement('div');
-      container.innerHTML = html;
-      container.style.position = 'fixed';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = '794px';
-      container.style.backgroundColor = '#ffffff';
-      document.body.appendChild(container);
+      // Wait for iframe to load and printReady flag
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 15000);
+        
+        const checkReady = setInterval(() => {
+          try {
+            const iframeWindow = iframe.contentWindow as any;
+            if (iframeWindow && iframeWindow.printReady === true) {
+              clearInterval(checkReady);
+              clearTimeout(timeout);
+              resolve();
+            }
+          } catch (e) {
+            // Cross-origin error, continue waiting
+          }
+        }, 100);
+        
+        iframe.onerror = () => {
+          clearInterval(checkReady);
+          clearTimeout(timeout);
+          reject(new Error('Failed to load'));
+        };
+      });
       
+      // Extra wait for rendering
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const docElement = container.querySelector('.document') as HTMLElement || container;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      const docElement = iframeDoc?.querySelector('.document') as HTMLElement;
+      
+      if (!docElement) {
+        throw new Error('Document element not found');
+      }
       
       const canvas = await html2canvas(docElement, {
         scale: 2,
@@ -1087,7 +1117,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
       }
       
       pdf.save(`Checklist_${eventTitle || "Production"}_${format(new Date(), "yyyy-MM-dd")}.pdf`);
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       toast({ title: "PDF downloaded successfully" });
     } catch (error) {
       console.error('PDF generation error:', error);
