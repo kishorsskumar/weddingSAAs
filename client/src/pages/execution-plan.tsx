@@ -23,7 +23,9 @@ import {
   User,
   CheckCircle2,
   FileText,
-  Download
+  Download,
+  Copy,
+  Save
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -484,8 +486,11 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [showCloneDialog, setShowCloneDialog] = useState(false);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingData, setEditingData] = useState<{ itemDescription: string; quantity: number; vendorName: string }>({ itemDescription: "", quantity: 1, vendorName: "" });
   const [newItem, setNewItem] = useState({ 
     itemDescription: "", 
     quantity: 1, 
@@ -496,6 +501,10 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
 
   const { data: items = [] } = useQuery({
     queryKey: [`/api/execution-plans/${planId}/checklist`],
+  });
+
+  const { data: allPlans = [] } = useQuery({
+    queryKey: ['/api/execution-plans'],
   });
 
   const addItemMutation = useMutation({
@@ -591,6 +600,83 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
 
   const handleLoadTemplate = () => {
     loadTemplateMutation.mutate();
+  };
+
+  const cloneFromPlanMutation = useMutation({
+    mutationFn: async (sourcePlanId: string) => {
+      const sourceRes = await fetch(`/api/execution-plans/${sourcePlanId}/checklist`);
+      if (!sourceRes.ok) throw new Error("Failed to fetch source checklist");
+      const sourceItems = await sourceRes.json();
+      
+      if (sourceItems.length === 0) throw new Error("Source checklist is empty");
+      
+      let sortOrder = (items as any[]).length;
+      let slNoCounter = (items as any[]).filter((i: any) => !i.isSection).length;
+      const clonedItems = sourceItems.map((item: any, index: number) => {
+        const isSection = item.isSection || false;
+        if (!isSection) {
+          slNoCounter++;
+        }
+        return {
+          itemDescription: item.itemDescription,
+          quantity: item.quantity || 1,
+          vendorName: item.vendorName || "",
+          isSection: isSection,
+          slNo: isSection ? null : slNoCounter,
+          isChecked: false,
+          sortOrder: sortOrder + index
+        };
+      });
+      
+      const res = await fetch(`/api/execution-plans/${planId}/checklist/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: clonedItems }),
+      });
+      if (!res.ok) throw new Error("Failed to clone checklist");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/execution-plans/${planId}/checklist`] });
+      setShowCloneDialog(false);
+      toast({ title: "Checklist cloned successfully", description: `${data.count} items copied` });
+    },
+    onError: (error: any) => {
+      toast({ title: error.message || "Failed to clone checklist", variant: "destructive" });
+    }
+  });
+
+  const startEditing = (item: any) => {
+    setEditingId(item.id);
+    setEditingData({
+      itemDescription: item.itemDescription || "",
+      quantity: item.quantity || 1,
+      vendorName: item.vendorName || ""
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditingData({ itemDescription: "", quantity: 1, vendorName: "" });
+  };
+
+  const saveEditing = (item: any) => {
+    updateItemMutation.mutate({
+      id: item.id,
+      data: {
+        ...editingData,
+        sectionLabel: item.sectionLabel,
+        isSection: item.isSection,
+        sortOrder: item.sortOrder,
+        slNo: item.slNo
+      }
+    }, {
+      onSuccess: () => {
+        setEditingId(null);
+        setEditingData({ itemDescription: "", quantity: 1, vendorName: "" });
+        toast({ title: "Item updated" });
+      }
+    });
   };
 
   const toggleStatus = (item: any) => {
@@ -736,6 +822,16 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
             <Button 
               size="sm" 
               variant="outline" 
+              onClick={() => setShowCloneDialog(true)}
+              className="border-amber-300 hover:bg-amber-100"
+              data-testid="button-clone-checklist"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Clone From Plan
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
               onClick={handleDownloadPdf}
               disabled={isGeneratingPdf || sortedItems.length === 0}
               className="border-amber-300 hover:bg-amber-100"
@@ -830,7 +926,48 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancel</Button>
-            <Button onClick={handleLoadTemplate}>Load Template</Button>
+            <Button onClick={handleLoadTemplate} disabled={loadTemplateMutation.isPending}>
+              {loadTemplateMutation.isPending ? "Loading..." : "Load Template"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clone Dialog */}
+      <Dialog open={showCloneDialog} onOpenChange={setShowCloneDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Clone Checklist from Another Plan</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-muted-foreground mb-4">
+              Select an execution plan to copy its checklist items to this plan. All items will be copied with status reset to Pending.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {(allPlans as any[]).filter(p => p.id !== planId).map((plan: any) => (
+                <Button
+                  key={plan.id}
+                  variant="outline"
+                  className="w-full justify-start text-left h-auto py-3"
+                  onClick={() => cloneFromPlanMutation.mutate(plan.id)}
+                  disabled={cloneFromPlanMutation.isPending}
+                  data-testid={`clone-plan-${plan.id}`}
+                >
+                  <div>
+                    <div className="font-medium">{plan.title}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Created {format(new Date(plan.createdAt), "MMM d, yyyy")}
+                    </div>
+                  </div>
+                </Button>
+              ))}
+              {(allPlans as any[]).filter(p => p.id !== planId).length === 0 && (
+                <p className="text-center text-muted-foreground py-4">No other execution plans available to clone from</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCloneDialog(false)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -957,11 +1094,68 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
                       </div>
                     </TableCell>
                   </TableRow>
+                ) : editingId === item.id ? (
+                  <TableRow 
+                    key={item.id} 
+                    className="bg-blue-50/70 dark:bg-blue-950/30"
+                    data-testid={`checklist-item-editing-${item.id}`}
+                  >
+                    <TableCell className="font-semibold text-center text-slate-600 dark:text-slate-400">{item.slNo}</TableCell>
+                    <TableCell>
+                      <Input
+                        value={editingData.itemDescription}
+                        onChange={(e) => setEditingData({ ...editingData, itemDescription: e.target.value })}
+                        className="h-8 text-sm"
+                        data-testid={`input-edit-description-${item.id}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editingData.quantity}
+                        onChange={(e) => setEditingData({ ...editingData, quantity: parseInt(e.target.value) || 1 })}
+                        className="h-8 text-sm w-16"
+                        data-testid={`input-edit-quantity-${item.id}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={editingData.vendorName}
+                        onChange={(e) => setEditingData({ ...editingData, vendorName: e.target.value })}
+                        placeholder="Vendor"
+                        className="h-8 text-sm"
+                        data-testid={`input-edit-vendor-${item.id}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-1">
+                        <Button
+                          size="icon"
+                          className="h-7 w-7 bg-green-600 hover:bg-green-700"
+                          onClick={() => saveEditing(item)}
+                          data-testid={`button-save-edit-${item.id}`}
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={cancelEditing}
+                          data-testid={`button-cancel-edit-${item.id}`}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
                 ) : (
                   <TableRow 
                     key={item.id} 
                     className={cn(
-                      "transition-colors",
+                      "transition-colors group",
                       item.isChecked 
                         ? "bg-green-50/70 dark:bg-green-950/30" 
                         : index % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-slate-50/50 dark:bg-slate-900/50"
@@ -969,11 +1163,28 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
                     data-testid={`checklist-item-${item.id}`}
                   >
                     <TableCell className="font-semibold text-center text-slate-600 dark:text-slate-400">{item.slNo}</TableCell>
-                    <TableCell className={cn("font-medium", item.isChecked && "line-through text-muted-foreground")}>
-                      {item.itemDescription}
+                    <TableCell 
+                      className={cn("font-medium cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded", item.isChecked && "line-through text-muted-foreground")}
+                      onClick={() => startEditing(item)}
+                      data-testid={`cell-description-${item.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{item.itemDescription}</span>
+                        <Edit2 className="h-3 w-3 opacity-0 group-hover:opacity-50 ml-2" />
+                      </div>
                     </TableCell>
-                    <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{item.vendorName || "-"}</TableCell>
+                    <TableCell 
+                      className="text-center font-medium cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded"
+                      onClick={() => startEditing(item)}
+                    >
+                      {item.quantity}
+                    </TableCell>
+                    <TableCell 
+                      className="text-sm text-muted-foreground cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded"
+                      onClick={() => startEditing(item)}
+                    >
+                      {item.vendorName || "-"}
+                    </TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant={item.isChecked ? "default" : "outline"}
