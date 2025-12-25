@@ -1553,3 +1553,37 @@ export const executionPlanPrints = pgTable("execution_plan_prints", {
 export const insertExecutionPlanPrintSchema = createInsertSchema(executionPlanPrints).omit({ id: true, createdAt: true });
 export type InsertExecutionPlanPrint = z.infer<typeof insertExecutionPlanPrintSchema>;
 export type ExecutionPlanPrint = typeof executionPlanPrints.$inferSelect;
+
+// Checklist Templates - Reusable templates for production checklists
+export const checklistTemplates = pgTable("checklist_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // Wedding, Corporate, Concert, etc.
+  isDefault: boolean("is_default").default(false), // Default template shown first
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
+export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
+
+// Checklist Template Items - Items within a template
+export const checklistTemplateItems = pgTable("checklist_template_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => checklistTemplates.id, { onDelete: 'cascade' }),
+  slNo: integer("sl_no"),
+  sectionLabel: text("section_label"),
+  isSection: boolean("is_section").default(false),
+  itemDescription: text("item_description").notNull(),
+  quantity: integer("quantity").default(1),
+  vendorName: text("vendor_name"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecklistTemplateItemSchema = createInsertSchema(checklistTemplateItems).omit({ id: true, createdAt: true });
+export type InsertChecklistTemplateItem = z.infer<typeof insertChecklistTemplateItemSchema>;
+export type ChecklistTemplateItem = typeof checklistTemplateItems.$inferSelect;
