@@ -79,6 +79,336 @@ type Event = {
   outlookCalendarEventId?: string | null;
 };
 
+type ChecklistTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  isDefault: boolean | null;
+  createdBy: string | null;
+  updatedAt: Date | null;
+  createdAt: Date | null;
+};
+
+type ChecklistTemplateItem = {
+  id: string;
+  templateId: string;
+  slNo: number | null;
+  sectionLabel: string | null;
+  isSection: boolean | null;
+  itemDescription: string;
+  quantity: number | null;
+  vendorName: string | null;
+  sortOrder: number | null;
+  createdAt: Date | null;
+};
+
+function ChecklistTemplatesTab() {
+  const queryClient = useQueryClient();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<ChecklistTemplate | null>(null);
+  const [templateItems, setTemplateItems] = useState<ChecklistTemplateItem[]>([]);
+  const [newTemplate, setNewTemplate] = useState({ name: '', description: '', category: '' });
+  const [newItem, setNewItem] = useState({ itemDescription: '', quantity: 1, vendorName: '', sectionLabel: '', isSection: false });
+
+  const { data: templates = [], isLoading } = useQuery<ChecklistTemplate[]>({
+    queryKey: ['/api/checklist-templates'],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; category: string }) => {
+      const res = await fetch('/api/checklist-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
+      setIsDialogOpen(false);
+      setNewTemplate({ name: '', description: '', category: '' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/checklist-templates/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/checklist-templates'] });
+    },
+  });
+
+  const fetchTemplateItems = async (templateId: string) => {
+    const res = await fetch(`/api/checklist-templates/${templateId}`);
+    const data = await res.json();
+    setTemplateItems(data.items || []);
+  };
+
+  const addItemMutation = useMutation({
+    mutationFn: async (data: { templateId: string; itemDescription: string; quantity: number; vendorName: string; sectionLabel: string; isSection: boolean; sortOrder: number }) => {
+      const res = await fetch('/api/checklist-template-items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to add item');
+      return res.json();
+    },
+    onSuccess: () => {
+      if (selectedTemplate) {
+        fetchTemplateItems(selectedTemplate.id);
+      }
+      setNewItem({ itemDescription: '', quantity: 1, vendorName: '', sectionLabel: '', isSection: false });
+    },
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/checklist-template-items/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete item');
+      return res.json();
+    },
+    onSuccess: () => {
+      if (selectedTemplate) {
+        fetchTemplateItems(selectedTemplate.id);
+      }
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="flex items-center gap-2">
+          <Tag className="h-5 w-5" />
+          Checklist Templates
+        </CardTitle>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" className="gap-1" data-testid="button-add-template">
+              <Plus className="h-4 w-4" /> New Template
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Checklist Template</DialogTitle>
+              <DialogDescription>Create a reusable checklist template for execution plans</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(newTemplate); }} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Template Name</Label>
+                <Input 
+                  value={newTemplate.name}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
+                  placeholder="e.g., Ramada Wedding Setup"
+                  required
+                  data-testid="input-template-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea 
+                  value={newTemplate.description}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, description: e.target.value })}
+                  placeholder="Brief description of this template"
+                  data-testid="input-template-description"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input 
+                  value={newTemplate.category}
+                  onChange={(e) => setNewTemplate({ ...newTemplate, category: e.target.value })}
+                  placeholder="e.g., Wedding, Corporate, Birthday"
+                  data-testid="input-template-category"
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={createMutation.isPending} data-testid="button-create-template">
+                {createMutation.isPending ? 'Creating...' : 'Create Template'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : templates.length === 0 ? (
+          <p className="text-muted-foreground text-center py-4">No templates created yet. Create your first template to get started.</p>
+        ) : (
+          <div className="space-y-3">
+            {templates.map((template) => (
+              <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/50 transition-colors">
+                <div className="space-y-1">
+                  <div className="font-medium">{template.name}</div>
+                  {template.description && <p className="text-sm text-muted-foreground">{template.description}</p>}
+                  {template.category && <Badge variant="secondary" className="text-xs">{template.category}</Badge>}
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTemplate(template);
+                      fetchTemplateItems(template.id);
+                      setIsEditDialogOpen(true);
+                    }}
+                    data-testid={`button-edit-template-${template.id}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={() => {
+                      if (confirm('Delete this template?')) {
+                        deleteMutation.mutate(template.id);
+                      }
+                    }}
+                    data-testid={`button-delete-template-${template.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setSelectedTemplate(null); setTemplateItems([]); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Template: {selectedTemplate?.name}</DialogTitle>
+            <DialogDescription>Add, edit, or remove items from this template</DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border rounded-lg">
+              <div className="p-3 bg-muted/50 border-b font-medium">Template Items ({templateItems.length})</div>
+              <div className="max-h-[300px] overflow-y-auto">
+                {templateItems.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4">No items yet</p>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-muted/30 sticky top-0">
+                      <tr className="border-b">
+                        <th className="p-2 text-left text-sm font-medium">#</th>
+                        <th className="p-2 text-left text-sm font-medium">Description</th>
+                        <th className="p-2 text-left text-sm font-medium">Qty</th>
+                        <th className="p-2 text-left text-sm font-medium">Vendor</th>
+                        <th className="p-2 text-center text-sm font-medium w-16">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {templateItems.map((item, idx) => (
+                        <tr key={item.id} className={`border-b ${item.isSection ? 'bg-primary/10 font-semibold' : ''}`}>
+                          <td className="p-2 text-sm">{item.isSection ? '' : item.slNo || idx + 1}</td>
+                          <td className="p-2 text-sm">{item.isSection ? `[${item.sectionLabel}]` : item.itemDescription}</td>
+                          <td className="p-2 text-sm">{item.isSection ? '-' : item.quantity || 1}</td>
+                          <td className="p-2 text-sm">{item.isSection ? '-' : item.vendorName || '-'}</td>
+                          <td className="p-2 text-center">
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => deleteItemMutation.mutate(item.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-4">
+              <div className="font-medium">Add New Item</div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="isSection" 
+                  checked={newItem.isSection}
+                  onCheckedChange={(checked) => setNewItem({ ...newItem, isSection: checked as boolean })}
+                />
+                <Label htmlFor="isSection" className="text-sm">This is a section header</Label>
+              </div>
+              
+              {newItem.isSection ? (
+                <div className="space-y-2">
+                  <Label>Section Name</Label>
+                  <Input 
+                    value={newItem.sectionLabel}
+                    onChange={(e) => setNewItem({ ...newItem, sectionLabel: e.target.value, itemDescription: e.target.value })}
+                    placeholder="e.g., Lighting, Stage, Seating"
+                    data-testid="input-section-name"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Item Description</Label>
+                    <Input 
+                      value={newItem.itemDescription}
+                      onChange={(e) => setNewItem({ ...newItem, itemDescription: e.target.value })}
+                      placeholder="e.g., Par Lights 200W"
+                      data-testid="input-item-description"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Quantity</Label>
+                    <Input 
+                      type="number"
+                      value={newItem.quantity}
+                      onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 1 })}
+                      min={1}
+                      data-testid="input-item-quantity"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Vendor</Label>
+                    <Input 
+                      value={newItem.vendorName}
+                      onChange={(e) => setNewItem({ ...newItem, vendorName: e.target.value })}
+                      placeholder="e.g., Oak Production"
+                      data-testid="input-item-vendor"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <Button 
+                onClick={() => {
+                  if (selectedTemplate && (newItem.itemDescription || newItem.sectionLabel)) {
+                    addItemMutation.mutate({
+                      templateId: selectedTemplate.id,
+                      itemDescription: newItem.isSection ? newItem.sectionLabel : newItem.itemDescription,
+                      quantity: newItem.isSection ? 0 : newItem.quantity,
+                      vendorName: newItem.vendorName,
+                      sectionLabel: newItem.isSection ? newItem.sectionLabel : '',
+                      isSection: newItem.isSection,
+                      sortOrder: templateItems.length,
+                    });
+                  }
+                }}
+                disabled={addItemMutation.isPending}
+                className="w-full"
+                data-testid="button-add-item"
+              >
+                {addItemMutation.isPending ? 'Adding...' : 'Add Item'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function CalendarIntegrationTab() {
   const queryClient = useQueryClient();
   const [selectedCalendar, setSelectedCalendar] = useState<string>('primary');
@@ -995,7 +1325,7 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-8' : 'grid-cols-1'}`}>
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-9' : 'grid-cols-1'}`}>
           <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
           {isSuperAdmin && <TabsTrigger value="employees" data-testid="tab-employees">Employees</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
@@ -1004,6 +1334,7 @@ export default function Admin() {
           {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="calendar" data-testid="tab-calendar">Calendar</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="messaging" data-testid="tab-messaging">Messaging</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="templates" data-testid="tab-templates">Templates</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -1952,6 +2283,12 @@ export default function Admin() {
         {isSuperAdmin && (
           <TabsContent value="messaging" className="mt-4">
             <MessagingTab />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="templates" className="mt-4">
+            <ChecklistTemplatesTab />
           </TabsContent>
         )}
       </Tabs>
