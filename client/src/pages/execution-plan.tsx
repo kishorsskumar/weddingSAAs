@@ -21,7 +21,9 @@ import {
   Calendar,
   Clock,
   User,
-  CheckCircle2
+  CheckCircle2,
+  FileText,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -255,7 +257,7 @@ export default function ExecutionPlanPage() {
 
             <div className="flex-1 overflow-auto p-4">
               <TabsContent value="checklist" className="m-0 h-full">
-                <ChecklistSection planId={selectedPlan.id} employees={employees} />
+                <ChecklistSection planId={selectedPlan.id} employees={employees} eventTitle={selectedEvent ? `${selectedEvent.customer} - ${selectedEvent.type}` : selectedPlan.title} />
               </TabsContent>
               <TabsContent value="items" className="m-0 h-full">
                 <ItemListSection planId={selectedPlan.id} inventory={inventory} />
@@ -449,11 +451,41 @@ export default function ExecutionPlanPage() {
   );
 }
 
-function ChecklistSection({ planId, employees }: { planId: string; employees: Employee[] }) {
+const CHECKLIST_TEMPLATE = [
+  { isSection: true, itemDescription: "COMMON LIGHTING & FLOATING DECOR" },
+  { slNo: 1, itemDescription: "Mirchi lights for 2 days", quantity: 1 },
+  { slNo: 2, itemDescription: "Green MH - 30no.s for 2 days", quantity: 1 },
+  { slNo: 3, itemDescription: "Pillar to pillar decor with Mariegold hangings and drapes", quantity: 10 },
+  { slNo: 4, itemDescription: "Event itinerary board", quantity: 1 },
+  { isSection: true, itemDescription: "HALDI (COURTYARD)" },
+  { slNo: 5, itemDescription: "Welcome board - Option 1 (as per design)", quantity: 1 },
+  { slNo: 6, itemDescription: "Petal station (petals on table)", quantity: 1 },
+  { slNo: 7, itemDescription: "Theme props with fresh flowers - Option 2", quantity: 8 },
+  { slNo: 8, itemDescription: "Tender coconut cart with decoration", quantity: 1 },
+  { slNo: 9, itemDescription: "Tender coconuts", quantity: 50 },
+  { slNo: 10, itemDescription: "Tree decor : Mariegold - 100pcs (10ft each)", quantity: 1 },
+  { isSection: true, itemDescription: "HALDI STAGE" },
+  { slNo: 11, itemDescription: "Haldi stage - Option 1 (as per design fresh & artificial flower mix)", quantity: 1 },
+  { slNo: 12, itemDescription: "Platform & platform masking with flex", quantity: 1 },
+  { isSection: true, itemDescription: "SEATING" },
+  { slNo: 13, itemDescription: "Tent - 10x10ft", quantity: 4 },
+  { slNo: 14, itemDescription: "Bench with cushion", quantity: 8 },
+  { slNo: 15, itemDescription: "Cylinder cushion seats", quantity: 16 },
+  { slNo: 16, itemDescription: "Chair Bow - Organza material", quantity: 30 },
+  { isSection: true, itemDescription: "ENTERTAINMENTS FOR HALDI" },
+  { slNo: 17, itemDescription: "Emcee", quantity: 1 },
+  { slNo: 18, itemDescription: "DJ with Sound", quantity: 1 },
+  { slNo: 19, itemDescription: "Karaoke setup", quantity: 1 },
+];
+
+function ChecklistSection({ planId, employees, eventTitle }: { planId: string; employees: Employee[]; eventTitle?: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [isAddingSection, setIsAddingSection] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [newItem, setNewItem] = useState({ 
     itemDescription: "", 
     quantity: 1, 
@@ -530,6 +562,37 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
     });
   };
 
+  const loadTemplateMutation = useMutation({
+    mutationFn: async () => {
+      let sortOrder = (items as any[]).length;
+      const templateItems = CHECKLIST_TEMPLATE.map((item, index) => ({
+        ...item,
+        isSection: item.isSection || false,
+        isChecked: false,
+        sortOrder: sortOrder + index
+      }));
+      const res = await fetch(`/api/execution-plans/${planId}/checklist/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: templateItems }),
+      });
+      if (!res.ok) throw new Error("Failed to load template");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/execution-plans/${planId}/checklist`] });
+      setShowTemplateDialog(false);
+      toast({ title: "Template loaded successfully", description: `${data.count} items added` });
+    },
+    onError: () => {
+      toast({ title: "Failed to load template", variant: "destructive" });
+    }
+  });
+
+  const handleLoadTemplate = () => {
+    loadTemplateMutation.mutate();
+  };
+
   const toggleStatus = (item: any) => {
     updateItemMutation.mutate({ 
       id: item.id, 
@@ -537,30 +600,250 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
     });
   };
 
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      await import("jspdf-autotable");
+      
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Header with gradient effect
+      doc.setFillColor(139, 90, 43); // Oak brown
+      doc.rect(0, 0, pageWidth, 35, "F");
+      
+      // Company name
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont("helvetica", "bold");
+      doc.text("OAK & GOLD", 14, 18);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Event Management", 14, 25);
+      
+      // Title
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.text("PRODUCTION CHECKLIST", pageWidth - 14, 18, { align: "right" });
+      if (eventTitle) {
+        doc.setFontSize(10);
+        doc.text(eventTitle, pageWidth - 14, 25, { align: "right" });
+      }
+      
+      // Date
+      doc.setFontSize(8);
+      doc.text(`Generated: ${format(new Date(), "PPP")}`, pageWidth - 14, 32, { align: "right" });
+      
+      // Table data
+      const sortedItems = (items as any[]).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      const tableData: any[] = [];
+      
+      sortedItems.forEach((item: any) => {
+        if (item.isSection) {
+          tableData.push([{ content: item.itemDescription, colSpan: 5, styles: { fillColor: [139, 90, 43], textColor: [255, 255, 255], fontStyle: "bold", halign: "left" } }]);
+        } else {
+          tableData.push([
+            item.slNo || "",
+            item.itemDescription || "",
+            item.quantity || "",
+            item.vendorName || "-",
+            item.isChecked ? "✓ Completed" : "○ Pending"
+          ]);
+        }
+      });
+      
+      (doc as any).autoTable({
+        startY: 42,
+        head: [["Sl No", "Item & Description", "Qty", "Vendor", "Status"]],
+        body: tableData,
+        theme: "grid",
+        headStyles: { fillColor: [51, 51, 51], textColor: [255, 255, 255], fontStyle: "bold" },
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+          0: { cellWidth: 15, halign: "center" },
+          1: { cellWidth: "auto" },
+          2: { cellWidth: 15, halign: "center" },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 30, halign: "center" }
+        },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        didParseCell: function(data: any) {
+          if (data.section === "body" && data.column.index === 4) {
+            if (data.cell.raw === "✓ Completed") {
+              data.cell.styles.textColor = [34, 139, 34];
+              data.cell.styles.fontStyle = "bold";
+            } else {
+              data.cell.styles.textColor = [200, 150, 50];
+            }
+          }
+        }
+      });
+      
+      // Footer
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(128, 128, 128);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: "center" });
+      }
+      
+      doc.save(`Checklist_${eventTitle || "Production"}_${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      toast({ title: "PDF downloaded successfully" });
+    } catch (error) {
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const sortedItems = (items as any[]).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const filteredItems = filter === "all" 
+    ? sortedItems 
+    : sortedItems.filter(item => item.isSection || (filter === "completed" ? item.isChecked : !item.isChecked));
+  
+  const totalItems = sortedItems.filter(i => !i.isSection).length;
+  const completedItems = sortedItems.filter(i => !i.isSection && i.isChecked).length;
+  const pendingItems = totalItems - completedItems;
+  const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center flex-wrap gap-2">
-        <h2 className="text-lg font-semibold">Checklist</h2>
+      {/* Header with Logo and Actions */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-xl p-4 border border-amber-200/50 dark:border-amber-800/30">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-lg bg-gradient-to-br from-amber-600 to-amber-800 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+              O&G
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100">Production Checklist</h2>
+              <p className="text-sm text-amber-700 dark:text-amber-300">Oak & Gold Event Management</p>
+            </div>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => setShowTemplateDialog(true)}
+              className="border-amber-300 hover:bg-amber-100"
+              data-testid="button-load-template"
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              Load Template
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf || sortedItems.length === 0}
+              className="border-amber-300 hover:bg-amber-100"
+              data-testid="button-download-pdf"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {isGeneratingPdf ? "Generating..." : "Download PDF"}
+            </Button>
+          </div>
+        </div>
+        
+        {/* Progress Bar */}
+        {totalItems > 0 && (
+          <div className="mt-4">
+            <div className="flex justify-between text-sm mb-1">
+              <span className="text-amber-800 dark:text-amber-200 font-medium">Progress</span>
+              <span className="text-amber-700 dark:text-amber-300">{completedItems} of {totalItems} completed ({progressPercent}%)</span>
+            </div>
+            <div className="h-2 bg-amber-200 dark:bg-amber-900 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex justify-between items-center flex-wrap gap-3">
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={filter === "all" ? "default" : "outline"}
+            onClick={() => setFilter("all")}
+            className="text-xs"
+          >
+            All ({totalItems})
+          </Button>
+          <Button
+            size="sm"
+            variant={filter === "pending" ? "default" : "outline"}
+            onClick={() => setFilter("pending")}
+            className={cn("text-xs", filter === "pending" && "bg-amber-600 hover:bg-amber-700")}
+          >
+            <Clock className="h-3 w-3 mr-1" />
+            Pending ({pendingItems})
+          </Button>
+          <Button
+            size="sm"
+            variant={filter === "completed" ? "default" : "outline"}
+            onClick={() => setFilter("completed")}
+            className={cn("text-xs", filter === "completed" && "bg-green-600 hover:bg-green-700")}
+          >
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Completed ({completedItems})
+          </Button>
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setIsAddingSection(true)} data-testid="button-add-section">
             <Plus className="h-4 w-4 mr-1" />
-            Add Section
+            Section
           </Button>
           <Button size="sm" onClick={() => setIsAddingItem(true)} data-testid="button-add-checklist">
             <Plus className="h-4 w-4 mr-1" />
-            Add Item
+            Item
           </Button>
         </div>
       </div>
 
+      {/* Template Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Load Checklist Template</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-muted-foreground mb-4">
+              This will add a pre-made template with common wedding/event items to your checklist. 
+              Existing items will not be affected.
+            </p>
+            <div className="bg-muted/50 rounded-lg p-3 max-h-48 overflow-y-auto text-sm">
+              <p className="font-semibold mb-2">Template includes:</p>
+              <ul className="space-y-1">
+                <li>• Common Lighting & Floating Decor (4 items)</li>
+                <li>• Haldi Courtyard Setup (6 items)</li>
+                <li>• Haldi Stage (2 items)</li>
+                <li>• Seating Arrangements (4 items)</li>
+                <li>• Entertainment Setup (3 items)</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>Cancel</Button>
+            <Button onClick={handleLoadTemplate}>Load Template</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {isAddingSection && (
-        <Card className="p-4">
+        <Card className="p-4 border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
           <div className="space-y-3">
-            <Label>Section Header</Label>
+            <Label className="font-semibold">Section Header</Label>
             <Input
               placeholder="e.g., COMMON LIGHTING & DECOR, 21st Nov - HALDI"
               value={newSection}
               onChange={(e) => setNewSection(e.target.value)}
+              className="border-amber-300"
               data-testid="input-section-name"
             />
             <div className="flex justify-end gap-2">
@@ -576,10 +859,10 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
       )}
 
       {isAddingItem && (
-        <Card className="p-4">
+        <Card className="p-4 border-blue-200 bg-blue-50/50 dark:bg-blue-950/20">
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2">
-              <Label>Item Description *</Label>
+              <Label className="font-semibold">Item Description *</Label>
               <Input
                 placeholder="e.g., Mirchi lights for 2 days"
                 value={newItem.itemDescription}
@@ -588,7 +871,7 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
               />
             </div>
             <div>
-              <Label>Quantity</Label>
+              <Label className="font-semibold">Quantity</Label>
               <Input
                 type="number"
                 min={1}
@@ -598,7 +881,7 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
               />
             </div>
             <div>
-              <Label>Vendor</Label>
+              <Label className="font-semibold">Vendor</Label>
               <Input
                 placeholder="Vendor name"
                 value={newItem.vendorName}
@@ -618,72 +901,96 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
         </Card>
       )}
 
-      <Card>
+      <Card className="overflow-hidden shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="w-16">Sl No</TableHead>
-              <TableHead>Item & Description</TableHead>
-              <TableHead className="w-20 text-center">Qty</TableHead>
-              <TableHead className="w-32">Vendor</TableHead>
-              <TableHead className="w-28 text-center">Status</TableHead>
-              <TableHead className="w-16"></TableHead>
+            <TableRow className="bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900">
+              <TableHead className="w-16 font-bold">Sl No</TableHead>
+              <TableHead className="font-bold">Item & Description</TableHead>
+              <TableHead className="w-20 text-center font-bold">Qty</TableHead>
+              <TableHead className="w-36 font-bold">Vendor</TableHead>
+              <TableHead className="w-32 text-center font-bold">Status</TableHead>
+              <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(items as any[]).length === 0 ? (
+            {filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                  <p>No checklist items yet. Add sections and items to get started.</p>
+                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <div className="flex flex-col items-center">
+                    <div className="h-16 w-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mb-4">
+                      <ClipboardList className="h-8 w-8 text-amber-600" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-1">No checklist items yet</h3>
+                    <p className="text-sm mb-4">Load a template or add items manually to get started</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setShowTemplateDialog(true)}>
+                        <FileText className="h-4 w-4 mr-1" />
+                        Load Template
+                      </Button>
+                      <Button size="sm" onClick={() => setIsAddingItem(true)}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Item
+                      </Button>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
-              (items as any[]).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((item: any) => (
+              filteredItems.map((item: any, index: number) => (
                 item.isSection ? (
-                  <TableRow key={item.id} className="bg-primary/10 hover:bg-primary/15" data-testid={`checklist-section-${item.id}`}>
-                    <TableCell colSpan={6} className="font-bold text-primary py-3">
-                      {item.itemDescription}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 ml-2 text-destructive hover:text-destructive float-right"
-                        onClick={() => deleteItemMutation.mutate(item.id)}
-                        data-testid={`button-delete-section-${item.id}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                  <TableRow key={item.id} className="bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-900/20 hover:from-amber-150" data-testid={`checklist-section-${item.id}`}>
+                    <TableCell colSpan={6} className="py-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-800 dark:text-amber-200 uppercase tracking-wide text-sm">
+                          {item.itemDescription}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => deleteItemMutation.mutate(item.id)}
+                          data-testid={`button-delete-section-${item.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
                   <TableRow 
                     key={item.id} 
-                    className={cn(item.isChecked && "bg-green-50 dark:bg-green-950/20")}
+                    className={cn(
+                      "transition-colors",
+                      item.isChecked 
+                        ? "bg-green-50/70 dark:bg-green-950/30" 
+                        : index % 2 === 0 ? "bg-white dark:bg-slate-950" : "bg-slate-50/50 dark:bg-slate-900/50"
+                    )}
                     data-testid={`checklist-item-${item.id}`}
                   >
-                    <TableCell className="font-medium text-center">{item.slNo}</TableCell>
-                    <TableCell className={cn(item.isChecked && "line-through text-muted-foreground")}>
+                    <TableCell className="font-semibold text-center text-slate-600 dark:text-slate-400">{item.slNo}</TableCell>
+                    <TableCell className={cn("font-medium", item.isChecked && "line-through text-muted-foreground")}>
                       {item.itemDescription}
                     </TableCell>
-                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-center font-medium">{item.quantity}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{item.vendorName || "-"}</TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant={item.isChecked ? "default" : "outline"}
                         size="sm"
                         className={cn(
-                          "w-24 text-xs",
+                          "w-28 text-xs font-medium shadow-sm",
                           item.isChecked 
                             ? "bg-green-600 hover:bg-green-700 text-white" 
-                            : "border-amber-500 text-amber-600 hover:bg-amber-50"
+                            : "border-amber-400 text-amber-700 hover:bg-amber-50 hover:border-amber-500"
                         )}
                         onClick={() => toggleStatus(item)}
                         data-testid={`button-status-${item.id}`}
                       >
                         {item.isChecked ? (
-                          <><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</>
+                          <><CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Completed</>
                         ) : (
-                          <><Clock className="h-3 w-3 mr-1" /> Pending</>
+                          <><Clock className="h-3.5 w-3.5 mr-1" /> Pending</>
                         )}
                       </Button>
                     </TableCell>
@@ -691,7 +998,7 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                         onClick={() => deleteItemMutation.mutate(item.id)}
                         data-testid={`button-delete-checklist-${item.id}`}
                       >

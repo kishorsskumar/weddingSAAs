@@ -7076,6 +7076,26 @@ export async function registerRoutes(
     res.json(item);
   });
 
+  // Bulk insert checklist items (for template loading)
+  app.post('/api/execution-plans/:planId/checklist/bulk', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { items } = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Items must be an array' });
+    }
+    const createdItems = [];
+    for (const item of items) {
+      const created = await storage.createExecutionPlanChecklistItem({
+        planId: req.params.planId,
+        ...item,
+      });
+      createdItems.push(created);
+    }
+    res.json({ items: createdItems, count: createdItems.length });
+  });
+
   app.put('/api/execution-plan-checklist/:id', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
