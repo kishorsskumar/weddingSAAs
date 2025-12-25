@@ -20,7 +20,8 @@ import {
   Search,
   Calendar,
   Clock,
-  User
+  User,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +59,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -444,7 +453,14 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddingItem, setIsAddingItem] = useState(false);
-  const [newItem, setNewItem] = useState({ task: "", assignedTo: "", dueDate: "" });
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [newItem, setNewItem] = useState({ 
+    itemDescription: "", 
+    quantity: 1, 
+    vendorName: "",
+    sectionLabel: ""
+  });
+  const [newSection, setNewSection] = useState("");
 
   const { data: items = [] } = useQuery({
     queryKey: [`/api/execution-plans/${planId}/checklist`],
@@ -463,7 +479,9 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/execution-plans/${planId}/checklist`] });
       setIsAddingItem(false);
-      setNewItem({ task: "", assignedTo: "", dueDate: "" });
+      setIsAddingSection(false);
+      setNewItem({ itemDescription: "", quantity: 1, vendorName: "", sectionLabel: "" });
+      setNewSection("");
       toast({ title: "Item added" });
     },
   });
@@ -494,117 +512,199 @@ function ChecklistSection({ planId, employees }: { planId: string; employees: Em
     },
   });
 
+  const handleAddItem = () => {
+    const maxSlNo = (items as any[]).filter(i => !i.isSection).reduce((max, i) => Math.max(max, i.slNo || 0), 0);
+    addItemMutation.mutate({
+      ...newItem,
+      slNo: maxSlNo + 1,
+      isSection: false,
+      sortOrder: (items as any[]).length
+    });
+  };
+
+  const handleAddSection = () => {
+    addItemMutation.mutate({
+      itemDescription: newSection,
+      isSection: true,
+      sortOrder: (items as any[]).length
+    });
+  };
+
+  const toggleStatus = (item: any) => {
+    updateItemMutation.mutate({ 
+      id: item.id, 
+      data: { isChecked: !item.isChecked } 
+    });
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-2">
         <h2 className="text-lg font-semibold">Checklist</h2>
-        <Button size="sm" onClick={() => setIsAddingItem(true)} data-testid="button-add-checklist">
-          <Plus className="h-4 w-4 mr-1" />
-          Add Item
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setIsAddingSection(true)} data-testid="button-add-section">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Section
+          </Button>
+          <Button size="sm" onClick={() => setIsAddingItem(true)} data-testid="button-add-checklist">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Item
+          </Button>
+        </div>
       </div>
+
+      {isAddingSection && (
+        <Card className="p-4">
+          <div className="space-y-3">
+            <Label>Section Header</Label>
+            <Input
+              placeholder="e.g., COMMON LIGHTING & DECOR, 21st Nov - HALDI"
+              value={newSection}
+              onChange={(e) => setNewSection(e.target.value)}
+              data-testid="input-section-name"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setIsAddingSection(false); setNewSection(""); }}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleAddSection} disabled={!newSection.trim()}>
+                Add Section
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {isAddingItem && (
         <Card className="p-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <div className="sm:col-span-2">
+              <Label>Item Description *</Label>
               <Input
-                placeholder="Task description"
-                value={newItem.task}
-                onChange={(e) => setNewItem({ ...newItem, task: e.target.value })}
-                data-testid="input-checklist-task"
+                placeholder="e.g., Mirchi lights for 2 days"
+                value={newItem.itemDescription}
+                onChange={(e) => setNewItem({ ...newItem, itemDescription: e.target.value })}
+                data-testid="input-checklist-description"
               />
             </div>
-            <Select value={newItem.assignedTo} onValueChange={(v) => setNewItem({ ...newItem, assignedTo: v })}>
-              <SelectTrigger data-testid="select-checklist-assignee">
-                <SelectValue placeholder="Assign to..." />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((emp) => (
-                  <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Label>Quantity</Label>
+              <Input
+                type="number"
+                min={1}
+                value={newItem.quantity}
+                onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 1 })}
+                data-testid="input-checklist-quantity"
+              />
+            </div>
+            <div>
+              <Label>Vendor</Label>
+              <Input
+                placeholder="Vendor name"
+                value={newItem.vendorName}
+                onChange={(e) => setNewItem({ ...newItem, vendorName: e.target.value })}
+                data-testid="input-checklist-vendor"
+              />
+            </div>
           </div>
-          <div className="flex gap-2 mt-3">
-            <Input
-              type="date"
-              value={newItem.dueDate}
-              onChange={(e) => setNewItem({ ...newItem, dueDate: e.target.value })}
-              className="w-40"
-              data-testid="input-checklist-duedate"
-            />
-            <div className="flex-1" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsAddingItem(false)}
-            >
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="ghost" size="sm" onClick={() => { setIsAddingItem(false); setNewItem({ itemDescription: "", quantity: 1, vendorName: "", sectionLabel: "" }); }}>
               Cancel
             </Button>
-            <Button
-              size="sm"
-              onClick={() => addItemMutation.mutate(newItem)}
-              disabled={!newItem.task}
-            >
-              Add
+            <Button size="sm" onClick={handleAddItem} disabled={!newItem.itemDescription.trim()}>
+              Add Item
             </Button>
           </div>
         </Card>
       )}
 
-      <div className="space-y-2">
-        {(items as any[]).map((item: any) => (
-          <div
-            key={item.id}
-            className={cn(
-              "flex items-center gap-3 p-3 rounded-lg border bg-card",
-              item.isCompleted && "bg-muted/50"
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="w-16">Sl No</TableHead>
+              <TableHead>Item & Description</TableHead>
+              <TableHead className="w-20 text-center">Qty</TableHead>
+              <TableHead className="w-32">Vendor</TableHead>
+              <TableHead className="w-28 text-center">Status</TableHead>
+              <TableHead className="w-16"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {(items as any[]).length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                  <p>No checklist items yet. Add sections and items to get started.</p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              (items as any[]).sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((item: any) => (
+                item.isSection ? (
+                  <TableRow key={item.id} className="bg-primary/10 hover:bg-primary/15" data-testid={`checklist-section-${item.id}`}>
+                    <TableCell colSpan={6} className="font-bold text-primary py-3">
+                      {item.itemDescription}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 ml-2 text-destructive hover:text-destructive float-right"
+                        onClick={() => deleteItemMutation.mutate(item.id)}
+                        data-testid={`button-delete-section-${item.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow 
+                    key={item.id} 
+                    className={cn(item.isChecked && "bg-green-50 dark:bg-green-950/20")}
+                    data-testid={`checklist-item-${item.id}`}
+                  >
+                    <TableCell className="font-medium text-center">{item.slNo}</TableCell>
+                    <TableCell className={cn(item.isChecked && "line-through text-muted-foreground")}>
+                      {item.itemDescription}
+                    </TableCell>
+                    <TableCell className="text-center">{item.quantity}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{item.vendorName || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant={item.isChecked ? "default" : "outline"}
+                        size="sm"
+                        className={cn(
+                          "w-24 text-xs",
+                          item.isChecked 
+                            ? "bg-green-600 hover:bg-green-700 text-white" 
+                            : "border-amber-500 text-amber-600 hover:bg-amber-50"
+                        )}
+                        onClick={() => toggleStatus(item)}
+                        data-testid={`button-status-${item.id}`}
+                      >
+                        {item.isChecked ? (
+                          <><CheckCircle2 className="h-3 w-3 mr-1" /> Completed</>
+                        ) : (
+                          <><Clock className="h-3 w-3 mr-1" /> Pending</>
+                        )}
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => deleteItemMutation.mutate(item.id)}
+                        data-testid={`button-delete-checklist-${item.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              ))
             )}
-            data-testid={`checklist-item-${item.id}`}
-          >
-            <Checkbox
-              checked={item.isCompleted}
-              onCheckedChange={(checked) =>
-                updateItemMutation.mutate({ id: item.id, data: { isCompleted: checked } })
-              }
-              data-testid={`checkbox-checklist-${item.id}`}
-            />
-            <div className="flex-1 min-w-0">
-              <p className={cn("font-medium", item.isCompleted && "line-through text-muted-foreground")}>
-                {item.task}
-              </p>
-              <div className="flex gap-4 text-xs text-muted-foreground">
-                {item.assignedToId && (
-                  <span>{employees.find(e => e.id === item.assignedToId)?.name}</span>
-                )}
-                {item.dueDate && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(item.dueDate), "MMM d")}
-                  </span>
-                )}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={() => deleteItemMutation.mutate(item.id)}
-              data-testid={`button-delete-checklist-${item.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
-
-        {(items as any[]).length === 0 && !isAddingItem && (
-          <div className="text-center py-8 text-muted-foreground">
-            <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-50" />
-            <p>No checklist items yet</p>
-          </div>
-        )}
-      </div>
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }
