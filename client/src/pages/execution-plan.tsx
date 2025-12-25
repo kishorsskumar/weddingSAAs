@@ -688,6 +688,11 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<{ itemDescription: string; quantity: number; vendorName: string }>({ itemDescription: "", quantity: 1, vendorName: "" });
+  const [isEditingHeader, setIsEditingHeader] = useState(false);
+  const [headerTitle, setHeaderTitle] = useState("Production Checklist");
+  const [headerSubtitle, setHeaderSubtitle] = useState("Oakstreet Events");
+  const [editHeaderTitle, setEditHeaderTitle] = useState("");
+  const [editHeaderSubtitle, setEditHeaderSubtitle] = useState("");
   const [newItem, setNewItem] = useState({ 
     itemDescription: "", 
     quantity: 1, 
@@ -1006,10 +1011,67 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
             <img src={oakstreetLogo} alt="Oakstreet Events" className="h-12 w-12 rounded-lg object-cover shadow-lg" />
-            <div>
-              <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100">Production Checklist</h2>
-              <p className="text-sm text-amber-700 dark:text-amber-300">Oakstreet Events</p>
-            </div>
+            {isEditingHeader ? (
+              <div className="flex items-center gap-2">
+                <div className="space-y-1">
+                  <Input
+                    value={editHeaderTitle}
+                    onChange={(e) => setEditHeaderTitle(e.target.value)}
+                    className="h-8 text-lg font-bold"
+                    placeholder="Checklist Title"
+                    data-testid="input-header-title"
+                  />
+                  <Input
+                    value={editHeaderSubtitle}
+                    onChange={(e) => setEditHeaderSubtitle(e.target.value)}
+                    className="h-7 text-sm"
+                    placeholder="Subtitle"
+                    data-testid="input-header-subtitle"
+                  />
+                </div>
+                <Button
+                  size="icon"
+                  className="h-8 w-8 bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    setHeaderTitle(editHeaderTitle || "Production Checklist");
+                    setHeaderSubtitle(editHeaderSubtitle || "Oakstreet Events");
+                    setIsEditingHeader(false);
+                  }}
+                  data-testid="button-save-header"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  onClick={() => setIsEditingHeader(false)}
+                  data-testid="button-cancel-header"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <div>
+                  <h2 className="text-xl font-bold text-amber-900 dark:text-amber-100">{headerTitle}</h2>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">{headerSubtitle}</p>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-amber-700 hover:text-amber-900 hover:bg-amber-100"
+                  onClick={() => {
+                    setEditHeaderTitle(headerTitle);
+                    setEditHeaderSubtitle(headerSubtitle);
+                    setIsEditingHeader(true);
+                  }}
+                  data-testid="button-edit-header"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button 
