@@ -360,59 +360,73 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram with Connection Lines */}
-        <div className="relative bg-slate-50 dark:bg-slate-900/30 rounded-xl p-8">
+        {/* S-Curve Flow Diagram - 2 Rows with Connection Lines */}
+        <div className="relative bg-slate-50 dark:bg-slate-900/30 rounded-xl p-6">
           
-          {/* Row 1: Phases 1-3 with horizontal connections */}
-          <div className="relative mb-12">
-            <div className="flex justify-between items-center px-8">
+          {/* Row 1: Phases 1-4 with horizontal connections */}
+          <div className="relative mb-10">
+            <div className="flex justify-between items-center">
               {/* Phase 1 */}
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center">
                 {renderStepBox(1, getPhaseStats(1), phaseConfig[1])}
               </div>
               
               {/* Connection Line 1→2 */}
               <motion.div 
-                className="flex-1 h-5 bg-gradient-to-r from-[#6b9937] to-[#7cb342] rounded-full mx-2"
+                className="flex-1 h-2.5 bg-[#6b9937] rounded-full -mx-1"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
                 style={{ originX: 0 }}
               />
               
               {/* Phase 2 */}
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center">
                 {renderStepBox(2, getPhaseStats(2), phaseConfig[2])}
               </div>
               
               {/* Connection Line 2→3 */}
               <motion.div 
-                className="flex-1 h-5 bg-gradient-to-r from-[#7cb342] to-[#8bc34a] rounded-full mx-2"
+                className="flex-1 h-2.5 bg-[#7cb342] rounded-full -mx-1"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.5, delay: 0.4 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
                 style={{ originX: 0 }}
               />
               
               {/* Phase 3 */}
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center">
                 {renderStepBox(3, getPhaseStats(3), phaseConfig[3])}
+              </div>
+              
+              {/* Connection Line 3→4 */}
+              <motion.div 
+                className="flex-1 h-2.5 bg-[#8bc34a] rounded-full -mx-1"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+                style={{ originX: 0 }}
+              />
+              
+              {/* Phase 4 */}
+              <div className="relative z-10 flex flex-col items-center">
+                {renderStepBox(4, getPhaseStats(4), phaseConfig[4])}
               </div>
             </div>
             
-            {/* Vertical connector from Phase 3 down to Row 2 */}
+            {/* Vertical connector from Phase 4 down to Row 2 */}
             <motion.div 
-              className="absolute right-12 top-full w-5 h-12 bg-gradient-to-b from-[#8bc34a] to-[#9ccc65] rounded-full"
+              className="absolute right-[3rem] top-[90%] w-2.5 h-10 bg-[#9ccc65] rounded-full"
               initial={{ scaleY: 0 }}
               animate={{ scaleY: 1 }}
-              transition={{ duration: 0.4, delay: 0.6 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
               style={{ originY: 0 }}
             />
           </div>
 
           {/* Expanded Details for Row 1 */}
           <AnimatePresence>
-            {expandedPhase && expandedPhase <= 3 && (
+            {expandedPhase && expandedPhase <= 4 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
@@ -424,80 +438,47 @@ export default function EventMilestones() {
             )}
           </AnimatePresence>
 
-          {/* Row 2: Phases 4-5 (Right side) with connection */}
-          <div className="relative mb-12">
-            <div className="flex justify-end items-center px-8 gap-0">
-              {/* Phase 4 */}
-              <div className="relative z-10">
-                {renderStepBox(4, getPhaseStats(4), phaseConfig[4])}
+          {/* Row 2: Phases 5-7 (Right to Left flow) with connections */}
+          <div className="relative">
+            <div className="flex justify-end items-center gap-0">
+              {/* Phase 5 */}
+              <div className="relative z-10 flex flex-col items-center">
+                {renderStepBox(5, getPhaseStats(5), phaseConfig[5])}
               </div>
               
-              {/* Connection Line 4←5 */}
+              {/* Connection Line 5→6 */}
               <motion.div 
-                className="w-24 h-5 bg-gradient-to-r from-[#9ccc65] to-[#aed581] rounded-full mx-2"
+                className="w-16 h-2.5 bg-[#aed581] rounded-full -mx-1"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.5, delay: 0.8 }}
+                transition={{ duration: 0.4, delay: 0.5 }}
                 style={{ originX: 1 }}
               />
               
-              {/* Phase 5 */}
-              <div className="relative z-10">
-                {renderStepBox(5, getPhaseStats(5), phaseConfig[5])}
-              </div>
-            </div>
-            
-            {/* Vertical connector from Phase 4 down to Row 3 */}
-            <motion.div 
-              className="absolute left-[calc(50%+2rem)] top-full w-5 h-12 bg-gradient-to-b from-[#aed581] to-[#c5e1a5] rounded-full"
-              initial={{ scaleY: 0 }}
-              animate={{ scaleY: 1 }}
-              transition={{ duration: 0.4, delay: 1.0 }}
-              style={{ originY: 0 }}
-            />
-          </div>
-
-          {/* Expanded Details for Row 2 */}
-          <AnimatePresence>
-            {expandedPhase && (expandedPhase === 4 || expandedPhase === 5) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mb-4"
-              >
-                <PhaseDetails phase={expandedPhase} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Row 3: Phases 6-7 (Left side) with connection */}
-          <div className="relative">
-            <div className="flex justify-start items-center px-8 gap-0">
               {/* Phase 6 */}
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center">
                 {renderStepBox(6, getPhaseStats(6), phaseConfig[6])}
               </div>
               
               {/* Connection Line 6→7 */}
               <motion.div 
-                className="w-24 h-5 bg-gradient-to-r from-[#c5e1a5] to-[#dcedc8] rounded-full mx-2"
+                className="w-16 h-2.5 bg-[#c5e1a5] rounded-full -mx-1"
                 initial={{ scaleX: 0 }}
                 animate={{ scaleX: 1 }}
-                transition={{ duration: 0.5, delay: 1.2 }}
-                style={{ originX: 0 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+                style={{ originX: 1 }}
               />
               
               {/* Phase 7 */}
-              <div className="relative z-10">
+              <div className="relative z-10 flex flex-col items-center">
                 {renderStepBox(7, getPhaseStats(7), phaseConfig[7])}
               </div>
             </div>
           </div>
 
-          {/* Expanded Details for Row 3 */}
+          {/* Expanded Details for Row 2 */}
           <AnimatePresence>
-            {expandedPhase && expandedPhase >= 6 && (
+            {expandedPhase && expandedPhase >= 5 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
