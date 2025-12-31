@@ -354,28 +354,13 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram - Fixed aspect ratio container */}
-        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-hidden" style={{ aspectRatio: '1200 / 520', maxHeight: '460px' }}>
-          
-          {/* Start Badge - positioned at path start (x=120, y=120 in 1200x520 coords) */}
-          <div className="absolute z-30" style={{ left: '5%', top: '23%', transform: 'translate(-50%, -50%)' }}>
-            <div className="w-14 h-14 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg border-2 border-white">
-              <span className="text-white text-[9px] font-bold text-center leading-tight">Event<br/>Start</span>
-            </div>
-          </div>
-          
-          {/* End Badge - positioned at path end (x=1080, y=440 in 1200x520 coords) */}
-          <div className="absolute z-30" style={{ left: '95%', top: '84.6%', transform: 'translate(-50%, -50%)' }}>
-            <div className="w-14 h-14 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg border-2 border-white">
-              <span className="text-white text-[9px] font-bold text-center leading-tight">Event<br/>Done</span>
-            </div>
-          </div>
-          
-          {/* SVG S-Curve Path - Uses fixed 1200x520 coordinate system */}
+        {/* S-Curve Flow Diagram - Everything inside SVG for perfect alignment */}
+        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-visible">
           <svg 
-            className="absolute inset-0 w-full h-full pointer-events-none z-10"
+            className="w-full"
             viewBox="0 0 1200 520"
             preserveAspectRatio="xMidYMid meet"
+            style={{ minHeight: '400px' }}
           >
             <defs>
               <linearGradient id="sCurveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -384,18 +369,19 @@ export default function EventMilestones() {
                 <stop offset="100%" stopColor="#6b9937" />
               </linearGradient>
             </defs>
-            {/* Continuous S-curve path with arc connectors */}
+            
+            {/* Continuous S-curve path - Row 1 at y=100, Row 2 at y=280, Row 3 at y=440 */}
             <motion.path
-              d="M 120 120 
-                 H 1040 
-                 A 60 60 0 0 1 1100 180 
-                 V 240 
-                 A 60 60 0 0 1 1040 300 
-                 H 360 
-                 A 60 60 0 0 0 300 360 
-                 V 400 
-                 A 60 60 0 0 0 360 440 
-                 H 1080"
+              d="M 60 100 
+                 H 1060 
+                 Q 1120 100 1120 160 
+                 V 220 
+                 Q 1120 280 1060 280 
+                 H 140 
+                 Q 80 280 80 340 
+                 V 380 
+                 Q 80 440 140 440 
+                 H 1140"
               fill="none"
               stroke="url(#sCurveGradient)"
               strokeWidth="10"
@@ -405,35 +391,49 @@ export default function EventMilestones() {
               animate={{ pathLength: 1, opacity: 0.7 }}
               transition={{ duration: 2.5, ease: "easeInOut" }}
             />
+            
+            {/* Start Badge - at path start */}
+            <g transform="translate(60, 100)">
+              <circle r="35" fill="#6b9937" stroke="white" strokeWidth="3" />
+              <text x="0" y="-5" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Event</text>
+              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Start</text>
+            </g>
+            
+            {/* End Badge - at path end */}
+            <g transform="translate(1140, 440)">
+              <circle r="35" fill="#6b9937" stroke="white" strokeWidth="3" />
+              <text x="0" y="-5" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Event</text>
+              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Done</text>
+            </g>
+            
+            {/* Phase Cards using foreignObject - positioned at exact path coordinates */}
+            {/* Row 1: y=100 - Phases 1, 2, 3 */}
+            <foreignObject x="200" y="30" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(1, getPhaseStats(1), phaseConfig[1])}</div>
+            </foreignObject>
+            <foreignObject x="520" y="30" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(2, getPhaseStats(2), phaseConfig[2])}</div>
+            </foreignObject>
+            <foreignObject x="840" y="30" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(3, getPhaseStats(3), phaseConfig[3])}</div>
+            </foreignObject>
+            
+            {/* Row 2: y=280 - Phases 4, 5, 6 (right to left) */}
+            <foreignObject x="840" y="210" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(4, getPhaseStats(4), phaseConfig[4])}</div>
+            </foreignObject>
+            <foreignObject x="520" y="210" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(5, getPhaseStats(5), phaseConfig[5])}</div>
+            </foreignObject>
+            <foreignObject x="200" y="210" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(6, getPhaseStats(6), phaseConfig[6])}</div>
+            </foreignObject>
+            
+            {/* Row 3: y=440 - Phase 7 */}
+            <foreignObject x="280" y="370" width="160" height="140">
+              <div className="flex flex-col items-center">{renderStepCard(7, getPhaseStats(7), phaseConfig[7])}</div>
+            </foreignObject>
           </svg>
-          
-          {/* Phase Cards - Positioned using same 1200x520 coordinate system converted to % */}
-          {/* Row 1: y=120 → 23.1%, Phases at x=280, 540, 800 */}
-          <div className="absolute z-20" style={{ left: '23.3%', top: '23.1%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(1, getPhaseStats(1), phaseConfig[1])}
-          </div>
-          <div className="absolute z-20" style={{ left: '45%', top: '23.1%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(2, getPhaseStats(2), phaseConfig[2])}
-          </div>
-          <div className="absolute z-20" style={{ left: '66.7%', top: '23.1%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(3, getPhaseStats(3), phaseConfig[3])}
-          </div>
-          
-          {/* Row 2: y=300 → 57.7%, Phases at x=800, 540, 480 (right to left) */}
-          <div className="absolute z-20" style={{ left: '73.3%', top: '57.7%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(4, getPhaseStats(4), phaseConfig[4])}
-          </div>
-          <div className="absolute z-20" style={{ left: '53.3%', top: '57.7%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(5, getPhaseStats(5), phaseConfig[5])}
-          </div>
-          <div className="absolute z-20" style={{ left: '33.3%', top: '57.7%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(6, getPhaseStats(6), phaseConfig[6])}
-          </div>
-          
-          {/* Row 3: y=440 → 84.6%, Phase at x=480 */}
-          <div className="absolute z-20" style={{ left: '40%', top: '84.6%', transform: 'translate(-50%, -50%)' }}>
-            {renderStepCard(7, getPhaseStats(7), phaseConfig[7])}
-          </div>
         </div>
         
         {/* Expanded Phase Details - Below diagram */}
