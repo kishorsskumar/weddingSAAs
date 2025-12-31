@@ -60,6 +60,8 @@ function formatDate(dateStr: string): string {
 }
 
 export async function generateSalesReportPdf(options: {
+  year?: number;
+  month?: number;
   startDate?: string;
   endDate?: string;
   planner?: string;
@@ -67,11 +69,32 @@ export async function generateSalesReportPdf(options: {
 }): Promise<{ documentId: string; filename: string; message: string }> {
   let events = await storage.getAllEvents();
   
-  if (options.startDate) {
-    events = events.filter(e => e.date >= options.startDate!);
+  // Handle year/month-based filtering (preferred for monthly reports)
+  let effectiveStartDate = options.startDate;
+  let effectiveEndDate = options.endDate;
+  let periodDescription = '';
+  
+  if (options.year && options.month) {
+    // Calculate start and end of the month
+    const year = options.year;
+    const month = options.month;
+    effectiveStartDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate(); // Get last day of month
+    effectiveEndDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    periodDescription = `${monthNames[month - 1]} ${year}`;
+  } else if (options.year && !options.month) {
+    // Full year
+    effectiveStartDate = `${options.year}-01-01`;
+    effectiveEndDate = `${options.year}-12-31`;
+    periodDescription = `Year ${options.year}`;
   }
-  if (options.endDate) {
-    events = events.filter(e => e.date <= options.endDate!);
+  
+  if (effectiveStartDate) {
+    events = events.filter(e => e.date >= effectiveStartDate!);
+  }
+  if (effectiveEndDate) {
+    events = events.filter(e => e.date <= effectiveEndDate!);
   }
   if (options.planner) {
     events = events.filter(e => e.planner?.toLowerCase().includes(options.planner!.toLowerCase()));
@@ -98,8 +121,12 @@ export async function generateSalesReportPdf(options: {
   
   doc.setFontSize(10);
   const filterText = [];
-  if (options.startDate) filterText.push(`From: ${formatDate(options.startDate)}`);
-  if (options.endDate) filterText.push(`To: ${formatDate(options.endDate)}`);
+  if (periodDescription) {
+    filterText.push(periodDescription);
+  } else {
+    if (effectiveStartDate) filterText.push(`From: ${formatDate(effectiveStartDate)}`);
+    if (effectiveEndDate) filterText.push(`To: ${formatDate(effectiveEndDate)}`);
+  }
   if (options.planner) filterText.push(`Planner: ${options.planner}`);
   if (options.eventType) filterText.push(`Type: ${options.eventType}`);
   if (filterText.length === 0) filterText.push('All Events');

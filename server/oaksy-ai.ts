@@ -468,12 +468,14 @@ const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool
     type: "function",
     function: {
       name: "generate_sales_report",
-      description: "Generate a downloadable PDF sales report with event data, totals, and breakdown. (Superadmin only)",
+      description: "Generate a downloadable PDF sales report with event data, totals, and breakdown. (Superadmin only). IMPORTANT: When user says 'November 25' or 'Nov 25', they mean 'November 2025' (the whole month), so use year=2025, month=11. For a full month report, use the year and month parameters.",
       parameters: {
         type: "object",
         properties: {
-          startDate: { type: "string", description: "Start date for report (YYYY-MM-DD)" },
-          endDate: { type: "string", description: "End date for report (YYYY-MM-DD)" },
+          year: { type: "number", description: "Year for the report (e.g., 2024, 2025). Use this for month-based reports." },
+          month: { type: "number", description: "Month number 1-12 (e.g., 11 for November). Use with year for monthly reports." },
+          startDate: { type: "string", description: "Specific start date (YYYY-MM-DD). Only use if user specifies exact dates, not for month-based requests." },
+          endDate: { type: "string", description: "Specific end date (YYYY-MM-DD). Only use if user specifies exact dates." },
           planner: { type: "string", description: "Filter by wedding planner name" },
           eventType: { type: "string", description: "Filter by event type (wedding, corporate, etc.)" },
         },
@@ -1266,6 +1268,8 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
           return { success: false, message: "Only superadmin can generate documents" };
         }
         const result = await documentService.generateSalesReportPdf({
+          year: args.year,
+          month: args.month,
           startDate: args.startDate,
           endDate: args.endDate,
           planner: args.planner,
