@@ -6637,6 +6637,24 @@ export async function registerRoutes(
   });
 
   // ==================== OAKSY AI ASSISTANT ====================
+  
+  // Helper to check Oaksy access
+  async function checkOaksyAccess(userId: string): Promise<{ allowed: boolean; user?: any; allowedPages?: string[] }> {
+    const user = await storage.getUser(userId);
+    if (!user) return { allowed: false };
+    
+    // Only superadmin gets ALL_PAGES, everyone else (including admin) gets filtered by their permissions
+    let allowedPages: string[];
+    if (user.role === 'superadmin') {
+      allowedPages = ALL_PAGES;
+    } else {
+      const permissions = await storage.getUserPermissions(user.id);
+      allowedPages = permissions.map(p => p.pageId);
+    }
+    
+    const { canAccessOaksy } = await import('./oaksy-ai');
+    return { allowed: canAccessOaksy(user.role, allowedPages), user, allowedPages };
+  }
 
   // Get user's conversations
   app.get('/api/oaksy/conversations', async (req, res) => {
@@ -6644,6 +6662,10 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
+      const access = await checkOaksyAccess(req.session.userId);
+      if (!access.allowed) {
+        return res.status(403).json({ error: 'You do not have access to Oaksy AI' });
+      }
       const conversations = await storage.getOaksyConversations(req.session.userId);
       res.json(conversations);
     } catch (error: any) {
@@ -6658,6 +6680,10 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
+      const access = await checkOaksyAccess(req.session.userId);
+      if (!access.allowed) {
+        return res.status(403).json({ error: 'You do not have access to Oaksy AI' });
+      }
       const conversation = await storage.getOaksyConversation(req.params.id);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
@@ -6679,6 +6705,10 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
+      const access = await checkOaksyAccess(req.session.userId);
+      if (!access.allowed) {
+        return res.status(403).json({ error: 'You do not have access to Oaksy AI' });
+      }
       const { department } = req.body;
       const conversation = await storage.createOaksyConversation({
         userId: req.session.userId,
@@ -6697,6 +6727,10 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
+      const access = await checkOaksyAccess(req.session.userId);
+      if (!access.allowed) {
+        return res.status(403).json({ error: 'You do not have access to Oaksy AI' });
+      }
       const conversation = await storage.getOaksyConversation(req.params.id);
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
@@ -6745,9 +6779,9 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'User not found' });
       }
       
-      // Get user's allowed pages for permission filtering
+      // Get user's allowed pages for permission filtering (only superadmin gets ALL_PAGES)
       let allowedPages: string[];
-      if (user.role === 'admin' || user.role === 'superadmin') {
+      if (user.role === 'superadmin') {
         allowedPages = ALL_PAGES;
       } else {
         const permissions = await storage.getUserPermissions(user.id);

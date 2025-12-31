@@ -29,22 +29,22 @@ export interface OaksyActionResult {
   }[];
 }
 
-// Map pages to their associated tool capabilities
+// Map pages to their associated tool capabilities (only existing tools)
 const PAGE_TO_TOOLS: Record<string, string[]> = {
-  'dashboard': ['view_dashboard_stats'],
+  'dashboard': ['view_events', 'view_employees', 'view_daybook', 'view_banks'],
   'event-calendar': ['view_events', 'create_event', 'update_event', 'delete_event'],
   'team-calendar': ['view_meetings', 'create_meeting', 'update_meeting', 'delete_meeting'],
   'event-database': ['view_events', 'create_event', 'update_event', 'delete_event'],
   'event-milestones': ['view_events', 'update_event'],
-  'daybook': ['view_daybook', 'create_daybook_entry', 'update_daybook_entry', 'delete_daybook_entry', 'create_bank_transfer'],
-  'oak-book': ['view_daybook', 'view_banks', 'create_daybook_entry', 'create_bank_transfer', 'update_bank', 'view_vendors'],
+  'daybook': ['view_daybook', 'create_daybook_entry', 'delete_daybook_entry', 'create_bank_transfer', 'view_banks'],
+  'oak-book': ['view_daybook', 'view_banks', 'create_daybook_entry', 'create_bank_transfer'],
   'oak-sales': ['view_events', 'create_event', 'update_event'],
-  'oak-inventory': ['view_inventory'],
+  'oak-inventory': ['view_events'],
   'execution-plan': ['view_events'],
   'hr': ['view_employees', 'create_employee', 'update_employee', 'delete_employee', 'view_leave_requests', 'update_leave_request'],
   'employee-portal': [],
   'oaksy': [],
-  'admin': ['view_users', 'create_user', 'update_user', 'delete_user', 'view_roles', 'update_permissions', 'send_whatsapp_message'],
+  'admin': ['view_users', 'create_user', 'view_employees', 'view_events', 'view_daybook', 'view_banks', 'view_meetings', 'view_leave_requests'],
 };
 
 // All available Oaksy tools with their definitions
@@ -448,26 +448,18 @@ const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool
 function getToolsForUser(userRole: string, allowedPages: string[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
   const availableToolNames = new Set<string>();
 
-  // Superadmin gets ALL tools
+  // Superadmin gets ALL tools including WhatsApp
   if (userRole === 'superadmin') {
     return Object.values(ALL_OAKSY_TOOLS);
   }
 
-  // Admin gets most tools except superadmin-specific ones
-  if (userRole === 'admin') {
-    const adminTools = Object.entries(ALL_OAKSY_TOOLS)
-      .filter(([name]) => name !== 'send_whatsapp_message')
-      .map(([, tool]) => tool);
-    return adminTools;
-  }
-
-  // For other users, check their allowed pages and add corresponding tools
+  // For all other users (including admin), filter by allowed pages
   for (const pageId of allowedPages) {
     const toolsForPage = PAGE_TO_TOOLS[pageId] || [];
     toolsForPage.forEach(toolName => availableToolNames.add(toolName));
   }
 
-  // Convert tool names to actual tool definitions
+  // Convert tool names to actual tool definitions (only include existing tools)
   const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
   Array.from(availableToolNames).forEach(toolName => {
     if (ALL_OAKSY_TOOLS[toolName]) {
@@ -516,15 +508,19 @@ You are the ultimate authority in this system. Help the superadmin manage Oak St
   }
 
   if (userRole === 'admin') {
+    const adminAccessibleModules = allowedPages
+      .filter(p => PAGE_TO_TOOLS[p] && PAGE_TO_TOOLS[p].length > 0)
+      .map(p => `- ${p}`)
+      .join('\n');
+    
     return `${basePrompt}
 
 USER ROLE: ADMIN
-You have administrative access to most modules:
-- Events: View, create, edit, delete events
-- Meetings: View, create, edit, delete meetings
-- Daybook: Full access to financial entries
-- HR: Manage employees and leave requests
-- Users: View and manage system users
+You have administrative access to the modules you are assigned to. Your accessible pages:
+${adminAccessibleModules}
+
+You can perform view and management operations on these modules.
+Note: WhatsApp messaging is restricted to superadmin only.
 
 Help the admin manage daily operations effectively.`;
   }
@@ -600,13 +596,13 @@ function formatContextForAI(context: OaksyContext): string {
 
 async function executeToolCall(toolName: string, args: any, userRole: string, allowedPages: string[]): Promise<{ success: boolean; message: string; data?: any }> {
   try {
-    // Check if user has permission for this tool
+    // Check if user has permission for this tool (consistent with getToolsForUser)
     const availableTools = new Set<string>();
     if (userRole === 'superadmin') {
+      // Superadmin gets ALL tools
       Object.keys(ALL_OAKSY_TOOLS).forEach(t => availableTools.add(t));
-    } else if (userRole === 'admin') {
-      Object.keys(ALL_OAKSY_TOOLS).filter(t => t !== 'send_whatsapp_message').forEach(t => availableTools.add(t));
     } else {
+      // All other users (including admin) are filtered by their allowed pages
       for (const pageId of allowedPages) {
         (PAGE_TO_TOOLS[pageId] || []).forEach(t => availableTools.add(t));
       }
