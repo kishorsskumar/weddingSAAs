@@ -234,68 +234,62 @@ export default function EventMilestones() {
     7: { icon: PackageCheck, color: 'text-indigo-500', bgColor: 'bg-indigo-100 dark:bg-indigo-900/40' },
   };
 
-  // Visual Flow Diagram Component - S-Curve design matching reference image
+  // Visual Flow Diagram Component - S-Curve design matching reference image exactly
   const MilestoneFlowDiagram = () => {
     const [expandedPhase, setExpandedPhase] = useState<number | null>(null);
     
-    // Compact step box matching reference design
-    const renderStepBox = (
+    // Step card positioned on the S-curve path
+    const renderStepCard = (
       phase: number,
       stats: { total: number; completed: number; progress: number; isComplete: boolean; hasOverdue: boolean; phaseName: string },
       config: { icon: any; color: string; bgColor: string }
     ) => {
       const Icon = config.icon;
-      const statusColor = stats.isComplete 
-        ? 'border-emerald-400 dark:border-emerald-500' 
-        : stats.hasOverdue 
-        ? 'border-rose-400 dark:border-rose-500' 
-        : 'border-slate-300 dark:border-slate-600';
       
       return (
         <motion.div
           key={phase}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: phase * 0.1 }}
-          whileHover={{ scale: 1.02, y: -2 }}
+          whileHover={{ scale: 1.05 }}
           onClick={() => setExpandedPhase(expandedPhase === phase ? null : phase)}
           className={cn(
-            "cursor-pointer flex flex-col items-center text-center",
-            expandedPhase === phase && "z-10"
+            "cursor-pointer flex flex-col items-center text-center w-24",
+            expandedPhase === phase && "z-20"
           )}
           data-testid={`phase-card-${phase}`}
         >
-          {/* Icon with colored background */}
+          {/* Icon box - sits on top of the path */}
           <motion.div 
             className={cn(
-              "w-12 h-12 rounded-xl flex items-center justify-center mb-2 border-2 shadow-sm",
+              "w-14 h-14 rounded-2xl flex items-center justify-center mb-2 shadow-lg border-4 border-white dark:border-slate-800",
               config.bgColor,
-              statusColor,
-              expandedPhase === phase && "ring-2 ring-primary ring-offset-2"
+              expandedPhase === phase && "ring-2 ring-[#6b9937] ring-offset-2"
             )}
-            whileHover={{ rotate: [0, -5, 5, 0] }}
+            whileHover={{ rotate: [0, -3, 3, 0] }}
             transition={{ duration: 0.3 }}
           >
-            <Icon className={cn("w-6 h-6", config.color)} />
+            <Icon className={cn("w-7 h-7", config.color)} />
           </motion.div>
           
           {/* Phase title */}
-          <h4 className="text-xs font-bold text-slate-800 dark:text-white mb-0.5">
-            Phase {phase}
+          <h4 className="text-sm font-bold text-slate-800 dark:text-white">
+            Phase {String(phase).padStart(2, '0')}
           </h4>
           
           {/* Phase name */}
-          <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight max-w-[80px] line-clamp-2">
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-tight mt-0.5 line-clamp-2">
             {stats.phaseName}
           </p>
           
-          {/* Progress indicator */}
+          {/* Progress */}
           <div className="flex items-center gap-1 mt-1">
             <div className={cn(
-              "w-1.5 h-1.5 rounded-full",
+              "w-2 h-2 rounded-full",
               stats.isComplete ? "bg-emerald-500" : stats.hasOverdue ? "bg-rose-500" : "bg-slate-400"
             )} />
-            <span className="text-[9px] font-medium text-slate-500 dark:text-slate-400">
+            <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
               {stats.progress}%
             </span>
           </div>
@@ -360,135 +354,103 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram - 2 Rows with Connection Lines */}
-        <div className="relative bg-slate-50 dark:bg-slate-900/30 rounded-xl p-6">
+        {/* S-Curve Flow Diagram - Matching Reference Design */}
+        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg p-8 overflow-hidden min-h-[420px]">
           
-          {/* Row 1: Phases 1-4 with horizontal connections */}
-          <div className="relative mb-10">
-            <div className="flex justify-between items-center">
-              {/* Phase 1 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(1, getPhaseStats(1), phaseConfig[1])}
-              </div>
-              
-              {/* Connection Line 1→2 */}
-              <motion.div 
-                className="flex-1 h-2.5 bg-[#6b9937] rounded-full -mx-1"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                style={{ originX: 0 }}
-              />
-              
-              {/* Phase 2 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(2, getPhaseStats(2), phaseConfig[2])}
-              </div>
-              
-              {/* Connection Line 2→3 */}
-              <motion.div 
-                className="flex-1 h-2.5 bg-[#7cb342] rounded-full -mx-1"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                style={{ originX: 0 }}
-              />
-              
-              {/* Phase 3 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(3, getPhaseStats(3), phaseConfig[3])}
-              </div>
-              
-              {/* Connection Line 3→4 */}
-              <motion.div 
-                className="flex-1 h-2.5 bg-[#8bc34a] rounded-full -mx-1"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.4, delay: 0.3 }}
-                style={{ originX: 0 }}
-              />
-              
-              {/* Phase 4 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(4, getPhaseStats(4), phaseConfig[4])}
-              </div>
+          {/* Start Badge - Left side */}
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20">
+            <div className="w-20 h-20 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
+              <span className="text-white text-xs font-bold text-center leading-tight">Event<br/>Start</span>
+            </div>
+          </div>
+          
+          {/* End Badge - Right side */}
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+            <div className="w-20 h-20 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
+              <span className="text-white text-xs font-bold text-center leading-tight">Event<br/>Complete</span>
+            </div>
+          </div>
+          
+          {/* SVG S-Curve Path */}
+          <svg 
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 1000 400"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <defs>
+              <linearGradient id="sCurveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#6b9937" />
+                <stop offset="50%" stopColor="#8bc34a" />
+                <stop offset="100%" stopColor="#6b9937" />
+              </linearGradient>
+            </defs>
+            <motion.path
+              d="M 80 100 
+                 L 200 100 L 400 100 L 600 100 L 800 100 
+                 Q 880 100 880 180 
+                 L 880 220 
+                 Q 880 300 800 300 
+                 L 600 300 L 400 300 L 200 300 
+                 Q 120 300 120 220 
+                 L 120 180"
+              fill="none"
+              stroke="url(#sCurveGradient)"
+              strokeWidth="28"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0, opacity: 0.3 }}
+              animate={{ pathLength: 1, opacity: 0.4 }}
+              transition={{ duration: 2, ease: "easeInOut" }}
+            />
+          </svg>
+          
+          {/* Phase Cards Container */}
+          <div className="relative z-10 ml-24 mr-24">
+            
+            {/* Row 1: Phases 1-4 */}
+            <div className="flex justify-between items-start mb-16 pt-4">
+              {renderStepCard(1, getPhaseStats(1), phaseConfig[1])}
+              {renderStepCard(2, getPhaseStats(2), phaseConfig[2])}
+              {renderStepCard(3, getPhaseStats(3), phaseConfig[3])}
+              {renderStepCard(4, getPhaseStats(4), phaseConfig[4])}
             </div>
             
-            {/* Vertical connector from Phase 4 down to Row 2 */}
-            <motion.div 
-              className="absolute right-[3rem] top-[90%] w-2.5 h-10 bg-[#9ccc65] rounded-full"
-              initial={{ scaleY: 0 }}
-              animate={{ scaleY: 1 }}
-              transition={{ duration: 0.3, delay: 0.4 }}
-              style={{ originY: 0 }}
-            />
-          </div>
-
-          {/* Expanded Details for Row 1 */}
-          <AnimatePresence>
-            {expandedPhase && expandedPhase <= 4 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mb-4"
-              >
-                <PhaseDetails phase={expandedPhase} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Row 2: Phases 5-7 (Right to Left flow) with connections */}
-          <div className="relative">
-            <div className="flex justify-end items-center gap-0">
-              {/* Phase 5 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(5, getPhaseStats(5), phaseConfig[5])}
-              </div>
-              
-              {/* Connection Line 5→6 */}
-              <motion.div 
-                className="w-16 h-2.5 bg-[#aed581] rounded-full -mx-1"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.4, delay: 0.5 }}
-                style={{ originX: 1 }}
-              />
-              
-              {/* Phase 6 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(6, getPhaseStats(6), phaseConfig[6])}
-              </div>
-              
-              {/* Connection Line 6→7 */}
-              <motion.div 
-                className="w-16 h-2.5 bg-[#c5e1a5] rounded-full -mx-1"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
-                style={{ originX: 1 }}
-              />
-              
-              {/* Phase 7 */}
-              <div className="relative z-10 flex flex-col items-center">
-                {renderStepBox(7, getPhaseStats(7), phaseConfig[7])}
-              </div>
+            {/* Expanded Details for Row 1 */}
+            <AnimatePresence>
+              {expandedPhase && expandedPhase <= 4 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mb-8"
+                >
+                  <PhaseDetails phase={expandedPhase} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Row 2: Phases 5-7 (reversed order for S-curve flow) */}
+            <div className="flex justify-between items-start pt-8">
+              <div className="w-24" /> {/* Spacer */}
+              {renderStepCard(7, getPhaseStats(7), phaseConfig[7])}
+              {renderStepCard(6, getPhaseStats(6), phaseConfig[6])}
+              {renderStepCard(5, getPhaseStats(5), phaseConfig[5])}
             </div>
+            
+            {/* Expanded Details for Row 2 */}
+            <AnimatePresence>
+              {expandedPhase && expandedPhase >= 5 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mt-4"
+                >
+                  <PhaseDetails phase={expandedPhase} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-
-          {/* Expanded Details for Row 2 */}
-          <AnimatePresence>
-            {expandedPhase && expandedPhase >= 5 && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mt-4"
-              >
-                <PhaseDetails phase={expandedPhase} />
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Compact Legend */}
