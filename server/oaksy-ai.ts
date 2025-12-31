@@ -31,24 +31,41 @@ export interface OaksyActionResult {
 
 // Map pages to their associated tool capabilities (only existing tools)
 const PAGE_TO_TOOLS: Record<string, string[]> = {
-  'dashboard': ['view_events', 'view_employees', 'view_daybook', 'view_banks'],
-  'event-calendar': ['view_events', 'create_event', 'update_event', 'delete_event'],
+  'dashboard': ['view_events', 'view_employees', 'view_daybook', 'view_banks', 'get_sales_summary'],
+  'event-calendar': ['view_events', 'create_event', 'update_event', 'delete_event', 'get_sales_summary'],
   'team-calendar': ['view_meetings', 'create_meeting', 'update_meeting', 'delete_meeting'],
-  'event-database': ['view_events', 'create_event', 'update_event', 'delete_event'],
+  'event-database': ['view_events', 'create_event', 'update_event', 'delete_event', 'get_sales_summary'],
   'event-milestones': ['view_events', 'update_event'],
-  'daybook': ['view_daybook', 'create_daybook_entry', 'delete_daybook_entry', 'create_bank_transfer', 'view_banks'],
-  'oak-book': ['view_daybook', 'view_banks', 'create_daybook_entry', 'create_bank_transfer'],
-  'oak-sales': ['view_events', 'create_event', 'update_event'],
+  'daybook': ['view_daybook', 'create_daybook_entry', 'delete_daybook_entry', 'create_bank_transfer', 'view_banks', 'get_sales_summary'],
+  'oak-book': ['view_daybook', 'view_banks', 'create_daybook_entry', 'create_bank_transfer', 'get_sales_summary'],
+  'oak-sales': ['view_events', 'create_event', 'update_event', 'get_sales_summary'],
   'oak-inventory': ['view_events'],
   'execution-plan': ['view_events'],
   'hr': ['view_employees', 'create_employee', 'update_employee', 'delete_employee', 'view_leave_requests', 'update_leave_request'],
   'employee-portal': [],
   'oaksy': [],
-  'admin': ['view_users', 'create_user', 'view_employees', 'view_events', 'view_daybook', 'view_banks', 'view_meetings', 'view_leave_requests'],
+  'admin': ['view_users', 'create_user', 'view_employees', 'view_events', 'view_daybook', 'view_banks', 'view_meetings', 'view_leave_requests', 'get_sales_summary'],
 };
 
 // All available Oaksy tools with their definitions
 const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool> = {
+  // Sales summary tool - calculates accurate totals
+  get_sales_summary: {
+    type: "function",
+    function: {
+      name: "get_sales_summary",
+      description: "Get accurate sales figures including total booked sales, payments received, and outstanding amounts. ALWAYS use this tool when asked about sales totals, revenue, or financial summaries for events.",
+      parameters: {
+        type: "object",
+        properties: {
+          year: { type: "number", description: "Filter by year (e.g., 2024, 2025). If not provided, returns all-time totals." },
+          month: { type: "number", description: "Filter by month (1-12). Requires year to be set." },
+          eventType: { type: "string", description: "Filter by event type (wedding, corporate, birthday, other)" },
+        },
+        required: [],
+      },
+    },
+  },
   // View tools
   view_events: {
     type: "function",
@@ -613,6 +630,67 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
     }
 
     switch (toolName) {
+      // Sales summary - calculates accurate totals from all events
+      case "get_sales_summary": {
+        let events = await storage.getAllEvents();
+        
+        // Apply filters
+        if (args.year) {
+          events = events.filter(e => {
+            const eventYear = new Date(e.date).getFullYear();
+            return eventYear === args.year;
+          });
+          if (args.month) {
+            events = events.filter(e => {
+              const eventMonth = new Date(e.date).getMonth() + 1;
+              return eventMonth === args.month;
+            });
+          }
+        }
+        if (args.eventType) {
+          events = events.filter(e => e.type?.toLowerCase() === args.eventType.toLowerCase());
+        }
+        
+        // Calculate totals with proper numeric conversion
+        const totalBookedSales = events.reduce((sum, e) => sum + Number(e.salesValue || 0), 0);
+        const totalPaymentsReceived = events.reduce((sum, e) => sum + Number(e.paymentReceived || 0), 0);
+        const totalCosts = events.reduce((sum, e) => sum + Number(e.cost || 0), 0);
+        const outstandingAmount = totalBookedSales - totalPaymentsReceived;
+        const grossProfit = totalPaymentsReceived - totalCosts;
+        
+        // Group by event type
+        const byType: Record<string, { count: number; sales: number; received: number }> = {};
+        events.forEach(e => {
+          const type = e.type || 'other';
+          if (!byType[type]) {
+            byType[type] = { count: 0, sales: 0, received: 0 };
+          }
+          byType[type].count++;
+          byType[type].sales += Number(e.salesValue || 0);
+          byType[type].received += Number(e.paymentReceived || 0);
+        });
+        
+        const filterDescription = args.year 
+          ? (args.month ? `${args.month}/${args.year}` : `Year ${args.year}`)
+          : 'All Time';
+        
+        return {
+          success: true,
+          message: `Sales Summary (${filterDescription}): Total Booked: ₹${totalBookedSales.toLocaleString('en-IN')}, Received: ₹${totalPaymentsReceived.toLocaleString('en-IN')}, Outstanding: ₹${outstandingAmount.toLocaleString('en-IN')}`,
+          data: {
+            filterPeriod: filterDescription,
+            eventType: args.eventType || 'all',
+            totalEvents: events.length,
+            totalBookedSales,
+            totalPaymentsReceived,
+            outstandingAmount,
+            totalCosts,
+            grossProfit,
+            byEventType: byType,
+          },
+        };
+      }
+      
       // View operations
       case "view_events": {
         let events = await storage.getAllEvents();
