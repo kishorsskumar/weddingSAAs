@@ -354,13 +354,13 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram - Everything inside SVG for perfect alignment */}
+        {/* S-Curve Flow Diagram - Matching Reference Image Exactly */}
         <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-visible">
           <svg 
             className="w-full"
             viewBox="0 0 1200 520"
             preserveAspectRatio="xMidYMid meet"
-            style={{ minHeight: '400px' }}
+            style={{ minHeight: '420px' }}
           >
             <defs>
               <linearGradient id="sCurveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -370,18 +370,18 @@ export default function EventMilestones() {
               </linearGradient>
             </defs>
             
-            {/* Continuous S-curve path - Row 1 at y=100, Row 2 at y=280, Row 3 at y=440 */}
+            {/* S-curve path: Row1 y=100, Row2 y=280, Row3 y=440 - curves on RIGHT side */}
             <motion.path
-              d="M 60 100 
-                 H 1060 
-                 Q 1120 100 1120 160 
-                 V 220 
-                 Q 1120 280 1060 280 
-                 H 140 
-                 Q 80 280 80 340 
-                 V 380 
-                 Q 80 440 140 440 
-                 H 1140"
+              d="M 80 100 
+                 H 1040 
+                 Q 1100 100 1100 160 
+                 L 1100 220 
+                 Q 1100 280 1040 280 
+                 H 160 
+                 Q 100 280 100 340 
+                 L 100 380 
+                 Q 100 440 160 440 
+                 H 1120"
               fill="none"
               stroke="url(#sCurveGradient)"
               strokeWidth="10"
@@ -392,45 +392,44 @@ export default function EventMilestones() {
               transition={{ duration: 2.5, ease: "easeInOut" }}
             />
             
-            {/* Start Badge - at path start */}
-            <g transform="translate(60, 100)">
-              <circle r="35" fill="#6b9937" stroke="white" strokeWidth="3" />
-              <text x="0" y="-5" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Event</text>
-              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Start</text>
+            {/* Start Badge - top left at path start */}
+            <g transform="translate(80, 100)">
+              <circle r="38" fill="#6b9937" stroke="white" strokeWidth="3" />
+              <text x="0" y="-6" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">Event</text>
+              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">Start</text>
             </g>
             
-            {/* End Badge - at path end */}
-            <g transform="translate(1140, 440)">
-              <circle r="35" fill="#6b9937" stroke="white" strokeWidth="3" />
-              <text x="0" y="-5" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Event</text>
-              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">Done</text>
+            {/* End Badge - bottom right at path end */}
+            <g transform="translate(1120, 440)">
+              <circle r="38" fill="#6b9937" stroke="white" strokeWidth="3" />
+              <text x="0" y="-6" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">Event</text>
+              <text x="0" y="10" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">Done</text>
             </g>
             
-            {/* Phase Cards using foreignObject - positioned at exact path coordinates */}
-            {/* Row 1: y=100 - Phases 1, 2, 3 */}
-            <foreignObject x="200" y="30" width="160" height="140">
+            {/* Row 1: y=100 - Phases 1, 2, 3 equally spaced (centers at x=300, 600, 900) */}
+            <foreignObject x="220" y="30" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(1, getPhaseStats(1), phaseConfig[1])}</div>
             </foreignObject>
             <foreignObject x="520" y="30" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(2, getPhaseStats(2), phaseConfig[2])}</div>
             </foreignObject>
-            <foreignObject x="840" y="30" width="160" height="140">
+            <foreignObject x="820" y="30" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(3, getPhaseStats(3), phaseConfig[3])}</div>
             </foreignObject>
             
-            {/* Row 2: y=280 - Phases 4, 5, 6 (right to left) */}
-            <foreignObject x="840" y="210" width="160" height="140">
+            {/* Row 2: y=280 - Phases 4, 5, 6 equally spaced (centers at x=300, 600, 900) */}
+            <foreignObject x="220" y="210" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(4, getPhaseStats(4), phaseConfig[4])}</div>
             </foreignObject>
             <foreignObject x="520" y="210" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(5, getPhaseStats(5), phaseConfig[5])}</div>
             </foreignObject>
-            <foreignObject x="200" y="210" width="160" height="140">
+            <foreignObject x="820" y="210" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(6, getPhaseStats(6), phaseConfig[6])}</div>
             </foreignObject>
             
-            {/* Row 3: y=440 - Phase 7 */}
-            <foreignObject x="280" y="370" width="160" height="140">
+            {/* Row 3: y=440 - Phase 7 centered */}
+            <foreignObject x="520" y="370" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(7, getPhaseStats(7), phaseConfig[7])}</div>
             </foreignObject>
           </svg>
