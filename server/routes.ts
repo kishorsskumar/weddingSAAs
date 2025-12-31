@@ -6746,6 +6746,33 @@ export async function registerRoutes(
     }
   });
 
+  // Download generated document (superadmin only)
+  app.get('/api/oaksy/documents/:documentId', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can download documents' });
+      }
+      
+      const { getDocument } = await import('./document-service');
+      const doc = getDocument(req.params.documentId);
+      
+      if (!doc) {
+        return res.status(404).json({ error: 'Document not found or expired. Please generate a new one.' });
+      }
+      
+      res.setHeader('Content-Type', doc.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
+      res.send(doc.data);
+    } catch (error: any) {
+      console.error('[Oaksy] Document download error:', error);
+      res.status(500).json({ error: 'Failed to download document' });
+    }
+  });
+
   // Send message to Oaksy
   app.post('/api/oaksy/conversations/:id/messages', async (req, res) => {
     if (!req.session.userId) {
