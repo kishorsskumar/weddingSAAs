@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "./storage";
+import * as documentService from "./document-service";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -458,6 +459,99 @@ const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool
           departments: { type: "array", items: { type: "string" }, description: "Department names (for 'department' mode)" },
         },
         required: ["message", "targetMode"],
+      },
+    },
+  },
+
+  // Document generation tools (Superadmin only)
+  generate_sales_report: {
+    type: "function",
+    function: {
+      name: "generate_sales_report",
+      description: "Generate a downloadable PDF sales report with event data, totals, and breakdown. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {
+          startDate: { type: "string", description: "Start date for report (YYYY-MM-DD)" },
+          endDate: { type: "string", description: "End date for report (YYYY-MM-DD)" },
+          planner: { type: "string", description: "Filter by wedding planner name" },
+          eventType: { type: "string", description: "Filter by event type (wedding, corporate, etc.)" },
+        },
+        required: [],
+      },
+    },
+  },
+  generate_invoice: {
+    type: "function",
+    function: {
+      name: "generate_invoice",
+      description: "Generate a downloadable PDF invoice for an event. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {
+          eventId: { type: "string", description: "The event ID to generate invoice for" },
+          eventTitle: { type: "string", description: "Event title to search for (alternative to eventId)" },
+        },
+        required: [],
+      },
+    },
+  },
+  generate_quote: {
+    type: "function",
+    function: {
+      name: "generate_quote",
+      description: "Generate a downloadable PDF quotation/proposal for a potential customer. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {
+          customerName: { type: "string", description: "Customer name" },
+          eventDate: { type: "string", description: "Proposed event date (YYYY-MM-DD)" },
+          eventType: { type: "string", description: "Type of event (wedding, corporate, birthday, etc.)" },
+          venue: { type: "string", description: "Venue name or location" },
+          services: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                description: { type: "string" },
+                amount: { type: "number" },
+              },
+              required: ["description", "amount"],
+            },
+            description: "List of services with descriptions and amounts",
+          },
+          notes: { type: "string", description: "Additional notes for the quote" },
+        },
+        required: ["customerName", "eventDate", "eventType", "venue", "services"],
+      },
+    },
+  },
+  generate_financial_report: {
+    type: "function",
+    function: {
+      name: "generate_financial_report",
+      description: "Generate a downloadable Excel financial report with events and daybook data. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {
+          startDate: { type: "string", description: "Start date for report (YYYY-MM-DD)" },
+          endDate: { type: "string", description: "End date for report (YYYY-MM-DD)" },
+          includeEvents: { type: "boolean", description: "Include events data (default true)" },
+          includeDaybook: { type: "boolean", description: "Include daybook data (default true)" },
+        },
+        required: [],
+      },
+    },
+  },
+  generate_employee_report: {
+    type: "function",
+    function: {
+      name: "generate_employee_report",
+      description: "Generate a downloadable PDF report of all employees. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
       },
     },
   },
@@ -1163,6 +1257,95 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
           message: result.success 
             ? `WhatsApp sent to ${targetEmployeeIds.length} employee(s)` 
             : (result.error || "Failed to send"),
+        };
+      }
+
+      // Document generation tools (superadmin only)
+      case "generate_sales_report": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can generate documents" };
+        }
+        const result = await documentService.generateSalesReportPdf({
+          startDate: args.startDate,
+          endDate: args.endDate,
+          planner: args.planner,
+          eventType: args.eventType,
+        });
+        return {
+          success: true,
+          message: `${result.message}. Download link: /api/oaksy/documents/${result.documentId}`,
+          data: { documentId: result.documentId, filename: result.filename, downloadUrl: `/api/oaksy/documents/${result.documentId}` },
+        };
+      }
+
+      case "generate_invoice": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can generate documents" };
+        }
+        try {
+          const result = await documentService.generateInvoicePdf({
+            eventId: args.eventId,
+            eventTitle: args.eventTitle,
+          });
+          return {
+            success: true,
+            message: `${result.message}. Download link: /api/oaksy/documents/${result.documentId}`,
+            data: { documentId: result.documentId, filename: result.filename, downloadUrl: `/api/oaksy/documents/${result.documentId}` },
+          };
+        } catch (err) {
+          return { success: false, message: err instanceof Error ? err.message : "Failed to generate invoice" };
+        }
+      }
+
+      case "generate_quote": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can generate documents" };
+        }
+        try {
+          const result = await documentService.generateQuotePdf({
+            customerName: args.customerName,
+            eventDate: args.eventDate,
+            eventType: args.eventType,
+            venue: args.venue,
+            services: args.services,
+            notes: args.notes,
+          });
+          return {
+            success: true,
+            message: `${result.message}. Download link: /api/oaksy/documents/${result.documentId}`,
+            data: { documentId: result.documentId, filename: result.filename, downloadUrl: `/api/oaksy/documents/${result.documentId}` },
+          };
+        } catch (err) {
+          return { success: false, message: err instanceof Error ? err.message : "Failed to generate quote" };
+        }
+      }
+
+      case "generate_financial_report": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can generate documents" };
+        }
+        const result = await documentService.generateFinancialReportExcel({
+          startDate: args.startDate,
+          endDate: args.endDate,
+          includeEvents: args.includeEvents,
+          includeDaybook: args.includeDaybook,
+        });
+        return {
+          success: true,
+          message: `${result.message}. Download link: /api/oaksy/documents/${result.documentId}`,
+          data: { documentId: result.documentId, filename: result.filename, downloadUrl: `/api/oaksy/documents/${result.documentId}` },
+        };
+      }
+
+      case "generate_employee_report": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can generate documents" };
+        }
+        const result = await documentService.generateEmployeeReportPdf();
+        return {
+          success: true,
+          message: `${result.message}. Download link: /api/oaksy/documents/${result.documentId}`,
+          data: { documentId: result.documentId, filename: result.filename, downloadUrl: `/api/oaksy/documents/${result.documentId}` },
         };
       }
 
