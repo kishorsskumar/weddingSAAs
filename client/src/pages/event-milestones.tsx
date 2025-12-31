@@ -354,104 +354,121 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram - Matching Reference Design */}
-        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg p-8 overflow-hidden min-h-[420px]">
+        {/* S-Curve Flow Diagram - Matching Reference Design Exactly */}
+        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-hidden" style={{ height: '480px' }}>
           
           {/* Start Badge - Left side */}
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-20">
-            <div className="w-20 h-20 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
-              <span className="text-white text-xs font-bold text-center leading-tight">Event<br/>Start</span>
+          <div className="absolute left-2 top-[18%] z-30">
+            <div className="w-16 h-16 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
+              <span className="text-white text-[10px] font-bold text-center leading-tight">Event<br/>Start</span>
             </div>
           </div>
           
           {/* End Badge - Right side */}
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
-            <div className="w-20 h-20 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
-              <span className="text-white text-xs font-bold text-center leading-tight">Event<br/>Complete</span>
+          <div className="absolute right-2 top-[82%] z-30">
+            <div className="w-16 h-16 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
+              <span className="text-white text-[10px] font-bold text-center leading-tight">Event<br/>Done</span>
             </div>
           </div>
           
-          {/* SVG S-Curve Path */}
+          {/* SVG S-Curve Path - 3 horizontal runs */}
           <svg 
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 1000 400"
-            preserveAspectRatio="xMidYMid meet"
+            className="absolute inset-0 w-full h-full pointer-events-none z-0"
+            viewBox="0 0 1000 480"
+            preserveAspectRatio="xMidYMid slice"
           >
             <defs>
-              <linearGradient id="sCurveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <linearGradient id="sCurveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#6b9937" />
                 <stop offset="50%" stopColor="#8bc34a" />
                 <stop offset="100%" stopColor="#6b9937" />
               </linearGradient>
             </defs>
             <motion.path
-              d="M 80 100 
-                 L 200 100 L 400 100 L 600 100 L 800 100 
-                 Q 880 100 880 180 
-                 L 880 220 
-                 Q 880 300 800 300 
-                 L 600 300 L 400 300 L 200 300 
-                 Q 120 300 120 220 
-                 L 120 180"
+              d="M 60 90 
+                 H 900 
+                 C 960 90, 960 150, 960 180 
+                 L 960 210 
+                 C 960 240, 960 270, 900 270 
+                 H 100 
+                 C 40 270, 40 330, 40 360 
+                 L 40 390 
+                 C 40 420, 40 450, 100 450 
+                 H 940"
               fill="none"
               stroke="url(#sCurveGradient)"
-              strokeWidth="28"
+              strokeWidth="32"
               strokeLinecap="round"
               strokeLinejoin="round"
-              initial={{ pathLength: 0, opacity: 0.3 }}
-              animate={{ pathLength: 1, opacity: 0.4 }}
-              transition={{ duration: 2, ease: "easeInOut" }}
+              initial={{ pathLength: 0, opacity: 0.5 }}
+              animate={{ pathLength: 1, opacity: 0.5 }}
+              transition={{ duration: 2.5, ease: "easeInOut" }}
             />
           </svg>
           
-          {/* Phase Cards Container */}
-          <div className="relative z-10 ml-24 mr-24">
-            
-            {/* Row 1: Phases 1-4 */}
-            <div className="flex justify-between items-start mb-16 pt-4">
-              {renderStepCard(1, getPhaseStats(1), phaseConfig[1])}
-              {renderStepCard(2, getPhaseStats(2), phaseConfig[2])}
-              {renderStepCard(3, getPhaseStats(3), phaseConfig[3])}
-              {renderStepCard(4, getPhaseStats(4), phaseConfig[4])}
-            </div>
-            
-            {/* Expanded Details for Row 1 */}
-            <AnimatePresence>
-              {expandedPhase && expandedPhase <= 4 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden mb-8"
-                >
-                  <PhaseDetails phase={expandedPhase} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            
-            {/* Row 2: Phases 5-7 (reversed order for S-curve flow) */}
-            <div className="flex justify-between items-start pt-8">
-              <div className="w-24" /> {/* Spacer */}
-              {renderStepCard(7, getPhaseStats(7), phaseConfig[7])}
-              {renderStepCard(6, getPhaseStats(6), phaseConfig[6])}
-              {renderStepCard(5, getPhaseStats(5), phaseConfig[5])}
-            </div>
-            
-            {/* Expanded Details for Row 2 */}
-            <AnimatePresence>
-              {expandedPhase && expandedPhase >= 5 && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="overflow-hidden mt-4"
-                >
-                  <PhaseDetails phase={expandedPhase} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+          {/* Phase Cards - Absolutely positioned ON the path */}
+          {/* Row 1: Phases 1-4 positioned on top path line (y ~18%) */}
+          <div 
+            className="absolute z-20" 
+            style={{ left: '12%', top: '18%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(1, getPhaseStats(1), phaseConfig[1])}
+          </div>
+          <div 
+            className="absolute z-20" 
+            style={{ left: '35%', top: '18%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(2, getPhaseStats(2), phaseConfig[2])}
+          </div>
+          <div 
+            className="absolute z-20" 
+            style={{ left: '58%', top: '18%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(3, getPhaseStats(3), phaseConfig[3])}
+          </div>
+          <div 
+            className="absolute z-20" 
+            style={{ left: '81%', top: '18%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(4, getPhaseStats(4), phaseConfig[4])}
+          </div>
+          
+          {/* Row 2: Phases 5-6 positioned on middle path line (y ~56%) - Right to Left */}
+          <div 
+            className="absolute z-20" 
+            style={{ left: '75%', top: '56%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(5, getPhaseStats(5), phaseConfig[5])}
+          </div>
+          <div 
+            className="absolute z-20" 
+            style={{ left: '50%', top: '56%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(6, getPhaseStats(6), phaseConfig[6])}
+          </div>
+          
+          {/* Row 3: Phase 7 positioned on bottom path line (y ~94%) */}
+          <div 
+            className="absolute z-20" 
+            style={{ left: '25%', top: '94%', transform: 'translate(-50%, -50%)' }}
+          >
+            {renderStepCard(7, getPhaseStats(7), phaseConfig[7])}
           </div>
         </div>
+        
+        {/* Expanded Phase Details - Below diagram */}
+        <AnimatePresence>
+          {expandedPhase && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <PhaseDetails phase={expandedPhase} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Compact Legend */}
         <motion.div 
