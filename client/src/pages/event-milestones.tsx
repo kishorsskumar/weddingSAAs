@@ -406,30 +406,30 @@ export default function EventMilestones() {
               <text x="0" y="10" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">Done</text>
             </g>
             
-            {/* Row 1: y=100 - Phases 1, 2, 3 equally spaced (centers at x=300, 600, 900) */}
-            <foreignObject x="220" y="30" width="160" height="140">
+            {/* Row 1: y=100 - Phases 1, 2, 3 - icon box centered on line (icon ~56px, so y=100-28=72) */}
+            <foreignObject x="220" y="72" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(1, getPhaseStats(1), phaseConfig[1])}</div>
             </foreignObject>
-            <foreignObject x="520" y="30" width="160" height="140">
+            <foreignObject x="520" y="72" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(2, getPhaseStats(2), phaseConfig[2])}</div>
             </foreignObject>
-            <foreignObject x="820" y="30" width="160" height="140">
+            <foreignObject x="820" y="72" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(3, getPhaseStats(3), phaseConfig[3])}</div>
             </foreignObject>
             
-            {/* Row 2: y=280 - Phases 4, 5, 6 equally spaced (centers at x=300, 600, 900) */}
-            <foreignObject x="220" y="210" width="160" height="140">
+            {/* Row 2: y=280 - Phases 4, 5, 6 - icon box centered on line (y=280-28=252) */}
+            <foreignObject x="220" y="252" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(4, getPhaseStats(4), phaseConfig[4])}</div>
             </foreignObject>
-            <foreignObject x="520" y="210" width="160" height="140">
+            <foreignObject x="520" y="252" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(5, getPhaseStats(5), phaseConfig[5])}</div>
             </foreignObject>
-            <foreignObject x="820" y="210" width="160" height="140">
+            <foreignObject x="820" y="252" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(6, getPhaseStats(6), phaseConfig[6])}</div>
             </foreignObject>
             
-            {/* Row 3: y=440 - Phase 7 centered */}
-            <foreignObject x="520" y="370" width="160" height="140">
+            {/* Row 3: y=440 - Phase 7 - icon box centered on line (y=440-28=412) */}
+            <foreignObject x="520" y="412" width="160" height="140">
               <div className="flex flex-col items-center">{renderStepCard(7, getPhaseStats(7), phaseConfig[7])}</div>
             </foreignObject>
           </svg>
