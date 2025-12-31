@@ -54,13 +54,15 @@ const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool
     type: "function",
     function: {
       name: "get_sales_summary",
-      description: "Get accurate sales figures including total booked sales, payments received, and outstanding amounts. ALWAYS use this tool when asked about sales totals, revenue, or financial summaries for events.",
+      description: "Get accurate sales figures including total booked sales, payments received, and outstanding amounts. ALWAYS use this tool when asked about sales totals, revenue, or financial summaries for events. Can filter by planner, year, month, or event type.",
       parameters: {
         type: "object",
         properties: {
+          planner: { type: "string", description: "Filter by wedding planner name (e.g., 'Femina KM', 'Femina'). Partial match supported." },
           year: { type: "number", description: "Filter by year (e.g., 2024, 2025). If not provided, returns all-time totals." },
           month: { type: "number", description: "Filter by month (1-12). Requires year to be set." },
           eventType: { type: "string", description: "Filter by event type (wedding, corporate, birthday, other)" },
+          customer: { type: "string", description: "Filter by customer name. Partial match supported." },
         },
         required: [],
       },
@@ -634,7 +636,24 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
       case "get_sales_summary": {
         let events = await storage.getAllEvents();
         
-        // Apply filters
+        // Build filter description parts
+        const filterParts: string[] = [];
+        
+        // Apply planner filter (case-insensitive partial match)
+        if (args.planner) {
+          const plannerSearch = args.planner.toLowerCase();
+          events = events.filter(e => e.planner?.toLowerCase().includes(plannerSearch));
+          filterParts.push(`Planner: ${args.planner}`);
+        }
+        
+        // Apply customer filter (case-insensitive partial match)
+        if (args.customer) {
+          const customerSearch = args.customer.toLowerCase();
+          events = events.filter(e => e.customer?.toLowerCase().includes(customerSearch));
+          filterParts.push(`Customer: ${args.customer}`);
+        }
+        
+        // Apply year/month filters
         if (args.year) {
           events = events.filter(e => {
             const eventYear = new Date(e.date).getFullYear();
@@ -645,10 +664,16 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
               const eventMonth = new Date(e.date).getMonth() + 1;
               return eventMonth === args.month;
             });
+            filterParts.push(`${args.month}/${args.year}`);
+          } else {
+            filterParts.push(`Year ${args.year}`);
           }
         }
+        
+        // Apply event type filter
         if (args.eventType) {
           events = events.filter(e => e.type?.toLowerCase() === args.eventType.toLowerCase());
+          filterParts.push(`Type: ${args.eventType}`);
         }
         
         // Calculate totals with proper numeric conversion
@@ -670,15 +695,25 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
           byType[type].received += Number(e.paymentReceived || 0);
         });
         
-        const filterDescription = args.year 
-          ? (args.month ? `${args.month}/${args.year}` : `Year ${args.year}`)
-          : 'All Time';
+        const filterDescription = filterParts.length > 0 ? filterParts.join(', ') : 'All Time';
+        
+        // List individual events if filtered by planner/customer
+        const eventDetails = (args.planner || args.customer) ? events.map(e => ({
+          title: e.title,
+          customer: e.customer,
+          planner: e.planner,
+          date: e.date,
+          salesValue: Number(e.salesValue || 0),
+          paymentReceived: Number(e.paymentReceived || 0),
+        })) : undefined;
         
         return {
           success: true,
-          message: `Sales Summary (${filterDescription}): Total Booked: ₹${totalBookedSales.toLocaleString('en-IN')}, Received: ₹${totalPaymentsReceived.toLocaleString('en-IN')}, Outstanding: ₹${outstandingAmount.toLocaleString('en-IN')}`,
+          message: `Sales Summary (${filterDescription}): ${events.length} events, Total Booked: ₹${totalBookedSales.toLocaleString('en-IN')}, Received: ₹${totalPaymentsReceived.toLocaleString('en-IN')}, Outstanding: ₹${outstandingAmount.toLocaleString('en-IN')}`,
           data: {
-            filterPeriod: filterDescription,
+            filterDescription,
+            planner: args.planner || null,
+            customer: args.customer || null,
             eventType: args.eventType || 'all',
             totalEvents: events.length,
             totalBookedSales,
@@ -687,6 +722,7 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
             totalCosts,
             grossProfit,
             byEventType: byType,
+            events: eventDetails,
           },
         };
       }
