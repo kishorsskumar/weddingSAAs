@@ -8,6 +8,10 @@ Oak Event Management is a comprehensive full-stack web application designed for 
 
 Preferred communication style: Simple, everyday language.
 
+**Company Branding:**
+- Company name is "Oakstreet Events" (one word, not "Oak Street Events")
+- All documents, reports, and UI elements should use "Oakstreet Events"
+
 **Important Development Rules:**
 - When creating new pages, ALWAYS add them to:
   1. `client/src/components/layout.tsx` - ALL_PAGES array and ICONS object for sidebar navigation

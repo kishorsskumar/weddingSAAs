@@ -113,7 +113,7 @@ export async function generateSalesReportPdf(options: {
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events', 105, 20, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
@@ -202,7 +202,7 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events', 105, 18, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('INVOICE', 105, 30, { align: 'center' });
@@ -261,7 +261,7 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text('Thank you for choosing Oak Street Events!', 105, 270, { align: 'center' });
+  doc.text('Thank you for choosing Oakstreet Events!', 105, 270, { align: 'center' });
   doc.text('For queries, please contact us at events@oakstreet.in', 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
@@ -291,7 +291,7 @@ export async function generateQuotePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events', 105, 18, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('QUOTATION', 105, 30, { align: 'center' });
@@ -341,7 +341,7 @@ export async function generateQuotePdf(options: {
   
   doc.setFontSize(9);
   doc.text('Terms & Conditions apply. This quote is valid for 30 days.', 105, 270, { align: 'center' });
-  doc.text('Thank you for considering Oak Street Events!', 105, 276, { align: 'center' });
+  doc.text('Thank you for considering Oakstreet Events!', 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const filename = `quote-${quoteNumber}.pdf`;
@@ -451,7 +451,7 @@ export async function generateEmployeeReportPdf(): Promise<{ documentId: string;
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events', 105, 20, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
