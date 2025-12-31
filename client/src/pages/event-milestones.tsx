@@ -355,26 +355,26 @@ export default function EventMilestones() {
         </motion.div>
 
         {/* S-Curve Flow Diagram - Matching Reference Design Exactly */}
-        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-hidden" style={{ height: '480px' }}>
+        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-hidden" style={{ height: '420px' }}>
           
-          {/* Start Badge - Left side */}
-          <div className="absolute left-2 top-[18%] z-30">
-            <div className="w-16 h-16 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
-              <span className="text-white text-[10px] font-bold text-center leading-tight">Event<br/>Start</span>
+          {/* Start Badge - Left side, aligned with path start */}
+          <div className="absolute left-3 top-[23%] -translate-y-1/2 z-30">
+            <div className="w-14 h-14 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg border-2 border-white">
+              <span className="text-white text-[9px] font-bold text-center leading-tight">Event<br/>Start</span>
             </div>
           </div>
           
-          {/* End Badge - Right side */}
-          <div className="absolute right-2 top-[82%] z-30">
-            <div className="w-16 h-16 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg">
-              <span className="text-white text-[10px] font-bold text-center leading-tight">Event<br/>Done</span>
+          {/* End Badge - Right side, aligned with path end */}
+          <div className="absolute right-3 top-[85%] -translate-y-1/2 z-30">
+            <div className="w-14 h-14 rounded-full bg-[#6b9937] flex items-center justify-center shadow-lg border-2 border-white">
+              <span className="text-white text-[9px] font-bold text-center leading-tight">Event<br/>Done</span>
             </div>
           </div>
           
-          {/* SVG S-Curve Path - 3 horizontal runs */}
+          {/* SVG S-Curve Path - 3 horizontal runs, 10px stroke (1cm) */}
           <svg 
             className="absolute inset-0 w-full h-full pointer-events-none z-0"
-            viewBox="0 0 1000 480"
+            viewBox="0 0 1200 520"
             preserveAspectRatio="xMidYMid slice"
           >
             <defs>
@@ -385,73 +385,52 @@ export default function EventMilestones() {
               </linearGradient>
             </defs>
             <motion.path
-              d="M 60 90 
-                 H 900 
-                 C 960 90, 960 150, 960 180 
-                 L 960 210 
-                 C 960 240, 960 270, 900 270 
-                 H 100 
-                 C 40 270, 40 330, 40 360 
-                 L 40 390 
-                 C 40 420, 40 450, 100 450 
-                 H 940"
+              d="M 160 120 
+                 H 1040 
+                 A 70 70 0 0 1 1110 190 
+                 V 230 
+                 A 70 70 0 0 1 1040 300 
+                 H 300 
+                 A 70 70 0 0 0 230 370 
+                 V 410 
+                 A 70 70 0 0 0 300 440 
+                 H 1040"
               fill="none"
               stroke="url(#sCurveGradient)"
-              strokeWidth="32"
+              strokeWidth="10"
               strokeLinecap="round"
               strokeLinejoin="round"
-              initial={{ pathLength: 0, opacity: 0.5 }}
-              animate={{ pathLength: 1, opacity: 0.5 }}
-              transition={{ duration: 2.5, ease: "easeInOut" }}
+              initial={{ pathLength: 0, opacity: 0.7 }}
+              animate={{ pathLength: 1, opacity: 0.7 }}
+              transition={{ duration: 2, ease: "easeInOut" }}
             />
           </svg>
           
-          {/* Phase Cards - Absolutely positioned ON the path */}
-          {/* Row 1: Phases 1-4 positioned on top path line (y ~18%) */}
-          <div 
-            className="absolute z-20" 
-            style={{ left: '12%', top: '18%', transform: 'translate(-50%, -50%)' }}
-          >
+          {/* Phase Cards - Positioned ON the path lines */}
+          {/* Row 1: Phases 1-3 on top path (y=23%) */}
+          <div className="absolute z-20" style={{ left: '20%', top: '23%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(1, getPhaseStats(1), phaseConfig[1])}
           </div>
-          <div 
-            className="absolute z-20" 
-            style={{ left: '35%', top: '18%', transform: 'translate(-50%, -50%)' }}
-          >
+          <div className="absolute z-20" style={{ left: '45%', top: '23%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(2, getPhaseStats(2), phaseConfig[2])}
           </div>
-          <div 
-            className="absolute z-20" 
-            style={{ left: '58%', top: '18%', transform: 'translate(-50%, -50%)' }}
-          >
+          <div className="absolute z-20" style={{ left: '70%', top: '23%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(3, getPhaseStats(3), phaseConfig[3])}
           </div>
-          <div 
-            className="absolute z-20" 
-            style={{ left: '81%', top: '18%', transform: 'translate(-50%, -50%)' }}
-          >
+          
+          {/* Row 2: Phases 4-5-6 on middle path (y=58%) - Right to Left */}
+          <div className="absolute z-20" style={{ left: '75%', top: '58%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(4, getPhaseStats(4), phaseConfig[4])}
           </div>
-          
-          {/* Row 2: Phases 5-6 positioned on middle path line (y ~56%) - Right to Left */}
-          <div 
-            className="absolute z-20" 
-            style={{ left: '75%', top: '56%', transform: 'translate(-50%, -50%)' }}
-          >
+          <div className="absolute z-20" style={{ left: '50%', top: '58%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(5, getPhaseStats(5), phaseConfig[5])}
           </div>
-          <div 
-            className="absolute z-20" 
-            style={{ left: '50%', top: '56%', transform: 'translate(-50%, -50%)' }}
-          >
+          <div className="absolute z-20" style={{ left: '25%', top: '58%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(6, getPhaseStats(6), phaseConfig[6])}
           </div>
           
-          {/* Row 3: Phase 7 positioned on bottom path line (y ~94%) */}
-          <div 
-            className="absolute z-20" 
-            style={{ left: '25%', top: '94%', transform: 'translate(-50%, -50%)' }}
-          >
+          {/* Row 3: Phase 7 on bottom path (y=85%) */}
+          <div className="absolute z-20" style={{ left: '30%', top: '85%', transform: 'translate(-50%, -50%)' }}>
             {renderStepCard(7, getPhaseStats(7), phaseConfig[7])}
           </div>
         </div>
