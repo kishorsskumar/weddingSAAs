@@ -6741,6 +6741,24 @@ export async function registerRoutes(
 
       // Get user info for context
       const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+      
+      // Get user's allowed pages for permission filtering
+      let allowedPages: string[];
+      if (user.role === 'admin' || user.role === 'superadmin') {
+        allowedPages = ALL_PAGES;
+      } else {
+        const permissions = await storage.getUserPermissions(user.id);
+        allowedPages = permissions.map(p => p.pageId);
+      }
+      
+      // Check if user can access Oaksy (exclude employee portal users)
+      const { canAccessOaksy, generateOaksyResponse, generateConversationTitle } = await import('./oaksy-ai');
+      if (!canAccessOaksy(user.role, allowedPages)) {
+        return res.status(403).json({ error: 'You do not have access to Oaksy AI' });
+      }
       
       // Build context for AI
       const events = await storage.getAllEvents();
@@ -6763,7 +6781,8 @@ export async function registerRoutes(
 
       const context = {
         userId: req.session.userId,
-        userRole: user?.role || 'employee',
+        userRole: user.role,
+        allowedPages,
         department: conversation.department || undefined,
         events,
         employees,
@@ -6775,9 +6794,6 @@ export async function registerRoutes(
           balance: totalIncome - totalExpense,
         },
       };
-
-      // Generate AI response with potential actions
-      const { generateOaksyResponse, generateConversationTitle } = await import('./oaksy-ai');
       const aiResult = await generateOaksyResponse(
         req.params.id,
         content,
