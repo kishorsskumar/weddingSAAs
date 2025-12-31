@@ -6721,7 +6721,7 @@ export async function registerRoutes(
     }
   });
 
-  // Delete conversation
+  // Delete conversation (superadmin can delete any, others can only delete their own)
   app.delete('/api/oaksy/conversations/:id', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -6735,7 +6735,9 @@ export async function registerRoutes(
       if (!conversation) {
         return res.status(404).json({ error: 'Conversation not found' });
       }
-      if (conversation.userId !== req.session.userId) {
+      // Superadmin can delete any conversation, others can only delete their own
+      const user = await storage.getUser(req.session.userId);
+      if (conversation.userId !== req.session.userId && user?.role !== 'superadmin') {
         return res.status(403).json({ error: 'Access denied' });
       }
       await storage.deleteOaksyConversation(req.params.id);
@@ -6743,6 +6745,24 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error('[Oaksy] Delete conversation error:', error);
       res.status(500).json({ error: error.message || 'Failed to delete conversation' });
+    }
+  });
+
+  // Clear all Oaksy chat history (superadmin only)
+  app.delete('/api/oaksy/conversations', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can clear all chat history' });
+      }
+      const deletedCount = await storage.deleteAllOaksyConversations();
+      res.json({ success: true, deletedCount });
+    } catch (error: any) {
+      console.error('[Oaksy] Clear all history error:', error);
+      res.status(500).json({ error: error.message || 'Failed to clear history' });
     }
   });
 

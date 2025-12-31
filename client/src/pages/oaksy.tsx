@@ -13,6 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
   MessageSquare, 
   Plus, 
@@ -30,6 +41,7 @@ import {
   Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 import { format } from "date-fns";
 
 interface OaksyAction {
@@ -74,7 +86,9 @@ export default function OaksyPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isSuperAdmin = user?.role === 'superadmin';
 
   const { data: conversations = [], isLoading: loadingConversations } = useQuery<Conversation[]>({
     queryKey: ["/api/oaksy/conversations"],
@@ -133,6 +147,28 @@ export default function OaksyPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to delete conversation", variant: "destructive" });
+    },
+  });
+
+  const clearAllHistoryMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/oaksy/conversations", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to clear history");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/oaksy/conversations"] });
+      setActiveConversationId(null);
+      toast({ 
+        title: "History Cleared", 
+        description: `Deleted ${data.deletedCount} conversation(s)` 
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to clear history", variant: "destructive" });
     },
   });
 
@@ -321,6 +357,46 @@ export default function OaksyPage() {
             )}
           </ScrollArea>
         </CardContent>
+        {isSuperAdmin && conversations.length > 0 && (
+          <div className="p-2 border-t">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full text-destructive hover:text-destructive"
+                  data-testid="button-clear-all-history"
+                  disabled={clearAllHistoryMutation.isPending}
+                >
+                  {clearAllHistoryMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Clear All History
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear All Chat History</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all Oaksy conversations from all users. 
+                    This action cannot be undone. Are you sure you want to continue?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => clearAllHistoryMutation.mutate()}
+                  >
+                    Delete All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </Card>
 
       <Card className="flex-1 flex flex-col" data-testid="card-chat-main">

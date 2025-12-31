@@ -3165,6 +3165,16 @@ export class DatabaseStorage implements IStorage {
     await db.delete(oaksyConversations).where(eq(oaksyConversations.id, id));
   }
 
+  async getAllOaksyConversations(): Promise<OaksyConversation[]> {
+    return await db.select().from(oaksyConversations)
+      .orderBy(desc(oaksyConversations.updatedAt));
+  }
+
+  async deleteAllOaksyConversations(): Promise<number> {
+    const result = await db.delete(oaksyConversations);
+    return result.rowCount || 0;
+  }
+
   // Oaksy AI Messages
   async getOaksyMessages(conversationId: string): Promise<OaksyMessage[]> {
     return await db.select().from(oaksyMessages)
