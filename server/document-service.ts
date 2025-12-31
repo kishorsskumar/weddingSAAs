@@ -1,14 +1,8 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { storage } from './storage';
 import { randomUUID } from 'crypto';
-
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-  }
-}
 
 interface GeneratedDocument {
   id: string;
@@ -134,7 +128,7 @@ export async function generateSalesReportPdf(options: {
     formatCurrency(Number(e.paymentReceived || 0)),
   ]);
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: 88,
     head: [['Date', 'Event', 'Customer', 'Planner', 'Venue', 'Sales', 'Received']],
     body: tableData,
@@ -211,7 +205,7 @@ export async function generateInvoicePdf(options: {
   const paymentReceived = Number(event.paymentReceived || 0);
   const balance = salesValue - paymentReceived;
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: 105,
     head: [['Description', 'Amount']],
     body: [
@@ -299,7 +293,7 @@ export async function generateQuotePdf(options: {
   const tableData = options.services.map(s => [s.description, formatCurrency(s.amount)]);
   const total = options.services.reduce((sum, s) => sum + s.amount, 0);
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: 105,
     head: [['Service Description', 'Amount']],
     body: tableData,
@@ -449,7 +443,7 @@ export async function generateEmployeeReportPdf(): Promise<{ documentId: string;
     e.email || '-',
   ]);
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: 55,
     head: [['ID', 'Name', 'Department', 'Designation', 'Phone', 'Email']],
     body: tableData,
