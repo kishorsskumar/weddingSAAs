@@ -26,7 +26,8 @@ import {
   CheckCircle2,
   FileText,
   Calendar,
-  Users
+  Users,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -409,23 +410,42 @@ export default function OaksyPage() {
                     >
                       <p className="text-sm whitespace-pre-wrap" data-testid={`text-message-content-${msg.id}`}>{msg.content}</p>
                       {msg.metadata?.actions && msg.metadata.actions.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1" data-testid={`actions-${msg.id}`}>
-                          {msg.metadata.actions.map((action, idx) => (
-                            <Badge
-                              key={idx}
-                              variant={action.success ? "default" : "destructive"}
-                              className={action.success ? "bg-[#9AAF6C] text-white" : ""}
-                              data-testid={`action-badge-${msg.id}-${idx}`}
-                            >
-                              {action.success ? (
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                              ) : null}
-                              {action.type === "create_daybook_entry" && "Entry Created"}
-                              {action.type === "create_meeting" && "Meeting Scheduled"}
-                              {action.type === "create_event" && "Event Created"}
-                              {action.type === "create_bank_transfer" && "Transfer Created"}
-                            </Badge>
-                          ))}
+                        <div className="mt-2 flex flex-wrap gap-2" data-testid={`actions-${msg.id}`}>
+                          {msg.metadata.actions.map((action, idx) => {
+                            const isDocumentAction = action.type.startsWith('generate_') && action.success && action.data?.downloadUrl;
+                            
+                            if (isDocumentAction) {
+                              return (
+                                <a
+                                  key={idx}
+                                  href={action.data.downloadUrl}
+                                  download={action.data.filename}
+                                  className="inline-flex items-center gap-2 px-3 py-2 bg-[#8B5A2B] text-white rounded-lg hover:bg-[#6B4423] transition-colors text-sm font-medium"
+                                  data-testid={`download-button-${msg.id}-${idx}`}
+                                >
+                                  <Download className="h-4 w-4" />
+                                  Download {action.data.filename || 'Document'}
+                                </a>
+                              );
+                            }
+                            
+                            return (
+                              <Badge
+                                key={idx}
+                                variant={action.success ? "default" : "destructive"}
+                                className={action.success ? "bg-[#9AAF6C] text-white" : ""}
+                                data-testid={`action-badge-${msg.id}-${idx}`}
+                              >
+                                {action.success ? (
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                ) : null}
+                                {action.type === "create_daybook_entry" && "Entry Created"}
+                                {action.type === "create_meeting" && "Meeting Scheduled"}
+                                {action.type === "create_event" && "Event Created"}
+                                {action.type === "create_bank_transfer" && "Transfer Created"}
+                              </Badge>
+                            );
+                          })}
                         </div>
                       )}
                       <p className={`text-xs mt-1 ${msg.role === "user" ? "text-white/70" : "text-muted-foreground"}`} data-testid={`text-message-time-${msg.id}`}>
