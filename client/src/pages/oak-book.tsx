@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -527,7 +528,7 @@ export default function OakBook() {
     setMobilePreviewOpen(false);
   };
 
-  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string) => {
+  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string, hideHeader: boolean = false) => {
     try {
       toast({ title: "Generating PDF...", description: "Please wait" });
       
@@ -543,7 +544,7 @@ export default function OakBook() {
         docNumber = payment?.number || 'receipt';
       }
 
-      const printUrl = `/print/${type}/${id}`;
+      const printUrl = `/print/${type}/${id}${hideHeader ? '?noHeader=true' : ''}`;
       
       // Create hidden iframe to render the React print page
       const iframe = document.createElement('iframe');
@@ -1369,9 +1370,21 @@ export default function OakBook() {
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneEstimate(estimate); }} title="Clone">
                               <FileText className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDownloadPdf("quote", estimate.id); }} title="Download PDF">
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, false)}>
+                                  With Header
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, true)}>
+                                  Without Header
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(estimate.id); }} title="Delete">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -1400,10 +1413,22 @@ export default function OakBook() {
               <div className="flex items-center justify-between p-3 border-b bg-muted/30">
                 <span className="font-medium text-sm">Preview</span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf("quote", selectedDocId)}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleDownloadPdf("quote", selectedDocId, false)}>
+                        With Header
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadPdf("quote", selectedDocId, true)}>
+                        Without Header
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelectedDocument}>
                     <X className="h-4 w-4" />
                   </Button>
@@ -1427,10 +1452,22 @@ export default function OakBook() {
           <SheetHeader className="p-4 border-b">
             <div className="flex items-center justify-between">
               <SheetTitle>Estimate Preview</SheetTitle>
-              <Button variant="outline" size="sm" onClick={() => selectedDocId && handleDownloadPdf("quote", selectedDocId)}>
-                <Download className="h-4 w-4 mr-1" />
-                Download
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => selectedDocId && handleDownloadPdf("quote", selectedDocId, false)}>
+                    With Header
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => selectedDocId && handleDownloadPdf("quote", selectedDocId, true)}>
+                    Without Header
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </SheetHeader>
           {selectedDocId && (
@@ -1508,9 +1545,21 @@ export default function OakBook() {
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneInvoice(invoice); }} title="Clone">
                               <FileText className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDownloadPdf("invoice", invoice.id); }} title="Download PDF">
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, false)}>
+                                  With Header
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, true)}>
+                                  Without Header
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteInvoice.mutate(invoice.id); }} title="Delete">
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -1539,10 +1588,22 @@ export default function OakBook() {
               <div className="flex items-center justify-between p-3 border-b bg-muted/30">
                 <span className="font-medium text-sm">Preview</span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleDownloadPdf("invoice", selectedDocId)}>
-                    <Download className="h-4 w-4 mr-1" />
-                    Download
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", selectedDocId, false)}>
+                        With Header
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", selectedDocId, true)}>
+                        Without Header
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearSelectedDocument}>
                     <X className="h-4 w-4" />
                   </Button>
@@ -1566,10 +1627,22 @@ export default function OakBook() {
           <SheetHeader className="p-4 border-b">
             <div className="flex items-center justify-between">
               <SheetTitle>Invoice Preview</SheetTitle>
-              <Button variant="outline" size="sm" onClick={() => selectedDocId && handleDownloadPdf("invoice", selectedDocId)}>
-                <Download className="h-4 w-4 mr-1" />
-                Download
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => selectedDocId && handleDownloadPdf("invoice", selectedDocId, false)}>
+                    With Header
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => selectedDocId && handleDownloadPdf("invoice", selectedDocId, true)}>
+                    Without Header
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </SheetHeader>
           {selectedDocId && (
@@ -1631,9 +1704,21 @@ export default function OakBook() {
                         <Button variant="ghost" size="icon" onClick={() => { setEditingPayment(payment); setPaymentModalOpen(true); }} title="Edit">
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDownloadPdf("receipt", payment.id)} title="Download PDF">
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" title="Download PDF">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleDownloadPdf("receipt", payment.id, false)}>
+                              With Header
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadPdf("receipt", payment.id, true)}>
+                              Without Header
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button variant="ghost" size="icon" onClick={() => deletePayment.mutate(payment.id)} title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -2473,14 +2558,22 @@ export default function OakBook() {
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Document Preview</span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => previewType && previewId && handleDownloadPdf(previewType, previewId)}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download PDF
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => previewType && previewId && handleDownloadPdf(previewType, previewId, false)}>
+                    With Header
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => previewType && previewId && handleDownloadPdf(previewType, previewId, true)}>
+                    Without Header
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </DialogTitle>
           </DialogHeader>
           {previewType && previewId && (

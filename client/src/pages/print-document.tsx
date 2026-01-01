@@ -90,6 +90,10 @@ export default function PrintDocument() {
   const [data, setData] = useState<DocumentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Check for noHeader query parameter
+  const searchParams = new URLSearchParams(window.location.search);
+  const hideHeader = searchParams.get('noHeader') === 'true';
 
   useEffect(() => {
     async function fetchData() {
@@ -183,15 +187,15 @@ export default function PrintDocument() {
   const { estimate, invoice, payment, customer, bank, companySettings } = data!;
 
   if (params.type === 'quote' && estimate) {
-    return <QuotePrint estimate={estimate} customer={customer} companySettings={companySettings} />;
+    return <QuotePrint estimate={estimate} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
   if (params.type === 'invoice' && invoice) {
-    return <InvoicePrint invoice={invoice} customer={customer} companySettings={companySettings} />;
+    return <InvoicePrint invoice={invoice} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
   if (params.type === 'receipt' && payment) {
-    return <ReceiptPrint payment={payment} customer={customer} invoice={invoice} bank={bank} companySettings={companySettings} />;
+    return <ReceiptPrint payment={payment} customer={customer} invoice={invoice} bank={bank} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
   if (params.type === 'checklist' && data?.checklist) {
@@ -287,7 +291,7 @@ const baseStyles = `
   .footer { text-align: center; margin-top: 20px; padding-top: 10px; border-top: 1px solid #eee; font-size: 9px; color: #888; }
 `;
 
-function QuotePrint({ estimate, customer, companySettings }: any) {
+function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
   const lineItems: LineItem[] = estimate.lineItems || [];
   
   // Use olive green for all documents
@@ -299,20 +303,23 @@ function QuotePrint({ estimate, customer, companySettings }: any) {
 
       {/* Header */}
       <div className="header">
-        <div className="company-info">
-          <div className="company-logo">
-            <img src={logo} alt="Logo" />
+        {!hideHeader && (
+          <div className="company-info">
+            <div className="company-logo">
+              <img src={logo} alt="Logo" />
+            </div>
+            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-address">
+              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+                <div key={i}>{line}</div>
+              ))}
+              <div>{companySettings?.phone || '7902373354'}</div>
+              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+              <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+            </div>
           </div>
-          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="company-address">
-            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-              <div key={i}>{line}</div>
-            ))}
-            <div>{companySettings?.phone || '7902373354'}</div>
-            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-            <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
-          </div>
-        </div>
+        )}
+        {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
           <div className="doc-type" style={{ color: '#6b9937' }}>Quote</div>
         </div>
@@ -453,7 +460,7 @@ function QuotePrint({ estimate, customer, companySettings }: any) {
   );
 }
 
-function InvoicePrint({ invoice, customer, companySettings }: any) {
+function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
   const lineItems: LineItem[] = invoice.lineItems || [];
 
   // Use olive green for all documents
@@ -465,20 +472,23 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
 
       {/* Header */}
       <div className="header">
-        <div className="company-info">
-          <div className="company-logo">
-            <img src={logo} alt="Logo" />
+        {!hideHeader && (
+          <div className="company-info">
+            <div className="company-logo">
+              <img src={logo} alt="Logo" />
+            </div>
+            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-address">
+              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+                <div key={i}>{line}</div>
+              ))}
+              <div>{companySettings?.phone || '7902373354'}</div>
+              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+              <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+            </div>
           </div>
-          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="company-address">
-            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-              <div key={i}>{line}</div>
-            ))}
-            <div>{companySettings?.phone || '7902373354'}</div>
-            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-            <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
-          </div>
-        </div>
+        )}
+        {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
           <div className="doc-type" style={{ color: '#6b9937' }}>Tax Invoice</div>
         </div>
@@ -655,7 +665,7 @@ function InvoicePrint({ invoice, customer, companySettings }: any) {
   );
 }
 
-function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any) {
+function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideHeader }: any) {
   // Use olive green for all documents
   const receiptStyles = baseStyles;
 
@@ -665,19 +675,22 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings }: any
 
       {/* Header */}
       <div className="header">
-        <div className="company-info">
-          <div className="company-logo">
-            <img src={logo} alt="Logo" />
+        {!hideHeader && (
+          <div className="company-info">
+            <div className="company-logo">
+              <img src={logo} alt="Logo" />
+            </div>
+            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-address">
+              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+                <div key={i}>{line}</div>
+              ))}
+              <div>{companySettings?.phone || '7902373354'}</div>
+              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+            </div>
           </div>
-          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
-          <div className="company-address">
-            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
-              <div key={i}>{line}</div>
-            ))}
-            <div>{companySettings?.phone || '7902373354'}</div>
-            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-          </div>
-        </div>
+        )}
+        {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
           <div className="doc-type" style={{ color: '#6b9937' }}>Payment Receipt</div>
         </div>
