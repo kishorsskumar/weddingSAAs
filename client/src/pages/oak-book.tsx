@@ -544,21 +544,56 @@ export default function OakBook() {
       }
 
       const printUrl = `/print/${type}/${id}`;
-      const response = await fetch(printUrl);
-      const html = await response.text();
-
-      const container = document.createElement('div');
-      container.innerHTML = html;
-      container.style.position = 'fixed';
-      container.style.left = '-9999px';
-      container.style.top = '0';
-      container.style.width = '794px';
-      container.style.backgroundColor = '#ffffff';
-      document.body.appendChild(container);
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const docElement = container.querySelector('.document') as HTMLElement || container;
+      
+      // Create hidden iframe to render the React print page
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.left = '-9999px';
+      iframe.style.top = '0';
+      iframe.style.width = '794px';
+      iframe.style.height = '1123px';
+      iframe.style.border = 'none';
+      iframe.style.backgroundColor = '#ffffff';
+      document.body.appendChild(iframe);
+      
+      iframe.src = printUrl;
+      
+      // Wait for iframe to load and React to render
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout waiting for document to load'));
+        }, 15000);
+        
+        iframe.onload = () => {
+          // Wait for React to render the content
+          const checkReady = setInterval(() => {
+            try {
+              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+              const docElement = iframeDoc?.querySelector('.document');
+              if (docElement) {
+                clearInterval(checkReady);
+                clearTimeout(timeout);
+                // Extra delay to ensure all styles and images are loaded
+                setTimeout(resolve, 1000);
+              }
+            } catch (e) {
+              // Cross-origin issues - continue waiting
+            }
+          }, 200);
+        };
+        
+        iframe.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('Failed to load document'));
+        };
+      });
+      
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      const docElement = iframeDoc?.querySelector('.document') as HTMLElement;
+      
+      if (!docElement) {
+        throw new Error('Document element not found');
+      }
       
       const canvas = await html2canvas(docElement, {
         scale: 2,
@@ -566,6 +601,7 @@ export default function OakBook() {
         logging: false,
         backgroundColor: '#ffffff',
         width: 794,
+        windowWidth: 794,
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -594,7 +630,7 @@ export default function OakBook() {
       }
 
       pdf.save(`${docNumber}.pdf`);
-      document.body.removeChild(container);
+      document.body.removeChild(iframe);
       toast({ title: "PDF downloaded!" });
     } catch (error) {
       console.error('PDF generation error:', error);
