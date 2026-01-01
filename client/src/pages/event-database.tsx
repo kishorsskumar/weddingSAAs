@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Download, Upload, Trash2, Loader2 } from "lucide-react";
+import { Search, Download, Upload, Trash2, Loader2, Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ export default function EventDatabase() {
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -61,6 +62,26 @@ export default function EventDatabase() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Omit<Event, 'id' | 'createdAt'>) => {
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setIsAddEventOpen(false);
+      toast({ title: "Success", description: "Event created successfully" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create event", variant: "destructive" });
     },
   });
 
@@ -299,6 +320,132 @@ export default function EventDatabase() {
     return result;
   };
 
+  const AddEventForm = ({ onClose }: { onClose: () => void }) => {
+    const { register, handleSubmit, watch, formState: { errors } } = useForm({
+      defaultValues: {
+        title: '',
+        date: new Date().toISOString().split('T')[0],
+        time: '',
+        type: 'wedding',
+        planner: '',
+        customer: '',
+        venue: '',
+        salesValue: '0',
+        paymentReceived: '0',
+        cost: '0',
+      }
+    });
+    
+    const salesValue = watch("salesValue");
+    const cost = watch("cost");
+    const paymentReceived = watch("paymentReceived");
+    const profit = (Number(salesValue) || 0) - (Number(cost) || 0);
+    const profitPercent = salesValue && Number(salesValue) > 0 ? ((profit / Number(salesValue)) * 100).toFixed(2) : "0";
+    const balance = (Number(salesValue) || 0) - (Number(paymentReceived) || 0);
+
+    const onSubmit = (data: any) => {
+      createMutation.mutate({
+        ...data,
+        salesValue: data.salesValue?.toString() || '0',
+        paymentReceived: data.paymentReceived?.toString() || '0',
+        cost: data.cost?.toString() || '0',
+      });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Event Title <span className="text-destructive">*</span></Label>
+            <Input {...register("title", { required: "Title is required" })} placeholder="e.g., John & Jane Wedding" data-testid="input-event-title" />
+            {errors.title && <span className="text-xs text-destructive">{errors.title.message}</span>}
+          </div>
+          <div className="space-y-2">
+            <Label>Customer Name <span className="text-destructive">*</span></Label>
+            <Input {...register("customer", { required: "Customer name is required" })} placeholder="e.g., John Smith" data-testid="input-event-customer" />
+            {errors.customer && <span className="text-xs text-destructive">{errors.customer.message}</span>}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Event Date <span className="text-destructive">*</span></Label>
+            <Input type="date" {...register("date", { required: "Date is required" })} data-testid="input-event-date" />
+            {errors.date && <span className="text-xs text-destructive">{errors.date.message}</span>}
+          </div>
+          <div className="space-y-2">
+            <Label>Event Time</Label>
+            <Input type="time" {...register("time")} data-testid="input-event-time" />
+          </div>
+          <div className="space-y-2">
+            <Label>Event Type <span className="text-destructive">*</span></Label>
+            <select {...register("type", { required: "Type is required" })} className="w-full h-10 px-3 rounded-md border border-input bg-background" data-testid="select-event-type">
+              <option value="wedding">Wedding</option>
+              <option value="corporate">Corporate</option>
+              <option value="birthday">Birthday</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Wedding Planner <span className="text-destructive">*</span></Label>
+            <Input {...register("planner", { required: "Planner is required" })} placeholder="e.g., Sarah Johnson" data-testid="input-event-planner" />
+            {errors.planner && <span className="text-xs text-destructive">{errors.planner.message}</span>}
+          </div>
+          <div className="space-y-2">
+            <Label>Venue <span className="text-destructive">*</span></Label>
+            <Input {...register("venue", { required: "Venue is required" })} placeholder="e.g., Grand Ballroom" data-testid="input-event-venue" />
+            {errors.venue && <span className="text-xs text-destructive">{errors.venue.message}</span>}
+          </div>
+        </div>
+
+        <div className="border-t pt-4 mt-4">
+          <h4 className="font-medium mb-3">Financial Details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Sales Value (₹)</Label>
+              <Input type="number" {...register("salesValue")} placeholder="0" data-testid="input-event-sales" />
+            </div>
+            <div className="space-y-2">
+              <Label>Payment Received (₹)</Label>
+              <Input type="number" {...register("paymentReceived")} placeholder="0" data-testid="input-event-payment" />
+            </div>
+            <div className="space-y-2">
+              <Label>Estimated Cost (₹)</Label>
+              <Input type="number" {...register("cost")} placeholder="0" data-testid="input-event-cost" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-muted p-3 sm:p-4 rounded-lg grid grid-cols-3 gap-4 text-center">
+          <div>
+            <span className="text-xs sm:text-sm text-muted-foreground">Balance</span>
+            <div className="text-base sm:text-lg font-bold text-orange-600">₹{balance.toLocaleString()}</div>
+          </div>
+          <div>
+            <span className="text-xs sm:text-sm text-muted-foreground">Est. Profit</span>
+            <div className="text-base sm:text-lg font-bold text-primary">₹{profit.toLocaleString()}</div>
+          </div>
+          <div>
+            <span className="text-xs sm:text-sm text-muted-foreground">Margin</span>
+            <div className="text-base sm:text-lg font-bold text-primary">{profitPercent}%</div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" className="flex-1" disabled={createMutation.isPending} data-testid="button-create-event">
+            {createMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</> : 'Create Event'}
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
   const EditEventForm = ({ event, onClose }: { event: Event; onClose: () => void }) => {
     const { register, handleSubmit, watch } = useForm<Event>({ defaultValues: event });
     
@@ -379,6 +526,23 @@ export default function EventDatabase() {
             className="hidden"
             data-testid="input-import-file"
           />
+          <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
+                data-testid="button-add-event"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Add Event</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Event</DialogTitle>
+              </DialogHeader>
+              <AddEventForm onClose={() => setIsAddEventOpen(false)} />
+            </DialogContent>
+          </Dialog>
           <Button 
             variant="outline" 
             className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
