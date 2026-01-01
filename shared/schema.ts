@@ -203,9 +203,14 @@ export const lineItemSchema = z.object({
   slNo: z.number().optional(),
   name: z.string(),
   description: z.string().optional(),
+  hsnSac: z.string().optional(), // HSN/SAC code for tax documents
   quantity: z.number(),
   rate: z.number(),
   taxRate: z.number().optional().default(0),
+  cgstPercent: z.number().optional().default(0), // CGST percentage for tax documents
+  cgstAmount: z.number().optional().default(0), // CGST amount
+  sgstPercent: z.number().optional().default(0), // SGST percentage for tax documents  
+  sgstAmount: z.number().optional().default(0), // SGST amount
   total: z.number(),
   isHeading: z.boolean().optional().default(false), // For section headers like "DAY 1: MEHANDI"
 });
@@ -221,6 +226,11 @@ export const estimates = pgTable("estimates", {
   date: date("date").notNull(),
   dueDate: date("due_date"),
   status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'accepted' | 'declined' | 'converted'
+  // Tax document fields
+  isTaxDocument: boolean("is_tax_document").notNull().default(false), // Tax or Non-Tax estimate
+  placeOfSupply: text("place_of_supply"), // State for GST (e.g., "Kerala (32)")
+  cgstTotal: decimal("cgst_total", { precision: 12, scale: 2 }).default('0'), // Total CGST amount
+  sgstTotal: decimal("sgst_total", { precision: 12, scale: 2 }).default('0'), // Total SGST amount
   // Enhanced fields
   subject: text("subject"), // Event description like "Welcome party, Sangeet & Wedding on 14&15th Dec 2025"
   weddingPlannerName: text("wedding_planner_name"), // Wedding planner name on top
@@ -254,6 +264,11 @@ export const invoices = pgTable("invoices", {
   date: date("date").notNull(),
   dueDate: date("due_date"),
   status: text("status").notNull().default('draft'), // 'draft' | 'sent' | 'partial' | 'paid' | 'overdue'
+  // Tax document fields
+  isTaxDocument: boolean("is_tax_document").notNull().default(false), // Tax or Non-Tax invoice
+  placeOfSupply: text("place_of_supply"), // State for GST (e.g., "Kerala (32)")
+  cgstTotal: decimal("cgst_total", { precision: 12, scale: 2 }).default('0'), // Total CGST amount
+  sgstTotal: decimal("sgst_total", { precision: 12, scale: 2 }).default('0'), // Total SGST amount
   // Enhanced fields (same as estimates)
   subject: text("subject"),
   weddingPlannerName: text("wedding_planner_name"),
