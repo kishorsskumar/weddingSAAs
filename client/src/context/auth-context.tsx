@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
+import { registerPushSubscription } from "@/lib/push-notifications";
 
 interface User {
   id: string;
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(data => {
         setUser(data.user);
         setAllowedPages(data.permissions);
+        registerPushSubscription();
       })
       .catch(async () => {
         // Not logged in - clear any stale cached data
@@ -81,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await response.json();
       setUser(data.user);
       setAllowedPages(data.permissions);
+      registerPushSubscription();
       
       // Route based on how user was created
       if (data.user.createdVia === 'employee_onboarding') {
