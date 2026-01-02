@@ -22,6 +22,7 @@ import CustomerPortal from "@/pages/customer-portal";
 import PrintDocument from "@/pages/print-document";
 import EmployeePortal from "@/pages/employee-portal";
 import Oaksy from "@/pages/oaksy";
+import OakCreative from "@/pages/oak-creative";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -86,6 +87,9 @@ function AppRoutes() {
         </Route>
         <Route path="/oaksy">
            <PrivateRoute component={Oaksy} path="/oaksy" />
+        </Route>
+        <Route path="/oak-creative">
+           <PrivateRoute component={OakCreative} path="/oak-creative" />
         </Route>
         <Route component={NotFound} />
       </Switch>

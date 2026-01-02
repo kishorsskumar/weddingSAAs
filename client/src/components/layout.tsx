@@ -19,7 +19,8 @@ import {
   Package,
   UserCircle,
   Sparkles,
-  ClipboardList
+  ClipboardList,
+  Palette
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,6 +41,7 @@ const ALL_PAGES = [
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
+  { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -57,6 +59,7 @@ const ICONS: Record<string, any> = {
   hr: Briefcase,
   "employee-portal": UserCircle,
   oaksy: Sparkles,
+  "oak-creative": Palette,
   admin: Shield,
 };
 

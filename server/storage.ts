@@ -233,6 +233,18 @@ import {
   type InsertChecklistTemplate,
   type ChecklistTemplateItem,
   type InsertChecklistTemplateItem,
+  presentations,
+  presentationSlides,
+  slideImages,
+  presentationAssets,
+  type Presentation,
+  type InsertPresentation,
+  type PresentationSlide,
+  type InsertPresentationSlide,
+  type SlideImage,
+  type InsertSlideImage,
+  type PresentationAsset,
+  type InsertPresentationAsset,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -737,6 +749,34 @@ export interface IStorage {
   createWhatsappLog(log: InsertWhatsappMessageLog): Promise<WhatsappMessageLog>;
   updateWhatsappLog(id: string, log: Partial<InsertWhatsappMessageLog>): Promise<WhatsappMessageLog | undefined>;
   getEmployeesWithWhatsappOptIn(): Promise<Employee[]>;
+
+  // Oak Creative - Presentations
+  getAllPresentations(): Promise<Presentation[]>;
+  getPresentationsByUser(userId: string): Promise<Presentation[]>;
+  getPresentation(id: string): Promise<Presentation | undefined>;
+  createPresentation(presentation: InsertPresentation): Promise<Presentation>;
+  updatePresentation(id: string, presentation: Partial<InsertPresentation>): Promise<Presentation | undefined>;
+  deletePresentation(id: string): Promise<void>;
+
+  // Oak Creative - Presentation Slides
+  getPresentationSlides(presentationId: string): Promise<PresentationSlide[]>;
+  getPresentationSlide(id: string): Promise<PresentationSlide | undefined>;
+  createPresentationSlide(slide: InsertPresentationSlide): Promise<PresentationSlide>;
+  updatePresentationSlide(id: string, slide: Partial<InsertPresentationSlide>): Promise<PresentationSlide | undefined>;
+  deletePresentationSlide(id: string): Promise<void>;
+  reorderPresentationSlides(presentationId: string, slideIds: string[]): Promise<void>;
+
+  // Oak Creative - Slide Images
+  getSlideImages(slideId: string): Promise<SlideImage[]>;
+  createSlideImage(image: InsertSlideImage): Promise<SlideImage>;
+  updateSlideImage(id: string, image: Partial<InsertSlideImage>): Promise<SlideImage | undefined>;
+  deleteSlideImage(id: string): Promise<void>;
+
+  // Oak Creative - Presentation Assets
+  getAllPresentationAssets(): Promise<PresentationAsset[]>;
+  getPresentationAssetsByCategory(category: string): Promise<PresentationAsset[]>;
+  createPresentationAsset(asset: InsertPresentationAsset): Promise<PresentationAsset>;
+  deletePresentationAsset(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3619,6 +3659,122 @@ export class DatabaseStorage implements IStorage {
       this.getChecklistTemplateItems(id)
     ]);
     return { template, items };
+  }
+
+  // Oak Creative - Presentations
+  async getAllPresentations(): Promise<Presentation[]> {
+    return await db.select().from(presentations).orderBy(desc(presentations.createdAt));
+  }
+
+  async getPresentationsByUser(userId: string): Promise<Presentation[]> {
+    return await db.select().from(presentations)
+      .where(eq(presentations.createdBy, userId))
+      .orderBy(desc(presentations.createdAt));
+  }
+
+  async getPresentation(id: string): Promise<Presentation | undefined> {
+    const [presentation] = await db.select().from(presentations).where(eq(presentations.id, id));
+    return presentation;
+  }
+
+  async createPresentation(presentation: InsertPresentation): Promise<Presentation> {
+    const [created] = await db.insert(presentations).values(presentation).returning();
+    return created;
+  }
+
+  async updatePresentation(id: string, presentation: Partial<InsertPresentation>): Promise<Presentation | undefined> {
+    const [updated] = await db.update(presentations)
+      .set({ ...presentation, updatedAt: new Date() })
+      .where(eq(presentations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePresentation(id: string): Promise<void> {
+    await db.delete(presentations).where(eq(presentations.id, id));
+  }
+
+  // Oak Creative - Presentation Slides
+  async getPresentationSlides(presentationId: string): Promise<PresentationSlide[]> {
+    return await db.select().from(presentationSlides)
+      .where(eq(presentationSlides.presentationId, presentationId))
+      .orderBy(presentationSlides.sortOrder);
+  }
+
+  async getPresentationSlide(id: string): Promise<PresentationSlide | undefined> {
+    const [slide] = await db.select().from(presentationSlides).where(eq(presentationSlides.id, id));
+    return slide;
+  }
+
+  async createPresentationSlide(slide: InsertPresentationSlide): Promise<PresentationSlide> {
+    const [created] = await db.insert(presentationSlides).values(slide).returning();
+    return created;
+  }
+
+  async updatePresentationSlide(id: string, slide: Partial<InsertPresentationSlide>): Promise<PresentationSlide | undefined> {
+    const [updated] = await db.update(presentationSlides)
+      .set(slide)
+      .where(eq(presentationSlides.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePresentationSlide(id: string): Promise<void> {
+    await db.delete(presentationSlides).where(eq(presentationSlides.id, id));
+  }
+
+  async reorderPresentationSlides(presentationId: string, slideIds: string[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < slideIds.length; i++) {
+        await tx.update(presentationSlides)
+          .set({ sortOrder: i })
+          .where(and(eq(presentationSlides.id, slideIds[i]), eq(presentationSlides.presentationId, presentationId)));
+      }
+    });
+  }
+
+  // Oak Creative - Slide Images
+  async getSlideImages(slideId: string): Promise<SlideImage[]> {
+    return await db.select().from(slideImages)
+      .where(eq(slideImages.slideId, slideId))
+      .orderBy(slideImages.sortOrder);
+  }
+
+  async createSlideImage(image: InsertSlideImage): Promise<SlideImage> {
+    const [created] = await db.insert(slideImages).values(image).returning();
+    return created;
+  }
+
+  async updateSlideImage(id: string, image: Partial<InsertSlideImage>): Promise<SlideImage | undefined> {
+    const [updated] = await db.update(slideImages)
+      .set(image)
+      .where(eq(slideImages.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSlideImage(id: string): Promise<void> {
+    await db.delete(slideImages).where(eq(slideImages.id, id));
+  }
+
+  // Oak Creative - Presentation Assets
+  async getAllPresentationAssets(): Promise<PresentationAsset[]> {
+    return await db.select().from(presentationAssets).orderBy(presentationAssets.category);
+  }
+
+  async getPresentationAssetsByCategory(category: string): Promise<PresentationAsset[]> {
+    return await db.select().from(presentationAssets)
+      .where(eq(presentationAssets.category, category))
+      .orderBy(presentationAssets.name);
+  }
+
+  async createPresentationAsset(asset: InsertPresentationAsset): Promise<PresentationAsset> {
+    const [created] = await db.insert(presentationAssets).values(asset).returning();
+    return created;
+  }
+
+  async deletePresentationAsset(id: string): Promise<void> {
+    await db.delete(presentationAssets).where(eq(presentationAssets.id, id));
   }
 }
 

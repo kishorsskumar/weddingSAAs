@@ -760,6 +760,7 @@ export async function registerRoutes(
     'hr',
     'employee-portal',
     'oaksy',
+    'oak-creative',
     'admin',
   ];
 
@@ -7644,6 +7645,204 @@ export async function registerRoutes(
       return res.status(403).json({ error: 'Superadmin access required' });
     }
     await storage.deleteAllChecklistTemplateItems(req.params.id);
+    res.json({ success: true });
+  });
+
+  // ============ Oak Creative - Presentations ============
+  app.get('/api/presentations', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentations = await storage.getAllPresentations();
+    res.json(presentations);
+  });
+
+  app.get('/api/presentations/my', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentations = await storage.getPresentationsByUser(req.session.userId);
+    res.json(presentations);
+  });
+
+  app.get('/api/presentations/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentation = await storage.getPresentation(req.params.id);
+    if (!presentation) {
+      return res.status(404).json({ error: 'Presentation not found' });
+    }
+    res.json(presentation);
+  });
+
+  app.get('/api/presentations/:id/full', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentation = await storage.getPresentation(req.params.id);
+    if (!presentation) {
+      return res.status(404).json({ error: 'Presentation not found' });
+    }
+    const slides = await storage.getPresentationSlides(req.params.id);
+    const slidesWithImages = await Promise.all(slides.map(async (slide) => {
+      const images = await storage.getSlideImages(slide.id);
+      return { ...slide, images };
+    }));
+    res.json({ ...presentation, slides: slidesWithImages });
+  });
+
+  app.post('/api/presentations', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentation = await storage.createPresentation({
+      ...req.body,
+      createdBy: req.session.userId
+    });
+    res.json(presentation);
+  });
+
+  app.put('/api/presentations/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const presentation = await storage.updatePresentation(req.params.id, req.body);
+    if (!presentation) {
+      return res.status(404).json({ error: 'Presentation not found' });
+    }
+    res.json(presentation);
+  });
+
+  app.delete('/api/presentations/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deletePresentation(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Presentation Slides
+  app.get('/api/presentations/:presentationId/slides', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const slides = await storage.getPresentationSlides(req.params.presentationId);
+    res.json(slides);
+  });
+
+  app.post('/api/presentations/:presentationId/slides', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const slide = await storage.createPresentationSlide({
+      ...req.body,
+      presentationId: req.params.presentationId
+    });
+    res.json(slide);
+  });
+
+  app.put('/api/slides/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const slide = await storage.updatePresentationSlide(req.params.id, req.body);
+    if (!slide) {
+      return res.status(404).json({ error: 'Slide not found' });
+    }
+    res.json(slide);
+  });
+
+  app.delete('/api/slides/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deletePresentationSlide(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.post('/api/presentations/:presentationId/slides/reorder', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { slideIds } = req.body;
+    if (!Array.isArray(slideIds)) {
+      return res.status(400).json({ error: 'slideIds must be an array' });
+    }
+    await storage.reorderPresentationSlides(req.params.presentationId, slideIds);
+    res.json({ success: true });
+  });
+
+  // Slide Images
+  app.get('/api/slides/:slideId/images', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const images = await storage.getSlideImages(req.params.slideId);
+    res.json(images);
+  });
+
+  app.post('/api/slides/:slideId/images', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const image = await storage.createSlideImage({
+      ...req.body,
+      slideId: req.params.slideId
+    });
+    res.json(image);
+  });
+
+  app.put('/api/slide-images/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const image = await storage.updateSlideImage(req.params.id, req.body);
+    if (!image) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    res.json(image);
+  });
+
+  app.delete('/api/slide-images/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deleteSlideImage(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Presentation Assets (Library)
+  app.get('/api/presentation-assets', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { category } = req.query;
+    if (category && typeof category === 'string') {
+      const assets = await storage.getPresentationAssetsByCategory(category);
+      res.json(assets);
+    } else {
+      const assets = await storage.getAllPresentationAssets();
+      res.json(assets);
+    }
+  });
+
+  app.post('/api/presentation-assets', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const asset = await storage.createPresentationAsset({
+      ...req.body,
+      uploadedBy: req.session.userId
+    });
+    res.json(asset);
+  });
+
+  app.delete('/api/presentation-assets/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.deletePresentationAsset(req.params.id);
     res.json({ success: true });
   });
 
