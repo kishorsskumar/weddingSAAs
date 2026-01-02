@@ -32,8 +32,9 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
@@ -84,6 +85,7 @@ const NOTIFICATION_ICONS: Record<string, any> = {
 function NotificationBell() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["/api/notifications/unread-count"],
@@ -120,6 +122,7 @@ function NotificationBell() {
   });
 
   return (
+    <>
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -161,9 +164,8 @@ function NotificationBell() {
                       if (isUnread) {
                         markAsRead.mutate(notification.id);
                       }
-                      if (notification.actionUrl) {
-                        window.location.href = notification.actionUrl;
-                      }
+                      setSelectedNotification(notification);
+                      setIsOpen(false);
                     }}
                     data-testid={`notification-item-${notification.id}`}
                   >
@@ -202,6 +204,61 @@ function NotificationBell() {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+
+    <Dialog open={!!selectedNotification} onOpenChange={(open) => !open && setSelectedNotification(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            {selectedNotification && (
+              <div className={cn(
+                "p-2 rounded-full shrink-0",
+                selectedNotification.type === "success" && "bg-green-100 text-green-600",
+                selectedNotification.type === "warning" && "bg-amber-100 text-amber-600",
+                selectedNotification.type === "error" && "bg-red-100 text-red-600",
+                selectedNotification.type === "info" && "bg-blue-100 text-blue-600"
+              )}>
+                {(() => {
+                  const Icon = NOTIFICATION_ICONS[selectedNotification?.type] || Info;
+                  return <Icon className="h-5 w-5" />;
+                })()}
+              </div>
+            )}
+            <DialogTitle>{selectedNotification?.title}</DialogTitle>
+          </div>
+          {selectedNotification?.createdAt && (
+            <p className="text-xs text-muted-foreground mt-2">
+              {format(new Date(selectedNotification.createdAt), 'PPpp')}
+            </p>
+          )}
+        </DialogHeader>
+        <div className="mt-4">
+          <p className="text-sm text-foreground whitespace-pre-wrap">
+            {selectedNotification?.message}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          {selectedNotification?.actionUrl && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                window.location.href = selectedNotification.actionUrl;
+              }}
+              data-testid="button-notification-action"
+            >
+              Open Link
+            </Button>
+          )}
+          <Button
+            onClick={() => setSelectedNotification(null)}
+            className="bg-[#6b9937] hover:bg-[#5a8230]"
+            data-testid="button-close-notification"
+          >
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
