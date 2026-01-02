@@ -1608,18 +1608,20 @@ export default function Admin() {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-9' : 'grid-cols-1'}`}>
-          <TabsTrigger value="users" data-testid="tab-users">Users</TabsTrigger>
-          {isSuperAdmin && <TabsTrigger value="employees" data-testid="tab-employees">Employees</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="roles" data-testid="tab-roles">Roles</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="holidays" data-testid="tab-holidays">Holidays</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="leave" data-testid="tab-leave">Leave</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="onboarding" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="calendar" data-testid="tab-calendar">Calendar</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="messaging" data-testid="tab-messaging">Messaging</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="templates" data-testid="tab-templates">Templates</TabsTrigger>}
-          {isSuperAdmin && <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>}
-        </TabsList>
+        <div className="overflow-x-auto -mx-2 px-2 pb-2">
+          <TabsList className="inline-flex w-auto min-w-full sm:w-full h-auto flex-wrap sm:flex-nowrap gap-1">
+            <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-users">Users</TabsTrigger>
+            {isSuperAdmin && <TabsTrigger value="employees" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-employees">Employees</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="roles" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-roles">Roles</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="holidays" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-holidays">Holidays</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="leave" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-leave">Leave</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="onboarding" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-onboarding">Onboarding</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="calendar" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-calendar">Calendar</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="messaging" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-messaging">Messaging</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="templates" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-templates">Templates</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="notifications" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-notifications">Notifications</TabsTrigger>}
+          </TabsList>
+        </div>
 
         <TabsContent value="users" className="mt-4">
           <div className="flex justify-end mb-4">
