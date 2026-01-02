@@ -580,13 +580,23 @@ export default function OakCreative() {
                   </div>
                   
                   {/* Slide content */}
-                  <div className="flex-1 bg-white p-6">
+                  <div className="flex-1 bg-white p-6 overflow-auto">
+                    {/* Text content from AI generation */}
+                    {currentSlide.content && typeof currentSlide.content === 'object' && (currentSlide.content as any).text && (
+                      <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                        <p className="text-gray-700 leading-relaxed">
+                          {(currentSlide.content as any).text}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Images grid */}
                     {currentSlide.images && currentSlide.images.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-4 h-full">
+                      <div className="grid grid-cols-3 gap-4">
                         {currentSlide.images.map((img, index) => (
                           <div
                             key={img.id}
-                            className="relative group rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center"
+                            className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center"
                           >
                             <img
                               src={img.imageUrl}
@@ -612,12 +622,12 @@ export default function OakCreative() {
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    ) : !currentSlide.content ? (
                       <div className="h-full flex flex-col items-center justify-center text-gray-400">
                         <ImageIcon className="h-16 w-16 mb-4" />
                         <p>Add images from the asset library</p>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </Card>
