@@ -5136,6 +5136,27 @@ export async function registerRoutes(
   app.post('/api/sales/pipelines', async (req, res) => {
     try {
       const pipeline = await storage.createSalesPipeline(req.body);
+      
+      // Create default stages for the new pipeline
+      const defaultStages = [
+        { name: 'Lead', color: '#6b7280', order: 1 },
+        { name: 'Awaiting Response', color: '#f59e0b', order: 2 },
+        { name: 'Contacted', color: '#3b82f6', order: 3 },
+        { name: 'Prospective', color: '#8b5cf6', order: 4 },
+        { name: 'Proposal', color: '#ec4899', order: 5 },
+        { name: 'Negotiation', color: '#f97316', order: 6 },
+        { name: 'Advance Received', color: '#14b8a6', order: 7 },
+        { name: 'Closed Won', color: '#22c55e', order: 8 },
+        { name: 'Closed Lost', color: '#ef4444', order: 9 },
+      ];
+      
+      for (const stage of defaultStages) {
+        await storage.createSalesStage({
+          ...stage,
+          pipelineId: pipeline.id,
+        });
+      }
+      
       res.json(pipeline);
     } catch (error) {
       res.status(400).json({ error: 'Failed to create pipeline' });

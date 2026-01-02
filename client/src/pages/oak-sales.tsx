@@ -128,7 +128,7 @@ export default function OakSales() {
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'pipeline', label: 'Deals Pipeline', icon: Target },
+    { id: 'pipeline', label: 'Leads Pipeline', icon: Target },
     { id: 'contacts', label: 'Contacts', icon: Users },
     { id: 'companies', label: 'Companies', icon: Building2 },
     { id: 'activities', label: 'Activities', icon: CheckSquare },
@@ -587,11 +587,33 @@ function PipelineSection({
   searchQuery: string;
   setSearchQuery: (query: string) => void;
 }) {
-  const [isAddDealOpen, setIsAddDealOpen] = useState(false);
+  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+  const [isAddPipelineOpen, setIsAddPipelineOpen] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<SalesDeal | null>(null);
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  const createPipelineMutation = useMutation({
+    mutationFn: async (data: { name: string }) => {
+      return apiRequest('POST', '/api/sales/pipelines', data);
+    },
+    onSuccess: (newPipeline: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/pipelines'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/stages'] });
+      setIsAddPipelineOpen(false);
+      setSelectedPipelineId(newPipeline.id);
+      toast({ title: 'Pipeline created with default stages' });
+    },
+  });
+  
+  const handleAddPipeline = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    createPipelineMutation.mutate({
+      name: formData.get('name') as string,
+    });
+  };
 
   const pipelineStages = stages
     .filter(s => s.pipelineId === selectedPipelineId)
@@ -619,8 +641,8 @@ function PipelineSection({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales/deals'] });
-      setIsAddDealOpen(false);
-      toast({ title: 'Deal created successfully' });
+      setIsAddLeadOpen(false);
+      toast({ title: 'Lead created successfully' });
     },
   });
 
@@ -642,7 +664,7 @@ function PipelineSection({
     }
   };
 
-  const handleAddDeal = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddLead = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const firstStage = pipelineStages[0];
@@ -665,7 +687,7 @@ function PipelineSection({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Deals Pipeline</h1>
+          <h1 className="text-2xl font-bold">Leads Pipeline</h1>
           <p className="text-muted-foreground">Manage your sales pipeline</p>
         </div>
         <div className="flex items-center gap-2">
@@ -679,21 +701,51 @@ function PipelineSection({
               ))}
             </SelectContent>
           </Select>
-          <Dialog open={isAddDealOpen} onOpenChange={setIsAddDealOpen}>
+          <Dialog open={isAddPipelineOpen} onOpenChange={setIsAddPipelineOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-deal">
+              <Button variant="outline" data-testid="button-new-pipeline">
                 <Plus className="w-4 h-4 mr-2" />
-                Add Deal
+                New Pipeline
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Create New Pipeline</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddPipeline} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pipeline-name">Pipeline Name *</Label>
+                  <Input id="pipeline-name" name="name" required placeholder="e.g., Wedding Events" data-testid="input-pipeline-name" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Default stages will be created: Lead, Awaiting Response, Contacted, Prospective, Proposal, Negotiation, Advance Received, Closed Won, Closed Lost
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsAddPipelineOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" data-testid="button-create-pipeline">
+                    Create Pipeline
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-lead">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Lead
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-[95vw] sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Add New Deal</DialogTitle>
+                <DialogTitle>Add New Lead</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleAddDeal} className="space-y-4">
+              <form onSubmit={handleAddLead} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Deal Title *</Label>
-                  <Input id="title" name="title" required data-testid="input-deal-title" />
+                  <Label htmlFor="title">Lead Title *</Label>
+                  <Input id="title" name="title" required data-testid="input-lead-title" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -754,11 +806,11 @@ function PipelineSection({
                   <Textarea id="notes" name="notes" data-testid="input-deal-notes" />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsAddDealOpen(false)}>
+                  <Button type="button" variant="outline" onClick={() => setIsAddLeadOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" data-testid="button-save-deal">
-                    Create Deal
+                  <Button type="submit" data-testid="button-save-lead">
+                    Create Lead
                   </Button>
                 </div>
               </form>
