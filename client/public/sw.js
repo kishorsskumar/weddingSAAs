@@ -6,6 +6,69 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received');
+  
+  let data = { title: 'Oakstreet Events', body: 'You have a new notification' };
+  
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (e) {
+    console.error('[SW] Error parsing push data:', e);
+  }
+  
+  const options = {
+    body: data.body || data.message,
+    icon: '/oak-street-pwa-icon.jpg',
+    badge: '/oak-street-logo.png',
+    vibrate: [100, 50, 100],
+    data: {
+      url: data.actionUrl || data.url || '/',
+      notificationId: data.notificationId
+    },
+    actions: data.actionUrl ? [
+      { action: 'open', title: 'Open' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ] : []
+  };
+  
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked:', event.action);
+  event.notification.close();
+  
+  if (event.action === 'dismiss') {
+    return;
+  }
+  
+  const urlToOpen = event.notification.data?.url || '/';
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        // Focus existing window if available
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(urlToOpen);
+            return client.focus();
+          }
+        }
+        // Open new window if no existing window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
+
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker...');
   event.waitUntil(
