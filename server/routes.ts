@@ -4258,7 +4258,17 @@ export async function registerRoutes(
 
   // Oak Book - Customers
   app.get('/api/customers', async (req, res) => {
-    const customers = await storage.getAllCustomers();
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    let customers = await storage.getAllCustomers();
+    
+    // Wedding planners only see their own customers
+    if (user?.role === 'wedding_planner') {
+      customers = customers.filter(c => c.weddingPlannerId === req.session.userId);
+    }
+    
     res.json(customers);
   });
 
@@ -4334,7 +4344,19 @@ export async function registerRoutes(
 
   // Oak Book - Estimates
   app.get('/api/estimates', async (req, res) => {
-    const estimates = await storage.getAllEstimates();
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    let estimates = await storage.getAllEstimates();
+    
+    // Wedding planners only see estimates for their customers
+    if (user?.role === 'wedding_planner') {
+      const customers = await storage.getAllCustomers();
+      const myCustomerIds = new Set(customers.filter(c => c.weddingPlannerId === req.session.userId).map(c => c.id));
+      estimates = estimates.filter(e => e.customerId && myCustomerIds.has(e.customerId));
+    }
+    
     res.json(estimates);
   });
 
@@ -4411,7 +4433,19 @@ export async function registerRoutes(
 
   // Oak Book - Invoices
   app.get('/api/invoices', async (req, res) => {
-    const invoices = await storage.getAllInvoices();
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    let invoices = await storage.getAllInvoices();
+    
+    // Wedding planners only see invoices for their customers
+    if (user?.role === 'wedding_planner') {
+      const customers = await storage.getAllCustomers();
+      const myCustomerIds = new Set(customers.filter(c => c.weddingPlannerId === req.session.userId).map(c => c.id));
+      invoices = invoices.filter(i => i.customerId && myCustomerIds.has(i.customerId));
+    }
+    
     res.json(invoices);
   });
 
@@ -4458,7 +4492,19 @@ export async function registerRoutes(
 
   // Oak Book - Customer Payments (Receipts)
   app.get('/api/customer-payments', async (req, res) => {
-    const payments = await storage.getAllCustomerPayments();
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    let payments = await storage.getAllCustomerPayments();
+    
+    // Wedding planners only see payments for their customers
+    if (user?.role === 'wedding_planner') {
+      const customers = await storage.getAllCustomers();
+      const myCustomerIds = new Set(customers.filter(c => c.weddingPlannerId === req.session.userId).map(c => c.id));
+      payments = payments.filter(p => p.customerId && myCustomerIds.has(p.customerId));
+    }
+    
     res.json(payments);
   });
 

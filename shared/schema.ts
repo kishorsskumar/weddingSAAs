@@ -183,6 +183,7 @@ export const customers = pgTable("customers", {
   phone: text("phone"),
   gstNumber: text("gst_number"),
   billingAddress: text("billing_address"),
+  weddingPlannerId: varchar("wedding_planner_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
