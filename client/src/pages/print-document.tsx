@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { format } from "date-fns";
 import logo from "@assets/OAK_1_1766646679471.jpg";
-import yepmanLogo from "@assets/Yep_Man_Logo_1767318376266.png";
+import yepmanLogo from "@assets/Yepman_1767319118647.png";
 
 // Brand colors
 const BRAND_COLOR = '#6b9937';  // Oakstreet brand color
@@ -312,7 +312,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
       <div className="header">
         {!hideHeader && (
           <div className="company-info">
-            <div className="company-logo" style={isTaxDocument ? { background: '#1a1a1a', padding: '8px' } : {}}>
+            <div className="company-logo">
               <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
             <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
@@ -561,7 +561,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
       <div className="header">
         {!hideHeader && (
           <div className="company-info">
-            <div className="company-logo" style={isTaxDocument ? { background: '#1a1a1a', padding: '8px' } : {}}>
+            <div className="company-logo">
               <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
             <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
