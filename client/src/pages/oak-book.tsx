@@ -68,11 +68,17 @@ import {
   Legend
 } from "recharts";
 
+type SidebarChild = {
+  id: string;
+  label: string;
+  children?: { id: string; label: string }[];
+};
+
 type SidebarSection = {
   id: string;
   label: string;
   icon: any;
-  children?: { id: string; label: string }[];
+  children?: SidebarChild[];
 };
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
@@ -85,8 +91,22 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
     label: "Sales", 
     icon: TrendingUp,
     children: [
-      { id: "estimates", label: "Estimates" },
-      { id: "invoices", label: "Invoices" },
+      { 
+        id: "estimates", 
+        label: "Estimates",
+        children: [
+          { id: "standard-estimates", label: "Standard" },
+          { id: "tax-estimates", label: "Tax" },
+        ]
+      },
+      { 
+        id: "invoices", 
+        label: "Invoices",
+        children: [
+          { id: "standard-invoices", label: "Standard" },
+          { id: "tax-invoices", label: "Tax" },
+        ]
+      },
       { id: "payments-received", label: "Payments Received" },
     ]
   },
@@ -771,19 +791,61 @@ export default function OakBook() {
                   {expandedMenus.includes(section.id) && (
                     <div className="ml-6 space-y-1 mt-1">
                       {section.children.map((child) => (
-                        <Button
-                          key={child.id}
-                          variant="ghost"
-                          className={cn(
-                            "w-full justify-start text-sm",
-                            activeSection === child.id &&
-                              "bg-sidebar-accent text-sidebar-accent-foreground"
+                        <div key={child.id}>
+                          {child.children ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                className={cn(
+                                  "w-full justify-between text-sm",
+                                  expandedMenus.includes(child.id) && "bg-sidebar-accent/30"
+                                )}
+                                onClick={() => toggleMenu(child.id)}
+                                data-testid={`nav-${child.id}`}
+                              >
+                                {child.label}
+                                {expandedMenus.includes(child.id) ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )}
+                              </Button>
+                              {expandedMenus.includes(child.id) && (
+                                <div className="ml-4 space-y-1 mt-1">
+                                  {child.children.map((subChild) => (
+                                    <Button
+                                      key={subChild.id}
+                                      variant="ghost"
+                                      size="sm"
+                                      className={cn(
+                                        "w-full justify-start text-xs h-7",
+                                        activeSection === subChild.id &&
+                                          "bg-sidebar-accent text-sidebar-accent-foreground"
+                                      )}
+                                      onClick={() => handleNavClick(subChild.id)}
+                                      data-testid={`nav-${subChild.id}`}
+                                    >
+                                      {subChild.label}
+                                    </Button>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              className={cn(
+                                "w-full justify-start text-sm",
+                                activeSection === child.id &&
+                                  "bg-sidebar-accent text-sidebar-accent-foreground"
+                              )}
+                              onClick={() => handleNavClick(child.id)}
+                              data-testid={`nav-${child.id}`}
+                            >
+                              {child.label}
+                            </Button>
                           )}
-                          onClick={() => handleNavClick(child.id)}
-                          data-testid={`nav-${child.id}`}
-                        >
-                          {child.label}
-                        </Button>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -1307,9 +1369,11 @@ export default function OakBook() {
     );
   };
 
-  const renderEstimates = () => {
-    const standardEstimates = estimates.filter((e: any) => !e.isTaxDocument);
-    const taxEstimates = estimates.filter((e: any) => e.isTaxDocument === true);
+  const renderEstimates = (filterType: "standard" | "tax" = "standard") => {
+    const filteredEstimates = filterType === "tax" 
+      ? estimates.filter((e: any) => e.isTaxDocument === true)
+      : estimates.filter((e: any) => !e.isTaxDocument);
+    const title = filterType === "tax" ? "Tax Estimates (GST)" : "Standard Estimates";
     
     const renderEstimateRow = (estimate: any) => {
       const customer = customers.find((c) => c.id === estimate.customerId);
@@ -1371,7 +1435,7 @@ export default function OakBook() {
     return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-serif font-bold text-primary">Estimates</h1>
+        <h1 className={cn("text-2xl font-serif font-bold", filterType === "tax" ? "text-primary" : "text-foreground")}>{title}</h1>
         <Button onClick={() => { setEditingEstimate(null); setEstimateModalOpen(true); }} data-testid="btn-add-estimate">
           <Plus className="h-4 w-4 mr-2" />
           New Estimate
@@ -1384,69 +1448,35 @@ export default function OakBook() {
           "flex-shrink-0 overflow-auto",
           selectedDocType === "quote" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
         )}>
-          <div className="space-y-6">
-            {/* Standard Estimates Section */}
-            <Card>
-              <div className="p-3 border-b bg-muted/30">
-                <h3 className="font-semibold text-sm">Standard Estimates ({standardEstimates.length})</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+          <Card>
+            <div className={cn("p-3 border-b", filterType === "tax" ? "bg-primary/10" : "bg-muted/30")}>
+              <h3 className={cn("font-semibold text-sm", filterType === "tax" && "text-primary")}>{title} ({filteredEstimates.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredEstimates.map(renderEstimateRow)}
+                  {filteredEstimates.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                        No {filterType === "tax" ? "tax" : "standard"} estimates
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {standardEstimates.map(renderEstimateRow)}
-                    {standardEstimates.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
-                          No standard estimates
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            {/* Tax Estimates Section */}
-            <Card>
-              <div className="p-3 border-b bg-primary/10">
-                <h3 className="font-semibold text-sm text-primary">Tax Estimates - GST ({taxEstimates.length})</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {taxEstimates.map(renderEstimateRow)}
-                    {taxEstimates.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
-                          No tax estimates
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
 
         {/* Preview Panel - Desktop */}
@@ -1526,9 +1556,11 @@ export default function OakBook() {
   );
   };
 
-  const renderInvoices = () => {
-    const standardInvoices = invoices.filter((i: any) => !i.isTaxDocument);
-    const taxInvoices = invoices.filter((i: any) => i.isTaxDocument === true);
+  const renderInvoices = (filterType: "standard" | "tax" = "standard") => {
+    const filteredInvoices = filterType === "tax" 
+      ? invoices.filter((i: any) => i.isTaxDocument === true)
+      : invoices.filter((i: any) => !i.isTaxDocument);
+    const title = filterType === "tax" ? "Tax Invoices (GST)" : "Standard Invoices";
     
     const renderInvoiceRow = (invoice: any) => {
       const customer = customers.find((c) => c.id === invoice.customerId);
@@ -1590,7 +1622,7 @@ export default function OakBook() {
     return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-serif font-bold text-primary">Invoices</h1>
+        <h1 className={cn("text-2xl font-serif font-bold", filterType === "tax" ? "text-primary" : "text-foreground")}>{title}</h1>
         <Button onClick={() => { setEditingInvoice(null); setInvoiceModalOpen(true); }} data-testid="btn-add-invoice">
           <Plus className="h-4 w-4 mr-2" />
           New Invoice
@@ -1603,69 +1635,35 @@ export default function OakBook() {
           "flex-shrink-0 overflow-auto",
           selectedDocType === "invoice" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
         )}>
-          <div className="space-y-6">
-            {/* Standard Invoices Section */}
-            <Card>
-              <div className="p-3 border-b bg-muted/30">
-                <h3 className="font-semibold text-sm">Standard Invoices ({standardInvoices.length})</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+          <Card>
+            <div className={cn("p-3 border-b", filterType === "tax" ? "bg-primary/10" : "bg-muted/30")}>
+              <h3 className={cn("font-semibold text-sm", filterType === "tax" && "text-primary")}>{title} ({filteredInvoices.length})</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-card z-10">
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInvoices.map(renderInvoiceRow)}
+                  {filteredInvoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                        No {filterType === "tax" ? "tax" : "standard"} invoices
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {standardInvoices.map(renderInvoiceRow)}
-                    {standardInvoices.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
-                          No standard invoices
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            {/* Tax Invoices Section */}
-            <Card>
-              <div className="p-3 border-b bg-primary/10">
-                <h3 className="font-semibold text-sm text-primary">Tax Invoices - GST ({taxInvoices.length})</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="sticky top-0 bg-card z-10">
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {taxInvoices.map(renderInvoiceRow)}
-                    {taxInvoices.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
-                          No tax invoices
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
 
         {/* Preview Panel - Desktop */}
@@ -2125,9 +2123,15 @@ export default function OakBook() {
       case "items":
         return renderItems();
       case "estimates":
-        return renderEstimates();
+      case "standard-estimates":
+        return renderEstimates("standard");
+      case "tax-estimates":
+        return renderEstimates("tax");
       case "invoices":
-        return renderInvoices();
+      case "standard-invoices":
+        return renderInvoices("standard");
+      case "tax-invoices":
+        return renderInvoices("tax");
       case "payments-received":
         return renderPaymentsReceived();
       case "expenses":
