@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { format } from "date-fns";
 import logo from "@assets/OAK_1_1766646679471.jpg";
+import yepmanLogo from "@assets/Yep_Man_Logo_1767318376266.png";
 
-// Oakstreet brand colors
+// Brand colors
 const BRAND_COLOR = '#6b9937';  // Oakstreet brand color
+const YEPMAN_BRAND_COLOR = '#9d2966';  // Yepman brand color (maroon/magenta)
 
 interface LineItem {
   slNo?: number;
@@ -310,10 +312,12 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
       <div className="header">
         {!hideHeader && (
           <div className="company-info">
-            <div className="company-logo">
-              <img src={logo} alt="Logo" />
+            <div className="company-logo" style={isTaxDocument ? { background: '#1a1a1a', padding: '8px' } : {}}>
+              <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
-            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
+              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events')}
+            </div>
             <div className="company-address">
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
@@ -327,7 +331,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#6b9937' }}>{isTaxDocument ? 'TAX ESTIMATE' : 'Quote'}</div>
+          <div className="doc-type" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>{isTaxDocument ? 'TAX ESTIMATE' : 'Quote'}</div>
         </div>
       </div>
 
@@ -557,10 +561,12 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
       <div className="header">
         {!hideHeader && (
           <div className="company-info">
-            <div className="company-logo">
-              <img src={logo} alt="Logo" />
+            <div className="company-logo" style={isTaxDocument ? { background: '#1a1a1a', padding: '8px' } : {}}>
+              <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
-            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
+              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events')}
+            </div>
             <div className="company-address">
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
@@ -574,7 +580,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#6b9937' }}>{isTaxDocument ? 'TAX INVOICE' : 'Invoice'}</div>
+          <div className="doc-type" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>{isTaxDocument ? 'TAX INVOICE' : 'Invoice'}</div>
         </div>
       </div>
 
