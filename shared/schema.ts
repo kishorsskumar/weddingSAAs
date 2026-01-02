@@ -1602,3 +1602,72 @@ export const checklistTemplateItems = pgTable("checklist_template_items", {
 export const insertChecklistTemplateItemSchema = createInsertSchema(checklistTemplateItems).omit({ id: true, createdAt: true });
 export type InsertChecklistTemplateItem = z.infer<typeof insertChecklistTemplateItemSchema>;
 export type ChecklistTemplateItem = typeof checklistTemplateItems.$inferSelect;
+
+// Oak Creative - Presentations
+export const presentations = pgTable("presentations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  clientName: text("client_name"),
+  eventId: varchar("event_id").references(() => events.id),
+  theme: text("theme"), // e.g., "Kerala Traditional", "Royal Wedding"
+  eventType: text("event_type"), // wedding, corporate, birthday
+  status: text("status").default('draft'), // draft, completed, shared
+  createdBy: varchar("created_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPresentationSchema = createInsertSchema(presentations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPresentation = z.infer<typeof insertPresentationSchema>;
+export type Presentation = typeof presentations.$inferSelect;
+
+// Oak Creative - Presentation Slides
+export const presentationSlides = pgTable("presentation_slides", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  presentationId: varchar("presentation_id").notNull().references(() => presentations.id, { onDelete: 'cascade' }),
+  slideType: text("slide_type").notNull(), // cover, category, contact
+  title: text("title"),
+  subtitle: text("subtitle"),
+  category: text("category"), // Welcome Board, Entrance Arch, Mandap, etc.
+  layout: text("layout").default('options-grid'), // options-grid, single-image, text-only
+  sortOrder: integer("sort_order").default(0),
+  content: jsonb("content"), // Flexible JSON for additional slide data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPresentationSlideSchema = createInsertSchema(presentationSlides).omit({ id: true, createdAt: true });
+export type InsertPresentationSlide = z.infer<typeof insertPresentationSlideSchema>;
+export type PresentationSlide = typeof presentationSlides.$inferSelect;
+
+// Oak Creative - Slide Images/Options
+export const slideImages = pgTable("slide_images", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slideId: varchar("slide_id").notNull().references(() => presentationSlides.id, { onDelete: 'cascade' }),
+  imageUrl: text("image_url").notNull(),
+  optionLabel: text("option_label"), // "Option 1", "Option 2", etc.
+  caption: text("caption"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSlideImageSchema = createInsertSchema(slideImages).omit({ id: true, createdAt: true });
+export type InsertSlideImage = z.infer<typeof insertSlideImageSchema>;
+export type SlideImage = typeof slideImages.$inferSelect;
+
+// Oak Creative - Asset Library (reusable images for presentations)
+export const presentationAssets = pgTable("presentation_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // Welcome Board, Mandap, Entrance Arch, etc.
+  subcategory: text("subcategory"), // Kerala Traditional, Royal, Modern, etc.
+  imageUrl: text("image_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  eventType: text("event_type"), // wedding, corporate, birthday
+  tags: text("tags").array(),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPresentationAssetSchema = createInsertSchema(presentationAssets).omit({ id: true, createdAt: true });
+export type InsertPresentationAsset = z.infer<typeof insertPresentationAssetSchema>;
+export type PresentationAsset = typeof presentationAssets.$inferSelect;
