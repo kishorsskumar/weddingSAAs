@@ -6926,6 +6926,103 @@ export async function registerRoutes(
     }
   });
 
+  // Oak Creative AI Presentation Generation
+  app.post('/api/oaksy/generate-presentation', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { prompt, presentationId } = req.body;
+      if (!prompt || !presentationId) {
+        return res.status(400).json({ error: 'Prompt and presentationId are required' });
+      }
+
+      const presentation = await storage.getPresentation(presentationId);
+      if (!presentation) {
+        return res.status(404).json({ error: 'Presentation not found' });
+      }
+
+      const OpenAI = (await import('openai')).default;
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      const systemPrompt = `You are an expert wedding and event presentation designer for Oakstreet Events. 
+Generate a structured JSON array of slides for a wedding/event presentation based on the user's request.
+
+Each slide should have:
+- slideType: "cover" | "category" | "content" | "contact"
+- title: Main slide title
+- subtitle: Optional subtitle
+- category: Category name for category slides (e.g., "Welcome Board", "Entrance Arch", "Mandap", "Haldi Decor", "Mehendi Decor", "Stage Setup", "Ceiling Decor", "Table Setup", "Lighting", "Floral Arrangements")
+- layout: "single" | "options-grid" | "full-image" | "text-only"
+- content: Optional text content for the slide
+
+Common wedding presentation categories:
+- Welcome Board
+- Entrance Arch
+- Mandap/Stage
+- Haldi Decor
+- Mehendi Decor
+- Sangeet Setup
+- Reception Stage
+- Ceiling Decor
+- Table Setup
+- Floral Arrangements
+- Lighting Design
+- Photo Booth
+- Seating Arrangement
+
+Respond with a JSON array only, no markdown formatting.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Create a presentation for: ${prompt}\n\nClient: ${presentation.clientName || 'Client'}\nEvent Type: ${presentation.eventType || 'wedding'}\nTheme: ${presentation.theme || 'traditional'}` }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
+
+      const responseText = completion.choices[0]?.message?.content || '[]';
+      
+      // Parse the JSON response
+      let slides: any[] = [];
+      try {
+        const cleanedResponse = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        slides = JSON.parse(cleanedResponse);
+      } catch (parseError) {
+        console.error('[Oak Creative] Failed to parse AI response:', parseError);
+        return res.status(500).json({ error: 'Failed to parse AI response' });
+      }
+
+      // Create slides in database
+      const createdSlides = [];
+      for (let i = 0; i < slides.length; i++) {
+        const slideData = slides[i];
+        const slide = await storage.createPresentationSlide({
+          presentationId,
+          slideType: slideData.slideType || 'category',
+          title: slideData.title || `Slide ${i + 1}`,
+          subtitle: slideData.subtitle || null,
+          category: slideData.category || null,
+          layout: slideData.layout || 'options-grid',
+          sortOrder: i,
+          content: slideData.content ? JSON.stringify({ text: slideData.content }) : null,
+        });
+        createdSlides.push(slide);
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Generated ${createdSlides.length} slides`,
+        slides: createdSlides 
+      });
+    } catch (error: any) {
+      console.error('[Oak Creative] AI generation error:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate presentation' });
+    }
+  });
+
   // WhatsApp Messaging Routes
   app.get('/api/whatsapp/status', async (req, res) => {
     if (!req.session.userId) {
