@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +32,9 @@ import {
   Download,
   Eye,
   Save,
-  ArrowLeft
+  ArrowLeft,
+  Upload,
+  Loader2
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Presentation as PresentationType, PresentationSlide, SlideImage, PresentationAsset } from "@shared/schema";
@@ -91,6 +93,11 @@ export default function OakCreative() {
     category: "",
     layout: "options-grid"
   });
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState(SLIDE_CATEGORIES[0]);
+  const [uploadName, setUploadName] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Queries
   const { data: presentations = [] } = useQuery<PresentationType[]>({
@@ -283,6 +290,51 @@ export default function OakCreative() {
     } catch (error) {
       console.error("PDF export error:", error);
       toast({ title: "Export failed", variant: "destructive" });
+    }
+  };
+
+  const handleUploadAsset = async (file: File) => {
+    if (!file) return;
+    
+    setIsUploading(true);
+    try {
+      // 1. Get signed upload URL
+      const uploadRes = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = await uploadRes.json();
+      
+      // 2. Upload file to signed URL
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type,
+        },
+      });
+      
+      // 3. Finalize upload to get permanent URL
+      const finalizeRes = await apiRequest("PUT", "/api/objects/finalize", { uploadURL });
+      const { objectPath } = await finalizeRes.json();
+      
+      // 4. Create asset record in database
+      await apiRequest("POST", "/api/presentation-assets", {
+        name: uploadName || file.name.replace(/\.[^/.]+$/, ""),
+        category: uploadCategory,
+        imageUrl: objectPath,
+        thumbnailUrl: objectPath,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/presentation-assets"] });
+      toast({ title: "Asset uploaded successfully!" });
+      setShowUploadDialog(false);
+      setUploadName("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -652,9 +704,20 @@ export default function OakCreative() {
             
             <TabsContent value="assets" className="flex-1 overflow-auto p-3">
               <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Click an asset to add it to the selected slide
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    Click an asset to add it to the selected slide
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowUploadDialog(true)}
+                    data-testid="button-upload-asset"
+                  >
+                    <Upload className="h-4 w-4 mr-1" />
+                    Upload
+                  </Button>
+                </div>
                 
                 {SLIDE_CATEGORIES.map((category) => {
                   const categoryAssets = assets.filter(a => a.category === category);
@@ -848,6 +911,80 @@ export default function OakCreative() {
               data-testid="button-generate-ai"
             >
               {isGenerating ? "Generating..." : "Generate Slides"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Asset Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-amber-500" />
+              Upload Asset
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select
+                value={uploadCategory}
+                onValueChange={setUploadCategory}
+              >
+                <SelectTrigger data-testid="select-upload-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SLIDE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Name (optional)</Label>
+              <Input
+                value={uploadName}
+                onChange={(e) => setUploadName(e.target.value)}
+                placeholder="Asset name"
+                data-testid="input-upload-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Image File</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                data-testid="input-upload-file"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const file = fileInputRef.current?.files?.[0];
+                if (file) {
+                  handleUploadAsset(file);
+                }
+              }}
+              disabled={isUploading}
+              className="bg-gradient-to-r from-amber-500 to-orange-600"
+              data-testid="button-confirm-upload"
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Upload"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
