@@ -341,21 +341,21 @@ export default function OakCreative() {
   // Main presentation list view
   if (!selectedPresentation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-[#f5f7f2] via-[#eef2e8] to-[#f0f4eb] p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center">
+              <h1 className="text-3xl font-bold text-[#2d4a22] flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#6b9937] to-[#4a7a25] rounded-xl flex items-center justify-center shadow-lg">
                   <Palette className="h-6 w-6 text-white" />
                 </div>
                 Oak Creative
               </h1>
-              <p className="text-gray-600 mt-1">Create stunning wedding proposals and presentations</p>
+              <p className="text-[#5a7a4a] mt-1">Create stunning wedding proposals and presentations</p>
             </div>
             <Button
               onClick={() => setShowNewPresentationDialog(true)}
-              className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] hover:from-[#5a8830] hover:to-[#3d6920] text-white shadow-md"
               data-testid="button-new-presentation"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -364,18 +364,18 @@ export default function OakCreative() {
           </div>
 
           {presentations.length === 0 ? (
-            <Card className="border-dashed border-2 border-gray-300 bg-white/50">
+            <Card className="border-dashed border-2 border-[#6b9937]/30 bg-white/70 backdrop-blur-sm">
               <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="w-20 h-20 bg-amber-100 rounded-2xl flex items-center justify-center mb-4">
-                  <Presentation className="h-10 w-10 text-amber-600" />
+                <div className="w-20 h-20 bg-gradient-to-br from-[#6b9937]/20 to-[#c9a961]/20 rounded-2xl flex items-center justify-center mb-4">
+                  <Presentation className="h-10 w-10 text-[#6b9937]" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No presentations yet</h3>
-                <p className="text-gray-500 text-center max-w-md mb-6">
+                <h3 className="text-xl font-semibold text-[#2d4a22] mb-2">No presentations yet</h3>
+                <p className="text-[#5a7a4a] text-center max-w-md mb-6">
                   Create your first presentation to start building beautiful wedding proposals
                 </p>
                 <Button
                   onClick={() => setShowNewPresentationDialog(true)}
-                  className="bg-gradient-to-r from-amber-500 to-orange-600"
+                  className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] text-white shadow-md"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Presentation
@@ -387,29 +387,30 @@ export default function OakCreative() {
               {presentations.map((presentation) => (
                 <Card 
                   key={presentation.id}
-                  className="group hover:shadow-lg transition-all cursor-pointer bg-white overflow-hidden"
+                  className="group hover:shadow-xl transition-all cursor-pointer bg-white overflow-hidden border border-[#6b9937]/20"
                   onClick={() => setSelectedPresentation(presentation.id)}
                   data-testid={`card-presentation-${presentation.id}`}
                 >
-                  <div className="h-40 bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                    <Presentation className="h-16 w-16 text-white/80" />
+                  <div className="h-40 bg-gradient-to-br from-[#6b9937] via-[#5a8830] to-[#4a7a25] flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNTQuNjI3IDM2LjE4TDM2LjE4IDU0LjYyNyIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utb3BhY2l0eT0iLjEiIGZpbGw9Im5vbmUiLz48L3N2Zz4=')] opacity-30" />
+                    <Presentation className="h-16 w-16 text-white/90 drop-shadow-lg" />
+                    <div className="absolute bottom-2 right-2 bg-[#c9a961] text-white text-xs px-2 py-1 rounded-full font-medium">
+                      {presentation.eventType || "Wedding"}
+                    </div>
                   </div>
                   <CardContent className="p-4">
-                    <h3 className="font-semibold text-lg text-gray-900 truncate">{presentation.title}</h3>
+                    <h3 className="font-semibold text-lg text-[#2d4a22] truncate">{presentation.title}</h3>
                     {presentation.clientName && (
-                      <p className="text-sm text-gray-500">For: {presentation.clientName}</p>
+                      <p className="text-sm text-[#5a7a4a]">For: {presentation.clientName}</p>
                     )}
-                    <div className="flex items-center gap-2 mt-3">
-                      <Badge variant="secondary" className="text-xs">
-                        {presentation.eventType || "Wedding"}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
+                    <div className="flex items-center justify-between mt-3">
+                      <Badge className="text-xs bg-[#6b9937]/10 text-[#6b9937] border-[#6b9937]/30">
                         {presentation.status || "Draft"}
                       </Badge>
+                      <p className="text-xs text-[#8a9a7a]">
+                        {presentation.createdAt ? new Date(presentation.createdAt).toLocaleDateString() : ""}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-2">
-                      {presentation.createdAt ? new Date(presentation.createdAt).toLocaleDateString() : ""}
-                    </p>
                   </CardContent>
                 </Card>
               ))}
@@ -485,7 +486,7 @@ export default function OakCreative() {
               <Button
                 onClick={() => createPresentationMutation.mutate(newPresentation)}
                 disabled={!newPresentation.title || createPresentationMutation.isPending}
-                className="bg-gradient-to-r from-amber-500 to-orange-600"
+                className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] text-white"
                 data-testid="button-create-presentation"
               >
                 Create
@@ -499,9 +500,9 @@ export default function OakCreative() {
 
   // Editor view
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#f5f7f2] to-[#eef2e8]">
       {/* Top toolbar */}
-      <div className="h-14 bg-white border-b flex items-center justify-between px-4 shadow-sm">
+      <div className="h-14 bg-white border-b border-[#6b9937]/20 flex items-center justify-between px-4 shadow-sm">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -557,12 +558,12 @@ export default function OakCreative() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left panel - Slide thumbnails */}
-        <div className="w-64 bg-white border-r flex flex-col">
-          <div className="p-3 border-b flex items-center justify-between">
-            <span className="font-medium text-sm text-gray-700">Slides</span>
+        <div className="w-64 bg-white border-r border-[#6b9937]/20 flex flex-col">
+          <div className="p-3 border-b border-[#6b9937]/20 flex items-center justify-between bg-[#f5f7f2]">
+            <span className="font-medium text-sm text-[#2d4a22]">Slides</span>
             <Button
-              variant="ghost"
               size="sm"
+              className="bg-[#6b9937] hover:bg-[#5a8830] text-white h-7 w-7 p-0"
               onClick={() => setShowNewSlideDialog(true)}
               data-testid="button-add-slide"
             >
@@ -576,20 +577,32 @@ export default function OakCreative() {
                   key={slide.id}
                   className={`relative group rounded-lg overflow-hidden cursor-pointer transition-all ${
                     selectedSlide === slide.id
-                      ? "ring-2 ring-amber-500"
-                      : "hover:ring-2 hover:ring-gray-300"
+                      ? "ring-2 ring-[#6b9937] shadow-md"
+                      : "hover:ring-2 hover:ring-[#6b9937]/50"
                   }`}
                   onClick={() => setSelectedSlide(slide.id)}
                   data-testid={`slide-thumbnail-${slide.id}`}
                 >
-                  <div className="aspect-[16/9] bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
-                    <div className="text-center">
-                      <span className="text-xs font-medium text-amber-800 block">
-                        {index + 1}
-                      </span>
-                      <span className="text-xs text-gray-600 truncate block max-w-20">
-                        {slide.category || slide.title || slide.slideType}
-                      </span>
+                  <div className="aspect-[16/9] bg-gradient-to-br from-[#6b9937]/10 to-[#c9a961]/10 flex items-center justify-center relative">
+                    {slide.images && slide.images.length > 0 ? (
+                      <img 
+                        src={slide.images[0].imageUrl} 
+                        alt={slide.title || ""} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                      <div className="text-center bg-white/90 px-2 py-1 rounded">
+                        <span className="text-xs font-bold text-[#6b9937] block">
+                          {index + 1}
+                        </span>
+                        <span className="text-xs text-[#2d4a22] truncate block max-w-16">
+                          {slide.category || slide.title || slide.slideType}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <Button
@@ -615,28 +628,33 @@ export default function OakCreative() {
         </div>
 
         {/* Center - Canvas */}
-        <div className="flex-1 p-6 overflow-auto">
+        <div className="flex-1 p-6 overflow-auto bg-[#e8ece3]">
           {currentSlide ? (
             <div className="max-w-4xl mx-auto">
-              <Card className="aspect-[16/9] overflow-hidden shadow-xl">
+              <Card className="aspect-[16/9] overflow-hidden shadow-2xl border-2 border-[#6b9937]/20">
                 {/* Slide preview */}
                 <div className="h-full flex flex-col">
                   {/* Slide header */}
-                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 p-6">
-                    <h3 className="text-2xl font-bold text-white">
+                  <div className="bg-gradient-to-r from-[#6b9937] via-[#5a8830] to-[#4a7a25] p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#c9a961]/20 rounded-full -translate-y-1/2 translate-x-1/2" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
+                    <h3 className="text-2xl font-bold text-white relative z-10">
                       {currentSlide.title || currentSlide.category || "Untitled Slide"}
                     </h3>
                     {currentSlide.subtitle && (
-                      <p className="text-white/80">{currentSlide.subtitle}</p>
+                      <p className="text-white/80 relative z-10">{currentSlide.subtitle}</p>
                     )}
+                    <div className="absolute bottom-2 right-4 text-white/50 text-xs font-medium">
+                      Oakstreet Events
+                    </div>
                   </div>
                   
                   {/* Slide content */}
-                  <div className="flex-1 bg-white p-6 overflow-auto">
+                  <div className="flex-1 bg-gradient-to-br from-white to-[#f5f7f2] p-6 overflow-auto">
                     {/* Text content from AI generation */}
                     {currentSlide.content && typeof currentSlide.content === 'object' && (currentSlide.content as any).text && (
-                      <div className="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
-                        <p className="text-gray-700 leading-relaxed">
+                      <div className="mb-4 p-4 bg-[#6b9937]/5 rounded-lg border border-[#6b9937]/20">
+                        <p className="text-[#2d4a22] leading-relaxed">
                           {(currentSlide.content as any).text}
                         </p>
                       </div>
@@ -648,18 +666,18 @@ export default function OakCreative() {
                         {currentSlide.images.map((img, index) => (
                           <div
                             key={img.id}
-                            className="relative group aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center"
+                            className="relative group aspect-square rounded-xl overflow-hidden bg-[#6b9937]/10 flex items-center justify-center shadow-md border border-[#6b9937]/20"
                           >
                             <img
                               src={img.imageUrl}
                               alt={img.optionLabel || `Option ${index + 1}`}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f3f4f6' width='200' height='200'/%3E%3Ctext fill='%239ca3af' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='14'%3EImage%3C/text%3E%3C/svg%3E";
+                                (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f0f4eb' width='200' height='200'/%3E%3Ctext fill='%236b9937' x='50%25' y='50%25' text-anchor='middle' dy='.3em' font-size='14'%3EImage%3C/text%3E%3C/svg%3E";
                               }}
                             />
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-2">
-                              <p className="text-white text-sm text-center">
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#2d4a22]/80 to-transparent p-3">
+                              <p className="text-white text-sm text-center font-medium">
                                 {img.optionLabel || `Option ${index + 1}`}
                               </p>
                             </div>
@@ -675,9 +693,12 @@ export default function OakCreative() {
                         ))}
                       </div>
                     ) : !currentSlide.content ? (
-                      <div className="h-full flex flex-col items-center justify-center text-gray-400">
-                        <ImageIcon className="h-16 w-16 mb-4" />
-                        <p>Add images from the asset library</p>
+                      <div className="h-full flex flex-col items-center justify-center text-[#6b9937]/50">
+                        <div className="w-24 h-24 bg-[#6b9937]/10 rounded-full flex items-center justify-center mb-4">
+                          <ImageIcon className="h-12 w-12 text-[#6b9937]/40" />
+                        </div>
+                        <p className="text-[#5a7a4a]">Add images from the asset library</p>
+                        <p className="text-xs text-[#8a9a7a] mt-1">or use AI Generate to create content</p>
                       </div>
                     ) : null}
                   </div>
@@ -685,32 +706,35 @@ export default function OakCreative() {
               </Card>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
+            <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <LayoutGrid className="h-16 w-16 mx-auto mb-4" />
-                <p className="text-lg">Select a slide or create a new one</p>
+                <div className="w-24 h-24 bg-[#6b9937]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <LayoutGrid className="h-12 w-12 text-[#6b9937]/40" />
+                </div>
+                <p className="text-lg text-[#5a7a4a]">Select a slide or create a new one</p>
+                <p className="text-sm text-[#8a9a7a] mt-1">Use AI Generate to auto-create slides</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Right panel - Properties & Assets */}
-        <div className="w-72 bg-white border-l flex flex-col">
+        <div className="w-72 bg-white border-l border-[#6b9937]/20 flex flex-col">
           <Tabs defaultValue="assets" className="flex-1 flex flex-col">
-            <TabsList className="m-2">
-              <TabsTrigger value="assets" className="flex-1">Assets</TabsTrigger>
-              <TabsTrigger value="properties" className="flex-1">Properties</TabsTrigger>
+            <TabsList className="m-2 bg-[#6b9937]/10">
+              <TabsTrigger value="assets" className="flex-1 data-[state=active]:bg-[#6b9937] data-[state=active]:text-white">Assets</TabsTrigger>
+              <TabsTrigger value="properties" className="flex-1 data-[state=active]:bg-[#6b9937] data-[state=active]:text-white">Properties</TabsTrigger>
             </TabsList>
             
             <TabsContent value="assets" className="flex-1 overflow-auto p-3">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm text-gray-600">
-                    Click an asset to add it to the selected slide
+                  <p className="text-sm text-[#5a7a4a]">
+                    Click an asset to add it
                   </p>
                   <Button
                     size="sm"
-                    variant="outline"
+                    className="bg-[#6b9937] hover:bg-[#5a8830] text-white"
                     onClick={() => setShowUploadDialog(true)}
                     data-testid="button-upload-asset"
                   >
@@ -725,12 +749,12 @@ export default function OakCreative() {
                   
                   return (
                     <div key={category}>
-                      <h4 className="font-medium text-sm text-gray-700 mb-2">{category}</h4>
+                      <h4 className="font-medium text-sm text-[#2d4a22] mb-2">{category}</h4>
                       <div className="grid grid-cols-2 gap-2">
                         {categoryAssets.map((asset) => (
                           <div
                             key={asset.id}
-                            className="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:ring-2 hover:ring-amber-500 transition-all"
+                            className="aspect-square rounded-lg overflow-hidden bg-[#6b9937]/10 cursor-pointer hover:ring-2 hover:ring-[#6b9937] transition-all border border-[#6b9937]/20"
                             onClick={() => {
                               if (selectedSlide) {
                                 addImageToSlideMutation.mutate({
@@ -756,8 +780,8 @@ export default function OakCreative() {
                 })}
                 
                 {assets.length === 0 && (
-                  <div className="text-center py-8 text-gray-400">
-                    <ImageIcon className="h-10 w-10 mx-auto mb-2" />
+                  <div className="text-center py-8 text-[#8a9a7a]">
+                    <ImageIcon className="h-10 w-10 mx-auto mb-2 text-[#6b9937]/40" />
                     <p className="text-sm">No assets uploaded yet</p>
                     <p className="text-xs mt-1">Upload images to the asset library</p>
                   </div>
@@ -769,32 +793,32 @@ export default function OakCreative() {
               {currentSlide ? (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm">Slide Type</Label>
-                    <Input value={currentSlide.slideType} disabled className="bg-gray-50" />
+                    <Label className="text-sm text-[#2d4a22]">Slide Type</Label>
+                    <Input value={currentSlide.slideType} disabled className="bg-[#f5f7f2] border-[#6b9937]/20" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Category</Label>
-                    <Input value={currentSlide.category || ""} disabled className="bg-gray-50" />
+                    <Label className="text-sm text-[#2d4a22]">Category</Label>
+                    <Input value={currentSlide.category || ""} disabled className="bg-[#f5f7f2] border-[#6b9937]/20" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Title</Label>
-                    <Input value={currentSlide.title || ""} disabled className="bg-gray-50" />
+                    <Label className="text-sm text-[#2d4a22]">Title</Label>
+                    <Input value={currentSlide.title || ""} disabled className="bg-[#f5f7f2] border-[#6b9937]/20" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm">Layout</Label>
-                    <Input value={currentSlide.layout || "options-grid"} disabled className="bg-gray-50" />
+                    <Label className="text-sm text-[#2d4a22]">Layout</Label>
+                    <Input value={currentSlide.layout || "options-grid"} disabled className="bg-[#f5f7f2] border-[#6b9937]/20" />
                   </div>
-                  <Separator />
+                  <Separator className="bg-[#6b9937]/20" />
                   <div>
-                    <Label className="text-sm">Images ({currentSlide.images?.length || 0})</Label>
-                    <p className="text-xs text-gray-500 mt-1">
+                    <Label className="text-sm text-[#2d4a22]">Images ({currentSlide.images?.length || 0})</Label>
+                    <p className="text-xs text-[#5a7a4a] mt-1">
                       Add images from the Assets tab
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-400">
-                  <Type className="h-10 w-10 mx-auto mb-2" />
+                <div className="text-center py-8 text-[#8a9a7a]">
+                  <Type className="h-10 w-10 mx-auto mb-2 text-[#6b9937]/40" />
                   <p className="text-sm">Select a slide to view properties</p>
                 </div>
               )}
@@ -859,7 +883,7 @@ export default function OakCreative() {
             <Button
               onClick={() => createSlideMutation.mutate(newSlide)}
               disabled={createSlideMutation.isPending}
-              className="bg-gradient-to-r from-amber-500 to-orange-600"
+              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] text-white"
               data-testid="button-create-slide"
             >
               Add Slide
@@ -873,13 +897,13 @@ export default function OakCreative() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-500" />
+              <Sparkles className="h-5 w-5 text-[#c9a961]" />
               Generate with Oaksy AI
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-gray-600">
-              Describe the presentation you want to create and Oaksy will generate slides for you.
+            <p className="text-sm text-[#5a7a4a]">
+              Describe the presentation you want to create and Oaksy will generate slides with AI images for you.
             </p>
             <div className="space-y-2">
               <Label>Your prompt</Label>
@@ -891,12 +915,17 @@ export default function OakCreative() {
                 data-testid="input-ai-prompt"
               />
             </div>
-            <div className="bg-amber-50 rounded-lg p-3">
-              <p className="text-xs text-amber-800">
+            <div className="bg-[#6b9937]/10 rounded-lg p-3 border border-[#6b9937]/20">
+              <p className="text-xs text-[#2d4a22]">
                 <strong>Examples:</strong>
                 <br />• "Create a Hindu wedding proposal with mandap, entrance, and reception"
                 <br />• "Generate a modern minimalist wedding presentation"
                 <br />• "Build slides for a beach wedding in Kerala"
+              </p>
+            </div>
+            <div className="bg-[#c9a961]/10 rounded-lg p-3 border border-[#c9a961]/30">
+              <p className="text-xs text-[#8a6a31]">
+                <strong>Note:</strong> AI will generate up to 5 images using DALL-E. This may take 30-60 seconds.
               </p>
             </div>
           </div>
@@ -907,10 +936,17 @@ export default function OakCreative() {
             <Button
               onClick={handleAiGenerate}
               disabled={!aiPrompt.trim() || isGenerating}
-              className="bg-gradient-to-r from-amber-500 to-orange-600"
+              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] text-white"
               data-testid="button-generate-ai"
             >
-              {isGenerating ? "Generating..." : "Generate Slides"}
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate Slides & Images"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -921,7 +957,7 @@ export default function OakCreative() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-amber-500" />
+              <Upload className="h-5 w-5 text-[#6b9937]" />
               Upload Asset
             </DialogTitle>
           </DialogHeader>
@@ -957,7 +993,7 @@ export default function OakCreative() {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#6b9937]/10 file:text-[#6b9937] hover:file:bg-[#6b9937]/20"
                 data-testid="input-upload-file"
               />
             </div>
@@ -974,7 +1010,7 @@ export default function OakCreative() {
                 }
               }}
               disabled={isUploading}
-              className="bg-gradient-to-r from-amber-500 to-orange-600"
+              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] text-white"
               data-testid="button-confirm-upload"
             >
               {isUploading ? (
