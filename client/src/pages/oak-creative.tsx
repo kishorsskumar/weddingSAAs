@@ -387,7 +387,7 @@ export default function OakCreative() {
               {presentations.map((presentation) => (
                 <Card 
                   key={presentation.id}
-                  className="group hover:shadow-xl transition-all cursor-pointer bg-white overflow-hidden border border-[#6b9937]/20"
+                  className="group hover:shadow-xl transition-all cursor-pointer bg-white overflow-hidden border border-[#6b9937]/20 relative"
                   onClick={() => setSelectedPresentation(presentation.id)}
                   data-testid={`card-presentation-${presentation.id}`}
                 >
@@ -397,6 +397,20 @@ export default function OakCreative() {
                     <div className="absolute bottom-2 right-2 bg-[#c9a961] text-white text-xs px-2 py-1 rounded-full font-medium">
                       {presentation.eventType || "Wedding"}
                     </div>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete "${presentation.title}"? This will remove all slides and images.`)) {
+                          deletePresentationMutation.mutate(presentation.id);
+                        }
+                      }}
+                      data-testid={`button-delete-presentation-${presentation.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-lg text-[#2d4a22] truncate">{presentation.title}</h3>
