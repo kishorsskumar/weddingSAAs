@@ -203,8 +203,7 @@ export default function OakBook() {
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
-  const [docTypeFilter, setDocTypeFilter] = useState<"all" | "standard" | "tax">("all");
-  
+    
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
@@ -1309,12 +1308,65 @@ export default function OakBook() {
   };
 
   const renderEstimates = () => {
-    const filteredEstimates = estimates.filter((e: any) => {
-      if (docTypeFilter === "all") return true;
-      if (docTypeFilter === "tax") return e.isTaxDocument === true;
-      if (docTypeFilter === "standard") return !e.isTaxDocument;
-      return true;
-    });
+    const standardEstimates = estimates.filter((e: any) => !e.isTaxDocument);
+    const taxEstimates = estimates.filter((e: any) => e.isTaxDocument === true);
+    
+    const renderEstimateRow = (estimate: any) => {
+      const customer = customers.find((c) => c.id === estimate.customerId);
+      const isSelected = selectedDocType === "quote" && selectedDocId === estimate.id;
+      return (
+        <tr 
+          key={estimate.id} 
+          className={cn(
+            "border-b cursor-pointer transition-colors",
+            isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+          )}
+          onClick={() => handleSelectDocument("quote", estimate.id)}
+        >
+          <td className="p-3 font-medium text-sm">{estimate.number}</td>
+          <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
+            {format(new Date(estimate.date), "dd MMM")}
+          </td>
+          <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
+          <td className="p-3 text-right font-medium text-sm">
+            ₹{parseFloat(estimate.total).toLocaleString("en-IN")}
+          </td>
+          <td className="p-3">
+            <Badge variant={estimate.status === "accepted" ? "default" : "secondary"} className="text-xs">
+              {estimate.status}
+            </Badge>
+          </td>
+          <td className="p-3 text-right">
+            <div className="flex justify-end gap-0.5">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingEstimate(estimate); setEstimateModalOpen(true); }} title="Edit">
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneEstimate(estimate); }} title="Clone">
+                <FileText className="h-3.5 w-3.5" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, false)}>
+                    With Header
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, true)}>
+                    Without Header
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(estimate.id); }} title="Delete">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+      );
+    };
     
     return (
     <div className="h-full flex flex-col">
@@ -1326,121 +1378,75 @@ export default function OakBook() {
         </Button>
       </div>
 
-      {/* Document Type Filter Tabs */}
-      <div className="flex gap-2 mb-4">
-        <Button 
-          variant={docTypeFilter === "all" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("all")}
-          data-testid="filter-all-estimates"
-        >
-          All ({estimates.length})
-        </Button>
-        <Button 
-          variant={docTypeFilter === "standard" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("standard")}
-          data-testid="filter-standard-estimates"
-        >
-          Standard ({estimates.filter((e: any) => !e.isTaxDocument).length})
-        </Button>
-        <Button 
-          variant={docTypeFilter === "tax" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("tax")}
-          data-testid="filter-tax-estimates"
-        >
-          Tax/GST ({estimates.filter((e: any) => e.isTaxDocument === true).length})
-        </Button>
-      </div>
-
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
         {/* List Panel */}
         <div className={cn(
           "flex-shrink-0 overflow-auto",
           selectedDocType === "quote" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
         )}>
-          <Card className="h-full">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-card z-10">
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEstimates.map((estimate) => {
-                    const customer = customers.find((c) => c.id === estimate.customerId);
-                    const isSelected = selectedDocType === "quote" && selectedDocId === estimate.id;
-                    return (
-                      <tr 
-                        key={estimate.id} 
-                        className={cn(
-                          "border-b cursor-pointer transition-colors",
-                          isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
-                        )}
-                        onClick={() => handleSelectDocument("quote", estimate.id)}
-                      >
-                        <td className="p-3 font-medium text-sm">{estimate.number}</td>
-                        <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
-                          {format(new Date(estimate.date), "dd MMM")}
-                        </td>
-                        <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
-                        <td className="p-3 text-right font-medium text-sm">
-                          ₹{parseFloat(estimate.total).toLocaleString("en-IN")}
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={estimate.status === "accepted" ? "default" : "secondary"} className="text-xs">
-                            {estimate.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-right">
-                          <div className="flex justify-end gap-0.5">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingEstimate(estimate); setEstimateModalOpen(true); }} title="Edit">
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneEstimate(estimate); }} title="Clone">
-                              <FileText className="h-3.5 w-3.5" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, false)}>
-                                  With Header
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDownloadPdf("quote", estimate.id, true)}>
-                                  Without Header
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(estimate.id); }} title="Delete">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+          <div className="space-y-6">
+            {/* Standard Estimates Section */}
+            <Card>
+              <div className="p-3 border-b bg-muted/30">
+                <h3 className="font-semibold text-sm">Standard Estimates ({standardEstimates.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standardEstimates.map(renderEstimateRow)}
+                    {standardEstimates.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                          No standard estimates
                         </td>
                       </tr>
-                    );
-                  })}
-                  {filteredEstimates.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                        No estimates found
-                      </td>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Tax Estimates Section */}
+            <Card>
+              <div className="p-3 border-b bg-primary/10">
+                <h3 className="font-semibold text-sm text-primary">Tax Estimates - GST ({taxEstimates.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                  </thead>
+                  <tbody>
+                    {taxEstimates.map(renderEstimateRow)}
+                    {taxEstimates.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                          No tax estimates
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Preview Panel - Desktop */}
@@ -1521,12 +1527,65 @@ export default function OakBook() {
   };
 
   const renderInvoices = () => {
-    const filteredInvoices = invoices.filter((i: any) => {
-      if (docTypeFilter === "all") return true;
-      if (docTypeFilter === "tax") return i.isTaxDocument === true;
-      if (docTypeFilter === "standard") return !i.isTaxDocument;
-      return true;
-    });
+    const standardInvoices = invoices.filter((i: any) => !i.isTaxDocument);
+    const taxInvoices = invoices.filter((i: any) => i.isTaxDocument === true);
+    
+    const renderInvoiceRow = (invoice: any) => {
+      const customer = customers.find((c) => c.id === invoice.customerId);
+      const isSelected = selectedDocType === "invoice" && selectedDocId === invoice.id;
+      return (
+        <tr 
+          key={invoice.id} 
+          className={cn(
+            "border-b cursor-pointer transition-colors",
+            isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+          )}
+          onClick={() => handleSelectDocument("invoice", invoice.id)}
+        >
+          <td className="p-3 font-medium text-sm">{invoice.number}</td>
+          <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
+            {format(new Date(invoice.date), "dd MMM")}
+          </td>
+          <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
+          <td className="p-3 text-right font-medium text-sm">
+            ₹{parseFloat(invoice.total).toLocaleString("en-IN")}
+          </td>
+          <td className="p-3">
+            <Badge variant={invoice.status === "paid" ? "default" : "secondary"} className="text-xs">
+              {invoice.status}
+            </Badge>
+          </td>
+          <td className="p-3 text-right">
+            <div className="flex justify-end gap-0.5">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingInvoice(invoice); setInvoiceModalOpen(true); }} title="Edit">
+                <Edit className="h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneInvoice(invoice); }} title="Clone">
+                <FileText className="h-3.5 w-3.5" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, false)}>
+                    With Header
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, true)}>
+                    Without Header
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteInvoice.mutate(invoice.id); }} title="Delete">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </td>
+        </tr>
+      );
+    };
     
     return (
     <div className="h-full flex flex-col">
@@ -1538,121 +1597,75 @@ export default function OakBook() {
         </Button>
       </div>
 
-      {/* Document Type Filter Tabs */}
-      <div className="flex gap-2 mb-4">
-        <Button 
-          variant={docTypeFilter === "all" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("all")}
-          data-testid="filter-all-invoices"
-        >
-          All ({invoices.length})
-        </Button>
-        <Button 
-          variant={docTypeFilter === "standard" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("standard")}
-          data-testid="filter-standard-invoices"
-        >
-          Standard ({invoices.filter((i: any) => !i.isTaxDocument).length})
-        </Button>
-        <Button 
-          variant={docTypeFilter === "tax" ? "default" : "outline"} 
-          size="sm" 
-          onClick={() => setDocTypeFilter("tax")}
-          data-testid="filter-tax-invoices"
-        >
-          Tax/GST ({invoices.filter((i: any) => i.isTaxDocument === true).length})
-        </Button>
-      </div>
-
       <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
         {/* List Panel */}
         <div className={cn(
           "flex-shrink-0 overflow-auto",
           selectedDocType === "invoice" && selectedDocId && !isMobile ? "lg:w-[40%] xl:w-[35%]" : "w-full"
         )}>
-          <Card className="h-full">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-card z-10">
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
-                    <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
-                    <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((invoice) => {
-                    const customer = customers.find((c) => c.id === invoice.customerId);
-                    const isSelected = selectedDocType === "invoice" && selectedDocId === invoice.id;
-                    return (
-                      <tr 
-                        key={invoice.id} 
-                        className={cn(
-                          "border-b cursor-pointer transition-colors",
-                          isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
-                        )}
-                        onClick={() => handleSelectDocument("invoice", invoice.id)}
-                      >
-                        <td className="p-3 font-medium text-sm">{invoice.number}</td>
-                        <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
-                          {format(new Date(invoice.date), "dd MMM")}
-                        </td>
-                        <td className="p-3 text-sm hidden md:table-cell truncate max-w-[120px]">{customer?.name || "-"}</td>
-                        <td className="p-3 text-right font-medium text-sm">
-                          ₹{parseFloat(invoice.total).toLocaleString("en-IN")}
-                        </td>
-                        <td className="p-3">
-                          <Badge variant={invoice.status === "paid" ? "default" : "secondary"} className="text-xs">
-                            {invoice.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-right">
-                          <div className="flex justify-end gap-0.5">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingInvoice(invoice); setInvoiceModalOpen(true); }} title="Edit">
-                              <Edit className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleCloneInvoice(invoice); }} title="Clone">
-                              <FileText className="h-3.5 w-3.5" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, false)}>
-                                  With Header
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDownloadPdf("invoice", invoice.id, true)}>
-                                  Without Header
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteInvoice.mutate(invoice.id); }} title="Delete">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
+          <div className="space-y-6">
+            {/* Standard Invoices Section */}
+            <Card>
+              <div className="p-3 border-b bg-muted/30">
+                <h3 className="font-semibold text-sm">Standard Invoices ({standardInvoices.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standardInvoices.map(renderInvoiceRow)}
+                    {standardInvoices.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                          No standard invoices
                         </td>
                       </tr>
-                    );
-                  })}
-                  {filteredInvoices.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="p-8 text-center text-muted-foreground">
-                        No invoices found
-                      </td>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Tax Invoices Section */}
+            <Card>
+              <div className="p-3 border-b bg-primary/10">
+                <h3 className="font-semibold text-sm text-primary">Tax Invoices - GST ({taxInvoices.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Number</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden sm:table-cell">Date</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm hidden md:table-cell">Customer</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Amount</th>
+                      <th className="text-left p-3 font-medium text-muted-foreground text-sm">Status</th>
+                      <th className="text-right p-3 font-medium text-muted-foreground text-sm">Actions</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+                  </thead>
+                  <tbody>
+                    {taxInvoices.map(renderInvoiceRow)}
+                    {taxInvoices.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-center text-muted-foreground text-sm">
+                          No tax invoices
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Preview Panel - Desktop */}
@@ -2781,6 +2794,15 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
       setValidationError("Wedding Planner Name is required");
       return;
     }
+    
+    // HSN code validation for tax documents
+    if (formData.isTaxDocument) {
+      const itemsWithoutHsn = lineItems.filter(item => !item.isHeading && !((item as any).hsnSac || '').trim());
+      if (itemsWithoutHsn.length > 0) {
+        setValidationError("HSN/SAC code is required for all items in Tax Invoice");
+        return;
+      }
+    }
     setValidationError(null);
 
     let slNo = 0;
@@ -3210,6 +3232,15 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
     if (!formData.weddingPlannerName.trim()) {
       setValidationError("Wedding Planner Name is required");
       return;
+    }
+    
+    // HSN code validation for tax documents
+    if (formData.isTaxDocument) {
+      const itemsWithoutHsn = lineItems.filter(item => !item.isHeading && !((item as any).hsnSac || '').trim());
+      if (itemsWithoutHsn.length > 0) {
+        setValidationError("HSN/SAC code is required for all items in Tax Estimate");
+        return;
+      }
     }
     setValidationError(null);
 
