@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/context/auth-context";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import html2canvas from "html2canvas";
@@ -131,6 +132,7 @@ type Customer = {
   phone: string | null;
   gstNumber: string | null;
   billingAddress: string | null;
+  weddingPlannerId: string | null;
 };
 
 type Vendor = {
@@ -212,8 +214,15 @@ type Bank = {
   balance: string;
 };
 
+type User = {
+  id: string;
+  name: string;
+  role: string;
+};
+
 export default function OakBook() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState("dashboard");
@@ -284,6 +293,13 @@ export default function OakBook() {
   const { data: companySettings } = useQuery<any>({
     queryKey: ["/api/company-settings"],
   });
+
+  // Query users for wedding planner selection (admin/superadmin only)
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: user?.role === 'superadmin' || user?.role === 'admin',
+  });
+  const weddingPlanners = allUsers.filter(u => u.role === 'wedding_planner');
 
   const updateCompanySettings = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/company-settings", data),
@@ -2150,9 +2166,17 @@ export default function OakBook() {
   };
 
   const CustomerModal = () => {
-    const [formData, setFormData] = useState<Partial<Customer>>(
-      editingCustomer || { name: "", email: "", phone: "", gstNumber: "", billingAddress: "" }
-    );
+    const isAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+    const isWeddingPlanner = user?.role === 'wedding_planner';
+    
+    const [formData, setFormData] = useState<Partial<Customer>>(() => {
+      if (editingCustomer) return editingCustomer;
+      // Auto-assign wedding planner ID for wedding_planner role
+      return { 
+        name: "", email: "", phone: "", gstNumber: "", billingAddress: "",
+        weddingPlannerId: isWeddingPlanner ? user?.id : null
+      };
+    });
     const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
 
     const validate = () => {
@@ -2172,10 +2196,15 @@ export default function OakBook() {
         toast({ title: "Please fix the errors", variant: "destructive" });
         return;
       }
+      // Auto-assign wedding planner if wedding_planner role and not editing
+      const submitData = { 
+        ...formData,
+        weddingPlannerId: isWeddingPlanner && !editingCustomer ? user?.id : formData.weddingPlannerId
+      };
       if (editingCustomer) {
-        updateCustomer.mutate({ id: editingCustomer.id, data: formData });
+        updateCustomer.mutate({ id: editingCustomer.id, data: submitData });
       } else {
-        createCustomer.mutate(formData);
+        createCustomer.mutate(submitData);
       }
     };
 
@@ -2236,6 +2265,30 @@ export default function OakBook() {
                 data-testid="input-customer-address"
               />
             </div>
+            {isAdmin && weddingPlanners.length > 0 && (
+              <div>
+                <Label>Assigned Wedding Planner</Label>
+                <Select 
+                  value={formData.weddingPlannerId || "none"} 
+                  onValueChange={(v) => setFormData({ ...formData, weddingPlannerId: v === "none" ? null : v })}
+                >
+                  <SelectTrigger data-testid="select-wedding-planner">
+                    <SelectValue placeholder="Select wedding planner (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No planner assigned</SelectItem>
+                    {weddingPlanners.map((planner) => (
+                      <SelectItem key={planner.id} value={planner.id}>
+                        {planner.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Assign this customer to a wedding planner for access control
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCustomerModalOpen(false)}>
