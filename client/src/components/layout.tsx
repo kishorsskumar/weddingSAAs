@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
   Users,
@@ -20,11 +21,19 @@ import {
   UserCircle,
   Sparkles,
   ClipboardList,
-  Palette
+  Palette,
+  Bell,
+  Check,
+  Info,
+  AlertTriangle,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatDistanceToNow } from "date-fns";
 import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
@@ -64,6 +73,137 @@ const ICONS: Record<string, any> = {
 };
 
 const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales", "/oak-inventory"];
+
+const NOTIFICATION_ICONS: Record<string, any> = {
+  info: Info,
+  success: Check,
+  warning: AlertTriangle,
+  error: AlertCircle,
+};
+
+function NotificationBell() {
+  const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["/api/notifications/unread-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.count || 0;
+    },
+    refetchInterval: 30000,
+  });
+
+  const { data: notifications = [] } = useQuery({
+    queryKey: ["/api/notifications"],
+    queryFn: async () => {
+      const res = await fetch("/api/notifications", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isOpen,
+  });
+
+  const markAsRead = useMutation({
+    mutationFn: async (id: string) => {
+      await fetch(`/api/notifications/${id}/read`, {
+        method: "POST",
+        credentials: "include",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+  });
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          data-testid="button-notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#6b9937] text-white text-xs flex items-center justify-center">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="p-3 border-b bg-muted/50">
+          <h4 className="font-semibold text-sm">Notifications</h4>
+        </div>
+        <ScrollArea className="h-[300px]">
+          {notifications.length === 0 ? (
+            <div className="p-4 text-center text-muted-foreground text-sm">
+              No notifications yet
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map((notification: any) => {
+                const Icon = NOTIFICATION_ICONS[notification.type] || Info;
+                const isUnread = !notification.readAt;
+                return (
+                  <div
+                    key={notification.id}
+                    className={cn(
+                      "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+                      isUnread && "bg-[#6b9937]/5"
+                    )}
+                    onClick={() => {
+                      if (isUnread) {
+                        markAsRead.mutate(notification.id);
+                      }
+                      if (notification.actionUrl) {
+                        window.location.href = notification.actionUrl;
+                      }
+                    }}
+                    data-testid={`notification-item-${notification.id}`}
+                  >
+                    <div className="flex gap-3">
+                      <div className={cn(
+                        "mt-0.5 p-1.5 rounded-full shrink-0",
+                        notification.type === "success" && "bg-green-100 text-green-600",
+                        notification.type === "warning" && "bg-amber-100 text-amber-600",
+                        notification.type === "error" && "bg-red-100 text-red-600",
+                        notification.type === "info" && "bg-blue-100 text-blue-600"
+                      )}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={cn("text-sm", isUnread && "font-semibold")}>
+                            {notification.title}
+                          </p>
+                          {isUnread && (
+                            <span className="h-2 w-2 rounded-full bg-[#6b9937]" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {notification.message}
+                        </p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">
+                          {notification.createdAt && formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const ROLE_LABELS: Record<string, string> = {
   superadmin: "Super Admin",
@@ -216,23 +356,31 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <NavContent />
       </aside>
 
-      {/* Mobile Sidebar */}
-      <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
-        <SheetTrigger asChild className="md:hidden absolute top-4 left-4 z-50">
-          <Button variant="outline" size="icon">
-            <Menu className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-64 border-r-0">
-          <NavContent />
-        </SheetContent>
-      </Sheet>
+      {/* Mobile Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b h-14 flex items-center justify-between px-4">
+        <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-64 border-r-0">
+            <NavContent />
+          </SheetContent>
+        </Sheet>
+        <NotificationBell />
+      </div>
+
+      {/* Desktop Notification Bell */}
+      <div className="hidden md:flex fixed top-4 right-6 z-40">
+        <NotificationBell />
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto h-screen">
         <motion.div 
           key={location}
-          className="container mx-auto p-6 pt-16 md:pt-6 md:p-10 max-w-7xl"
+          className="container mx-auto p-6 pt-16 md:pt-6 md:p-10 md:pr-16 max-w-7xl"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
