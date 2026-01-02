@@ -83,10 +83,7 @@ type SidebarSection = {
 };
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "customers", label: "Customers", icon: Users },
-  { id: "vendors", label: "Vendors", icon: Building2 },
-  { id: "items", label: "Items", icon: Package },
   { 
     id: "sales", 
     label: "Sales", 
@@ -111,16 +108,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "payments-received", label: "Payments Received" },
     ]
   },
-  { 
-    id: "purchases", 
-    label: "Purchases", 
-    icon: TrendingDown,
-    children: [
-      { id: "expenses", label: "Expenses" },
-      { id: "bills", label: "Bills" },
-    ]
-  },
-  { id: "banking", label: "Banking", icon: Landmark },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -225,8 +212,8 @@ export default function OakBook() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [activeSection, setActiveSection] = useState("dashboard");
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales", "purchases"]);
+  const [activeSection, setActiveSection] = useState("customers");
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
@@ -2130,14 +2117,8 @@ export default function OakBook() {
 
   const renderContent = () => {
     switch (activeSection) {
-      case "dashboard":
-        return renderDashboard();
       case "customers":
         return renderCustomers();
-      case "vendors":
-        return renderVendors();
-      case "items":
-        return renderItems();
       case "estimates":
       case "standard-estimates":
         return renderEstimates("standard");
@@ -2150,18 +2131,12 @@ export default function OakBook() {
         return renderInvoices("tax");
       case "payments-received":
         return renderPaymentsReceived();
-      case "expenses":
-        return renderExpenses();
-      case "bills":
-        return renderBills();
-      case "banking":
-        return renderBanking();
       case "reports":
         return renderReports();
       case "settings":
         return renderSettings();
       default:
-        return renderDashboard();
+        return renderCustomers();
     }
   };
 
