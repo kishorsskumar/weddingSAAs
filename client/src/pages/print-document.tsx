@@ -293,9 +293,14 @@ const baseStyles = `
 
 function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
   const lineItems: LineItem[] = estimate.lineItems || [];
+  const isTaxDocument = estimate.isTaxDocument === true;
   
   // Use olive green for all documents
   const quoteStyles = baseStyles;
+
+  // Calculate CGST and SGST totals for tax documents
+  const cgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.cgstAmount || 0), 0) : 0;
+  const sgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.sgstAmount || 0), 0) : 0;
 
   return (
     <div className="document">
@@ -313,6 +318,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
+              {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
               <div>{companySettings?.phone || '7902373354'}</div>
               <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
               <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
@@ -321,7 +327,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#6b9937' }}>Quote</div>
+          <div className="doc-type" style={{ color: '#6b9937' }}>{isTaxDocument ? 'TAX ESTIMATE' : 'Quote'}</div>
         </div>
       </div>
 
@@ -332,9 +338,15 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
           <span>: {estimate.number}</span>
         </div>
         <div className="doc-info-row">
-          <span className="doc-info-label">Quote Date</span>
+          <span className="doc-info-label">{isTaxDocument ? 'Estimate Date' : 'Quote Date'}</span>
           <span>: {format(new Date(estimate.date), 'dd/MM/yyyy')}</span>
         </div>
+        {isTaxDocument && estimate.placeOfSupply && (
+          <div className="doc-info-row">
+            <span className="doc-info-label">Place of Supply</span>
+            <span>: {estimate.placeOfSupply}</span>
+          </div>
+        )}
       </div>
 
       {/* Bill To */}
@@ -357,40 +369,87 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
       )}
 
       {/* Items Table */}
-      <table className="items-table">
-        <thead>
-          <tr>
-            <th className="sl-no">Sl<br/>No</th>
-            <th>Item & Description</th>
-            <th className="qty-col">Qty</th>
-            <th className="rate-col">Rate</th>
-            <th className="amount-col">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lineItems.map((item, index) => {
-            if (item.isHeading) {
+      {isTaxDocument ? (
+        <table className="items-table" style={{ fontSize: '9px' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '30px' }}>#</th>
+              <th>Item & Description</th>
+              <th style={{ width: '60px' }}>HSN/SAC</th>
+              <th style={{ width: '45px', textAlign: 'right' }}>Qty</th>
+              <th style={{ width: '60px', textAlign: 'right' }}>Rate</th>
+              <th style={{ width: '35px', textAlign: 'center' }}>CGST%</th>
+              <th style={{ width: '55px', textAlign: 'right' }}>CGST</th>
+              <th style={{ width: '35px', textAlign: 'center' }}>SGST%</th>
+              <th style={{ width: '55px', textAlign: 'right' }}>SGST</th>
+              <th style={{ width: '70px', textAlign: 'right' }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => {
+              if (item.isHeading) {
+                return (
+                  <tr key={index} className="heading-row">
+                    <td colSpan={10} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                  </tr>
+                );
+              }
               return (
-                <tr key={index} className="heading-row">
-                  <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                <tr key={index}>
+                  <td style={{ textAlign: 'center' }}>{item.slNo}</td>
+                  <td>
+                    <div className="item-name">{item.name}</div>
+                    {item.description && <div className="item-desc">{item.description}</div>}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).hsnSac || ''}</td>
+                  <td style={{ textAlign: 'right' }}>{item.quantity.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.rate)}</td>
+                  <td style={{ textAlign: 'center' }}>{item.cgstPercent || 0}%</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.cgstAmount || 0)}</td>
+                  <td style={{ textAlign: 'center' }}>{item.sgstPercent || 0}%</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.sgstAmount || 0)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.total)}</td>
                 </tr>
               );
-            }
-            return (
-              <tr key={index}>
-                <td className="sl-no">{item.slNo}</td>
-                <td>
-                  <div className="item-name">{item.name}</div>
-                  {item.description && <div className="item-desc">{item.description}</div>}
-                </td>
-                <td className="qty-col">{item.quantity.toFixed(2)}</td>
-                <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
-                <td className="amount-col">{formatIndianCurrency(item.total)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <table className="items-table">
+          <thead>
+            <tr>
+              <th className="sl-no">Sl<br/>No</th>
+              <th>Item & Description</th>
+              <th className="qty-col">Qty</th>
+              <th className="rate-col">Rate</th>
+              <th className="amount-col">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => {
+              if (item.isHeading) {
+                return (
+                  <tr key={index} className="heading-row">
+                    <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                  </tr>
+                );
+              }
+              return (
+                <tr key={index}>
+                  <td className="sl-no">{item.slNo}</td>
+                  <td>
+                    <div className="item-name">{item.name}</div>
+                    {item.description && <div className="item-desc">{item.description}</div>}
+                  </td>
+                  <td className="qty-col">{item.quantity.toFixed(2)}</td>
+                  <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
+                  <td className="amount-col">{formatIndianCurrency(item.total)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
       {/* Totals */}
       <div className="totals-section">
@@ -399,17 +458,36 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
             <span className="totals-label">Sub Total</span>
             <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.subtotal || estimate.total))}</span>
           </div>
-          {parseFloat(estimate.discountPercent) > 0 && (
-            <div className="totals-row" style={{ color: '#dc2626' }}>
-              <span className="totals-label">Discount ({estimate.discountPercent}%)</span>
-              <span className="totals-value">-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
-            </div>
-          )}
-          {parseFloat(estimate.serviceChargePercent) > 0 && (
-            <div className="totals-row">
-              <span className="totals-label">Service Charge</span>
-              <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
-            </div>
+          {isTaxDocument ? (
+            <>
+              {cgstTotal > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">CGST</span>
+                  <span className="totals-value">{formatIndianCurrency(cgstTotal)}</span>
+                </div>
+              )}
+              {sgstTotal > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">SGST</span>
+                  <span className="totals-value">{formatIndianCurrency(sgstTotal)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {parseFloat(estimate.discountPercent) > 0 && (
+                <div className="totals-row" style={{ color: '#dc2626' }}>
+                  <span className="totals-label">Discount ({estimate.discountPercent}%)</span>
+                  <span className="totals-value">-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
+                </div>
+              )}
+              {parseFloat(estimate.serviceChargePercent) > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">Service Charge</span>
+                  <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
+                </div>
+              )}
+            </>
           )}
           <div className="totals-row total-row">
             <span className="totals-label">Total</span>
@@ -462,9 +540,14 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
 
 function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
   const lineItems: LineItem[] = invoice.lineItems || [];
+  const isTaxDocument = invoice.isTaxDocument === true;
 
   // Use olive green for all documents
   const invoiceStyles = baseStyles;
+
+  // Calculate CGST and SGST totals for tax documents
+  const cgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.cgstAmount || 0), 0) : 0;
+  const sgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.sgstAmount || 0), 0) : 0;
 
   return (
     <div className="document">
@@ -482,6 +565,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
+              {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
               <div>{companySettings?.phone || '7902373354'}</div>
               <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
               <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
@@ -490,7 +574,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#6b9937' }}>Tax Invoice</div>
+          <div className="doc-type" style={{ color: '#6b9937' }}>{isTaxDocument ? 'TAX INVOICE' : 'Invoice'}</div>
         </div>
       </div>
 
@@ -510,10 +594,10 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
             <span>: {format(new Date(invoice.dueDate), 'dd/MM/yyyy')}</span>
           </div>
         )}
-        {companySettings?.gstNumber && (
+        {isTaxDocument && invoice.placeOfSupply && (
           <div className="doc-info-row">
-            <span className="doc-info-label">GSTIN</span>
-            <span>: {companySettings.gstNumber}</span>
+            <span className="doc-info-label">Place of Supply</span>
+            <span>: {invoice.placeOfSupply}</span>
           </div>
         )}
       </div>
@@ -539,40 +623,87 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
       )}
 
       {/* Items Table */}
-      <table className="items-table">
-        <thead>
-          <tr>
-            <th className="sl-no">Sl<br/>No</th>
-            <th>Item & Description</th>
-            <th className="qty-col">Qty</th>
-            <th className="rate-col">Rate</th>
-            <th className="amount-col">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lineItems.map((item, index) => {
-            if (item.isHeading) {
+      {isTaxDocument ? (
+        <table className="items-table" style={{ fontSize: '9px' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '30px' }}>#</th>
+              <th>Item & Description</th>
+              <th style={{ width: '60px' }}>HSN/SAC</th>
+              <th style={{ width: '45px', textAlign: 'right' }}>Qty</th>
+              <th style={{ width: '60px', textAlign: 'right' }}>Rate</th>
+              <th style={{ width: '35px', textAlign: 'center' }}>CGST%</th>
+              <th style={{ width: '55px', textAlign: 'right' }}>CGST</th>
+              <th style={{ width: '35px', textAlign: 'center' }}>SGST%</th>
+              <th style={{ width: '55px', textAlign: 'right' }}>SGST</th>
+              <th style={{ width: '70px', textAlign: 'right' }}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => {
+              if (item.isHeading) {
+                return (
+                  <tr key={index} className="heading-row">
+                    <td colSpan={10} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                  </tr>
+                );
+              }
               return (
-                <tr key={index} className="heading-row">
-                  <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                <tr key={index}>
+                  <td style={{ textAlign: 'center' }}>{item.slNo}</td>
+                  <td>
+                    <div className="item-name">{item.name}</div>
+                    {item.description && <div className="item-desc">{item.description}</div>}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>{(item as any).hsnSac || ''}</td>
+                  <td style={{ textAlign: 'right' }}>{item.quantity.toFixed(2)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.rate)}</td>
+                  <td style={{ textAlign: 'center' }}>{item.cgstPercent || 0}%</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.cgstAmount || 0)}</td>
+                  <td style={{ textAlign: 'center' }}>{item.sgstPercent || 0}%</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.sgstAmount || 0)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatIndianCurrency(item.total)}</td>
                 </tr>
               );
-            }
-            return (
-              <tr key={index}>
-                <td className="sl-no">{item.slNo}</td>
-                <td>
-                  <div className="item-name">{item.name}</div>
-                  {item.description && <div className="item-desc">{item.description}</div>}
-                </td>
-                <td className="qty-col">{item.quantity.toFixed(2)}</td>
-                <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
-                <td className="amount-col">{formatIndianCurrency(item.total)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            })}
+          </tbody>
+        </table>
+      ) : (
+        <table className="items-table">
+          <thead>
+            <tr>
+              <th className="sl-no">Sl<br/>No</th>
+              <th>Item & Description</th>
+              <th className="qty-col">Qty</th>
+              <th className="rate-col">Rate</th>
+              <th className="amount-col">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.map((item, index) => {
+              if (item.isHeading) {
+                return (
+                  <tr key={index} className="heading-row">
+                    <td colSpan={5} style={{ fontWeight: 'bold' }}>{item.name}</td>
+                  </tr>
+                );
+              }
+              return (
+                <tr key={index}>
+                  <td className="sl-no">{item.slNo}</td>
+                  <td>
+                    <div className="item-name">{item.name}</div>
+                    {item.description && <div className="item-desc">{item.description}</div>}
+                  </td>
+                  <td className="qty-col">{item.quantity.toFixed(2)}</td>
+                  <td className="rate-col">{formatIndianCurrency(item.rate)}</td>
+                  <td className="amount-col">{formatIndianCurrency(item.total)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
       {/* Totals */}
       <div className="totals-section">
@@ -581,17 +712,36 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
             <span className="totals-label">Sub Total</span>
             <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.subtotal || invoice.total))}</span>
           </div>
-          {parseFloat(invoice.discountPercent) > 0 && (
-            <div className="totals-row" style={{ color: '#dc2626' }}>
-              <span className="totals-label">Discount ({invoice.discountPercent}%)</span>
-              <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
-            </div>
-          )}
-          {parseFloat(invoice.serviceChargePercent) > 0 && (
-            <div className="totals-row">
-              <span className="totals-label">Service Charge</span>
-              <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
-            </div>
+          {isTaxDocument ? (
+            <>
+              {cgstTotal > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">CGST</span>
+                  <span className="totals-value">{formatIndianCurrency(cgstTotal)}</span>
+                </div>
+              )}
+              {sgstTotal > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">SGST</span>
+                  <span className="totals-value">{formatIndianCurrency(sgstTotal)}</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {parseFloat(invoice.discountPercent) > 0 && (
+                <div className="totals-row" style={{ color: '#dc2626' }}>
+                  <span className="totals-label">Discount ({invoice.discountPercent}%)</span>
+                  <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
+                </div>
+              )}
+              {parseFloat(invoice.serviceChargePercent) > 0 && (
+                <div className="totals-row">
+                  <span className="totals-label">Service Charge</span>
+                  <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
+                </div>
+              )}
+            </>
           )}
           <div className="totals-row total-row" style={{ borderTopColor: '#6b9937' }}>
             <span className="totals-label">Total</span>

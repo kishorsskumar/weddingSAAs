@@ -203,6 +203,7 @@ export default function OakBook() {
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [docTypeFilter, setDocTypeFilter] = useState<"all" | "standard" | "tax">("all");
   
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -1307,13 +1308,49 @@ export default function OakBook() {
     );
   };
 
-  const renderEstimates = () => (
+  const renderEstimates = () => {
+    const filteredEstimates = estimates.filter((e: any) => {
+      if (docTypeFilter === "all") return true;
+      if (docTypeFilter === "tax") return e.isTaxDocument === true;
+      if (docTypeFilter === "standard") return !e.isTaxDocument;
+      return true;
+    });
+    
+    return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Estimates</h1>
         <Button onClick={() => { setEditingEstimate(null); setEstimateModalOpen(true); }} data-testid="btn-add-estimate">
           <Plus className="h-4 w-4 mr-2" />
           New Estimate
+        </Button>
+      </div>
+
+      {/* Document Type Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        <Button 
+          variant={docTypeFilter === "all" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("all")}
+          data-testid="filter-all-estimates"
+        >
+          All ({estimates.length})
+        </Button>
+        <Button 
+          variant={docTypeFilter === "standard" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("standard")}
+          data-testid="filter-standard-estimates"
+        >
+          Standard ({estimates.filter((e: any) => !e.isTaxDocument).length})
+        </Button>
+        <Button 
+          variant={docTypeFilter === "tax" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("tax")}
+          data-testid="filter-tax-estimates"
+        >
+          Tax/GST ({estimates.filter((e: any) => e.isTaxDocument === true).length})
         </Button>
       </div>
 
@@ -1337,7 +1374,7 @@ export default function OakBook() {
                   </tr>
                 </thead>
                 <tbody>
-                  {estimates.map((estimate) => {
+                  {filteredEstimates.map((estimate) => {
                     const customer = customers.find((c) => c.id === estimate.customerId);
                     const isSelected = selectedDocType === "quote" && selectedDocId === estimate.id;
                     return (
@@ -1393,7 +1430,7 @@ export default function OakBook() {
                       </tr>
                     );
                   })}
-                  {estimates.length === 0 && (
+                  {filteredEstimates.length === 0 && (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-muted-foreground">
                         No estimates found
@@ -1481,14 +1518,51 @@ export default function OakBook() {
       </Sheet>
     </div>
   );
+  };
 
-  const renderInvoices = () => (
+  const renderInvoices = () => {
+    const filteredInvoices = invoices.filter((i: any) => {
+      if (docTypeFilter === "all") return true;
+      if (docTypeFilter === "tax") return i.isTaxDocument === true;
+      if (docTypeFilter === "standard") return !i.isTaxDocument;
+      return true;
+    });
+    
+    return (
     <div className="h-full flex flex-col">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <h1 className="text-2xl font-serif font-bold text-primary">Invoices</h1>
         <Button onClick={() => { setEditingInvoice(null); setInvoiceModalOpen(true); }} data-testid="btn-add-invoice">
           <Plus className="h-4 w-4 mr-2" />
           New Invoice
+        </Button>
+      </div>
+
+      {/* Document Type Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        <Button 
+          variant={docTypeFilter === "all" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("all")}
+          data-testid="filter-all-invoices"
+        >
+          All ({invoices.length})
+        </Button>
+        <Button 
+          variant={docTypeFilter === "standard" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("standard")}
+          data-testid="filter-standard-invoices"
+        >
+          Standard ({invoices.filter((i: any) => !i.isTaxDocument).length})
+        </Button>
+        <Button 
+          variant={docTypeFilter === "tax" ? "default" : "outline"} 
+          size="sm" 
+          onClick={() => setDocTypeFilter("tax")}
+          data-testid="filter-tax-invoices"
+        >
+          Tax/GST ({invoices.filter((i: any) => i.isTaxDocument === true).length})
         </Button>
       </div>
 
@@ -1512,7 +1586,7 @@ export default function OakBook() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => {
+                  {filteredInvoices.map((invoice) => {
                     const customer = customers.find((c) => c.id === invoice.customerId);
                     const isSelected = selectedDocType === "invoice" && selectedDocId === invoice.id;
                     return (
@@ -1568,7 +1642,7 @@ export default function OakBook() {
                       </tr>
                     );
                   })}
-                  {invoices.length === 0 && (
+                  {filteredInvoices.length === 0 && (
                     <tr>
                       <td colSpan={6} className="p-8 text-center text-muted-foreground">
                         No invoices found
@@ -1656,6 +1730,7 @@ export default function OakBook() {
       </Sheet>
     </div>
   );
+  };
 
   const renderPaymentsReceived = () => (
     <div className="space-y-4">
@@ -2592,10 +2667,15 @@ export default function OakBook() {
 interface LineItem {
   name: string;
   description?: string;
+  hsnSac?: string;
   quantity: number;
   rate: number;
   total: number;
   taxRate?: number;
+  cgstPercent?: number;
+  cgstAmount?: number;
+  sgstPercent?: number;
+  sgstAmount?: number;
   isHeading?: boolean;
   slNo?: number;
 }
@@ -2620,15 +2700,38 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
     notes: (invoice as any)?.notes || "Looking forward for your business.",
     terms: (invoice as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
     thankYouMessage: (invoice as any)?.thankYouMessage || "Looking forward for your business.",
+    isTaxDocument: (invoice as any)?.isTaxDocument || false,
+    placeOfSupply: (invoice as any)?.placeOfSupply || "Kerala (32)",
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const [lineItems, setLineItems] = useState<LineItem[]>(
-    (invoice as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
+    (invoice as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]
   );
 
+  // Recalculate tax amounts when document type changes or on load
+  useEffect(() => {
+    if (formData.isTaxDocument) {
+      setLineItems(prev => prev.map(item => {
+        if (item.isHeading) return item;
+        const baseAmount = item.quantity * item.rate;
+        return {
+          ...item,
+          cgstPercent: item.cgstPercent ?? 9,
+          sgstPercent: item.sgstPercent ?? 9,
+          cgstAmount: baseAmount * ((item.cgstPercent ?? 9) / 100),
+          sgstAmount: baseAmount * ((item.sgstPercent ?? 9) / 100),
+        };
+      }));
+    }
+  }, [formData.isTaxDocument]);
+
   const addItem = () => {
-    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+    if (formData.isTaxDocument) {
+      setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]);
+    } else {
+      setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+    }
   };
 
   const addHeader = () => {
@@ -2642,19 +2745,33 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
   const updateItem = (index: number, field: keyof LineItem, value: any) => {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
-    if (field === 'quantity' || field === 'rate') {
-      updated[index].total = updated[index].quantity * updated[index].rate;
+    if (field === 'quantity' || field === 'rate' || field === 'cgstPercent' || field === 'sgstPercent') {
+      const baseAmount = updated[index].quantity * updated[index].rate;
+      updated[index].total = baseAmount;
+      if (formData.isTaxDocument) {
+        updated[index].cgstAmount = baseAmount * ((updated[index].cgstPercent || 0) / 100);
+        updated[index].sgstAmount = baseAmount * ((updated[index].sgstPercent || 0) / 100);
+      }
     }
     setLineItems(updated);
   };
 
   const calculateTotals = () => {
-    const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
-    const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
-    const afterDiscount = subtotal - discountAmount;
-    const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
-    const total = afterDiscount + serviceChargeAmount;
-    return { subtotal, discountAmount, serviceChargeAmount, total };
+    const items = lineItems.filter(i => !i.isHeading);
+    const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+    
+    if (formData.isTaxDocument) {
+      const cgstTotal = items.reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+      const sgstTotal = items.reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
+      const total = subtotal + cgstTotal + sgstTotal;
+      return { subtotal, discountAmount: 0, serviceChargeAmount: 0, cgstTotal, sgstTotal, total };
+    } else {
+      const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
+      const afterDiscount = subtotal - discountAmount;
+      const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
+      const total = afterDiscount + serviceChargeAmount;
+      return { subtotal, discountAmount, serviceChargeAmount, cgstTotal: 0, sgstTotal: 0, total };
+    }
   };
 
   const totals = calculateTotals();
@@ -2681,9 +2798,11 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
       subtotal: totals.subtotal.toFixed(2),
       discountAmount: totals.discountAmount.toFixed(2),
       serviceChargeAmount: totals.serviceChargeAmount.toFixed(2),
+      cgstTotal: (totals.cgstTotal || 0).toFixed(2),
+      sgstTotal: (totals.sgstTotal || 0).toFixed(2),
       total: totals.total.toFixed(2),
       balanceDue: totals.total.toFixed(2),
-      taxTotal: "0.00",
+      taxTotal: formData.isTaxDocument ? ((totals.cgstTotal || 0) + (totals.sgstTotal || 0)).toFixed(2) : "0.00",
     });
   };
 
@@ -2692,7 +2811,21 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
       {validationError && (
         <div className="bg-destructive/10 text-destructive text-sm p-2 rounded-md">{validationError}</div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* Document Type Selection */}
+      <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border">
+        <Label className="text-xs font-semibold">Document Type:</Label>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="invDocType" checked={!formData.isTaxDocument} onChange={() => setFormData({ ...formData, isTaxDocument: false })} className="w-4 h-4" />
+            <span className="text-sm">Standard Invoice</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="invDocType" checked={formData.isTaxDocument} onChange={() => setFormData({ ...formData, isTaxDocument: true })} className="w-4 h-4" />
+            <span className="text-sm font-medium text-primary">Tax Invoice (GST)</span>
+          </label>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
           <Label className="text-xs">Invoice Number</Label>
           <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="h-8 text-sm" />
@@ -2713,6 +2846,17 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
             </SelectContent>
           </Select>
         </div>
+        {formData.isTaxDocument && (
+          <div>
+            <Label className="text-xs">Place of Supply</Label>
+            <Select value={formData.placeOfSupply} onValueChange={(v) => setFormData({ ...formData, placeOfSupply: v })}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-60">
+                {INDIAN_STATES.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -2759,81 +2903,127 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
           </div>
         </div>
 
-        <div className="border rounded-md overflow-hidden">
-          <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
-            <div className="col-span-5">Item & Description</div>
-            <div className="col-span-2 text-right">Qty</div>
-            <div className="col-span-2 text-right">Rate</div>
-            <div className="col-span-2 text-right">Amount</div>
-            <div className="col-span-1"></div>
-          </div>
+        <div className="border rounded-md overflow-hidden overflow-x-auto">
+          {formData.isTaxDocument ? (
+            <div className="bg-muted px-2 py-1 grid gap-1 text-xs font-medium" style={{ gridTemplateColumns: '3fr 1fr 1fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 40px', minWidth: '900px' }}>
+              <div>Item & Description</div>
+              <div>HSN/SAC</div>
+              <div className="text-right">Qty</div>
+              <div className="text-right">Rate</div>
+              <div className="text-center">CGST%</div>
+              <div className="text-right">CGST</div>
+              <div className="text-center">SGST%</div>
+              <div className="text-right">SGST</div>
+              <div className="text-right">Amount</div>
+              <div></div>
+            </div>
+          ) : (
+            <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
+              <div className="col-span-5">Item & Description</div>
+              <div className="col-span-2 text-right">Qty</div>
+              <div className="col-span-2 text-right">Rate</div>
+              <div className="col-span-2 text-right">Amount</div>
+              <div className="col-span-1"></div>
+            </div>
+          )}
 
           {lineItems.map((item, index) => (
-            <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
-              {item.isHeading ? (
-                <>
-                  <div className="col-span-11">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      placeholder="Section heading (e.g., MEHANDI ARTIST)"
-                      className="h-7 text-xs font-bold uppercase"
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="col-span-5">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      placeholder="Item name"
-                      className="h-7 text-xs mb-1"
-                    />
-                    <Textarea
-                      value={item.description || ""}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="Description (optional)"
-                      rows={1}
-                      className="text-xs min-h-[28px]"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      className="h-7 text-xs text-right"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      value={item.rate}
-                      onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                      className="h-7 text-xs text-right"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2 text-right text-xs pt-2 font-medium">
-                    ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
+            formData.isTaxDocument ? (
+              <div key={index} className={cn("px-2 py-1 border-t grid gap-1 items-start", item.isHeading && "bg-amber-50")} style={{ gridTemplateColumns: '3fr 1fr 1fr 1fr 0.7fr 0.7fr 0.7fr 0.7fr 1fr 40px', minWidth: '900px' }}>
+                {item.isHeading ? (
+                  <>
+                    <div style={{ gridColumn: 'span 9' }}>
+                      <Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Section heading" className="h-7 text-xs font-bold uppercase" />
+                    </div>
+                    <div className="flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Item name" className="h-7 text-xs mb-1" />
+                      <Textarea value={item.description || ""} onChange={(e) => updateItem(index, 'description', e.target.value)} placeholder="Description" rows={1} className="text-xs min-h-[28px]" />
+                    </div>
+                    <div><Input value={item.hsnSac || ""} onChange={(e) => updateItem(index, 'hsnSac', e.target.value)} placeholder="HSN" className="h-7 text-xs" /></div>
+                    <div><Input type="number" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" step="0.01" /></div>
+                    <div><Input type="number" value={item.rate} onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" step="0.01" /></div>
+                    <div><Input type="number" value={item.cgstPercent || 0} onChange={(e) => updateItem(index, 'cgstPercent', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-center" min="0" max="50" step="0.5" /></div>
+                    <div className="text-right text-xs pt-2">₹{(item.cgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div><Input type="number" value={item.sgstPercent || 0} onChange={(e) => updateItem(index, 'sgstPercent', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-center" min="0" max="50" step="0.5" /></div>
+                    <div className="text-right text-xs pt-2">₹{(item.sgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="text-right text-xs pt-2 font-medium">₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="flex justify-center"><Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button></div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
+                {item.isHeading ? (
+                  <>
+                    <div className="col-span-11">
+                      <Input
+                        value={item.name}
+                        onChange={(e) => updateItem(index, 'name', e.target.value)}
+                        placeholder="Section heading (e.g., MEHANDI ARTIST)"
+                        className="h-7 text-xs font-bold uppercase"
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="col-span-5">
+                      <Input
+                        value={item.name}
+                        onChange={(e) => updateItem(index, 'name', e.target.value)}
+                        placeholder="Item name"
+                        className="h-7 text-xs mb-1"
+                      />
+                      <Textarea
+                        value={item.description || ""}
+                        onChange={(e) => updateItem(index, 'description', e.target.value)}
+                        placeholder="Description (optional)"
+                        rows={1}
+                        className="text-xs min-h-[28px]"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        className="h-7 text-xs text-right"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        value={item.rate}
+                        onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                        className="h-7 text-xs text-right"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="col-span-2 text-right text-xs pt-2 font-medium">
+                      ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
+                        <Trash2 className="w-3 h-3 text-destructive" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )
           ))}
         </div>
       </div>
@@ -2844,29 +3034,44 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
             <span>Sub Total</span>
             <span>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
           </div>
-          <div className="flex justify-between items-center gap-2">
-            <span>Discount (%)</span>
-            <Input
-              type="number"
-              value={formData.discountPercent}
-              onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
-              className="h-6 w-16 text-xs text-right"
-              min="0"
-              max="100"
-            />
-            <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex justify-between items-center gap-2">
-            <span>Service Charge (%)</span>
-            <Input
-              type="number"
-              value={formData.serviceChargePercent}
-              onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })}
-              className="h-6 w-16 text-xs text-right"
-              min="0"
-            />
-            <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
+          {formData.isTaxDocument ? (
+            <>
+              <div className="flex justify-between">
+                <span>CGST</span>
+                <span>₹{(totals.cgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>SGST</span>
+                <span>₹{(totals.sgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-center gap-2">
+                <span>Discount (%)</span>
+                <Input
+                  type="number"
+                  value={formData.discountPercent}
+                  onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
+                  className="h-6 w-16 text-xs text-right"
+                  min="0"
+                  max="100"
+                />
+                <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span>Service Charge (%)</span>
+                <Input
+                  type="number"
+                  value={formData.serviceChargePercent}
+                  onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })}
+                  className="h-6 w-16 text-xs text-right"
+                  min="0"
+                />
+                <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between font-bold text-base border-t pt-1">
             <span>Total</span>
             <span>₹{totals.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -2893,6 +3098,18 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
   );
 }
 
+// Indian states with GST codes for Place of Supply dropdown
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands (35)", "Andhra Pradesh (37)", "Arunachal Pradesh (12)", 
+  "Assam (18)", "Bihar (10)", "Chandigarh (04)", "Chhattisgarh (22)", "Dadra and Nagar Haveli (26)",
+  "Daman and Diu (25)", "Delhi (07)", "Goa (30)", "Gujarat (24)", "Haryana (06)", 
+  "Himachal Pradesh (02)", "Jammu and Kashmir (01)", "Jharkhand (20)", "Karnataka (29)",
+  "Kerala (32)", "Ladakh (38)", "Lakshadweep (31)", "Madhya Pradesh (23)", "Maharashtra (27)",
+  "Manipur (14)", "Meghalaya (17)", "Mizoram (15)", "Nagaland (13)", "Odisha (21)",
+  "Puducherry (34)", "Punjab (03)", "Rajasthan (08)", "Sikkim (11)", "Tamil Nadu (33)",
+  "Telangana (36)", "Tripura (16)", "Uttar Pradesh (09)", "Uttarakhand (05)", "West Bengal (19)"
+];
+
 function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustomer }: { 
   estimate: Estimate | null; 
   customers: Customer[]; 
@@ -2913,15 +3130,38 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
     notes: (estimate as any)?.notes || "Looking forward for your business.",
     terms: (estimate as any)?.terms || "1. Any other additional facilities & Services to support the event will be charged at actual\n2. 15% of the total amount to be paid in advance, 40% of the amount to be paid three months before the event, 40% three weeks before the event, and a balance of 5% on the event day.\n3. The venue is to be made available 1 day prior to the setup.\n4. Loading & unloading charges (Labour Union Charges) if any will be actual and have to be born by the client\n5. Any Damage that occurred to our materials by participants will be charged at the actual.\n6. In the unlikely event of cancellation of the function, the company reserves the right to claim 10% of the total amount as cancellation fees.\n7. All items mentioned above are on a rental basis for this event only\n8. 18% GST will be extra.",
     thankYouMessage: (estimate as any)?.thankYouMessage || "Looking forward for your business.",
+    isTaxDocument: (estimate as any)?.isTaxDocument || false,
+    placeOfSupply: (estimate as any)?.placeOfSupply || "Kerala (32)",
   });
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const [lineItems, setLineItems] = useState<LineItem[]>(
-    (estimate as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]
+    (estimate as any)?.lineItems || [{ name: "", quantity: 1, rate: 0, total: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]
   );
 
+  // Recalculate tax amounts when document type changes or on load
+  useEffect(() => {
+    if (formData.isTaxDocument) {
+      setLineItems(prev => prev.map(item => {
+        if (item.isHeading) return item;
+        const baseAmount = item.quantity * item.rate;
+        return {
+          ...item,
+          cgstPercent: item.cgstPercent ?? 9,
+          sgstPercent: item.sgstPercent ?? 9,
+          cgstAmount: baseAmount * ((item.cgstPercent ?? 9) / 100),
+          sgstAmount: baseAmount * ((item.sgstPercent ?? 9) / 100),
+        };
+      }));
+    }
+  }, [formData.isTaxDocument]);
+
   const addItem = () => {
-    setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+    if (formData.isTaxDocument) {
+      setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]);
+    } else {
+      setLineItems([...lineItems, { name: "", quantity: 1, rate: 0, total: 0, isHeading: false }]);
+    }
   };
 
   const addHeader = () => {
@@ -2935,19 +3175,33 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
   const updateItem = (index: number, field: keyof LineItem, value: any) => {
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
-    if (field === 'quantity' || field === 'rate') {
-      updated[index].total = updated[index].quantity * updated[index].rate;
+    if (field === 'quantity' || field === 'rate' || field === 'cgstPercent' || field === 'sgstPercent') {
+      const baseAmount = updated[index].quantity * updated[index].rate;
+      updated[index].total = baseAmount;
+      if (formData.isTaxDocument) {
+        updated[index].cgstAmount = baseAmount * ((updated[index].cgstPercent || 0) / 100);
+        updated[index].sgstAmount = baseAmount * ((updated[index].sgstPercent || 0) / 100);
+      }
     }
     setLineItems(updated);
   };
 
   const calculateTotals = () => {
-    const subtotal = lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.total || 0), 0);
-    const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
-    const afterDiscount = subtotal - discountAmount;
-    const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
-    const total = afterDiscount + serviceChargeAmount;
-    return { subtotal, discountAmount, serviceChargeAmount, total };
+    const items = lineItems.filter(i => !i.isHeading);
+    const subtotal = items.reduce((sum, item) => sum + (item.total || 0), 0);
+    
+    if (formData.isTaxDocument) {
+      const cgstTotal = items.reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
+      const sgstTotal = items.reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
+      const total = subtotal + cgstTotal + sgstTotal;
+      return { subtotal, discountAmount: 0, serviceChargeAmount: 0, cgstTotal, sgstTotal, total };
+    } else {
+      const discountAmount = subtotal * (parseFloat(formData.discountPercent) || 0) / 100;
+      const afterDiscount = subtotal - discountAmount;
+      const serviceChargeAmount = afterDiscount * (parseFloat(formData.serviceChargePercent) || 0) / 100;
+      const total = afterDiscount + serviceChargeAmount;
+      return { subtotal, discountAmount, serviceChargeAmount, cgstTotal: 0, sgstTotal: 0, total };
+    }
   };
 
   const totals = calculateTotals();
@@ -2974,8 +3228,10 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
       subtotal: totals.subtotal.toFixed(2),
       discountAmount: totals.discountAmount.toFixed(2),
       serviceChargeAmount: totals.serviceChargeAmount.toFixed(2),
+      cgstTotal: (totals.cgstTotal || 0).toFixed(2),
+      sgstTotal: (totals.sgstTotal || 0).toFixed(2),
       total: totals.total.toFixed(2),
-      taxTotal: "0.00",
+      taxTotal: formData.isTaxDocument ? ((totals.cgstTotal || 0) + (totals.sgstTotal || 0)).toFixed(2) : "0.00",
     });
   };
 
@@ -2984,8 +3240,35 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
       {validationError && (
         <div className="bg-destructive/10 text-destructive text-sm p-2 rounded-md">{validationError}</div>
       )}
+      {/* Document Type Selection */}
+      <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border">
+        <Label className="text-xs font-semibold">Document Type:</Label>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="docType" 
+              checked={!formData.isTaxDocument} 
+              onChange={() => setFormData({ ...formData, isTaxDocument: false })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">Standard Estimate</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="radio" 
+              name="docType" 
+              checked={formData.isTaxDocument} 
+              onChange={() => setFormData({ ...formData, isTaxDocument: true })}
+              className="w-4 h-4"
+            />
+            <span className="text-sm font-medium text-primary">Tax Estimate (GST)</span>
+          </label>
+        </div>
+      </div>
+
       {/* Basic Info */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div>
           <Label className="text-xs">Estimate Number</Label>
           <Input value={formData.number} onChange={(e) => setFormData({ ...formData, number: e.target.value })} className="h-8 text-sm" />
@@ -3006,6 +3289,17 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
             </SelectContent>
           </Select>
         </div>
+        {formData.isTaxDocument && (
+          <div>
+            <Label className="text-xs">Place of Supply</Label>
+            <Select value={formData.placeOfSupply} onValueChange={(v) => setFormData({ ...formData, placeOfSupply: v })}>
+              <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent className="max-h-60">
+                {INDIAN_STATES.map((state) => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Customer & Address */}
@@ -3054,115 +3348,133 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
           </div>
         </div>
 
-        <div className="border rounded-md overflow-hidden">
-          <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
-            <div className="col-span-5">Item & Description</div>
-            <div className="col-span-2 text-right">Qty</div>
-            <div className="col-span-2 text-right">Rate</div>
-            <div className="col-span-2 text-right">Amount</div>
-            <div className="col-span-1"></div>
+        {formData.isTaxDocument ? (
+          /* Tax Estimate Line Items Table */
+          <div className="border rounded-md overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="px-2 py-1 text-left w-1/4">Item & Description</th>
+                  <th className="px-2 py-1 text-left w-20">HSN/SAC</th>
+                  <th className="px-2 py-1 text-right w-16">Qty</th>
+                  <th className="px-2 py-1 text-right w-20">Rate</th>
+                  <th className="px-2 py-1 text-center w-16">CGST%</th>
+                  <th className="px-2 py-1 text-right w-20">CGST</th>
+                  <th className="px-2 py-1 text-center w-16">SGST%</th>
+                  <th className="px-2 py-1 text-right w-20">SGST</th>
+                  <th className="px-2 py-1 text-right w-24">Amount</th>
+                  <th className="px-2 py-1 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.map((item, index) => (
+                  <tr key={index} className={cn("border-t", item.isHeading && "bg-amber-50")}>
+                    {item.isHeading ? (
+                      <>
+                        <td colSpan={9} className="px-2 py-1">
+                          <Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Section heading" className="h-7 text-xs font-bold uppercase" />
+                        </td>
+                        <td className="px-1 py-1">
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-2 py-1"><Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Item" className="h-7 text-xs" /></td>
+                        <td className="px-2 py-1"><Input value={(item as any).hsnSac || ""} onChange={(e) => updateItem(index, 'hsnSac' as any, e.target.value)} placeholder="998596" className="h-7 text-xs" /></td>
+                        <td className="px-2 py-1"><Input type="number" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" step="0.01" /></td>
+                        <td className="px-2 py-1"><Input type="number" value={item.rate} onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" /></td>
+                        <td className="px-2 py-1"><Input type="number" value={(item as any).cgstPercent || 9} onChange={(e) => updateItem(index, 'cgstPercent' as any, parseFloat(e.target.value) || 0)} className="h-7 text-xs text-center" min="0" max="28" /></td>
+                        <td className="px-2 py-1 text-right">₹{((item as any).cgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-2 py-1"><Input type="number" value={(item as any).sgstPercent || 9} onChange={(e) => updateItem(index, 'sgstPercent' as any, parseFloat(e.target.value) || 0)} className="h-7 text-xs text-center" min="0" max="28" /></td>
+                        <td className="px-2 py-1 text-right">₹{((item as any).sgstAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-2 py-1 text-right font-medium">₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="px-1 py-1"><Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button></td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {lineItems.map((item, index) => (
-            <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
-              {item.isHeading ? (
-                <>
-                  <div className="col-span-11">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      placeholder="Section heading (e.g., MEHANDI ARTIST)"
-                      className="h-7 text-xs font-bold uppercase"
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="col-span-5">
-                    <Input
-                      value={item.name}
-                      onChange={(e) => updateItem(index, 'name', e.target.value)}
-                      placeholder="Item name"
-                      className="h-7 text-xs mb-1"
-                    />
-                    <Textarea
-                      value={item.description || ""}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="Description (optional)"
-                      rows={1}
-                      className="text-xs min-h-[28px]"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                      className="h-7 text-xs text-right"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <Input
-                      type="number"
-                      value={item.rate}
-                      onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
-                      className="h-7 text-xs text-right"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="col-span-2 text-right text-xs pt-2 font-medium">
-                    ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6">
-                      <Trash2 className="w-3 h-3 text-destructive" />
-                    </Button>
-                  </div>
-                </>
-              )}
+        ) : (
+          /* Standard Estimate Line Items Table */
+          <div className="border rounded-md overflow-hidden">
+            <div className="bg-muted px-2 py-1 grid grid-cols-12 gap-1 text-xs font-medium">
+              <div className="col-span-5">Item & Description</div>
+              <div className="col-span-2 text-right">Qty</div>
+              <div className="col-span-2 text-right">Rate</div>
+              <div className="col-span-2 text-right">Amount</div>
+              <div className="col-span-1"></div>
             </div>
-          ))}
-        </div>
+
+            {lineItems.map((item, index) => (
+              <div key={index} className={cn("px-2 py-1 border-t grid grid-cols-12 gap-1 items-start", item.isHeading && "bg-amber-50")}>
+                {item.isHeading ? (
+                  <>
+                    <div className="col-span-11">
+                      <Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Section heading (e.g., MEHANDI ARTIST)" className="h-7 text-xs font-bold uppercase" />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="col-span-5">
+                      <Input value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} placeholder="Item name" className="h-7 text-xs mb-1" />
+                      <Textarea value={item.description || ""} onChange={(e) => updateItem(index, 'description', e.target.value)} placeholder="Description (optional)" rows={1} className="text-xs min-h-[28px]" />
+                    </div>
+                    <div className="col-span-2">
+                      <Input type="number" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" step="0.01" />
+                    </div>
+                    <div className="col-span-2">
+                      <Input type="number" value={item.rate} onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)} className="h-7 text-xs text-right" min="0" step="0.01" />
+                    </div>
+                    <div className="col-span-2 text-right text-xs pt-2 font-medium">₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                    <div className="col-span-1 flex justify-center">
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeItem(index)} className="h-6 w-6"><Trash2 className="w-3 h-3 text-destructive" /></Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Totals */}
       <div className="flex justify-end">
-        <div className="w-64 space-y-1 text-sm">
+        <div className="w-72 space-y-1 text-sm">
           <div className="flex justify-between">
             <span>Sub Total</span>
             <span>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
           </div>
-          <div className="flex justify-between items-center gap-2">
-            <span>Discount (%)</span>
-            <Input
-              type="number"
-              value={formData.discountPercent}
-              onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })}
-              className="h-6 w-16 text-xs text-right"
-              min="0"
-              max="100"
-            />
-            <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
-          <div className="flex justify-between items-center gap-2">
-            <span>Service Charge (%)</span>
-            <Input
-              type="number"
-              value={formData.serviceChargePercent}
-              onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })}
-              className="h-6 w-16 text-xs text-right"
-              min="0"
-            />
-            <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-          </div>
+          {formData.isTaxDocument ? (
+            <>
+              <div className="flex justify-between">
+                <span>CGST</span>
+                <span>₹{(totals.cgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>SGST</span>
+                <span>₹{(totals.sgstTotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between items-center gap-2">
+                <span>Discount (%)</span>
+                <Input type="number" value={formData.discountPercent} onChange={(e) => setFormData({ ...formData, discountPercent: e.target.value })} className="h-6 w-16 text-xs text-right" min="0" max="100" />
+                <span className="text-destructive">-₹{totals.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span>Service Charge (%)</span>
+                <Input type="number" value={formData.serviceChargePercent} onChange={(e) => setFormData({ ...formData, serviceChargePercent: e.target.value })} className="h-6 w-16 text-xs text-right" min="0" />
+                <span>₹{totals.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </>
+          )}
           <div className="flex justify-between font-bold text-base border-t pt-1">
             <span>Total</span>
             <span>₹{totals.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
