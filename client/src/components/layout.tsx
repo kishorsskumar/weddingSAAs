@@ -229,7 +229,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto h-screen">
         <motion.div 
           key={location}
-          className="container mx-auto p-6 md:p-10 max-w-7xl"
+          className="container mx-auto p-6 pt-16 md:pt-6 md:p-10 max-w-7xl"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}

@@ -216,7 +216,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6 sm:space-y-8 px-2 sm:px-0">
       <motion.div 
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pl-12 md:pl-0"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
