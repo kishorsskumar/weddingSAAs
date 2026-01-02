@@ -6932,7 +6932,7 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
-      const { prompt, presentationId } = req.body;
+      const { prompt, presentationId, generateImages = true } = req.body;
       if (!prompt || !presentationId) {
         return res.status(400).json({ error: 'Prompt and presentationId are required' });
       }
@@ -6955,6 +6955,7 @@ Each slide should have:
 - category: Category name for category slides (e.g., "Welcome Board", "Entrance Arch", "Mandap", "Haldi Decor", "Mehendi Decor", "Stage Setup", "Ceiling Decor", "Table Setup", "Lighting", "Floral Arrangements")
 - layout: "single" | "options-grid" | "full-image" | "text-only"
 - content: Optional text content for the slide
+- imagePrompt: A detailed prompt for generating an image for this slide (only for category/content slides that need visuals)
 
 Common wedding presentation categories:
 - Welcome Board
@@ -6971,6 +6972,9 @@ Common wedding presentation categories:
 - Photo Booth
 - Seating Arrangement
 
+For imagePrompt, write detailed visual descriptions like:
+"Elegant Indian wedding mandap with intricate gold and red fabric drapes, marigold flowers, traditional wooden pillars, soft ambient lighting, luxurious and festive atmosphere"
+
 Respond with a JSON array only, no markdown formatting.`;
 
       const completion = await openai.chat.completions.create({
@@ -6980,7 +6984,7 @@ Respond with a JSON array only, no markdown formatting.`;
           { role: 'user', content: `Create a presentation for: ${prompt}\n\nClient: ${presentation.clientName || 'Client'}\nEvent Type: ${presentation.eventType || 'wedding'}\nTheme: ${presentation.theme || 'traditional'}` }
         ],
         temperature: 0.7,
-        max_tokens: 2000,
+        max_tokens: 3000,
       });
 
       const responseText = completion.choices[0]?.message?.content || '[]';
@@ -7009,12 +7013,44 @@ Respond with a JSON array only, no markdown formatting.`;
           sortOrder: i,
           content: slideData.content ? JSON.stringify({ text: slideData.content }) : null,
         });
-        createdSlides.push(slide);
+        createdSlides.push({ ...slide, imagePrompt: slideData.imagePrompt });
+      }
+
+      // Generate images for slides that have imagePrompt (limit to 5 to save costs/time)
+      if (generateImages) {
+        const slidesWithPrompts = createdSlides.filter(s => s.imagePrompt).slice(0, 5);
+        
+        for (const slide of slidesWithPrompts) {
+          try {
+            console.log(`[Oak Creative] Generating image for slide: ${slide.title}`);
+            const imageResponse = await openai.images.generate({
+              model: 'dall-e-3',
+              prompt: `Professional event decoration photograph: ${slide.imagePrompt}. High quality, realistic, elegant wedding/event decor.`,
+              n: 1,
+              size: '1024x1024',
+              quality: 'standard',
+            });
+
+            const imageUrl = imageResponse.data[0]?.url;
+            if (imageUrl) {
+              await storage.createSlideImage({
+                slideId: slide.id,
+                imageUrl,
+                optionLabel: slide.category || slide.title || 'Option',
+                sortOrder: 0,
+              });
+              console.log(`[Oak Creative] Image created for slide: ${slide.title}`);
+            }
+          } catch (imgError: any) {
+            console.error(`[Oak Creative] Failed to generate image for slide ${slide.title}:`, imgError.message);
+            // Continue with other slides even if one fails
+          }
+        }
       }
 
       res.json({ 
         success: true, 
-        message: `Generated ${createdSlides.length} slides`,
+        message: `Generated ${createdSlides.length} slides${generateImages ? ' with images' : ''}`,
         slides: createdSlides 
       });
     } catch (error: any) {
