@@ -207,25 +207,37 @@ export default function OakCreative() {
     }
   };
 
-  const loadImageAsBase64 = (url: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL("image/jpeg", 0.8));
-        } else {
-          reject(new Error("Failed to get canvas context"));
-        }
-      };
-      img.onerror = () => reject(new Error("Failed to load image"));
-      img.src = url;
-    });
+  const loadImageAsBase64 = async (url: string): Promise<string> => {
+    try {
+      // Use server proxy to fetch images (handles CORS for external URLs like DALL-E)
+      const response = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
+      if (!response.ok) {
+        throw new Error(`Proxy failed: ${response.status}`);
+      }
+      const data = await response.json();
+      return data.data;
+    } catch (proxyError) {
+      console.error("Proxy failed, trying direct load:", proxyError);
+      // Fallback: try direct loading (for local/same-origin images)
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/jpeg", 0.8));
+          } else {
+            reject(new Error("Failed to get canvas context"));
+          }
+        };
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = url;
+      });
+    }
   };
 
   const handleExportPDF = async () => {

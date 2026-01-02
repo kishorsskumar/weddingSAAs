@@ -7782,6 +7782,38 @@ Respond with a JSON array only, no markdown formatting.`;
   });
 
   // ============ Oak Creative - Presentations ============
+  
+  // Image proxy for PDF export (handles CORS for external images like DALL-E)
+  app.get('/api/image-proxy', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    const imageUrl = req.query.url as string;
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'Image URL required' });
+    }
+    
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+      
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/png';
+      
+      res.json({ 
+        data: `data:${contentType};base64,${base64}`,
+        contentType 
+      });
+    } catch (error: any) {
+      console.error('Image proxy error:', error);
+      res.status(500).json({ error: 'Failed to fetch image' });
+    }
+  });
+
   app.get('/api/presentations', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
