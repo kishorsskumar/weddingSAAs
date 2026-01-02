@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { apiRequest } from "@/lib/queryClient";
@@ -288,6 +289,7 @@ export default function OakSales() {
               setSelectedPipelineId={setSelectedPipelineId}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
+              isSuperAdmin={isSuperAdmin}
             />
           )}
           {activeSection === 'contacts' && (
@@ -576,6 +578,7 @@ function PipelineSection({
   setSelectedPipelineId,
   searchQuery,
   setSearchQuery,
+  isSuperAdmin,
 }: {
   pipelines: SalesPipeline[];
   stages: SalesStage[];
@@ -586,13 +589,19 @@ function PipelineSection({
   setSelectedPipelineId: (id: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  isSuperAdmin: boolean;
 }) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [isAddPipelineOpen, setIsAddPipelineOpen] = useState(false);
+  const [isEditPipelineOpen, setIsEditPipelineOpen] = useState(false);
+  const [isDeletePipelineOpen, setIsDeletePipelineOpen] = useState(false);
+  const [editPipelineName, setEditPipelineName] = useState('');
   const [selectedDeal, setSelectedDeal] = useState<SalesDeal | null>(null);
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
   
   const createPipelineMutation = useMutation({
     mutationFn: async (data: { name: string }) => {
@@ -607,12 +616,55 @@ function PipelineSection({
     },
   });
   
+  const updatePipelineMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return apiRequest('PATCH', `/api/sales/pipelines/${id}`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/pipelines'] });
+      setIsEditPipelineOpen(false);
+      toast({ title: 'Pipeline updated successfully' });
+    },
+  });
+  
+  const deletePipelineMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/sales/pipelines/${id}`);
+    },
+    onSuccess: (_data, deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/pipelines'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/stages'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/deals'] });
+      setIsDeletePipelineOpen(false);
+      const remainingPipelines = pipelines.filter(p => p.id !== deletedId);
+      setSelectedPipelineId(remainingPipelines[0]?.id || '');
+      toast({ title: 'Pipeline deleted successfully' });
+    },
+  });
+  
   const handleAddPipeline = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     createPipelineMutation.mutate({
       name: formData.get('name') as string,
     });
+  };
+  
+  const handleEditPipeline = () => {
+    if (selectedPipelineId && editPipelineName.trim()) {
+      updatePipelineMutation.mutate({ id: selectedPipelineId, name: editPipelineName.trim() });
+    }
+  };
+  
+  const handleDeletePipeline = () => {
+    if (selectedPipelineId) {
+      deletePipelineMutation.mutate(selectedPipelineId);
+    }
+  };
+  
+  const openEditDialog = () => {
+    setEditPipelineName(selectedPipeline?.name || '');
+    setIsEditPipelineOpen(true);
   };
 
   const pipelineStages = stages
@@ -701,6 +753,76 @@ function PipelineSection({
               ))}
             </SelectContent>
           </Select>
+          {isSuperAdmin && selectedPipelineId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" data-testid="button-pipeline-menu">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={openEditDialog} data-testid="menu-edit-pipeline">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Pipeline
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setIsDeletePipelineOpen(true)} 
+                  className="text-destructive"
+                  data-testid="menu-delete-pipeline"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Pipeline
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Dialog open={isEditPipelineOpen} onOpenChange={setIsEditPipelineOpen}>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Pipeline</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-pipeline-name">Pipeline Name *</Label>
+                  <Input 
+                    id="edit-pipeline-name" 
+                    value={editPipelineName} 
+                    onChange={(e) => setEditPipelineName(e.target.value)}
+                    placeholder="Enter pipeline name" 
+                    data-testid="input-edit-pipeline-name" 
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsEditPipelineOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleEditPipeline} data-testid="button-save-pipeline">
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isDeletePipelineOpen} onOpenChange={setIsDeletePipelineOpen}>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Delete Pipeline</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-muted-foreground">
+                  Are you sure you want to delete "{selectedPipeline?.name}"? This will also delete all stages and leads in this pipeline. This action cannot be undone.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setIsDeletePipelineOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleDeletePipeline} data-testid="button-confirm-delete-pipeline">
+                    Delete Pipeline
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={isAddPipelineOpen} onOpenChange={setIsAddPipelineOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="button-new-pipeline">
