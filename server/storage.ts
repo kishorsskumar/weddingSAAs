@@ -237,6 +237,9 @@ import {
   presentationSlides,
   slideImages,
   presentationAssets,
+  notifications,
+  notificationRecipients,
+  pushSubscriptions,
   type Presentation,
   type InsertPresentation,
   type PresentationSlide,
@@ -245,6 +248,12 @@ import {
   type InsertSlideImage,
   type PresentationAsset,
   type InsertPresentationAsset,
+  type Notification,
+  type InsertNotification,
+  type NotificationRecipient,
+  type InsertNotificationRecipient,
+  type PushSubscription,
+  type InsertPushSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -777,6 +786,23 @@ export interface IStorage {
   getPresentationAssetsByCategory(category: string): Promise<PresentationAsset[]>;
   createPresentationAsset(asset: InsertPresentationAsset): Promise<PresentationAsset>;
   deletePresentationAsset(id: string): Promise<void>;
+
+  // Notifications
+  getAllNotifications(): Promise<Notification[]>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  deleteNotification(id: string): Promise<void>;
+  getUserNotifications(userId: string): Promise<(Notification & { readAt: Date | null })[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  markNotificationAsRead(notificationId: string, userId: string): Promise<void>;
+  createNotificationRecipients(notificationId: string, userIds: string[]): Promise<void>;
+
+  // Push Subscriptions
+  getPushSubscription(userId: string, endpoint: string): Promise<PushSubscription | undefined>;
+  getPushSubscriptionsByUser(userId: string): Promise<PushSubscription[]>;
+  getAllPushSubscriptions(): Promise<PushSubscription[]>;
+  createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
+  deletePushSubscription(id: string): Promise<void>;
+  deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3775,6 +3801,104 @@ export class DatabaseStorage implements IStorage {
 
   async deletePresentationAsset(id: string): Promise<void> {
     await db.delete(presentationAssets).where(eq(presentationAssets.id, id));
+  }
+
+  // Notifications
+  async getAllNotifications(): Promise<Notification[]> {
+    return await db.select().from(notifications).orderBy(desc(notifications.createdAt));
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async deleteNotification(id: string): Promise<void> {
+    await db.delete(notifications).where(eq(notifications.id, id));
+  }
+
+  async getUserNotifications(userId: string): Promise<(Notification & { readAt: Date | null })[]> {
+    const results = await db
+      .select({
+        id: notifications.id,
+        title: notifications.title,
+        message: notifications.message,
+        type: notifications.type,
+        actionUrl: notifications.actionUrl,
+        audienceType: notifications.audienceType,
+        audienceRoles: notifications.audienceRoles,
+        audienceUserIds: notifications.audienceUserIds,
+        createdBy: notifications.createdBy,
+        createdAt: notifications.createdAt,
+        readAt: notificationRecipients.readAt,
+      })
+      .from(notificationRecipients)
+      .innerJoin(notifications, eq(notificationRecipients.notificationId, notifications.id))
+      .where(eq(notificationRecipients.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(50);
+    return results;
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(notificationRecipients)
+      .where(and(
+        eq(notificationRecipients.userId, userId),
+        sql`${notificationRecipients.readAt} IS NULL`
+      ));
+    return result[0]?.count || 0;
+  }
+
+  async markNotificationAsRead(notificationId: string, userId: string): Promise<void> {
+    await db
+      .update(notificationRecipients)
+      .set({ readAt: new Date() })
+      .where(and(
+        eq(notificationRecipients.notificationId, notificationId),
+        eq(notificationRecipients.userId, userId)
+      ));
+  }
+
+  async createNotificationRecipients(notificationId: string, userIds: string[]): Promise<void> {
+    if (userIds.length === 0) return;
+    const recipients = userIds.map(userId => ({
+      notificationId,
+      userId,
+    }));
+    await db.insert(notificationRecipients).values(recipients);
+  }
+
+  // Push Subscriptions
+  async getPushSubscription(userId: string, endpoint: string): Promise<PushSubscription | undefined> {
+    const [sub] = await db.select().from(pushSubscriptions)
+      .where(and(
+        eq(pushSubscriptions.userId, userId),
+        eq(pushSubscriptions.endpoint, endpoint)
+      ));
+    return sub;
+  }
+
+  async getPushSubscriptionsByUser(userId: string): Promise<PushSubscription[]> {
+    return await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
+  }
+
+  async getAllPushSubscriptions(): Promise<PushSubscription[]> {
+    return await db.select().from(pushSubscriptions);
+  }
+
+  async createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription> {
+    const [created] = await db.insert(pushSubscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async deletePushSubscription(id: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.id, id));
+  }
+
+  async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
+    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
   }
 }
 

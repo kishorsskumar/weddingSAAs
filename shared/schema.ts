@@ -1671,3 +1671,52 @@ export const presentationAssets = pgTable("presentation_assets", {
 export const insertPresentationAssetSchema = createInsertSchema(presentationAssets).omit({ id: true, createdAt: true });
 export type InsertPresentationAsset = z.infer<typeof insertPresentationAssetSchema>;
 export type PresentationAsset = typeof presentationAssets.$inferSelect;
+
+// ============ Notifications System ============
+
+// Notifications sent by superadmin
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default('info'), // info, warning, success, urgent
+  actionUrl: text("action_url"), // Optional link to navigate to
+  audienceType: text("audience_type").notNull().default('all'), // all, role, individual
+  audienceRoles: text("audience_roles").array(), // For role-based targeting
+  audienceUserIds: text("audience_user_ids").array(), // For individual targeting
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+
+// Track which users have read which notifications
+export const notificationRecipients = pgTable("notification_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  notificationId: varchar("notification_id").notNull().references(() => notifications.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  readAt: timestamp("read_at"),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationRecipientSchema = createInsertSchema(notificationRecipients).omit({ id: true, createdAt: true });
+export type InsertNotificationRecipient = z.infer<typeof insertNotificationRecipientSchema>;
+export type NotificationRecipient = typeof notificationRecipients.$inferSelect;
+
+// Push subscriptions for PWA users
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text("endpoint").notNull(),
+  p256dhKey: text("p256dh_key").notNull(),
+  authKey: text("auth_key").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
+export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
