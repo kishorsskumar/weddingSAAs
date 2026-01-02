@@ -202,16 +202,17 @@ export function MessagingTab() {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">WhatsApp Not Configured</h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              To enable WhatsApp messaging, please add your Twilio credentials as environment secrets:
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <Clock className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <Badge className="mb-3 bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+              <Clock className="h-3 w-3 mr-1" />
+              Integration Pending
+            </Badge>
+            <h3 className="text-lg font-medium mb-2">WhatsApp Integration Pending</h3>
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
+              WhatsApp messaging is not yet set up. Once configured, you'll be able to send bulk messages to employees directly through WhatsApp.
             </p>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>TWILIO_ACCOUNT_SID</li>
-              <li>TWILIO_AUTH_TOKEN</li>
-              <li>TWILIO_WHATSAPP_NUMBER</li>
-            </ul>
           </div>
         </CardContent>
       </Card>
