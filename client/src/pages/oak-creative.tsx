@@ -207,10 +207,31 @@ export default function OakCreative() {
     }
   };
 
+  const loadImageAsBase64 = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.8));
+        } else {
+          reject(new Error("Failed to get canvas context"));
+        }
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = url;
+    });
+  };
+
   const handleExportPDF = async () => {
     if (!presentationFull) return;
     
-    toast({ title: "Generating PDF...", description: "This may take a moment" });
+    toast({ title: "Generating PDF...", description: "Loading images, this may take a moment" });
     
     try {
       const jspdf = await import("jspdf");
@@ -219,77 +240,148 @@ export default function OakCreative() {
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      // Cover slide
-      pdf.setFillColor(139, 90, 43); // Oak brown
+      // Oakstreet brand colors
+      const oakGreen = [107, 153, 55] as [number, number, number]; // #6b9937
+      const darkGreen = [74, 122, 37] as [number, number, number]; // #4a7a25
+      const gold = [201, 169, 97] as [number, number, number]; // #c9a961
+      
+      // Cover slide with gradient effect
+      pdf.setFillColor(...oakGreen);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      
+      // Decorative gold accent
+      pdf.setFillColor(...gold);
+      pdf.rect(0, pageHeight - 8, pageWidth, 8, "F");
+      
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(48);
-      pdf.text(presentationFull.title, pageWidth / 2, pageHeight / 2 - 50, { align: "center" });
-      pdf.setFontSize(24);
+      pdf.setFontSize(52);
+      pdf.text(presentationFull.title, pageWidth / 2, pageHeight / 2 - 60, { align: "center" });
+      pdf.setFontSize(28);
       if (presentationFull.clientName) {
-        pdf.text(`For: ${presentationFull.clientName}`, pageWidth / 2, pageHeight / 2 + 20, { align: "center" });
+        pdf.text(`For: ${presentationFull.clientName}`, pageWidth / 2, pageHeight / 2 + 10, { align: "center" });
       }
-      pdf.setFontSize(14);
-      pdf.text("Oakstreet Events", pageWidth / 2, pageHeight - 50, { align: "center" });
+      
+      // Gold divider line
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(2);
+      pdf.line(pageWidth / 2 - 100, pageHeight / 2 + 40, pageWidth / 2 + 100, pageHeight / 2 + 40);
+      
+      pdf.setFontSize(16);
+      pdf.text("Oakstreet Events", pageWidth / 2, pageHeight - 40, { align: "center" });
 
       // Category slides
       for (const slide of presentationFull.slides) {
         pdf.addPage("a4", "landscape");
         
+        // White background
         pdf.setFillColor(255, 255, 255);
         pdf.rect(0, 0, pageWidth, pageHeight, "F");
         
-        // Header
-        pdf.setFillColor(139, 90, 43);
-        pdf.rect(0, 0, pageWidth, 80, "F");
+        // Header with Oakstreet green
+        pdf.setFillColor(...oakGreen);
+        pdf.rect(0, 0, pageWidth, 90, "F");
+        
+        // Gold accent under header
+        pdf.setFillColor(...gold);
+        pdf.rect(0, 90, pageWidth, 4, "F");
+        
         pdf.setTextColor(255, 255, 255);
-        pdf.setFontSize(32);
-        pdf.text(slide.title || slide.category || "Slide", pageWidth / 2, 50, { align: "center" });
+        pdf.setFontSize(36);
+        pdf.text(slide.title || slide.category || "Slide", pageWidth / 2, 55, { align: "center" });
+        
+        // Branding in corner
+        pdf.setFontSize(10);
+        pdf.text("Oakstreet Events", pageWidth - 20, 25, { align: "right" });
         
         // Content area
-        pdf.setTextColor(60, 60, 60);
+        pdf.setTextColor(45, 74, 34); // Dark green text
         pdf.setFontSize(16);
+        
+        // Show text content if available
+        let contentStartY = 120;
+        if (slide.content && typeof slide.content === 'object' && (slide.content as any).text) {
+          const textContent = (slide.content as any).text;
+          pdf.setFontSize(14);
+          pdf.setTextColor(60, 60, 60);
+          const splitText = pdf.splitTextToSize(textContent, pageWidth - 100);
+          pdf.text(splitText, 50, contentStartY);
+          contentStartY += splitText.length * 18 + 20;
+        }
         
         if (slide.images && slide.images.length > 0) {
           const cols = Math.min(slide.images.length, 3);
           const rows = Math.ceil(slide.images.length / cols);
+          const availableHeight = pageHeight - contentStartY - 60;
           const imgWidth = (pageWidth - 100) / cols - 20;
-          const imgHeight = (pageHeight - 180) / rows - 40;
+          const imgHeight = Math.min(availableHeight / rows - 40, imgWidth * 0.75);
           
-          slide.images.forEach((img, index) => {
+          for (let index = 0; index < slide.images.length; index++) {
+            const img = slide.images[index];
             const col = index % cols;
             const row = Math.floor(index / cols);
             const x = 50 + col * (imgWidth + 20);
-            const y = 100 + row * (imgHeight + 40);
+            const y = contentStartY + row * (imgHeight + 50);
             
-            // Placeholder rectangle for image
-            pdf.setDrawColor(200, 200, 200);
-            pdf.rect(x, y, imgWidth, imgHeight);
-            pdf.setFontSize(12);
-            pdf.text(img.optionLabel || `Option ${index + 1}`, x + imgWidth / 2, y + imgHeight + 20, { align: "center" });
-          });
-        } else {
+            try {
+              // Load and embed actual image
+              const imgData = await loadImageAsBase64(img.imageUrl);
+              pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+              
+              // Image border
+              pdf.setDrawColor(...oakGreen);
+              pdf.setLineWidth(1);
+              pdf.rect(x, y, imgWidth, imgHeight);
+            } catch (err) {
+              // Fallback: draw placeholder if image fails to load
+              pdf.setFillColor(240, 244, 235);
+              pdf.rect(x, y, imgWidth, imgHeight, "F");
+              pdf.setDrawColor(...oakGreen);
+              pdf.rect(x, y, imgWidth, imgHeight);
+              pdf.setFontSize(10);
+              pdf.setTextColor(107, 153, 55);
+              pdf.text("Image", x + imgWidth / 2, y + imgHeight / 2, { align: "center" });
+            }
+            
+            // Label under image
+            pdf.setFontSize(11);
+            pdf.setTextColor(45, 74, 34);
+            pdf.text(img.optionLabel || `Option ${index + 1}`, x + imgWidth / 2, y + imgHeight + 18, { align: "center" });
+          }
+        } else if (!slide.content) {
+          pdf.setTextColor(150, 150, 150);
           pdf.text("Add images to this slide", pageWidth / 2, pageHeight / 2, { align: "center" });
         }
       }
       
-      // Contact slide
+      // Thank you / Contact slide
       pdf.addPage("a4", "landscape");
-      pdf.setFillColor(139, 90, 43);
+      pdf.setFillColor(...oakGreen);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
+      
+      // Gold accent
+      pdf.setFillColor(...gold);
+      pdf.rect(0, 0, pageWidth, 8, "F");
+      pdf.rect(0, pageHeight - 8, pageWidth, 8, "F");
+      
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(36);
-      pdf.text("Thank You", pageWidth / 2, pageHeight / 2 - 50, { align: "center" });
-      pdf.setFontSize(20);
-      pdf.text("Oakstreet Events", pageWidth / 2, pageHeight / 2 + 20, { align: "center" });
-      pdf.setFontSize(14);
-      pdf.text("Contact us for your dream event", pageWidth / 2, pageHeight / 2 + 60, { align: "center" });
+      pdf.setFontSize(48);
+      pdf.text("Thank You", pageWidth / 2, pageHeight / 2 - 60, { align: "center" });
+      
+      // Gold divider
+      pdf.setDrawColor(...gold);
+      pdf.setLineWidth(2);
+      pdf.line(pageWidth / 2 - 80, pageHeight / 2 - 20, pageWidth / 2 + 80, pageHeight / 2 - 20);
+      
+      pdf.setFontSize(24);
+      pdf.text("Oakstreet Events", pageWidth / 2, pageHeight / 2 + 30, { align: "center" });
+      pdf.setFontSize(16);
+      pdf.text("Contact us for your dream event", pageWidth / 2, pageHeight / 2 + 70, { align: "center" });
       
       pdf.save(`${presentationFull.title || "presentation"}.pdf`);
-      toast({ title: "PDF exported successfully!" });
+      toast({ title: "PDF exported successfully!", description: "Your presentation with images has been saved" });
     } catch (error) {
       console.error("PDF export error:", error);
-      toast({ title: "Export failed", variant: "destructive" });
+      toast({ title: "Export failed", description: "Please try again", variant: "destructive" });
     }
   };
 
