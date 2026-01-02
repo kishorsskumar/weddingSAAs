@@ -8011,5 +8011,125 @@ Respond with a JSON array only, no markdown formatting.`;
     res.json({ success: true });
   });
 
+  // Notifications - User endpoints
+  app.get('/api/notifications', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const notifications = await storage.getUserNotifications(req.session.userId);
+    res.json(notifications);
+  });
+
+  app.get('/api/notifications/unread-count', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const count = await storage.getUnreadNotificationCount(req.session.userId);
+    res.json({ count });
+  });
+
+  app.post('/api/notifications/:id/read', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    await storage.markNotificationAsRead(req.params.id, req.session.userId);
+    res.json({ success: true });
+  });
+
+  // Notifications - Admin broadcast
+  app.post('/api/notifications/broadcast', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    const { title, message, type, actionUrl, audienceType, audienceRoles, audienceUserIds } = req.body;
+    
+    const notification = await storage.createNotification({
+      title,
+      message,
+      type: type || 'info',
+      actionUrl,
+      audienceType: audienceType || 'all',
+      audienceRoles,
+      audienceUserIds,
+      createdBy: req.session.userId,
+    });
+    
+    let targetUserIds: string[] = [];
+    
+    if (audienceType === 'all') {
+      const allUsers = await storage.getAllUsers();
+      targetUserIds = allUsers.map(u => u.id);
+    } else if (audienceType === 'roles' && audienceRoles?.length > 0) {
+      const allUsers = await storage.getAllUsers();
+      targetUserIds = allUsers.filter(u => audienceRoles.includes(u.role)).map(u => u.id);
+    } else if (audienceType === 'specific' && audienceUserIds?.length > 0) {
+      targetUserIds = audienceUserIds;
+    }
+    
+    await storage.createNotificationRecipients(notification.id, targetUserIds);
+    
+    res.json({ success: true, notification, recipientCount: targetUserIds.length });
+  });
+
+  app.get('/api/notifications/all', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const notifications = await storage.getAllNotifications();
+    res.json(notifications);
+  });
+
+  app.delete('/api/notifications/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    await storage.deleteNotification(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Push Subscriptions
+  app.post('/api/push-subscriptions', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { endpoint, keys, userAgent } = req.body;
+    
+    const existing = await storage.getPushSubscription(req.session.userId, endpoint);
+    if (existing) {
+      return res.json({ success: true, subscription: existing });
+    }
+    
+    const subscription = await storage.createPushSubscription({
+      userId: req.session.userId,
+      endpoint,
+      p256dhKey: keys.p256dh,
+      authKey: keys.auth,
+      userAgent,
+    });
+    res.json({ success: true, subscription });
+  });
+
+  app.delete('/api/push-subscriptions', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { endpoint } = req.body;
+    await storage.deletePushSubscriptionByEndpoint(endpoint);
+    res.json({ success: true });
+  });
+
   return httpServer;
 }
