@@ -103,6 +103,289 @@ type ChecklistTemplateItem = {
   createdAt: Date | null;
 };
 
+type BroadcastNotification = {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  actionUrl: string | null;
+  audienceType: string;
+  audienceRoles: string[] | null;
+  audienceUserIds: string[] | null;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+function NotificationsTab() {
+  const queryClient = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [message, setMessage] = useState('');
+  const [type, setType] = useState('info');
+  const [actionUrl, setActionUrl] = useState('');
+  const [audienceType, setAudienceType] = useState('all');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  const { data: notifications = [], isLoading } = useQuery<BroadcastNotification[]>({
+    queryKey: ['/api/notifications/all'],
+    queryFn: async () => {
+      const res = await fetch('/api/notifications/all', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+  });
+
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ['/api/roles'],
+  });
+
+  const broadcastMutation = useMutation({
+    mutationFn: async (data: {
+      title: string;
+      message: string;
+      type: string;
+      actionUrl?: string;
+      audienceType: string;
+      audienceRoles?: string[];
+      audienceUserIds?: string[];
+    }) => {
+      const res = await fetch('/api/notifications/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to broadcast notification');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/all'] });
+      setTitle('');
+      setMessage('');
+      setType('info');
+      setActionUrl('');
+      setAudienceType('all');
+      setSelectedRoles([]);
+      setSelectedUserIds([]);
+      alert(`Notification sent to ${data.recipientCount} users`);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete notification');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications/all'] });
+    },
+  });
+
+  const handleBroadcast = () => {
+    if (!title || !message) return;
+    broadcastMutation.mutate({
+      title,
+      message,
+      type,
+      actionUrl: actionUrl || undefined,
+      audienceType,
+      audienceRoles: audienceType === 'roles' ? selectedRoles : undefined,
+      audienceUserIds: audienceType === 'specific' ? selectedUserIds : undefined,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Broadcast Notification
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                placeholder="Notification title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                data-testid="input-notification-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger data-testid="select-notification-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="info">Info</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="warning">Warning</SelectItem>
+                  <SelectItem value="error">Error</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Message *</Label>
+            <Textarea
+              placeholder="Notification message..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={3}
+              data-testid="input-notification-message"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Action URL (optional)</Label>
+              <Input
+                placeholder="/path or https://..."
+                value={actionUrl}
+                onChange={(e) => setActionUrl(e.target.value)}
+                data-testid="input-notification-url"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Audience</Label>
+              <Select value={audienceType} onValueChange={setAudienceType}>
+                <SelectTrigger data-testid="select-notification-audience">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="roles">Specific Roles</SelectItem>
+                  <SelectItem value="specific">Specific Users</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {audienceType === 'roles' && (
+            <div className="space-y-2">
+              <Label>Select Roles</Label>
+              <div className="flex flex-wrap gap-2 p-3 border rounded-md">
+                {roles.map((role) => (
+                  <label key={role.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selectedRoles.includes(role.name)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedRoles([...selectedRoles, role.name]);
+                        } else {
+                          setSelectedRoles(selectedRoles.filter(r => r !== role.name));
+                        }
+                      }}
+                    />
+                    <span className="text-sm">{role.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {audienceType === 'specific' && (
+            <div className="space-y-2">
+              <Label>Select Users</Label>
+              <div className="flex flex-wrap gap-2 p-3 border rounded-md max-h-48 overflow-y-auto">
+                {users.map((user) => (
+                  <label key={user.id} className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={selectedUserIds.includes(user.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUserIds([...selectedUserIds, user.id]);
+                        } else {
+                          setSelectedUserIds(selectedUserIds.filter(id => id !== user.id));
+                        }
+                      }}
+                    />
+                    <span className="text-sm">{user.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button
+            onClick={handleBroadcast}
+            disabled={!title || !message || broadcastMutation.isPending}
+            className="bg-[#6b9937] hover:bg-[#5a8230]"
+            data-testid="button-broadcast-notification"
+          >
+            {broadcastMutation.isPending ? 'Sending...' : 'Broadcast Notification'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sent Notifications</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-muted-foreground">Loading...</p>
+          ) : notifications.length === 0 ? (
+            <p className="text-muted-foreground">No notifications sent yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((n) => (
+                <div key={n.id} className="flex items-start justify-between p-3 border rounded-md">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{n.title}</span>
+                      <Badge variant={
+                        n.type === 'success' ? 'default' :
+                        n.type === 'warning' ? 'secondary' :
+                        n.type === 'error' ? 'destructive' : 'outline'
+                      }>
+                        {n.type}
+                      </Badge>
+                      <Badge variant="outline">
+                        {n.audienceType === 'all' ? 'All Users' :
+                         n.audienceType === 'roles' ? `Roles: ${n.audienceRoles?.join(', ')}` :
+                         `${n.audienceUserIds?.length} users`}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{n.message}</p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      {n.createdAt && format(new Date(n.createdAt), 'PPp')}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (confirm('Delete this notification?')) {
+                        deleteMutation.mutate(n.id);
+                      }
+                    }}
+                    data-testid={`button-delete-notification-${n.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function ChecklistTemplatesTab() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -1335,6 +1618,7 @@ export default function Admin() {
           {isSuperAdmin && <TabsTrigger value="calendar" data-testid="tab-calendar">Calendar</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="messaging" data-testid="tab-messaging">Messaging</TabsTrigger>}
           {isSuperAdmin && <TabsTrigger value="templates" data-testid="tab-templates">Templates</TabsTrigger>}
+          {isSuperAdmin && <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="users" className="mt-4">
@@ -2289,6 +2573,12 @@ export default function Admin() {
         {isSuperAdmin && (
           <TabsContent value="templates" className="mt-4">
             <ChecklistTemplatesTab />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="notifications" className="mt-4">
+            <NotificationsTab />
           </TabsContent>
         )}
       </Tabs>
