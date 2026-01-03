@@ -254,6 +254,9 @@ import {
   type InsertNotificationRecipient,
   type PushSubscription,
   type InsertPushSubscription,
+  monthlyProductionPlan,
+  type MonthlyProductionPlan,
+  type InsertMonthlyProductionPlan,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -803,6 +806,13 @@ export interface IStorage {
   createPushSubscription(subscription: InsertPushSubscription): Promise<PushSubscription>;
   deletePushSubscription(id: string): Promise<void>;
   deletePushSubscriptionByEndpoint(endpoint: string): Promise<void>;
+  
+  // Monthly Production Plan
+  getMonthlyProductionPlan(month: number, year: number): Promise<MonthlyProductionPlan[]>;
+  createMonthlyProductionPlanEntry(entry: InsertMonthlyProductionPlan): Promise<MonthlyProductionPlan>;
+  updateMonthlyProductionPlanEntry(id: string, entry: Partial<InsertMonthlyProductionPlan>): Promise<MonthlyProductionPlan | undefined>;
+  deleteMonthlyProductionPlanEntry(id: string): Promise<void>;
+  generateMonthlyPlanFromEvents(month: number, year: number): Promise<MonthlyProductionPlan[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3899,6 +3909,78 @@ export class DatabaseStorage implements IStorage {
 
   async deletePushSubscriptionByEndpoint(endpoint: string): Promise<void> {
     await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+  }
+
+  // Monthly Production Plan
+  async getMonthlyProductionPlan(month: number, year: number): Promise<MonthlyProductionPlan[]> {
+    return await db.select().from(monthlyProductionPlan)
+      .where(and(
+        eq(monthlyProductionPlan.month, month),
+        eq(monthlyProductionPlan.year, year)
+      ))
+      .orderBy(monthlyProductionPlan.eventDate, monthlyProductionPlan.sortOrder);
+  }
+
+  async createMonthlyProductionPlanEntry(entry: InsertMonthlyProductionPlan): Promise<MonthlyProductionPlan> {
+    const [created] = await db.insert(monthlyProductionPlan).values(entry).returning();
+    return created;
+  }
+
+  async updateMonthlyProductionPlanEntry(id: string, entry: Partial<InsertMonthlyProductionPlan>): Promise<MonthlyProductionPlan | undefined> {
+    const [updated] = await db.update(monthlyProductionPlan)
+      .set({ ...entry, updatedAt: new Date() })
+      .where(eq(monthlyProductionPlan.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteMonthlyProductionPlanEntry(id: string): Promise<void> {
+    await db.delete(monthlyProductionPlan).where(eq(monthlyProductionPlan.id, id));
+  }
+
+  async generateMonthlyPlanFromEvents(month: number, year: number): Promise<MonthlyProductionPlan[]> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    
+    const monthEvents = await db.select().from(events)
+      .where(and(
+        gte(events.date, startDate.toISOString().split('T')[0]),
+        lte(events.date, endDate.toISOString().split('T')[0])
+      ))
+      .orderBy(events.date);
+
+    const existingEntries = await this.getMonthlyProductionPlan(month, year);
+    const existingEventIds = new Set(existingEntries.map(e => e.eventId));
+
+    const newEntries: MonthlyProductionPlan[] = [];
+    
+    for (const event of monthEvents) {
+      if (!existingEventIds.has(event.id)) {
+        const entry = await this.createMonthlyProductionPlanEntry({
+          eventId: event.id,
+          month,
+          year,
+          eventDate: event.date,
+          subEventName: event.title || event.type,
+          venue: event.venue,
+          teamLead: null,
+          productionTeamCount: null,
+          florist: null,
+          loadingStartDateTime: null,
+          productionStartTime: null,
+          productionEndTime: null,
+          dismantlingDateTime: null,
+          dismantlingTeamLead: null,
+          sortOrder: 0,
+          createdBy: null,
+        });
+        newEntries.push(entry);
+      }
+    }
+
+    return [...existingEntries, ...newEntries].sort((a, b) => 
+      new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
+    );
   }
 }
 
