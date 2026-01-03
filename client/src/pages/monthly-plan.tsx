@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { format, addMonths, subMonths } from "date-fns";
@@ -76,7 +76,7 @@ export default function MonthlyPlan() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (showToast: boolean = true) => {
       const res = await fetch("/api/monthly-plan/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,16 +84,24 @@ export default function MonthlyPlan() {
         body: JSON.stringify({ month, year }),
       });
       if (!res.ok) throw new Error("Failed to generate plan");
-      return res.json();
+      return { data: await res.json(), showToast };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-plan", month, year] });
-      toast({ title: "Plan generated from events" });
+      if (result.showToast) {
+        toast({ title: "Plan synced with events" });
+      }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  useEffect(() => {
+    if (!isLoading) {
+      generateMutation.mutate(false);
+    }
+  }, [month, year]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<MonthlyProductionPlan> }) => {
@@ -319,7 +327,7 @@ export default function MonthlyPlan() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => generateMutation.mutate()}
+            onClick={() => generateMutation.mutate(true)}
             disabled={generateMutation.isPending}
             className="gap-2"
             data-testid="button-generate-plan"
@@ -352,7 +360,7 @@ export default function MonthlyPlan() {
             <div className="p-8 text-center">
               <p className="text-muted-foreground mb-4">No production plan entries for this month</p>
               <Button
-                onClick={() => generateMutation.mutate()}
+                onClick={() => generateMutation.mutate(true)}
                 disabled={generateMutation.isPending}
                 className="gap-2"
               >

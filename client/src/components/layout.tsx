@@ -39,8 +39,9 @@ import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
-  { id: "event-calendar", label: "Oak Event Calendar", path: "/events" },
-  { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan" },
+  { id: "event-calendar", label: "Oak Event Calendar", path: "/events", subPages: [
+    { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan" },
+  ] },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
@@ -308,6 +309,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {navItems.map((item, index) => {
           const Icon = ICONS[item.id] || LayoutDashboard;
           const isActive = location === item.path;
+          const hasSubPages = (item as any).subPages?.length > 0;
+          const subPages = (item as any).subPages || [];
+          const isSubPageActive = subPages.some((sp: any) => location === sp.path);
+          
           return (
             <motion.div
               key={item.id}
@@ -350,6 +355,47 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   </Button>
                 </motion.div>
               </Link>
+              {hasSubPages && subPages.map((subPage: any) => {
+                const SubIcon = ICONS[subPage.id] || Calendar;
+                const isSubActive = location === subPage.path;
+                const hasAccess = allowedPages.includes(subPage.id);
+                if (!hasAccess) return null;
+                return (
+                  <Link key={subPage.id} href={subPage.path}>
+                    <motion.div
+                      whileHover={{ x: 4 }}
+                      whileTap={{ scale: 0.98 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    >
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full justify-start gap-3 text-sm font-medium transition-all duration-200 pl-10",
+                          isSubActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                            : "text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                        )}
+                        onClick={() => setIsMobileOpen(false)}
+                        data-testid={`nav-${subPage.id}`}
+                      >
+                        <span className={cn("transition-transform duration-300", isSubActive && "scale-110")}>
+                          <SubIcon className="h-3.5 w-3.5" />
+                        </span>
+                        {subPage.label}
+                        {isSubActive && (
+                          <motion.div
+                            layoutId="subActiveIndicator"
+                            className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                          />
+                        )}
+                      </Button>
+                    </motion.div>
+                  </Link>
+                );
+              })}
             </motion.div>
           );
         })}
