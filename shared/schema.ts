@@ -1741,6 +1741,7 @@ export const monthlyProductionPlan = pgTable("monthly_production_plan", {
   productionEndTime: text("production_end_time"),
   dismantlingDateTime: text("dismantling_date_time"),
   dismantlingTeamLead: text("dismantling_team_lead"),
+  isComplete: boolean("is_complete").default(false),
   sortOrder: integer("sort_order").default(0),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
