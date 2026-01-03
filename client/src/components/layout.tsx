@@ -40,6 +40,7 @@ import logo from "@assets/oakstreet_white_1764858814551.png";
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "event-calendar", label: "Oak Event Calendar", path: "/events" },
+  { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan" },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
@@ -58,6 +59,7 @@ const ALL_PAGES = [
 const ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
   "event-calendar": Calendar,
+  "monthly-plan": Calendar,
   "team-calendar": Users,
   "event-database": Database,
   "event-milestones": CheckSquare,

@@ -23,6 +23,7 @@ import PrintDocument from "@/pages/print-document";
 import EmployeePortal from "@/pages/employee-portal";
 import Oaksy from "@/pages/oaksy";
 import OakCreative from "@/pages/oak-creative";
+import MonthlyPlan from "@/pages/monthly-plan";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -51,6 +52,9 @@ function AppRoutes() {
         </Route>
         <Route path="/events">
           <PrivateRoute component={EventCalendar} path="/events" />
+        </Route>
+        <Route path="/monthly-plan">
+          <PrivateRoute component={MonthlyPlan} path="/monthly-plan" />
         </Route>
         <Route path="/team">
            <PrivateRoute component={TeamCalendar} path="/team" />
