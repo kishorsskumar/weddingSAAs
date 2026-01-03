@@ -749,6 +749,7 @@ export async function registerRoutes(
   const ALL_PAGES = [
     'dashboard',
     'event-calendar',
+    'monthly-plan',
     'team-calendar',
     'event-database',
     'event-milestones',
@@ -8197,6 +8198,97 @@ Respond with a JSON array only, no markdown formatting.`;
     const { endpoint } = req.body;
     await storage.deletePushSubscriptionByEndpoint(endpoint);
     res.json({ success: true });
+  });
+
+  // Monthly Production Plan Routes
+  app.get('/api/monthly-plan', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { month, year } = req.query;
+      if (!month || !year) {
+        return res.status(400).json({ error: 'Month and year are required' });
+      }
+      const entries = await storage.getMonthlyProductionPlan(
+        parseInt(month as string),
+        parseInt(year as string)
+      );
+      res.json(entries);
+    } catch (error: any) {
+      console.error('[Monthly Plan] Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/monthly-plan/generate', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const { month, year } = req.body;
+      if (!month || !year) {
+        return res.status(400).json({ error: 'Month and year are required' });
+      }
+      const entries = await storage.generateMonthlyPlanFromEvents(month, year);
+      res.json(entries);
+    } catch (error: any) {
+      console.error('[Monthly Plan] Generate error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/monthly-plan', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const entry = await storage.createMonthlyProductionPlanEntry({
+        ...req.body,
+        createdBy: req.session.userId,
+      });
+      res.json(entry);
+    } catch (error: any) {
+      console.error('[Monthly Plan] Create error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/monthly-plan/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    try {
+      const entry = await storage.updateMonthlyProductionPlanEntry(req.params.id, req.body);
+      if (!entry) {
+        return res.status(404).json({ error: 'Entry not found' });
+      }
+      res.json(entry);
+    } catch (error: any) {
+      console.error('[Monthly Plan] Update error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/monthly-plan/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
+    try {
+      await storage.deleteMonthlyProductionPlanEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[Monthly Plan] Delete error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   return httpServer;
