@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Plus, Send, Users, Trash2, Eye, CheckCircle2, XCircle, Clock, Loader2, Search } from "lucide-react";
+import { MessageSquare, Plus, Send, Users, Trash2, Eye, CheckCircle2, XCircle, Clock, Loader2, Search, Copy, Check, QrCode, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
 type WhatsappTemplate = {
@@ -52,6 +52,8 @@ export function MessagingTab() {
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isComposeDialogOpen, setIsComposeDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showQrCode, setShowQrCode] = useState(false);
 
   const [templateName, setTemplateName] = useState('');
   const [templateBody, setTemplateBody] = useState('');
@@ -81,6 +83,19 @@ export function MessagingTab() {
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['/api/whatsapp/employees'],
   });
+
+  const { data: optInData } = useQuery<{ link: string; qrCodeUrl: string; phoneNumber: string }>({
+    queryKey: ['/api/whatsapp/opt-in-link'],
+    enabled: !!status?.configured,
+  });
+
+  const handleCopyLink = async () => {
+    if (optInData?.link) {
+      await navigator.clipboard.writeText(optInData.link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
 
   const optedInEmployees = employees;
   const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[];
@@ -603,6 +618,61 @@ export function MessagingTab() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-6">
+            <h3 className="font-medium mb-3 flex items-center gap-2">
+              <ExternalLink className="h-4 w-4" />
+              Employee Opt-In Link
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Share this link with employees so they can opt-in to receive WhatsApp messages. 
+              Employees must send a message first before you can message them (WhatsApp requirement).
+            </p>
+            {optInData?.link && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={optInData.link} 
+                    readOnly 
+                    className="flex-1 text-sm bg-muted"
+                    data-testid="input-opt-in-link"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={handleCopyLink}
+                    data-testid="button-copy-opt-in-link"
+                  >
+                    {copiedLink ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setShowQrCode(!showQrCode)}
+                    data-testid="button-toggle-qr-code"
+                  >
+                    <QrCode className="h-4 w-4" />
+                  </Button>
+                </div>
+                {copiedLink && (
+                  <p className="text-sm text-green-600">Link copied to clipboard!</p>
+                )}
+                {showQrCode && optInData.qrCodeUrl && (
+                  <div className="flex flex-col items-center gap-2 p-4 border rounded-lg bg-white">
+                    <img 
+                      src={optInData.qrCodeUrl} 
+                      alt="WhatsApp Opt-In QR Code" 
+                      className="w-48 h-48"
+                      data-testid="img-opt-in-qr-code"
+                    />
+                    <p className="text-sm text-muted-foreground text-center">
+                      Scan this QR code with your phone to opt-in
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

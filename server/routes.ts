@@ -7117,6 +7117,28 @@ Respond with a JSON array only, no markdown formatting.`;
     });
   });
 
+  // Get WhatsApp opt-in link for employees
+  app.get('/api/whatsapp/opt-in-link', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const { getWhatsAppFromNumber } = await import('./whatsapp-service');
+    const fromNumber = getWhatsAppFromNumber();
+    if (!fromNumber) {
+      return res.status(400).json({ error: 'WhatsApp not configured' });
+    }
+    // Remove whatsapp: prefix and + if present
+    const cleanNumber = fromNumber.replace(/^whatsapp:/i, '').replace(/^\+/, '');
+    const optInMessage = encodeURIComponent('Hi, I would like to opt-in to receive WhatsApp messages from Oakstreet Events.');
+    const clickToChatLink = `https://wa.me/${cleanNumber}?text=${optInMessage}`;
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(clickToChatLink)}`;
+    res.json({
+      link: clickToChatLink,
+      qrCodeUrl,
+      phoneNumber: fromNumber,
+    });
+  });
+
   app.get('/api/whatsapp/templates', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
