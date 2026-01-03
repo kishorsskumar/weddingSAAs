@@ -1721,3 +1721,32 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
 export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions).omit({ id: true, createdAt: true });
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+// ============ Monthly Production Plan ============
+
+// Monthly Production Plan entries for events
+export const monthlyProductionPlan = pgTable("monthly_production_plan", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: 'cascade' }),
+  month: integer("month").notNull(), // 1-12
+  year: integer("year").notNull(),
+  eventDate: date("event_date").notNull(),
+  subEventName: text("sub_event_name").notNull(), // e.g., "Haldi", "Sangeeth", "Wedding"
+  venue: text("venue"),
+  teamLead: text("team_lead"),
+  productionTeamCount: integer("production_team_count"),
+  florist: text("florist"),
+  loadingStartDateTime: text("loading_start_date_time"),
+  productionStartTime: text("production_start_time"),
+  productionEndTime: text("production_end_time"),
+  dismantlingDateTime: text("dismantling_date_time"),
+  dismantlingTeamLead: text("dismantling_team_lead"),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMonthlyProductionPlanSchema = createInsertSchema(monthlyProductionPlan).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMonthlyProductionPlan = z.infer<typeof insertMonthlyProductionPlanSchema>;
+export type MonthlyProductionPlan = typeof monthlyProductionPlan.$inferSelect;
