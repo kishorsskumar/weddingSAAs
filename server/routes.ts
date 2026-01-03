@@ -8242,6 +8242,10 @@ Respond with a JSON array only, no markdown formatting.`;
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.role !== 'superadmin') {
+      return res.status(403).json({ error: 'Superadmin access required' });
+    }
     try {
       const entry = await storage.createMonthlyProductionPlanEntry({
         ...req.body,
