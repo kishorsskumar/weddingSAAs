@@ -46,7 +46,11 @@ const ALL_PAGES = [
   { id: "oak-book", label: "Oak Book" },
   { id: "oak-sales", label: "Oak Sales" },
   { id: "oak-inventory", label: "Oak Inventory" },
+  { id: "execution-plan", label: "Execution Plan" },
   { id: "hr", label: "HR" },
+  { id: "employee-portal", label: "Employee Portal" },
+  { id: "oaksy", label: "Oaksy AI" },
+  { id: "oak-creative", label: "Oak Creative" },
   { id: "admin", label: "Admin" },
 ];
 
