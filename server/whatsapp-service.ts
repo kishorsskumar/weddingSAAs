@@ -72,7 +72,11 @@ export async function sendWhatsAppMessage(
 
   try {
     const formattedTo = formatPhoneForWhatsApp(to);
-    const formattedFrom = `whatsapp:${fromNumber}`;
+    // Ensure fromNumber doesn't already have whatsapp: prefix
+    const cleanFromNumber = fromNumber.replace(/^whatsapp:/i, '');
+    const formattedFrom = `whatsapp:${cleanFromNumber}`;
+    
+    console.log('[WhatsApp] Sending message:', { from: formattedFrom, to: formattedTo });
     
     const response = await client.messages.create({
       body: message,
@@ -80,9 +84,11 @@ export async function sendWhatsAppMessage(
       to: formattedTo,
     });
 
+    console.log('[WhatsApp] Message sent successfully:', response.sid);
     return { success: true, messageId: response.sid };
   } catch (error: any) {
     console.error('[WhatsApp] Send error:', error.message);
+    console.error('[WhatsApp] Full error:', JSON.stringify(error, null, 2));
     return { success: false, error: error.message };
   }
 }
