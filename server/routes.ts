@@ -5394,7 +5394,7 @@ export async function registerRoutes(
         // Update salary slip as sent
         await storage.updateSalarySlip(req.params.id, {
           sentViaWhatsapp: true,
-          sentAt: new Date().toISOString(),
+          sentAt: new Date(),
         });
         res.json({ success: true, message: 'Salary slip sent successfully' });
       } else {
