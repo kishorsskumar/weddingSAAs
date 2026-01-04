@@ -5221,32 +5221,54 @@ export async function registerRoutes(
         const employee = employeeMap.get(item.employeeId);
         if (!employee) continue;
 
-        const basicPay = parseFloat(item.basicPay);
-        const hra = basicPay * 0.4; // 40% of basic as HRA
-        const allowances = parseFloat(item.netPay) - basicPay - hra;
+        // Calculate salary breakdown based on payroll item
+        const grossPay = parseFloat(item.grossPay);
+        const basicPay = grossPay * 0.5; // 50% of gross as basic
+        const basicDa = basicPay; // Basic + DA combined
+        const hra = grossPay * 0.2; // 20% as HRA
+        const otherAllowances = grossPay - basicDa - hra; // Rest as allowances
         const professionalTax = 200; // Standard PT
-        const lossOfPay = (parseFloat(item.basicPay) / (item.totalDays || 30)) * (item.absentDays || 0);
+        const deductions = parseFloat(item.deductions || '0');
+        const lossOfPay = deductions - professionalTax > 0 ? deductions - professionalTax : 0;
+        const totalDeductions = professionalTax + lossOfPay;
+        const netPayment = parseFloat(item.netPay);
+
+        // Convert net payment to words
+        const numberToWords = (num: number): string => {
+          const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+          const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+          if (num === 0) return 'Zero';
+          if (num < 20) return ones[num];
+          if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
+          if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + numberToWords(num % 100) : '');
+          if (num < 100000) return numberToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + numberToWords(num % 1000) : '');
+          if (num < 10000000) return numberToWords(Math.floor(num / 100000)) + ' Lakh' + (num % 100000 ? ' ' + numberToWords(num % 100000) : '');
+          return numberToWords(Math.floor(num / 10000000)) + ' Crore' + (num % 10000000 ? ' ' + numberToWords(num % 10000000) : '');
+        };
+        const amountInWords = `Rupees ${numberToWords(Math.round(netPayment))} Only`;
 
         const slip = await storage.createSalarySlip({
           payrollRunId: req.params.runId,
+          payrollItemId: item.id,
           employeeId: item.employeeId,
           employeeName: item.employeeName,
           designation: employee.designation || 'Staff',
           department: employee.department || 'General',
           month: run.month,
           year: run.year,
-          totalDays: item.totalDays || 30,
-          daysPresent: (item.totalDays || 30) - (item.absentDays || 0),
-          daysPaid: item.workingDays || 30,
-          basicDa: basicPay.toFixed(2),
+          totalDays: 30,
+          daysPresent: item.daysWorked,
+          daysPaid: item.daysWorked,
+          basicPay: basicPay.toFixed(2),
+          basicDa: basicDa.toFixed(2),
           hra: hra.toFixed(2),
-          allowances: allowances > 0 ? allowances.toFixed(2) : '0.00',
-          grossEarnings: parseFloat(item.netPay).toFixed(2),
+          otherAllowances: otherAllowances.toFixed(2),
+          totalEarnings: grossPay.toFixed(2),
           professionalTax: professionalTax.toFixed(2),
           lossOfPay: lossOfPay.toFixed(2),
-          otherDeductions: '0.00',
-          totalDeductions: (professionalTax + lossOfPay).toFixed(2),
-          netPayment: (parseFloat(item.netPay) - professionalTax - lossOfPay).toFixed(2),
+          totalDeductions: totalDeductions.toFixed(2),
+          netPayment: netPayment.toFixed(2),
+          amountInWords,
         });
         slips.push(slip);
       }
@@ -5261,8 +5283,7 @@ export async function registerRoutes(
   app.patch('/api/salary-slips/:id/whatsapp-sent', async (req, res) => {
     try {
       const slip = await storage.updateSalarySlip(req.params.id, {
-        whatsappSent: true,
-        whatsappSentAt: new Date().toISOString(),
+        sentViaWhatsapp: true,
       });
       res.json(slip);
     } catch (error) {

@@ -871,6 +871,12 @@ export default function HR() {
             Past ({pastEmployees.length})
           </TabsTrigger>
           <TabsTrigger value="payroll" className="flex-1 sm:flex-none text-xs sm:text-sm">Payroll</TabsTrigger>
+          {isAdmin && (
+            <TabsTrigger value="salary-slips" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
+              <Receipt className="h-4 w-4" />
+              Salary Slips
+            </TabsTrigger>
+          )}
           {(isAdmin || user?.role === 'manager') && (
             <TabsTrigger value="approvals" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
               <ClipboardCheck className="h-4 w-4" />
@@ -931,6 +937,12 @@ export default function HR() {
             isAdmin={isAdmin}
           />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="salary-slips">
+            <SalarySlipsSection />
+          </TabsContent>
+        )}
 
         {(isAdmin || user?.role === 'manager') && (
           <TabsContent value="approvals">
@@ -1613,6 +1625,362 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Salary Slips Section
+interface SalarySlip {
+  id: string;
+  payrollRunId: string;
+  payrollItemId: string;
+  employeeId: string;
+  month: number;
+  year: number;
+  employeeName: string;
+  designation: string | null;
+  department: string | null;
+  panNumber: string | null;
+  location: string | null;
+  joinDate: string | null;
+  totalDays: number;
+  daysPresent: number;
+  daysPaid: number;
+  basicPay: string;
+  basicDa: string;
+  hra: string | null;
+  otherAllowances: string | null;
+  transportationAllowance: string | null;
+  totalEarnings: string;
+  professionalTax: string | null;
+  lossOfPay: string | null;
+  transportDeduction: string | null;
+  totalDeductions: string;
+  netPayment: string;
+  amountInWords: string | null;
+  sentViaWhatsapp: boolean;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+function SalarySlipsSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedPayrollId, setSelectedPayrollId] = useState<string>('');
+  const [payrollOpen, setPayrollOpen] = useState(false);
+  const [payrollSearch, setPayrollSearch] = useState('');
+  
+  const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
+    queryKey: ['/api/payroll-runs'],
+    queryFn: async () => {
+      const res = await fetch('/api/payroll-runs');
+      if (!res.ok) throw new Error('Failed to fetch payroll runs');
+      return res.json();
+    },
+  });
+  
+  const { data: salarySlips = [], isLoading: slipsLoading, refetch: refetchSlips } = useQuery<SalarySlip[]>({
+    queryKey: ['/api/salary-slips/payroll', selectedPayrollId],
+    queryFn: async () => {
+      if (!selectedPayrollId) return [];
+      const res = await fetch(`/api/salary-slips/payroll/${selectedPayrollId}`);
+      if (!res.ok) throw new Error('Failed to fetch salary slips');
+      return res.json();
+    },
+    enabled: !!selectedPayrollId,
+  });
+  
+  const generateSlipsMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const res = await fetch(`/api/salary-slips/generate/${runId}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to generate salary slips');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: `Generated ${data.count} salary slips` });
+      refetchSlips();
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const filteredPayrollRuns = payrollRuns.filter(run => {
+    const label = `${monthNames[run.month - 1]} ${run.year}`;
+    return label.toLowerCase().includes(payrollSearch.toLowerCase());
+  });
+  
+  const selectedRun = payrollRuns.find(r => r.id === selectedPayrollId);
+  
+  const downloadPDF = (slip: SalarySlip) => {
+    import('jspdf').then(({ jsPDF }) => {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Yepman International colors
+      const maroon = '#9d2966';
+      
+      // Header with maroon background
+      doc.setFillColor(157, 41, 102);
+      doc.rect(0, 0, pageWidth, 35, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2, 15, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2, 22, { align: 'center' });
+      doc.text('Tel: 7902373354', pageWidth / 2, 28, { align: 'center' });
+      
+      // Title
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAY SLIP', pageWidth / 2, 45, { align: 'center' });
+      
+      const monthLabel = `${monthNames[slip.month - 1]} ${slip.year}`;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`For the month of ${monthLabel}`, pageWidth / 2, 52, { align: 'center' });
+      
+      // Employee details box
+      doc.setDrawColor(157, 41, 102);
+      doc.setLineWidth(0.5);
+      doc.rect(15, 58, pageWidth - 30, 30);
+      
+      doc.setFontSize(9);
+      doc.text(`Employee Name: ${slip.employeeName}`, 20, 66);
+      doc.text(`Designation: ${slip.designation || '-'}`, 20, 73);
+      doc.text(`Department: ${slip.department || '-'}`, 20, 80);
+      doc.text(`Location: ${slip.location || 'KOCHI'}`, 110, 66);
+      doc.text(`PAN: ${slip.panNumber || '-'}`, 110, 73);
+      doc.text(`Join Date: ${slip.joinDate || '-'}`, 110, 80);
+      
+      // Attendance section
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, 95, pageWidth - 30, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ATTENDANCE', pageWidth / 2, 101, { align: 'center' });
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.rect(15, 103, pageWidth - 30, 15);
+      doc.text(`Total Days: ${slip.totalDays}`, 25, 112);
+      doc.text(`Days Present: ${slip.daysPresent}`, 75, 112);
+      doc.text(`Days Paid: ${slip.daysPaid}`, 130, 112);
+      
+      // Earnings section
+      let y = 125;
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, y, (pageWidth - 30) / 2, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('EARNINGS', 60, y + 6, { align: 'center' });
+      
+      // Deductions header
+      doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 8, 'F');
+      doc.text('DEDUCTIONS', 145, y + 6, { align: 'center' });
+      
+      y += 8;
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      
+      // Earnings details
+      doc.rect(15, y, (pageWidth - 30) / 2, 45);
+      doc.text('Basic + DA:', 20, y + 8);
+      doc.text(slip.basicDa, 80, y + 8, { align: 'right' });
+      doc.text('HRA:', 20, y + 16);
+      doc.text(slip.hra || '0.00', 80, y + 16, { align: 'right' });
+      doc.text('Other Allowances:', 20, y + 24);
+      doc.text(slip.otherAllowances || '0.00', 80, y + 24, { align: 'right' });
+      doc.text('Transportation:', 20, y + 32);
+      doc.text(slip.transportationAllowance || '0.00', 80, y + 32, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Earnings:', 20, y + 40);
+      doc.text(slip.totalEarnings, 80, y + 40, { align: 'right' });
+      
+      // Deductions details
+      doc.setFont('helvetica', 'normal');
+      doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 45);
+      doc.text('Professional Tax:', 105, y + 8);
+      doc.text(slip.professionalTax || '0.00', 180, y + 8, { align: 'right' });
+      doc.text('Loss of Pay:', 105, y + 16);
+      doc.text(slip.lossOfPay || '0.00', 180, y + 16, { align: 'right' });
+      doc.text('Transport Deduction:', 105, y + 24);
+      doc.text(slip.transportDeduction || '0.00', 180, y + 24, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Deductions:', 105, y + 40);
+      doc.text(slip.totalDeductions, 180, y + 40, { align: 'right' });
+      
+      // Net Payment section
+      y += 52;
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, y, pageWidth - 30, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text('NET PAYMENT:', 20, y + 8);
+      doc.text(`Rs. ${slip.netPayment}`, pageWidth - 20, y + 8, { align: 'right' });
+      
+      // Amount in words
+      y += 18;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`(${slip.amountInWords || ''})`, pageWidth / 2, y, { align: 'center' });
+      
+      // Signature section
+      y += 25;
+      doc.setFont('helvetica', 'normal');
+      doc.line(15, y, 70, y);
+      doc.line(pageWidth - 70, y, pageWidth - 15, y);
+      doc.text("Employee's Signature", 42.5, y + 8, { align: 'center' });
+      doc.text("For Yepman International", pageWidth - 42.5, y + 8, { align: 'center' });
+      
+      // Footer
+      y += 25;
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated document.', pageWidth / 2, y, { align: 'center' });
+      
+      doc.save(`Salary_Slip_${slip.employeeName.replace(/\s+/g, '_')}_${monthNames[slip.month - 1]}_${slip.year}.pdf`);
+    });
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <CardTitle className="text-lg font-serif flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-primary" />
+            Salary Slips
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Popover open={payrollOpen} onOpenChange={setPayrollOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-[200px] justify-between">
+                  {selectedRun
+                    ? `${monthNames[selectedRun.month - 1]} ${selectedRun.year}`
+                    : "Select payroll..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[200px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search payroll..." value={payrollSearch} onValueChange={setPayrollSearch} />
+                  <CommandList>
+                    <CommandEmpty>No payroll found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredPayrollRuns.map((run) => (
+                        <CommandItem
+                          key={run.id}
+                          onSelect={() => {
+                            setSelectedPayrollId(run.id);
+                            setPayrollOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedPayrollId === run.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {monthNames[run.month - 1]} {run.year}
+                          <Badge variant={run.status === 'paid' ? 'default' : 'secondary'} className="ml-auto">
+                            {run.status}
+                          </Badge>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            
+            {selectedPayrollId && (
+              <Button
+                onClick={() => generateSlipsMutation.mutate(selectedPayrollId)}
+                disabled={generateSlipsMutation.isPending}
+                variant="outline"
+              >
+                {generateSlipsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Receipt className="h-4 w-4 mr-2" />
+                )}
+                Generate Slips
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!selectedPayrollId ? (
+          <div className="text-center py-8 text-muted-foreground">
+            Select a payroll to view or generate salary slips
+          </div>
+        ) : slipsLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : salarySlips.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No salary slips found for this payroll.</p>
+            <p className="text-sm">Click "Generate Slips" to create salary slips for all employees.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Employee</TableHead>
+                <TableHead>Designation</TableHead>
+                <TableHead>Department</TableHead>
+                <TableHead className="text-right">Net Payment</TableHead>
+                <TableHead className="text-center">WhatsApp</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {salarySlips.map((slip) => (
+                <TableRow key={slip.id}>
+                  <TableCell className="font-medium">{slip.employeeName}</TableCell>
+                  <TableCell>{slip.designation || '-'}</TableCell>
+                  <TableCell>{slip.department || '-'}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    Rs. {parseFloat(slip.netPayment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {slip.sentViaWhatsapp ? (
+                      <Badge variant="default" className="bg-green-600">
+                        <Check className="h-3 w-3 mr-1" />
+                        Sent
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Pending</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => downloadPDF(slip)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
