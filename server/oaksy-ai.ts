@@ -42,10 +42,10 @@ const PAGE_TO_TOOLS: Record<string, string[]> = {
   'oak-sales': ['view_events', 'create_event', 'update_event', 'get_sales_summary'],
   'oak-inventory': ['view_events'],
   'execution-plan': ['view_events'],
-  'hr': ['view_employees', 'create_employee', 'update_employee', 'delete_employee', 'view_leave_requests', 'update_leave_request'],
+  'hr': ['view_employees', 'create_employee', 'update_employee', 'delete_employee', 'view_leave_requests', 'update_leave_request', 'send_salary_slips_whatsapp'],
   'employee-portal': [],
   'oaksy': [],
-  'admin': ['view_users', 'create_user', 'view_employees', 'view_events', 'view_daybook', 'view_banks', 'view_meetings', 'view_leave_requests', 'get_sales_summary'],
+  'admin': ['view_users', 'create_user', 'view_employees', 'view_events', 'view_daybook', 'view_banks', 'view_meetings', 'view_leave_requests', 'get_sales_summary', 'send_salary_slips_whatsapp'],
 };
 
 // All available Oaksy tools with their definitions
@@ -459,6 +459,24 @@ const ALL_OAKSY_TOOLS: Record<string, OpenAI.Chat.Completions.ChatCompletionTool
           departments: { type: "array", items: { type: "string" }, description: "Department names (for 'department' mode)" },
         },
         required: ["message", "targetMode"],
+      },
+    },
+  },
+
+  send_salary_slips_whatsapp: {
+    type: "function",
+    function: {
+      name: "send_salary_slips_whatsapp",
+      description: "Send salary slips via WhatsApp to employees. Can send to all employees in a payroll run, or to specific employees. (Superadmin only)",
+      parameters: {
+        type: "object",
+        properties: {
+          payrollRunId: { type: "string", description: "The payroll run ID to send slips from" },
+          employeeNames: { type: "array", items: { type: "string" }, description: "Specific employee names to send to (optional, sends to all if not specified)" },
+          month: { type: "number", description: "Month number 1-12 to identify the payroll" },
+          year: { type: "number", description: "Year of the payroll" },
+        },
+        required: [],
       },
     },
   },
@@ -1259,6 +1277,128 @@ async function executeToolCall(toolName: string, args: any, userRole: string, al
           message: result.success 
             ? `WhatsApp sent to ${targetEmployeeIds.length} employee(s)` 
             : (result.error || "Failed to send"),
+        };
+      }
+
+      case "send_salary_slips_whatsapp": {
+        if (userRole !== 'superadmin') {
+          return { success: false, message: "Only superadmin can send salary slips via WhatsApp" };
+        }
+        
+        const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
+        
+        if (!isWhatsAppConfigured()) {
+          return { success: false, message: "WhatsApp is not configured. Please set up Twilio credentials." };
+        }
+        
+        // Get all payroll runs and find the matching one
+        let payrollRunId = args.payrollRunId;
+        
+        if (!payrollRunId && args.month && args.year) {
+          const payrollRuns = await storage.getAllPayrollRuns();
+          const matchingRun = payrollRuns.find(r => r.month === args.month && r.year === args.year);
+          if (matchingRun) {
+            payrollRunId = matchingRun.id;
+          }
+        }
+        
+        if (!payrollRunId) {
+          return { success: false, message: "Could not find the payroll run. Please specify month and year." };
+        }
+        
+        // Get salary slips for this payroll run
+        const salarySlips = await storage.getSalarySlipsByPayrollRun(payrollRunId);
+        
+        if (salarySlips.length === 0) {
+          return { success: false, message: "No salary slips found for this payroll run. Generate slips first." };
+        }
+        
+        // Get employees with phone numbers
+        const allEmployees = await storage.getAllEmployees();
+        const employeePhoneMap = new Map(allEmployees.filter(e => e.phone).map(e => [e.id, e]));
+        
+        // Filter by employee names if specified
+        let slipsToSend = salarySlips;
+        if (args.employeeNames && args.employeeNames.length > 0) {
+          slipsToSend = salarySlips.filter(slip => 
+            args.employeeNames.some((name: string) => 
+              slip.employeeName.toLowerCase().includes(name.toLowerCase())
+            )
+          );
+        }
+        
+        if (slipsToSend.length === 0) {
+          return { success: false, message: "No matching employees found in the salary slips." };
+        }
+        
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        let successCount = 0;
+        let failCount = 0;
+        const results: string[] = [];
+        
+        for (const slip of slipsToSend) {
+          const employee = employeePhoneMap.get(slip.employeeId);
+          
+          if (!employee || !employee.phone) {
+            results.push(`${slip.employeeName}: No phone number`);
+            failCount++;
+            continue;
+          }
+          
+          if (!employee.whatsappOptIn) {
+            results.push(`${slip.employeeName}: WhatsApp not enabled`);
+            failCount++;
+            continue;
+          }
+          
+          // Format salary slip message
+          const message = `*SALARY SLIP - ${monthNames[slip.month - 1]} ${slip.year}*
+
+Dear ${slip.employeeName},
+
+Your salary details for ${monthNames[slip.month - 1]} ${slip.year}:
+
+*Earnings:*
+Basic + DA: Rs. ${slip.basicDa}
+HRA: Rs. ${slip.hra || '0.00'}
+Other Allowances: Rs. ${slip.otherAllowances || '0.00'}
+Transportation: Rs. ${slip.transportationAllowance || '0.00'}
+*Total Earnings: Rs. ${slip.totalEarnings}*
+
+*Deductions:*
+Professional Tax: Rs. ${slip.professionalTax || '0.00'}
+Loss of Pay: Rs. ${slip.lossOfPay || '0.00'}
+*Total Deductions: Rs. ${slip.totalDeductions}*
+
+*NET PAYMENT: Rs. ${slip.netPayment}*
+
+Days Present: ${slip.daysPresent}/${slip.totalDays}
+Days Paid: ${slip.daysPaid}
+
+_This is a system-generated message from Yepman International._`;
+
+          const sendResult = await sendWhatsAppMessage(employee.phone, message);
+          
+          if (sendResult.success) {
+            successCount++;
+            // Update the salary slip to mark as sent
+            await storage.updateSalarySlip(slip.id, { 
+              sentViaWhatsapp: true, 
+              sentAt: new Date() 
+            });
+            results.push(`${slip.employeeName}: Sent successfully`);
+          } else {
+            failCount++;
+            results.push(`${slip.employeeName}: Failed - ${sendResult.error}`);
+          }
+        }
+        
+        return {
+          success: successCount > 0,
+          message: `Sent ${successCount} salary slip(s) via WhatsApp. ${failCount > 0 ? `${failCount} failed.` : ''}`,
+          data: results,
         };
       }
 

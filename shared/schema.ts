@@ -560,7 +560,7 @@ export const salarySlips = pgTable("salary_slips", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertSalarySlipSchema = createInsertSchema(salarySlips).omit({ id: true, createdAt: true, sentAt: true });
+export const insertSalarySlipSchema = createInsertSchema(salarySlips).omit({ id: true, createdAt: true });
 
 // Oak Sales CRM
 
