@@ -1046,13 +1046,14 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
         id: emp.id,
         name: emp.name,
         salary: emp.salary,
-        daysWorked: employeeDays[emp.id] || 30,
+        daysWorked: employeeDays[emp.id] ?? 30,
         deductions: '0',
       }));
       
       const res = await fetch('/api/payroll-runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ month: selectedMonth, year: selectedYear, employees }),
       });
       if (!res.ok) {
@@ -1158,7 +1159,7 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
 
   const calculatePayrollPreview = () => {
     return payrollEligibleEmployees.map(emp => {
-      const days = employeeDays[emp.id] || 30;
+      const days = employeeDays[emp.id] ?? 30;
       const dailyRate = Number(emp.salary) / 30;
       const grossPay = dailyRate * days;
       return { ...emp, daysWorked: days, dailyRate, grossPay };
@@ -1571,7 +1572,7 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                         type="number"
                         min="0"
                         max="31"
-                        value={employeeDays[emp.id] || 30}
+                        value={employeeDays[emp.id] ?? 30}
                         onChange={e => setEmployeeDays(prev => ({
                           ...prev,
                           [emp.id]: Math.min(31, Math.max(0, Number(e.target.value)))
