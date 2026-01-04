@@ -120,6 +120,7 @@ export default function HR() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isSuperAdmin = user?.role === 'superadmin';
 
   // Handle URL tab parameter for deep linking from dashboard
   useEffect(() => {
@@ -1370,6 +1371,9 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                         <TableHead className="text-right text-xs sm:text-sm">Days Worked</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Daily Rate</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Net Pay</TableHead>
+                        {isSuperAdmin && selectedRun?.status !== 'paid' && (
+                          <TableHead className="text-right text-xs sm:text-sm w-12"></TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1407,6 +1411,29 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                             <TableCell className="text-right font-mono text-xs sm:text-sm font-bold">
                               ₹{calculatedPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
+                            {isSuperAdmin && selectedRun?.status !== 'paid' && (
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  onClick={async () => {
+                                    if (confirm(`Remove ${item.employeeName} from this payroll?`)) {
+                                      try {
+                                        await fetch(`/api/payroll-items/${item.id}`, { method: 'DELETE' });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+                                        toast({ title: 'Employee removed from payroll' });
+                                      } catch (error) {
+                                        toast({ title: 'Failed to remove employee', variant: 'destructive' });
+                                      }
+                                    }
+                                  }}
+                                  data-testid={`button-delete-payroll-item-${item.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            )}
                           </TableRow>
                         );
                       })}
@@ -1423,6 +1450,7 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                             `₹${Number(selectedRun.totalAmount).toLocaleString()}`
                           )}
                         </TableCell>
+                        {isSuperAdmin && selectedRun?.status !== 'paid' && <TableCell />}
                       </TableRow>
                     </TableBody>
                   </Table>

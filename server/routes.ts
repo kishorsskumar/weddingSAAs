@@ -5169,6 +5169,56 @@ export async function registerRoutes(
     }
   });
 
+  // Delete individual payroll item (superadmin only)
+  app.delete('/api/payroll-items/:id', async (req, res) => {
+    try {
+      // Check if user is superadmin
+      if (!req.user || req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can delete payroll items' });
+      }
+
+      // Get the item first to find the payroll run
+      const items = await storage.getPayrollItemsByRunId('');
+      // Find the item in all runs
+      const allRuns = await storage.getAllPayrollRuns();
+      let targetItem = null;
+      let targetRunId = null;
+
+      for (const run of allRuns) {
+        const runItems = await storage.getPayrollItemsByRunId(run.id);
+        const found = runItems.find(i => i.id === req.params.id);
+        if (found) {
+          targetItem = found;
+          targetRunId = run.id;
+          break;
+        }
+      }
+
+      if (!targetItem || !targetRunId) {
+        return res.status(404).json({ error: 'Payroll item not found' });
+      }
+
+      // Check if payroll is already paid
+      const run = await storage.getPayrollRun(targetRunId);
+      if (run?.status === 'paid') {
+        return res.status(400).json({ error: 'Cannot delete items from paid payroll' });
+      }
+
+      // Delete the payroll item (cascades to salary slips due to FK constraint)
+      await storage.deletePayrollItem(req.params.id);
+
+      // Recalculate and update total amount
+      const remainingItems = await storage.getPayrollItemsByRunId(targetRunId);
+      const totalAmount = remainingItems.reduce((sum, i) => sum + parseFloat(i.netPay), 0);
+      await storage.updatePayrollRun(targetRunId, { totalAmount: totalAmount.toFixed(2) });
+
+      res.json({ success: true, newTotal: totalAmount.toFixed(2) });
+    } catch (error) {
+      console.error('Delete payroll item error:', error);
+      res.status(400).json({ error: 'Failed to delete payroll item' });
+    }
+  });
+
   // Salary Slips
   app.get('/api/salary-slips/payroll/:runId', async (req, res) => {
     try {
