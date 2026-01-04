@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, KeyboardEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { format, addMonths, subMonths } from "date-fns";
@@ -9,23 +9,12 @@ import {
   Download,
   RefreshCw,
   Trash2,
-  Save,
-  X,
   Calendar,
-  Check,
-  CheckCircle2,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +31,32 @@ import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+type CellKey = `${string}-${string}`;
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  width: number;
+  readonly?: boolean;
+  frozen?: boolean;
+  editable?: boolean;
+  type?: "number" | "text";
+}
+
+const COLUMNS: ColumnDef[] = [
+  { key: "eventDate", label: "Date", width: 85, readonly: true, frozen: true },
+  { key: "subEventName", label: "Event", width: 160, readonly: true, frozen: true },
+  { key: "venue", label: "Venue", width: 120, readonly: true },
+  { key: "teamLead", label: "Team Lead", width: 100, editable: true },
+  { key: "productionTeamCount", label: "Count", width: 60, editable: true, type: "number" },
+  { key: "florist", label: "Florist", width: 100, editable: true },
+  { key: "loadingStartDateTime", label: "Loading", width: 110, editable: true },
+  { key: "productionStartTime", label: "Prod Start", width: 110, editable: true },
+  { key: "productionEndTime", label: "Prod End", width: 110, editable: true },
+  { key: "dismantlingDateTime", label: "Dismantling", width: 110, editable: true },
+  { key: "dismantlingTeamLead", label: "Dis. Lead", width: 100, editable: true },
+];
+
 export default function MonthlyPlan() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,9 +64,14 @@ export default function MonthlyPlan() {
   const isSuperadmin = user?.role === "superadmin";
   
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const [focusedCell, setFocusedCell] = useState<CellKey | null>(null);
+  const [editingCell, setEditingCell] = useState<CellKey | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, string>>>({});
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
   
   const month = currentDate.getMonth() + 1;
   const year = currentDate.getFullYear();
@@ -108,9 +128,6 @@ export default function MonthlyPlan() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/monthly-plan", month, year] });
-      setEditingId(null);
-      setEditData({});
-      toast({ title: "Entry updated" });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -137,56 +154,113 @@ export default function MonthlyPlan() {
   });
 
   const sortedEntries = useMemo(() => {
-    return [...entries].sort((a, b) => 
+    let filtered = [...entries].sort((a, b) => 
       new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
     );
-  }, [entries]);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(e => 
+        e.subEventName?.toLowerCase().includes(q) ||
+        e.venue?.toLowerCase().includes(q) ||
+        e.teamLead?.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [entries, searchQuery]);
 
-  const startEdit = useCallback((entry: MonthlyProductionPlan) => {
-    setEditingId(entry.id);
-    setEditData({
-      teamLead: entry.teamLead || "",
-      productionTeamCount: String(entry.productionTeamCount || ""),
-      florist: entry.florist || "",
-      loadingStartDateTime: entry.loadingStartDateTime || "",
-      productionStartTime: entry.productionStartTime || "",
-      productionEndTime: entry.productionEndTime || "",
-      dismantlingDateTime: entry.dismantlingDateTime || "",
-      dismantlingTeamLead: entry.dismantlingTeamLead || "",
-    });
-  }, []);
+  const getCellValue = useCallback((entry: MonthlyProductionPlan, key: string): string => {
+    if (pendingChanges[entry.id]?.[key] !== undefined) {
+      return pendingChanges[entry.id][key];
+    }
+    if (key === "eventDate") {
+      return format(new Date(entry.eventDate), "dd-MMM-yy");
+    }
+    const val = entry[key as keyof MonthlyProductionPlan];
+    return val != null ? String(val) : "";
+  }, [pendingChanges]);
+
+  const startEditing = useCallback((rowId: string, colKey: string) => {
+    if (!isSuperadmin) return;
+    const col = COLUMNS.find(c => c.key === colKey);
+    if (!col?.editable) return;
+    
+    const cellKey: CellKey = `${rowId}-${colKey}`;
+    const entry = entries.find(e => e.id === rowId);
+    if (!entry) return;
+    
+    setFocusedCell(cellKey);
+    setEditingCell(cellKey);
+    setEditValue(getCellValue(entry, colKey));
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [isSuperadmin, entries, getCellValue]);
+
+  const commitEdit = useCallback(() => {
+    if (!editingCell) return;
+    
+    const [rowId, colKey] = editingCell.split("-") as [string, string];
+    const entry = entries.find(e => e.id === rowId);
+    if (!entry) return;
+    
+    const originalValue = getCellValue(entry, colKey);
+    if (editValue !== originalValue) {
+      const col = COLUMNS.find(c => c.key === colKey);
+      const dataValue = col?.type === "number" ? (editValue ? parseInt(editValue) : null) : (editValue || null);
+      
+      updateMutation.mutate({
+        id: rowId,
+        data: { [colKey]: dataValue },
+      });
+    }
+    
+    setEditingCell(null);
+    setEditValue("");
+  }, [editingCell, editValue, entries, getCellValue, updateMutation]);
 
   const cancelEdit = useCallback(() => {
-    setEditingId(null);
-    setEditData({});
+    setEditingCell(null);
+    setEditValue("");
   }, []);
 
-  const handleFieldChange = useCallback((field: string, value: string) => {
-    setEditData(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  const saveEdit = useCallback((id: string) => {
-    updateMutation.mutate({ 
-      id, 
-      data: {
-        teamLead: editData.teamLead || null,
-        productionTeamCount: editData.productionTeamCount ? parseInt(editData.productionTeamCount) : null,
-        florist: editData.florist || null,
-        loadingStartDateTime: editData.loadingStartDateTime || null,
-        productionStartTime: editData.productionStartTime || null,
-        productionEndTime: editData.productionEndTime || null,
-        dismantlingDateTime: editData.dismantlingDateTime || null,
-        dismantlingTeamLead: editData.dismantlingTeamLead || null,
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>, rowId: string, colKey: string) => {
+    const editableColumns = COLUMNS.filter(c => c.editable);
+    const currentColIndex = editableColumns.findIndex(c => c.key === colKey);
+    const currentRowIndex = sortedEntries.findIndex(e => e.id === rowId);
+    
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+      // Move to next row same column
+      if (currentRowIndex < sortedEntries.length - 1) {
+        const nextRow = sortedEntries[currentRowIndex + 1];
+        setTimeout(() => startEditing(nextRow.id, colKey), 50);
       }
-    });
-  }, [editData, updateMutation]);
+    } else if (e.key === "Tab") {
+      e.preventDefault();
+      commitEdit();
+      // Move to next/prev editable column
+      if (e.shiftKey && currentColIndex > 0) {
+        const prevCol = editableColumns[currentColIndex - 1];
+        setTimeout(() => startEditing(rowId, prevCol.key), 50);
+      } else if (!e.shiftKey && currentColIndex < editableColumns.length - 1) {
+        const nextCol = editableColumns[currentColIndex + 1];
+        setTimeout(() => startEditing(rowId, nextCol.key), 50);
+      } else if (!e.shiftKey && currentRowIndex < sortedEntries.length - 1) {
+        const nextRow = sortedEntries[currentRowIndex + 1];
+        setTimeout(() => startEditing(nextRow.id, editableColumns[0].key), 50);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  }, [sortedEntries, commitEdit, cancelEdit, startEditing]);
 
   const toggleComplete = useCallback((entry: MonthlyProductionPlan) => {
+    if (!isSuperadmin) return;
     updateMutation.mutate({ 
       id: entry.id, 
       data: { isComplete: !entry.isComplete }
     });
-  }, [updateMutation]);
+  }, [isSuperadmin, updateMutation]);
 
   const downloadPDF = () => {
     const doc = new jsPDF("landscape");
@@ -217,24 +291,14 @@ export default function MonthlyPlan() {
       entry.productionEndTime || "-",
       entry.dismantlingDateTime || "-",
       entry.dismantlingTeamLead || "-",
-      entry.isComplete ? "Complete" : "Pending",
+      entry.isComplete ? "Done" : "Pending",
     ]);
 
     autoTable(doc, {
       startY: 35,
       head: [[
-        "Date",
-        "Event",
-        "Venue",
-        "Team Lead",
-        "Count",
-        "Florist",
-        "Loading",
-        "Prod Start",
-        "Prod End",
-        "Dismantling",
-        "Dis. Lead",
-        "Status",
+        "Date", "Event", "Venue", "Team Lead", "Count", "Florist",
+        "Loading", "Prod Start", "Prod End", "Dismantling", "Dis. Lead", "Status",
       ]],
       body: tableData,
       headStyles: {
@@ -243,27 +307,17 @@ export default function MonthlyPlan() {
         fontSize: 7,
         fontStyle: "bold",
       },
-      bodyStyles: {
-        fontSize: 7,
-      },
+      bodyStyles: { fontSize: 7 },
       columnStyles: {
-        0: { cellWidth: 18 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 18 },
-        4: { cellWidth: 12 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 22 },
-        7: { cellWidth: 22 },
-        8: { cellWidth: 22 },
-        9: { cellWidth: 22 },
-        10: { cellWidth: 18 },
-        11: { cellWidth: 16 },
+        0: { cellWidth: 18 }, 1: { cellWidth: 30 }, 2: { cellWidth: 25 },
+        3: { cellWidth: 18 }, 4: { cellWidth: 12 }, 5: { cellWidth: 18 },
+        6: { cellWidth: 22 }, 7: { cellWidth: 22 }, 8: { cellWidth: 22 },
+        9: { cellWidth: 22 }, 10: { cellWidth: 18 }, 11: { cellWidth: 16 },
       },
       didParseCell: function(data) {
         if (data.section === 'body' && data.row.raw) {
           const rowData = data.row.raw as string[];
-          if (rowData[11] === 'Complete') {
+          if (rowData[11] === 'Done') {
             data.cell.styles.fillColor = [230, 244, 230];
           }
         }
@@ -291,288 +345,262 @@ export default function MonthlyPlan() {
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
+  // Calculate frozen column offset
+  const frozenWidth = COLUMNS.filter(c => c.frozen).reduce((sum, c) => sum + c.width, 0);
+
   return (
-    <div className="space-y-4 h-full flex flex-col px-2 sm:px-0">
+    <div className="h-full flex flex-col gap-3 px-2 sm:px-0">
+      {/* Header */}
       <motion.div
-        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+        transition={{ duration: 0.3 }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-primary" />
-            <h1 className="text-xl sm:text-2xl font-bold font-serif text-primary">Monthly Plan</h1>
-          </div>
-          <div className="flex items-center gap-2 bg-card border rounded-md p-1 w-fit">
-            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8" data-testid="button-prev-month">
+        <div className="flex items-center gap-3">
+          <Calendar className="h-5 w-5 text-primary" />
+          <h1 className="text-lg sm:text-xl font-bold font-serif text-primary">Monthly Production Plan</h1>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Month Navigation */}
+          <div className="flex items-center bg-white border rounded shadow-sm">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 rounded-none border-r" data-testid="button-prev-month">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <AnimatePresence mode="wait">
               <motion.span
                 key={format(currentDate, "MMMM yyyy")}
-                className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[140px] text-center"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
+                className="text-xs font-medium min-w-[100px] text-center px-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                {format(currentDate, "MMMM yyyy")}
+                {format(currentDate, "MMM yyyy")}
               </motion.span>
             </AnimatePresence>
-            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8" data-testid="button-next-month">
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 rounded-none border-l" data-testid="button-next-month">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 w-[140px] pl-7 text-xs"
+              data-testid="input-search"
+            />
+          </div>
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => generateMutation.mutate(true)}
             disabled={generateMutation.isPending}
-            className="gap-2"
-            data-testid="button-generate-plan"
+            className="h-8 gap-1.5 text-xs"
+            data-testid="button-sync"
           >
-            <RefreshCw className={`h-4 w-4 ${generateMutation.isPending ? "animate-spin" : ""}`} />
-            Sync Events
+            <RefreshCw className={cn("h-3.5 w-3.5", generateMutation.isPending && "animate-spin")} />
+            Sync
           </Button>
           <Button
-            variant="default"
             size="sm"
             onClick={downloadPDF}
-            className="gap-2"
+            className="h-8 gap-1.5 text-xs"
             data-testid="button-download-pdf"
           >
-            <Download className="h-4 w-4" />
+            <Download className="h-3.5 w-3.5" />
             PDF
           </Button>
         </div>
       </motion.div>
 
+      {/* Spreadsheet */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.4 }}
-        className="flex-1"
+        transition={{ delay: 0.1, duration: 0.3 }}
+        className="flex-1 border rounded-lg bg-white shadow-sm overflow-hidden"
       >
-        <Card className="overflow-hidden">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">Loading...</div>
-          ) : sortedEntries.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-muted-foreground mb-4">No events for this month</p>
-            </div>
-          ) : (
-            <div className="overflow-auto max-h-[calc(100vh-220px)]">
-              <Table className="relative">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="font-bold text-primary text-xs w-[85px] min-w-[85px] sticky top-0 left-0 z-30 bg-[hsl(var(--primary)/0.1)]">Date</TableHead>
-                    <TableHead className="font-bold text-primary text-xs w-[140px] min-w-[140px] sticky top-0 left-[85px] z-30 bg-[hsl(var(--primary)/0.1)]">Event</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[100px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Venue</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[90px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Team Lead</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[60px] text-center sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Count</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[90px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Florist</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[100px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Loading</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[100px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Prod Start</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[100px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Prod End</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[100px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Dismantling</TableHead>
-                    <TableHead className="font-bold text-primary text-xs min-w-[90px] sticky top-0 z-20 bg-[hsl(var(--primary)/0.1)]">Dis. Lead</TableHead>
-                    {isSuperadmin && (
-                      <TableHead className="font-bold text-primary text-xs min-w-[160px] text-right sticky top-0 right-0 z-30 bg-[hsl(var(--primary)/0.1)]">Actions</TableHead>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedEntries.map((entry) => {
-                    const isEditing = editingId === entry.id;
-                    const isComplete = entry.isComplete;
-                    const rowBg = isComplete ? "bg-[#E6F4E6]" : "bg-card";
-                    const rowBgHover = isComplete ? "hover:bg-[#D4ECD4]" : "hover:bg-muted/20";
-                    
+        {isLoading ? (
+          <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+            Loading...
+          </div>
+        ) : sortedEntries.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+            <Calendar className="h-10 w-10 mb-3 opacity-30" />
+            <p className="text-sm">No events for {format(currentDate, "MMMM yyyy")}</p>
+          </div>
+        ) : (
+          <div ref={tableRef} className="h-full overflow-auto">
+            <table className="w-full border-collapse text-xs" style={{ minWidth: COLUMNS.reduce((sum, c) => sum + c.width, 0) + (isSuperadmin ? 80 : 0) }}>
+              {/* Header */}
+              <thead>
+                <tr className="bg-gradient-to-b from-gray-100 to-gray-50">
+                  {isSuperadmin && (
+                    <th 
+                      className="sticky top-0 left-0 z-30 bg-gradient-to-b from-gray-100 to-gray-50 border-b border-r border-gray-300 px-2 py-2 text-center font-semibold text-gray-700"
+                      style={{ width: 40, minWidth: 40 }}
+                    >
+                      Done
+                    </th>
+                  )}
+                  {COLUMNS.map((col, idx) => {
+                    let leftOffset = isSuperadmin ? 40 : 0;
+                    if (col.frozen) {
+                      for (let i = 0; i < idx; i++) {
+                        if (COLUMNS[i].frozen) leftOffset += COLUMNS[i].width;
+                      }
+                    }
                     return (
-                      <TableRow 
-                        key={entry.id} 
-                        className={cn("transition-colors", rowBg, rowBgHover)} 
-                        data-testid={`row-entry-${entry.id}`}
-                      >
-                        <TableCell className={cn("text-xs font-medium w-[85px] min-w-[85px] sticky left-0 z-10", rowBg)}>
-                          {format(new Date(entry.eventDate), "dd-MMM-yy")}
-                        </TableCell>
-                        <TableCell className={cn("text-xs font-medium w-[140px] min-w-[140px] sticky left-[85px] z-10", rowBg)}>
-                          {entry.subEventName || "-"}
-                        </TableCell>
-                        <TableCell className="text-xs">{entry.venue || "-"}</TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.teamLead}
-                              onChange={(e) => handleFieldChange("teamLead", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="Team Lead"
-                              data-testid="input-teamLead"
-                            />
-                          ) : (entry.teamLead || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs text-center">
-                          {isEditing ? (
-                            <Input
-                              type="number"
-                              value={editData.productionTeamCount}
-                              onChange={(e) => handleFieldChange("productionTeamCount", e.target.value)}
-                              className="h-8 text-xs w-16"
-                              data-testid="input-team-count"
-                            />
-                          ) : (entry.productionTeamCount || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.florist}
-                              onChange={(e) => handleFieldChange("florist", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="Florist"
-                              data-testid="input-florist"
-                            />
-                          ) : (entry.florist || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.loadingStartDateTime}
-                              onChange={(e) => handleFieldChange("loadingStartDateTime", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="e.g. 20 Dec-5PM"
-                              data-testid="input-loadingStartDateTime"
-                            />
-                          ) : (entry.loadingStartDateTime || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.productionStartTime}
-                              onChange={(e) => handleFieldChange("productionStartTime", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="e.g. 20 Dec-7PM"
-                              data-testid="input-productionStartTime"
-                            />
-                          ) : (entry.productionStartTime || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.productionEndTime}
-                              onChange={(e) => handleFieldChange("productionEndTime", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="e.g. 20 Dec-10PM"
-                              data-testid="input-productionEndTime"
-                            />
-                          ) : (entry.productionEndTime || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.dismantlingDateTime}
-                              onChange={(e) => handleFieldChange("dismantlingDateTime", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="e.g. 21 Dec-11PM"
-                              data-testid="input-dismantlingDateTime"
-                            />
-                          ) : (entry.dismantlingDateTime || "-")}
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {isEditing ? (
-                            <Input
-                              value={editData.dismantlingTeamLead}
-                              onChange={(e) => handleFieldChange("dismantlingTeamLead", e.target.value)}
-                              className="h-8 text-xs min-w-[80px]"
-                              placeholder="Dis. Lead"
-                              data-testid="input-dismantlingTeamLead"
-                            />
-                          ) : (entry.dismantlingTeamLead || "-")}
-                        </TableCell>
-                        {isSuperadmin && (
-                          <TableCell className={cn("sticky right-0 z-10", rowBg)}>
-                            <div className="flex items-center justify-end gap-1">
-                              {isEditing ? (
-                                <>
-                                  <Button
-                                    variant="default"
-                                    size="sm"
-                                    className="h-7 gap-1 text-xs"
-                                    onClick={() => saveEdit(entry.id)}
-                                    disabled={updateMutation.isPending}
-                                    data-testid={`button-save-${entry.id}`}
-                                  >
-                                    <Save className="h-3 w-3" />
-                                    Save
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-7 text-xs"
-                                    onClick={cancelEdit}
-                                    data-testid={`button-cancel-${entry.id}`}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 text-xs"
-                                    onClick={() => startEdit(entry)}
-                                    data-testid={`button-edit-${entry.id}`}
-                                  >
-                                    Edit
-                                  </Button>
-                                  <Button
-                                    variant={isComplete ? "default" : "outline"}
-                                    size="sm"
-                                    className={cn("h-7 text-xs gap-1", isComplete && "bg-[#6b9937] hover:bg-[#5a8230]")}
-                                    onClick={() => toggleComplete(entry)}
-                                    data-testid={`button-complete-${entry.id}`}
-                                  >
-                                    {isComplete ? (
-                                      <>
-                                        <CheckCircle2 className="h-3 w-3" />
-                                        Done
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Check className="h-3 w-3" />
-                                        Complete
-                                      </>
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                    onClick={() => setDeleteId(entry.id)}
-                                    data-testid={`button-delete-${entry.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          </TableCell>
+                      <th
+                        key={col.key}
+                        className={cn(
+                          "sticky top-0 border-b border-r border-gray-300 px-2 py-2 text-left font-semibold text-gray-700 whitespace-nowrap bg-gradient-to-b from-gray-100 to-gray-50",
+                          col.frozen ? "z-30" : "z-20"
                         )}
-                      </TableRow>
+                        style={{ 
+                          width: col.width, 
+                          minWidth: col.width,
+                          left: col.frozen ? leftOffset : undefined,
+                        }}
+                      >
+                        {col.label}
+                      </th>
                     );
                   })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </Card>
+                  {isSuperadmin && (
+                    <th 
+                      className="sticky top-0 right-0 z-30 bg-gradient-to-b from-gray-100 to-gray-50 border-b border-l border-gray-300 px-2 py-2 text-center font-semibold text-gray-700"
+                      style={{ width: 40, minWidth: 40 }}
+                    >
+                      Del
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              {/* Body */}
+              <tbody>
+                {sortedEntries.map((entry, rowIndex) => {
+                  const isComplete = entry.isComplete;
+                  const rowBg = isComplete ? "bg-green-100" : rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50/50";
+                  const hoverBg = isComplete ? "hover:bg-green-200/70" : "hover:bg-blue-50/50";
+                  
+                  return (
+                    <tr 
+                      key={entry.id} 
+                      className={cn("group", rowBg, hoverBg)}
+                      data-testid={`row-${entry.id}`}
+                    >
+                      {/* Completion Checkbox */}
+                      {isSuperadmin && (
+                        <td 
+                          className={cn("sticky left-0 z-10 border-b border-r border-gray-200 px-2 py-1.5 text-center", rowBg, isComplete ? "group-hover:bg-green-200/70" : "group-hover:bg-blue-50/50")}
+                          style={{ width: 40, minWidth: 40 }}
+                        >
+                          <Checkbox
+                            checked={!!isComplete}
+                            onCheckedChange={() => toggleComplete(entry)}
+                            className="h-4 w-4"
+                            data-testid={`checkbox-complete-${entry.id}`}
+                          />
+                        </td>
+                      )}
+                      
+                      {/* Data Cells */}
+                      {COLUMNS.map((col, idx) => {
+                        const cellKey: CellKey = `${entry.id}-${col.key}`;
+                        const isEditing = editingCell === cellKey;
+                        const isFocused = focusedCell === cellKey;
+                        const value = getCellValue(entry, col.key);
+                        
+                        let leftOffset = isSuperadmin ? 40 : 0;
+                        if (col.frozen) {
+                          for (let i = 0; i < idx; i++) {
+                            if (COLUMNS[i].frozen) leftOffset += COLUMNS[i].width;
+                          }
+                        }
+                        
+                        return (
+                          <td
+                            key={col.key}
+                            className={cn(
+                              "border-b border-r border-gray-200 px-2 py-1.5 transition-colors cursor-default",
+                              col.frozen && cn("sticky z-10", rowBg, isComplete ? "group-hover:bg-green-200/70" : "group-hover:bg-blue-50/50"),
+                              col.editable && isSuperadmin && "cursor-cell hover:bg-blue-100/50",
+                              isFocused && "ring-2 ring-inset ring-blue-400",
+                              isEditing && "p-0"
+                            )}
+                            style={{ 
+                              width: col.width, 
+                              minWidth: col.width,
+                              left: col.frozen ? leftOffset : undefined,
+                            }}
+                            onClick={() => {
+                              if (col.editable && isSuperadmin) {
+                                startEditing(entry.id, col.key);
+                              }
+                            }}
+                            onFocus={() => setFocusedCell(cellKey)}
+                            onBlur={() => setFocusedCell(null)}
+                            tabIndex={col.editable && isSuperadmin ? 0 : -1}
+                            data-testid={`cell-${entry.id}-${col.key}`}
+                          >
+                            {isEditing ? (
+                              <input
+                                ref={inputRef}
+                                type={col.type === "number" ? "number" : "text"}
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onBlur={commitEdit}
+                                onKeyDown={(e) => handleKeyDown(e, entry.id, col.key)}
+                                className="w-full h-full px-2 py-1.5 text-xs border-0 outline-none bg-blue-50 focus:ring-2 focus:ring-blue-400"
+                                data-testid={`input-${entry.id}-${col.key}`}
+                              />
+                            ) : (
+                              <span className={cn("block truncate", !value && "text-gray-400")}>
+                                {value || (col.editable && isSuperadmin ? "—" : "-")}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      
+                      {/* Delete Button */}
+                      {isSuperadmin && (
+                        <td 
+                          className={cn("sticky right-0 z-10 border-b border-l border-gray-200 px-2 py-1.5 text-center", rowBg, isComplete ? "group-hover:bg-green-200/70" : "group-hover:bg-blue-50/50")}
+                          style={{ width: 40, minWidth: 40 }}
+                        >
+                          <button
+                            onClick={() => setDeleteId(entry.id)}
+                            className="p-1 rounded hover:bg-red-100 text-gray-400 hover:text-red-600 transition-colors"
+                            data-testid={`button-delete-${entry.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </motion.div>
 
+      {/* Footer Stats */}
+      <div className="shrink-0 flex items-center justify-between text-xs text-muted-foreground px-1">
+        <span>{sortedEntries.length} event{sortedEntries.length !== 1 ? "s" : ""}</span>
+        <span>{sortedEntries.filter(e => e.isComplete).length} completed</span>
+      </div>
+
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
