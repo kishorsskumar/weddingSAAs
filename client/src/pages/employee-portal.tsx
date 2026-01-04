@@ -935,15 +935,19 @@ function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
       
       // Deductions
       doc.setFont('helvetica', 'normal');
-      doc.text('Professional Tax:', 105, y + 8);
-      doc.text('-', 180, y + 8, { align: 'right' });
-      doc.text('Loss of Pay:', 105, y + 16);
-      doc.text(slip.lossOfPay || '0.00', 180, y + 16, { align: 'right' });
-      doc.text('Transport Deduction:', 105, y + 24);
-      doc.text(slip.transportDeduction || '0.00', 180, y + 24, { align: 'right' });
+      const lossOfPayAmount = parseFloat(slip.lossOfPay || '0');
+      const transportDeductionAmount = parseFloat(slip.transportDeduction || '0');
+      const calculatedTotalDeductions = lossOfPayAmount + transportDeductionAmount;
+      
+      doc.text('Professional Tax:', 110, y + 8);
+      doc.text('0.00', 180, y + 8, { align: 'right' });
+      doc.text('Loss of Pay:', 110, y + 16);
+      doc.text(lossOfPayAmount.toFixed(2), 180, y + 16, { align: 'right' });
+      doc.text('Transport Deduction:', 110, y + 24);
+      doc.text(transportDeductionAmount.toFixed(2), 180, y + 24, { align: 'right' });
       doc.setFont('helvetica', 'bold');
-      doc.text('Total Deductions:', 105, y + 40);
-      doc.text(slip.totalDeductions, 180, y + 40, { align: 'right' });
+      doc.text('Total Deductions:', 110, y + 40);
+      doc.text(calculatedTotalDeductions.toFixed(2), 180, y + 40, { align: 'right' });
       
       // Net Payment
       y += 52;
