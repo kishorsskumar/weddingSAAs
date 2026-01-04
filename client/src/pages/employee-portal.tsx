@@ -866,11 +866,6 @@ function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
       doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2 + 15, 26, { align: 'center' });
       doc.text('Tel: 7902373354', pageWidth / 2 + 15, 33, { align: 'center' });
       
-      // Separator line
-      doc.setDrawColor(157, 41, 102);
-      doc.setLineWidth(0.5);
-      doc.line(15, 42, pageWidth - 15, 42);
-      
       // Title
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(14);
