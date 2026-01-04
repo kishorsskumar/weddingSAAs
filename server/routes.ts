@@ -5169,6 +5169,107 @@ export async function registerRoutes(
     }
   });
 
+  // Salary Slips
+  app.get('/api/salary-slips/payroll/:runId', async (req, res) => {
+    try {
+      const slips = await storage.getSalarySlipsByPayrollRun(req.params.runId);
+      res.json(slips);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch salary slips' });
+    }
+  });
+
+  app.get('/api/salary-slips/employee/:employeeId', async (req, res) => {
+    try {
+      const slips = await storage.getSalarySlipsForEmployee(req.params.employeeId);
+      res.json(slips);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch salary slips' });
+    }
+  });
+
+  app.get('/api/salary-slips/:id', async (req, res) => {
+    try {
+      const slip = await storage.getSalarySlip(req.params.id);
+      if (!slip) {
+        return res.status(404).json({ error: 'Salary slip not found' });
+      }
+      res.json(slip);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch salary slip' });
+    }
+  });
+
+  app.post('/api/salary-slips/generate/:runId', async (req, res) => {
+    try {
+      const run = await storage.getPayrollRun(req.params.runId);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+
+      // Delete existing slips for this run
+      await storage.deleteSalarySlipsByPayrollRun(req.params.runId);
+
+      // Get payroll items
+      const items = await storage.getPayrollItemsByRunId(req.params.runId);
+      const employees = await storage.getAllEmployees();
+      const employeeMap = new Map(employees.map(e => [e.id, e]));
+
+      // Generate salary slips for each payroll item
+      const slips = [];
+      for (const item of items) {
+        const employee = employeeMap.get(item.employeeId);
+        if (!employee) continue;
+
+        const basicPay = parseFloat(item.basicPay);
+        const hra = basicPay * 0.4; // 40% of basic as HRA
+        const allowances = parseFloat(item.netPay) - basicPay - hra;
+        const professionalTax = 200; // Standard PT
+        const lossOfPay = (parseFloat(item.basicPay) / (item.totalDays || 30)) * (item.absentDays || 0);
+
+        const slip = await storage.createSalarySlip({
+          payrollRunId: req.params.runId,
+          employeeId: item.employeeId,
+          employeeName: item.employeeName,
+          designation: employee.designation || 'Staff',
+          department: employee.department || 'General',
+          month: run.month,
+          year: run.year,
+          totalDays: item.totalDays || 30,
+          daysPresent: (item.totalDays || 30) - (item.absentDays || 0),
+          daysPaid: item.workingDays || 30,
+          basicDa: basicPay.toFixed(2),
+          hra: hra.toFixed(2),
+          allowances: allowances > 0 ? allowances.toFixed(2) : '0.00',
+          grossEarnings: parseFloat(item.netPay).toFixed(2),
+          professionalTax: professionalTax.toFixed(2),
+          lossOfPay: lossOfPay.toFixed(2),
+          otherDeductions: '0.00',
+          totalDeductions: (professionalTax + lossOfPay).toFixed(2),
+          netPayment: (parseFloat(item.netPay) - professionalTax - lossOfPay).toFixed(2),
+        });
+        slips.push(slip);
+      }
+
+      res.json({ success: true, count: slips.length, slips });
+    } catch (error: any) {
+      console.error('Generate salary slips error:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate salary slips' });
+    }
+  });
+
+  app.patch('/api/salary-slips/:id/whatsapp-sent', async (req, res) => {
+    try {
+      const slip = await storage.updateSalarySlip(req.params.id, {
+        whatsappSent: true,
+        whatsappSentAt: new Date().toISOString(),
+      });
+      res.json(slip);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update salary slip' });
+    }
+  });
+
   // Oak Sales - Pipelines
   app.get('/api/sales/pipelines', async (req, res) => {
     const pipelines = await storage.getAllSalesPipelines();
