@@ -962,8 +962,16 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
   
   // For payroll, include current employees PLUS employees who left during the selected month
   // This ensures employees who leave mid-month still get their payslip for that month
+  // Excludes system/test employees like "Oaksy AI" and "test employee"
   const payrollEligibleEmployees = useMemo(() => {
+    const excludedNames = ['oaksy ai', 'test employee', 'test'];
     return allEmployees.filter(emp => {
+      // Exclude system/test employees
+      const nameLower = emp.name.toLowerCase();
+      if (excludedNames.some(excluded => nameLower.includes(excluded))) {
+        return false;
+      }
+      
       // Include all current/active employees
       if (emp.isActive !== false) return true;
       
