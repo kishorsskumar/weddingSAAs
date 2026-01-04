@@ -1010,7 +1010,9 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
   const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
     queryKey: ['/api/payroll-runs'],
     queryFn: async () => {
-      const res = await fetch('/api/payroll-runs');
+      const res = await fetch('/api/payroll-runs', {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error('Failed to fetch payroll runs');
       return res.json();
     },
@@ -1033,7 +1035,9 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
     queryKey: ['/api/payroll-runs', selectedRun?.id, 'items'],
     queryFn: async () => {
       if (!selectedRun) return [];
-      const res = await fetch(`/api/payroll-runs/${selectedRun.id}/items`);
+      const res = await fetch(`/api/payroll-runs/${selectedRun.id}/items`, {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error('Failed to fetch payroll items');
       return res.json();
     },
@@ -1079,6 +1083,7 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
       const res = await fetch(`/api/payroll-runs/${selectedRunId}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ payDate, bankId: selectedBankId || undefined }),
       });
       if (!res.ok) {
@@ -1102,13 +1107,22 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
 
   const deletePayrollMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/payroll-runs/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete payroll');
+      const res = await fetch(`/api/payroll-runs/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete payroll');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
-      toast({ title: 'Payroll deleted' });
+      toast({ title: 'Payroll deleted successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -1117,6 +1131,7 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
       const res = await fetch(`/api/payroll-runs/${runId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ items }),
       });
       if (!res.ok) {
@@ -1709,7 +1724,9 @@ function SalarySlipsSection() {
   const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
     queryKey: ['/api/payroll-runs'],
     queryFn: async () => {
-      const res = await fetch('/api/payroll-runs');
+      const res = await fetch('/api/payroll-runs', {
+        credentials: 'include',
+      });
       if (!res.ok) throw new Error('Failed to fetch payroll runs');
       return res.json();
     },
