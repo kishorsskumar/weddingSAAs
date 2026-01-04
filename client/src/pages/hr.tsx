@@ -1776,28 +1776,31 @@ function SalarySlipsSection() {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       
-      // Header with maroon background
-      doc.setFillColor(157, 41, 102);
-      doc.rect(0, 0, pageWidth, 35, 'F');
-      
-      // Add Yepman logo on left side
+      // Add Yepman logo on left side (in color on white background)
       const img = new Image();
       img.src = yepmanLogo;
       try {
-        doc.addImage(img, 'PNG', 10, 5, 25, 25);
+        doc.addImage(img, 'PNG', 15, 8, 30, 30);
       } catch (e) {
         // Logo loading failed, continue without it
       }
       
-      doc.setTextColor(255, 255, 255);
+      // Header text - normal black text on white background
+      doc.setTextColor(157, 41, 102); // Maroon color for company name
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2 + 10, 15, { align: 'center' });
+      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2 + 15, 18, { align: 'center' });
       
+      doc.setTextColor(0, 0, 0); // Black for address
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2 + 10, 22, { align: 'center' });
-      doc.text('Tel: 7902373354', pageWidth / 2 + 10, 28, { align: 'center' });
+      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2 + 15, 26, { align: 'center' });
+      doc.text('Tel: 7902373354', pageWidth / 2 + 15, 33, { align: 'center' });
+      
+      // Separator line
+      doc.setDrawColor(157, 41, 102);
+      doc.setLineWidth(0.5);
+      doc.line(15, 42, pageWidth - 15, 42);
       
       // Title
       doc.setTextColor(0, 0, 0);
