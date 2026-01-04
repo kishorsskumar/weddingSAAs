@@ -1844,8 +1844,10 @@ function SalarySlipsSection() {
       doc.text('EARNINGS', 60, y + 6, { align: 'center' });
       
       // Deductions header
+      doc.setFillColor(157, 41, 102);
       doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 8, 'F');
-      doc.text('DEDUCTIONS', 145, y + 6, { align: 'center' });
+      doc.setTextColor(255, 255, 255);
+      doc.text('DEDUCTIONS', 150, y + 6, { align: 'center' });
       
       y += 8;
       doc.setTextColor(0, 0, 0);

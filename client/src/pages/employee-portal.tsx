@@ -912,7 +912,7 @@ function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.text('EARNINGS', 60, y + 6, { align: 'center' });
-      doc.text('DEDUCTIONS', 145, y + 6, { align: 'center' });
+      doc.text('DEDUCTIONS', 150, y + 6, { align: 'center' });
       
       y += 8;
       doc.setTextColor(0, 0, 0);
