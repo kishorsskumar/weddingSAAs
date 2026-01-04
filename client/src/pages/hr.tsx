@@ -935,6 +935,7 @@ export default function HR() {
             currentEmployees={currentEmployees}
             allEmployees={employees}
             totalCurrentSalary={totalCurrentSalary}
+            isSuperAdmin={isSuperAdmin}
             isAdmin={isAdmin}
           />
         </TabsContent>
@@ -962,11 +963,12 @@ export default function HR() {
   );
 }
 
-function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, isAdmin }: { 
+function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, isAdmin, isSuperAdmin }: { 
   currentEmployees: Employee[]; 
   allEmployees: Employee[];
   totalCurrentSalary: number;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
