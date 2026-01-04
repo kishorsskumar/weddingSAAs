@@ -1420,11 +1420,19 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                                   onClick={async () => {
                                     if (confirm(`Remove ${item.employeeName} from this payroll?`)) {
                                       try {
-                                        await fetch(`/api/payroll-items/${item.id}`, { method: 'DELETE' });
+                                        const response = await fetch(`/api/payroll-items/${item.id}`, { 
+                                          method: 'DELETE',
+                                          credentials: 'include'
+                                        });
+                                        if (!response.ok) {
+                                          const error = await response.json();
+                                          throw new Error(error.error || 'Failed to delete');
+                                        }
                                         queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+                                        queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs', selectedRun.id, 'items'] });
                                         toast({ title: 'Employee removed from payroll' });
-                                      } catch (error) {
-                                        toast({ title: 'Failed to remove employee', variant: 'destructive' });
+                                      } catch (error: any) {
+                                        toast({ title: error.message || 'Failed to remove employee', variant: 'destructive' });
                                       }
                                     }
                                   }}

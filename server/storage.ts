@@ -464,6 +464,7 @@ export interface IStorage {
   updatePayrollRun(id: string, run: Partial<InsertPayrollRun>): Promise<PayrollRun | undefined>;
   deletePayrollRun(id: string): Promise<void>;
   getPayrollItemsByRunId(runId: string): Promise<PayrollItem[]>;
+  getPayrollItem(id: string): Promise<PayrollItem | undefined>;
   createPayrollItem(item: InsertPayrollItem): Promise<PayrollItem>;
   updatePayrollItem(id: string, item: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
   deletePayrollItem(id: string): Promise<void>;
@@ -1998,6 +1999,11 @@ export class DatabaseStorage implements IStorage {
 
   async getPayrollItemsByRunId(runId: string): Promise<PayrollItem[]> {
     return await db.select().from(payrollItems).where(eq(payrollItems.payrollRunId, runId));
+  }
+
+  async getPayrollItem(id: string): Promise<PayrollItem | undefined> {
+    const [item] = await db.select().from(payrollItems).where(eq(payrollItems.id, id));
+    return item || undefined;
   }
 
   async createPayrollItem(item: InsertPayrollItem): Promise<PayrollItem> {
