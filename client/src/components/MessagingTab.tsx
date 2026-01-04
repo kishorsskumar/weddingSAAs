@@ -678,11 +678,34 @@ export function MessagingTab() {
           </div>
 
           <div>
-            <h3 className="font-medium mb-3">Opted-In Employees</h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <h3 className="font-medium mb-3 flex items-center gap-2">
               <Users className="h-4 w-4" />
-              <span>{optedInEmployees.length} employees have opted in to receive WhatsApp messages</span>
-            </div>
+              Opted-In Employees ({optedInEmployees.length})
+            </h3>
+            {optedInEmployees.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No employees have opted in yet. Share the opt-in link above with your team.</p>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">Name</th>
+                      <th className="text-left px-3 py-2 font-medium">Department</th>
+                      <th className="text-left px-3 py-2 font-medium">WhatsApp Number</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optedInEmployees.map((emp, idx) => (
+                      <tr key={emp.id} className={idx % 2 === 0 ? "bg-white" : "bg-muted/20"} data-testid={`row-opted-employee-${emp.id}`}>
+                        <td className="px-3 py-2">{emp.name}</td>
+                        <td className="px-3 py-2 text-muted-foreground">{emp.department || "-"}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{emp.whatsappNumber || emp.phone || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
