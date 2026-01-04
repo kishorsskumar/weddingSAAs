@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import yepmanLogo from "@assets/Yepman_1767319118647.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -848,15 +849,24 @@ function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
       doc.setFillColor(157, 41, 102);
       doc.rect(0, 0, pageWidth, 35, 'F');
       
+      // Add Yepman logo on left side
+      const img = new Image();
+      img.src = yepmanLogo;
+      try {
+        doc.addImage(img, 'PNG', 10, 5, 25, 25);
+      } catch (e) {
+        // Logo loading failed, continue without it
+      }
+      
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2, 15, { align: 'center' });
+      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2 + 10, 15, { align: 'center' });
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2, 22, { align: 'center' });
-      doc.text('Tel: 7902373354', pageWidth / 2, 28, { align: 'center' });
+      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2 + 10, 22, { align: 'center' });
+      doc.text('Tel: 7902373354', pageWidth / 2 + 10, 28, { align: 'center' });
       
       // Title
       doc.setTextColor(0, 0, 0);
@@ -928,7 +938,7 @@ function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
       // Deductions
       doc.setFont('helvetica', 'normal');
       doc.text('Professional Tax:', 105, y + 8);
-      doc.text(slip.professionalTax || '0.00', 180, y + 8, { align: 'right' });
+      doc.text('-', 180, y + 8, { align: 'right' });
       doc.text('Loss of Pay:', 105, y + 16);
       doc.text(slip.lossOfPay || '0.00', 180, y + 16, { align: 'right' });
       doc.text('Transport Deduction:', 105, y + 24);
