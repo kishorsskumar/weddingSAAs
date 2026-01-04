@@ -5331,6 +5331,81 @@ export async function registerRoutes(
     }
   });
 
+  // Send salary slip via WhatsApp (superadmin only)
+  app.post('/api/salary-slips/:id/send-whatsapp', async (req, res) => {
+    try {
+      // Check if user is superadmin
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can send salary slips via WhatsApp' });
+      }
+
+      const slip = await storage.getSalarySlip(req.params.id);
+      if (!slip) {
+        return res.status(404).json({ error: 'Salary slip not found' });
+      }
+
+      // Get employee to find their WhatsApp number
+      const employee = await storage.getEmployee(slip.employeeId);
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      const phoneNumber = employee.whatsappNumber || employee.phone;
+      if (!phoneNumber) {
+        return res.status(400).json({ error: 'Employee does not have a phone number' });
+      }
+
+      // Import WhatsApp service
+      const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
+      
+      if (!isWhatsAppConfigured()) {
+        return res.status(400).json({ error: 'WhatsApp is not configured. Please set up Twilio credentials.' });
+      }
+
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthLabel = `${monthNames[slip.month - 1]} ${slip.year}`;
+
+      // Create salary slip message
+      const message = `*SALARY SLIP - ${monthLabel}*\n\n` +
+        `Dear ${slip.employeeName},\n\n` +
+        `Your salary slip for ${monthLabel} is ready.\n\n` +
+        `*EARNINGS*\n` +
+        `Basic + DA: Rs. ${slip.basicDa}\n` +
+        `HRA: Rs. ${slip.hra || '0.00'}\n` +
+        `Other Allowances: Rs. ${slip.otherAllowances || '0.00'}\n` +
+        `Total Earnings: Rs. ${slip.totalEarnings}\n\n` +
+        `*DEDUCTIONS*\n` +
+        `Professional Tax: Rs. 0.00\n` +
+        `Loss of Pay: Rs. ${slip.lossOfPay || '0.00'}\n` +
+        `Total Deductions: Rs. ${parseFloat(slip.lossOfPay || '0').toFixed(2)}\n\n` +
+        `*NET PAYMENT: Rs. ${slip.netPayment}*\n\n` +
+        `Thank you for your service.\n` +
+        `- Yepman International`;
+
+      const result = await sendWhatsAppMessage(phoneNumber, message);
+
+      if (result.success) {
+        // Update salary slip as sent
+        await storage.updateSalarySlip(req.params.id, {
+          sentViaWhatsapp: true,
+          sentAt: new Date().toISOString(),
+        });
+        res.json({ success: true, message: 'Salary slip sent successfully' });
+      } else {
+        res.status(400).json({ error: result.error || 'Failed to send WhatsApp message' });
+      }
+    } catch (error: any) {
+      console.error('Send salary slip WhatsApp error:', error);
+      res.status(500).json({ error: error.message || 'Failed to send salary slip' });
+    }
+  });
+
   // Oak Sales - Pipelines
   app.get('/api/sales/pipelines', async (req, res) => {
     const pipelines = await storage.getAllSalesPipelines();

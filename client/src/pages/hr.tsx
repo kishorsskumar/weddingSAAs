@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload, Send } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { format, parseISO } from "date-fns";
@@ -1720,9 +1720,12 @@ interface SalarySlip {
 function SalarySlipsSection() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'superadmin';
   const [selectedPayrollId, setSelectedPayrollId] = useState<string>('');
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [payrollSearch, setPayrollSearch] = useState('');
+  const [sendingSlipId, setSendingSlipId] = useState<string | null>(null);
   
   const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
     queryKey: ['/api/payroll-runs'],
@@ -1758,6 +1761,30 @@ function SalarySlipsSection() {
     },
     onError: (error: any) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const sendWhatsAppMutation = useMutation({
+    mutationFn: async (slipId: string) => {
+      setSendingSlipId(slipId);
+      const res = await fetch(`/api/salary-slips/${slipId}/send-whatsapp`, { 
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to send WhatsApp');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Salary slip sent via WhatsApp' });
+      refetchSlips();
+      setSendingSlipId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setSendingSlipId(null);
     },
   });
   
@@ -2032,14 +2059,34 @@ function SalarySlipsSection() {
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => downloadPDF(slip)}
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      PDF
-                    </Button>
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => downloadPDF(slip)}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        PDF
+                      </Button>
+                      {isSuperAdmin && !slip.sentViaWhatsapp && (
+                        <Button
+                          size="sm"
+                          variant="default"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => sendWhatsAppMutation.mutate(slip.id)}
+                          disabled={sendingSlipId === slip.id}
+                        >
+                          {sendingSlipId === slip.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-1" />
+                              Send
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
