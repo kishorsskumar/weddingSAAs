@@ -791,6 +791,253 @@ function QuickEntryTab() {
   );
 }
 
+// Employee Salary Slips Section
+interface SalarySlip {
+  id: string;
+  payrollRunId: string;
+  payrollItemId: string;
+  employeeId: string;
+  month: number;
+  year: number;
+  employeeName: string;
+  designation: string | null;
+  department: string | null;
+  panNumber: string | null;
+  location: string | null;
+  joinDate: string | null;
+  totalDays: number;
+  daysPresent: number;
+  daysPaid: number;
+  basicPay: string;
+  basicDa: string;
+  hra: string | null;
+  otherAllowances: string | null;
+  transportationAllowance: string | null;
+  totalEarnings: string;
+  professionalTax: string | null;
+  lossOfPay: string | null;
+  transportDeduction: string | null;
+  totalDeductions: string;
+  netPayment: string;
+  amountInWords: string | null;
+  sentViaWhatsapp: boolean;
+  sentAt: string | null;
+  createdAt: string;
+}
+
+function EmployeeSalarySlipsSection({ employeeId }: { employeeId: string }) {
+  const { data: salarySlips = [], isLoading } = useQuery<SalarySlip[]>({
+    queryKey: ['/api/salary-slips/employee', employeeId],
+    queryFn: async () => {
+      const res = await fetch(`/api/salary-slips/employee/${employeeId}`);
+      if (!res.ok) throw new Error('Failed to fetch salary slips');
+      return res.json();
+    },
+    enabled: !!employeeId,
+  });
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  
+  const downloadPDF = (slip: SalarySlip) => {
+    import('jspdf').then(({ jsPDF }) => {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      
+      // Header with maroon background (Yepman branding)
+      doc.setFillColor(157, 41, 102);
+      doc.rect(0, 0, pageWidth, 35, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('YEPMAN INTERNATIONAL', pageWidth / 2, 15, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('2nd Floor, Above Devas Studio, Kaloor, Kochi-682017', pageWidth / 2, 22, { align: 'center' });
+      doc.text('Tel: 7902373354', pageWidth / 2, 28, { align: 'center' });
+      
+      // Title
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PAY SLIP', pageWidth / 2, 45, { align: 'center' });
+      
+      const monthLabel = `${monthNames[slip.month - 1]} ${slip.year}`;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`For the month of ${monthLabel}`, pageWidth / 2, 52, { align: 'center' });
+      
+      // Employee details box
+      doc.setDrawColor(157, 41, 102);
+      doc.setLineWidth(0.5);
+      doc.rect(15, 58, pageWidth - 30, 30);
+      
+      doc.setFontSize(9);
+      doc.text(`Employee Name: ${slip.employeeName}`, 20, 66);
+      doc.text(`Designation: ${slip.designation || '-'}`, 20, 73);
+      doc.text(`Department: ${slip.department || '-'}`, 20, 80);
+      doc.text(`Location: ${slip.location || 'KOCHI'}`, 110, 66);
+      doc.text(`PAN: ${slip.panNumber || '-'}`, 110, 73);
+      doc.text(`Join Date: ${slip.joinDate || '-'}`, 110, 80);
+      
+      // Attendance section
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, 95, pageWidth - 30, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ATTENDANCE', pageWidth / 2, 101, { align: 'center' });
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.rect(15, 103, pageWidth - 30, 15);
+      doc.text(`Total Days: ${slip.totalDays}`, 25, 112);
+      doc.text(`Days Present: ${slip.daysPresent}`, 75, 112);
+      doc.text(`Days Paid: ${slip.daysPaid}`, 130, 112);
+      
+      // Earnings and Deductions
+      let y = 125;
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, y, (pageWidth - 30) / 2, 8, 'F');
+      doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.text('EARNINGS', 60, y + 6, { align: 'center' });
+      doc.text('DEDUCTIONS', 145, y + 6, { align: 'center' });
+      
+      y += 8;
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      doc.rect(15, y, (pageWidth - 30) / 2, 45);
+      doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 45);
+      
+      // Earnings
+      doc.text('Basic + DA:', 20, y + 8);
+      doc.text(slip.basicDa, 80, y + 8, { align: 'right' });
+      doc.text('HRA:', 20, y + 16);
+      doc.text(slip.hra || '0.00', 80, y + 16, { align: 'right' });
+      doc.text('Other Allowances:', 20, y + 24);
+      doc.text(slip.otherAllowances || '0.00', 80, y + 24, { align: 'right' });
+      doc.text('Transportation:', 20, y + 32);
+      doc.text(slip.transportationAllowance || '0.00', 80, y + 32, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Earnings:', 20, y + 40);
+      doc.text(slip.totalEarnings, 80, y + 40, { align: 'right' });
+      
+      // Deductions
+      doc.setFont('helvetica', 'normal');
+      doc.text('Professional Tax:', 105, y + 8);
+      doc.text(slip.professionalTax || '0.00', 180, y + 8, { align: 'right' });
+      doc.text('Loss of Pay:', 105, y + 16);
+      doc.text(slip.lossOfPay || '0.00', 180, y + 16, { align: 'right' });
+      doc.text('Transport Deduction:', 105, y + 24);
+      doc.text(slip.transportDeduction || '0.00', 180, y + 24, { align: 'right' });
+      doc.setFont('helvetica', 'bold');
+      doc.text('Total Deductions:', 105, y + 40);
+      doc.text(slip.totalDeductions, 180, y + 40, { align: 'right' });
+      
+      // Net Payment
+      y += 52;
+      doc.setFillColor(157, 41, 102);
+      doc.rect(15, y, pageWidth - 30, 12, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text('NET PAYMENT:', 20, y + 8);
+      doc.text(`Rs. ${slip.netPayment}`, pageWidth - 20, y + 8, { align: 'right' });
+      
+      // Amount in words
+      y += 18;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`(${slip.amountInWords || ''})`, pageWidth / 2, y, { align: 'center' });
+      
+      // Signature section
+      y += 25;
+      doc.setFont('helvetica', 'normal');
+      doc.line(15, y, 70, y);
+      doc.line(pageWidth - 70, y, pageWidth - 15, y);
+      doc.text("Employee's Signature", 42.5, y + 8, { align: 'center' });
+      doc.text("For Yepman International", pageWidth - 42.5, y + 8, { align: 'center' });
+      
+      // Footer
+      y += 25;
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('This is a computer generated document.', pageWidth / 2, y, { align: 'center' });
+      
+      doc.save(`Salary_Slip_${slip.employeeName.replace(/\s+/g, '_')}_${monthNames[slip.month - 1]}_${slip.year}.pdf`);
+    });
+  };
+  
+  return (
+    <motion.div variants={staggerItem} initial="initial" animate="animate">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Receipt className="h-5 w-5" />
+            Salary Slips
+          </CardTitle>
+          <CardDescription>Download your monthly salary slips</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : salarySlips.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No salary slips available yet.</p>
+              <p className="text-sm">Your salary slips will appear here once generated.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Total Days</TableHead>
+                    <TableHead>Days Paid</TableHead>
+                    <TableHead className="text-right">Net Payment</TableHead>
+                    <TableHead className="text-center">Download</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {salarySlips.map((slip) => (
+                    <TableRow key={slip.id} data-testid={`row-salary-slip-${slip.id}`}>
+                      <TableCell className="font-medium">
+                        {monthNames[slip.month - 1]} {slip.year}
+                      </TableCell>
+                      <TableCell>{slip.totalDays}</TableCell>
+                      <TableCell>{slip.daysPaid}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        Rs. {parseFloat(slip.netPayment).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => downloadPDF(slip)}
+                          data-testid={`button-download-slip-${slip.id}`}
+                        >
+                          <Receipt className="h-4 w-4 mr-1" />
+                          PDF
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 export default function EmployeePortal() {
   const [location, setLocation] = useLocation();
   
@@ -1744,7 +1991,7 @@ export default function EmployeePortal() {
       </Dialog>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 md:grid-cols-10 gap-1">
+        <TabsList className="flex flex-wrap gap-1">
           <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
             <User className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Overview</span>
@@ -1764,6 +2011,10 @@ export default function EmployeePortal() {
           <TabsTrigger value="payroll" className="text-xs md:text-sm" data-testid="tab-payroll">
             <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Payroll</span>
+          </TabsTrigger>
+          <TabsTrigger value="salary-slips" className="text-xs md:text-sm" data-testid="tab-salary-slips">
+            <Receipt className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Salary Slips</span>
           </TabsTrigger>
           <TabsTrigger value="increments" className="text-xs md:text-sm" data-testid="tab-increments">
             <TrendingUp className="h-4 w-4 mr-1 md:mr-2" />
@@ -2215,6 +2466,10 @@ export default function EmployeePortal() {
               </CardContent>
             </Card>
           </motion.div>
+        </TabsContent>
+
+        <TabsContent value="salary-slips">
+          <EmployeeSalarySlipsSection employeeId={profile.id} />
         </TabsContent>
 
         <TabsContent value="increments">
