@@ -526,6 +526,42 @@ export const payrollItems = pgTable("payroll_items", {
 export const insertPayrollRunSchema = createInsertSchema(payrollRuns).omit({ id: true, createdAt: true, daybookEntryId: true });
 export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({ id: true, createdAt: true });
 
+// Salary Slips - Auto-generated from payroll
+export const salarySlips = pgTable("salary_slips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  payrollRunId: varchar("payroll_run_id").notNull().references(() => payrollRuns.id, { onDelete: 'cascade' }),
+  payrollItemId: varchar("payroll_item_id").notNull().references(() => payrollItems.id, { onDelete: 'cascade' }),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id),
+  month: integer("month").notNull(),
+  year: integer("year").notNull(),
+  employeeName: text("employee_name").notNull(),
+  designation: text("designation"),
+  department: text("department"),
+  panNumber: text("pan_number"),
+  location: text("location").default('KOCHI'),
+  joinDate: date("join_date"),
+  totalDays: integer("total_days").notNull().default(31),
+  daysPresent: integer("days_present").notNull(),
+  daysPaid: integer("days_paid").notNull(),
+  basicPay: decimal("basic_pay", { precision: 10, scale: 2 }).notNull(),
+  basicDa: decimal("basic_da", { precision: 10, scale: 2 }).notNull(),
+  hra: decimal("hra", { precision: 10, scale: 2 }).default('0'),
+  otherAllowances: decimal("other_allowances", { precision: 10, scale: 2 }).default('0'),
+  transportationAllowance: decimal("transportation_allowance", { precision: 10, scale: 2 }).default('0'),
+  totalEarnings: decimal("total_earnings", { precision: 10, scale: 2 }).notNull(),
+  professionalTax: decimal("professional_tax", { precision: 10, scale: 2 }).default('0'),
+  lossOfPay: decimal("loss_of_pay", { precision: 10, scale: 2 }).default('0'),
+  transportDeduction: decimal("transport_deduction", { precision: 10, scale: 2 }).default('0'),
+  totalDeductions: decimal("total_deductions", { precision: 10, scale: 2 }).notNull(),
+  netPayment: decimal("net_payment", { precision: 10, scale: 2 }).notNull(),
+  amountInWords: text("amount_in_words"),
+  sentViaWhatsapp: boolean("sent_via_whatsapp").default(false),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSalarySlipSchema = createInsertSchema(salarySlips).omit({ id: true, createdAt: true, sentAt: true });
+
 // Oak Sales CRM
 
 // Sales Pipelines (e.g., "Bookings FY26-27", "Wedding Planning")
@@ -735,6 +771,9 @@ export type InsertPayrollRun = z.infer<typeof insertPayrollRunSchema>;
 
 export type PayrollItem = typeof payrollItems.$inferSelect;
 export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
+
+export type SalarySlip = typeof salarySlips.$inferSelect;
+export type InsertSalarySlip = z.infer<typeof insertSalarySlipSchema>;
 
 // Oak Sales Types
 export type SalesPipeline = typeof salesPipelines.$inferSelect;

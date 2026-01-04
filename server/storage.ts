@@ -26,6 +26,7 @@ import {
   portalLinks,
   payrollRuns,
   payrollItems,
+  salarySlips,
   salesPipelines,
   salesStages,
   salesContacts,
@@ -125,6 +126,8 @@ import {
   type InsertPayrollRun,
   type PayrollItem,
   type InsertPayrollItem,
+  type SalarySlip,
+  type InsertSalarySlip,
   type SalesPipeline,
   type InsertSalesPipeline,
   type SalesStage,
@@ -465,6 +468,14 @@ export interface IStorage {
   updatePayrollItem(id: string, item: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
   deletePayrollItem(id: string): Promise<void>;
   markPayrollAsPaid(runId: string, payDate: string, bankId?: string): Promise<PayrollRun>;
+
+  // Salary Slips
+  createSalarySlip(slip: InsertSalarySlip): Promise<SalarySlip>;
+  getSalarySlipsByPayrollRun(payrollRunId: string): Promise<SalarySlip[]>;
+  getSalarySlipsForEmployee(employeeId: string): Promise<SalarySlip[]>;
+  getSalarySlip(id: string): Promise<SalarySlip | undefined>;
+  updateSalarySlip(id: string, data: Partial<InsertSalarySlip>): Promise<SalarySlip | undefined>;
+  deleteSalarySlipsByPayrollRun(payrollRunId: string): Promise<void>;
 
   // Oak Sales - Pipelines
   getAllSalesPipelines(): Promise<SalesPipeline[]>;
@@ -2046,6 +2057,38 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return updated;
+  }
+
+  // Salary Slips
+  async createSalarySlip(slip: InsertSalarySlip): Promise<SalarySlip> {
+    const [created] = await db.insert(salarySlips).values(slip).returning();
+    return created;
+  }
+
+  async getSalarySlipsByPayrollRun(payrollRunId: string): Promise<SalarySlip[]> {
+    return await db.select().from(salarySlips)
+      .where(eq(salarySlips.payrollRunId, payrollRunId))
+      .orderBy(salarySlips.employeeName);
+  }
+
+  async getSalarySlipsForEmployee(employeeId: string): Promise<SalarySlip[]> {
+    return await db.select().from(salarySlips)
+      .where(eq(salarySlips.employeeId, employeeId))
+      .orderBy(desc(salarySlips.year), desc(salarySlips.month));
+  }
+
+  async getSalarySlip(id: string): Promise<SalarySlip | undefined> {
+    const [slip] = await db.select().from(salarySlips).where(eq(salarySlips.id, id));
+    return slip || undefined;
+  }
+
+  async updateSalarySlip(id: string, data: Partial<InsertSalarySlip>): Promise<SalarySlip | undefined> {
+    const [updated] = await db.update(salarySlips).set(data).where(eq(salarySlips.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteSalarySlipsByPayrollRun(payrollRunId: string): Promise<void> {
+    await db.delete(salarySlips).where(eq(salarySlips.payrollRunId, payrollRunId));
   }
 
   // Oak Sales - Pipelines
