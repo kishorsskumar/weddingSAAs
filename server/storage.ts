@@ -1028,11 +1028,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEmployee(id: string, updateData: Partial<InsertEmployee>): Promise<Employee | undefined> {
-    // Auto-set isActive based on leaveDate
-    // If leaveDate is being set (and it's a valid date), mark as inactive
-    // If leaveDate is being cleared, mark as active
+    // Auto-set isActive based on leaveDate ONLY if isActive is not explicitly provided
+    // This allows explicit isActive toggles to work while auto-toggling on leaveDate changes
     const dataToUpdate = { ...updateData };
-    if ('leaveDate' in updateData) {
+    if ('leaveDate' in updateData && !('isActive' in updateData)) {
       if (updateData.leaveDate) {
         dataToUpdate.isActive = false;
       } else {
