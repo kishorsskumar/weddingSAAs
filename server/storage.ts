@@ -1028,7 +1028,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEmployee(id: string, updateData: Partial<InsertEmployee>): Promise<Employee | undefined> {
-    const [employee] = await db.update(employees).set(updateData).where(eq(employees.id, id)).returning();
+    // Auto-set isActive based on leaveDate
+    // If leaveDate is being set (and it's a valid date), mark as inactive
+    // If leaveDate is being cleared, mark as active
+    const dataToUpdate = { ...updateData };
+    if ('leaveDate' in updateData) {
+      if (updateData.leaveDate) {
+        dataToUpdate.isActive = false;
+      } else {
+        dataToUpdate.isActive = true;
+      }
+    }
+    const [employee] = await db.update(employees).set(dataToUpdate).where(eq(employees.id, id)).returning();
     return employee || undefined;
   }
 

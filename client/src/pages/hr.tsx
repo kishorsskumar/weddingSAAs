@@ -925,7 +925,8 @@ export default function HR() {
 
         <TabsContent value="payroll">
           <PayrollSection 
-            currentEmployees={currentEmployees} 
+            currentEmployees={currentEmployees}
+            allEmployees={employees}
             totalCurrentSalary={totalCurrentSalary}
             isAdmin={isAdmin}
           />
@@ -948,8 +949,9 @@ export default function HR() {
   );
 }
 
-function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: { 
+function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, isAdmin }: { 
   currentEmployees: Employee[]; 
+  allEmployees: Employee[];
   totalCurrentSalary: number;
   isAdmin: boolean;
 }) {
@@ -957,6 +959,24 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
   const queryClient = useQueryClient();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  
+  // For payroll, include current employees PLUS employees who left during the selected month
+  // This ensures employees who leave mid-month still get their payslip for that month
+  const payrollEligibleEmployees = useMemo(() => {
+    return allEmployees.filter(emp => {
+      // Include all current/active employees
+      if (emp.isActive !== false) return true;
+      
+      // Include inactive employees who left during the selected payroll month
+      if (emp.leaveDate) {
+        const leaveDate = new Date(emp.leaveDate);
+        const leaveMonth = leaveDate.getMonth() + 1;
+        const leaveYear = leaveDate.getFullYear();
+        return leaveMonth === selectedMonth && leaveYear === selectedYear;
+      }
+      return false;
+    });
+  }, [allEmployees, selectedMonth, selectedYear]);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -1001,7 +1021,7 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
 
   const createPayrollMutation = useMutation({
     mutationFn: async () => {
-      const employees = currentEmployees.map(emp => ({
+      const employees = payrollEligibleEmployees.map(emp => ({
         id: emp.id,
         name: emp.name,
         salary: emp.salary,
@@ -1101,7 +1121,7 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
 
   const openCreateDialog = () => {
     const defaultDays: Record<string, number> = {};
-    currentEmployees.forEach(emp => {
+    payrollEligibleEmployees.forEach(emp => {
       defaultDays[emp.id] = 30;
     });
     setEmployeeDays(defaultDays);
@@ -1116,7 +1136,7 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
   };
 
   const calculatePayrollPreview = () => {
-    return currentEmployees.map(emp => {
+    return payrollEligibleEmployees.map(emp => {
       const days = employeeDays[emp.id] || 30;
       const dailyRate = Number(emp.salary) / 30;
       const grossPay = dailyRate * days;
@@ -1395,12 +1415,12 @@ function PayrollSection({ currentEmployees, totalCurrentSalary, isAdmin }: {
               <p className="text-muted-foreground text-sm mb-4">
                 No payroll created for {monthNames[selectedMonth - 1]} {selectedYear}
               </p>
-              {isAdmin && currentEmployees.length > 0 && (
+              {isAdmin && payrollEligibleEmployees.length > 0 && (
                 <Button onClick={openCreateDialog} data-testid="button-create-payroll">
                   <Plus className="h-4 w-4 mr-2" /> Create Payroll
                 </Button>
               )}
-              {currentEmployees.length === 0 && (
+              {payrollEligibleEmployees.length === 0 && (
                 <p className="text-xs text-muted-foreground">Add employees first to create payroll</p>
               )}
             </div>
