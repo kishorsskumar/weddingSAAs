@@ -5173,7 +5173,12 @@ export async function registerRoutes(
   app.delete('/api/payroll-items/:id', async (req, res) => {
     try {
       // Check if user is superadmin
-      if (!req.user || req.user.role !== 'superadmin') {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Only superadmin can delete payroll items' });
       }
 
