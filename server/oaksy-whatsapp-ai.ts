@@ -86,6 +86,8 @@ function extractAmount(text: string): number | null {
     /([0-9,]+(?:\.[0-9]+)?)\s*(?:Rs\.?|₹|INR|rupees?)/i,
     /([0-9,]+(?:\.[0-9]+)?)\s*\/-/,
     /^([0-9,]+(?:\.[0-9]+)?)$/,
+    /^([0-9,]+(?:\.[0-9]+)?)\s+(?:for|to|towards)/i,
+    /^([0-9,]+(?:\.[0-9]+)?)\s+\w/i,
   ];
   
   for (const pattern of patterns) {
