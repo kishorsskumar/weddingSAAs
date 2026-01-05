@@ -970,66 +970,110 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Handle Income approval commands (A INC001)
-    const approveIncMatch = lowerMessage.match(/^a\s+(inc\d+)/i);
+    // Handle Income approval commands (A INC001 or A INC001 EventName)
+    const approveIncMatch = lowerMessage.match(/^a\s+(inc\d+)(?:\s+(.+))?/i);
     const rejectIncMatch = lowerMessage.match(/^(?:r|reject)\s+(inc\d+)(?:\s+(.+))?/i);
     
     if (approveIncMatch) {
       const incCode = approveIncMatch[1].toUpperCase();
+      const eventName = approveIncMatch[2]?.trim() || 'General';
       const incomeSubmission = await storage.getIncomeSubmissionByCode(incCode);
       
       if (!incomeSubmission) {
-        return `❌ Income submission ${incCode} not found.`;
+        return `❌ ${incCode} not found.`;
       }
       
       if (incomeSubmission.status !== 'pending') {
-        return `⚠️ Income ${incCode} was already ${incomeSubmission.status}.`;
+        return `⚠️ ${incCode} already ${incomeSubmission.status}.`;
       }
       
-      // Start event assignment flow for income
-      await storage.updateWhatsappConversation(conversation.id, {
-        activeIntent: 'kishor_income_approval',
-        intentContext: { incCode },
-        currentState: 'awaiting_income_event',
+      // Approve immediately and record in daybook
+      await storage.updateIncomeSubmission(incomeSubmission.id, {
+        status: 'approved',
+        approvedAt: new Date(),
+        eventAssignment: eventName,
       });
       
-      return `✅ Approving *${incCode}*\n\n📋 ${incomeSubmission.description}\n💰 ₹${parseFloat(incomeSubmission.amount).toLocaleString('en-IN')}\n\nWhich event should this income be recorded under?\n\n_Type the customer/event name, or "general" for general income_`;
+      const amount = parseFloat(incomeSubmission.amount);
+      await storage.createDaybookEntry({
+        date: new Date().toISOString().split('T')[0],
+        type: 'income',
+        category: incomeSubmission.type === 'bank_transfer' ? 'bank_transfer' : 'client_payment',
+        description: `[${incCode}] ${incomeSubmission.description}`,
+        amount: amount.toString(),
+        mode: incomeSubmission.type === 'bank_transfer' ? 'bank' : 'upi',
+        person: incomeSubmission.clientName,
+        eventName: eventName === 'General' ? 'General' : eventName,
+        approvedBy: 'Kishor',
+      });
+      
+      // Notify employee
+      const employeePhone = incomeSubmission.employeePhone;
+      if (employeePhone) {
+        try {
+          await sendWhatsAppMessage(employeePhone, `✅ *${incCode} Approved!*\n₹${amount.toLocaleString('en-IN')} from ${incomeSubmission.clientName}`);
+        } catch (e) {
+          console.error('[Income] Failed to notify employee:', e);
+        }
+      }
+      
+      return `✅ *${incCode}* approved\n₹${amount.toLocaleString('en-IN')} • ${eventName}`;
     }
     
     if (rejectIncMatch) {
       return handleIncomeReject(rejectIncMatch[1], rejectIncMatch[2]);
     }
     
-    // Handle QR payment PAID command - start screenshot collection flow
-    const paidMatch = lowerMessage.match(/^paid\s+(qr\d+)/i);
+    // Handle QR payment PAID command - simple one-message flow
+    // Format: "PAID QR002" or "PAID QR002 EventName"
+    const paidMatch = lowerMessage.match(/^paid\s+(qr\d+)(?:\s+(.+))?/i);
     const rejectQrMatch = lowerMessage.match(/^reject\s+(qr\d+)(?:\s+(.+))?/i);
     
     if (paidMatch) {
       const qrCode = paidMatch[1].toUpperCase();
+      const eventName = paidMatch[2]?.trim() || 'General';
       const qrRequest = await storage.getQrPaymentRequestByCode(qrCode);
       
       if (!qrRequest) {
-        return `❌ QR Payment Request ${qrCode} not found.`;
+        return `❌ ${qrCode} not found.`;
       }
       
       if (qrRequest.status !== 'pending') {
-        return `⚠️ QR Request ${qrCode} was already ${qrRequest.status}.`;
+        return `⚠️ ${qrCode} already ${qrRequest.status}.`;
       }
       
-      // Mark as paid (awaiting screenshot)
+      // Mark as paid immediately
       await storage.updateQrPaymentRequest(qrRequest.id, {
         status: 'paid',
         paidAt: new Date(),
+        eventAssignment: eventName,
       });
       
-      // Store QR code in Kishor's conversation context and ask for screenshot
-      await storage.updateWhatsappConversation(conversation.id, {
-        activeIntent: 'kishor_qr_payment',
-        intentContext: { qrCode },
-        currentState: 'awaiting_payment_screenshot',
+      // Record in daybook
+      const amount = parseFloat(qrRequest.amount);
+      await storage.createDaybookEntry({
+        date: new Date().toISOString().split('T')[0],
+        type: 'expense',
+        category: qrRequest.category || 'operations',
+        description: `[${qrCode}] ${qrRequest.description}`,
+        amount: amount.toString(),
+        mode: 'upi',
+        person: qrRequest.employeeName,
+        eventName: eventName === 'General' ? 'General' : eventName,
+        approvedBy: 'Kishor',
       });
       
-      return `✅ Payment marked for *${qrCode}*\n\n📸 Please send your payment screenshot so I can forward it to ${qrRequest.employeeName}.`;
+      // Notify employee
+      const employeePhone = qrRequest.employeePhone;
+      if (employeePhone) {
+        try {
+          await sendWhatsAppMessage(employeePhone, `✅ *${qrCode} Paid!*\n₹${amount.toLocaleString('en-IN')} for ${qrRequest.description}`);
+        } catch (e) {
+          console.error('[QR] Failed to notify employee:', e);
+        }
+      }
+      
+      return `✅ *${qrCode}* paid → ${qrRequest.employeeName}\n₹${amount.toLocaleString('en-IN')} • ${eventName}`;
     }
     
     if (rejectQrMatch) {
@@ -1066,8 +1110,8 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Default Kishor greeting
-    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after payment\n📥 *Income* - Reply "A INC001" to approve income submissions\n🏪 *Vendor Payments* - Reply "PAID VP001" to mark as paid\n\n_How can I help you today?_ 🌳`;
+    // Default Kishor greeting - simplified
+    return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID QR001 → Mark paid\n• PAID QR001 EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n\n_Send lead info or ask anything!_ 🌳`;
   }
   
   const employee = conversation.employeeId 
