@@ -174,6 +174,23 @@ Analyze this message and respond as Oaksy AI. Remember to be friendly and helpfu
   }
 }
 
+async function getSuperadminPhone(): Promise<string> {
+  const superadmins = await storage.getUsersByRole('superadmin');
+  for (const user of superadmins) {
+    const employee = await storage.getEmployeeByUserId(user.id);
+    if (employee?.phone) {
+      return employee.phone;
+    }
+  }
+  return process.env.SUPERADMIN_WHATSAPP || '';
+}
+
+function generateUniqueApprovalCode(prefix: string): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 4).toUpperCase();
+  return `${prefix}${timestamp.slice(-4)}${random}`;
+}
+
 async function createExpenseRequest(
   employeeId: string,
   employeeName: string,
@@ -181,9 +198,7 @@ async function createExpenseRequest(
   amount: number,
   mediaUrl?: string
 ): Promise<{ approvalCode: string; requestId: string }> {
-  const countResult = await storage.getExpenseReimbursementsCount();
-  const nextNumber = (countResult || 0) + 1;
-  const approvalCode = `EXP${String(nextNumber).padStart(3, '0')}`;
+  const approvalCode = generateUniqueApprovalCode('EXP');
 
   const expenseData: InsertExpenseReimbursement = {
     employeeId,
@@ -196,9 +211,7 @@ async function createExpenseRequest(
   };
 
   const expense = await storage.createExpenseReimbursement(expenseData);
-
-  const superadmins = await storage.getUsersByRole('superadmin');
-  const superadminPhone = superadmins[0]?.phone || process.env.SUPERADMIN_WHATSAPP || '';
+  const superadminPhone = await getSuperadminPhone();
 
   await storage.createWhatsappPendingApproval({
     approvalCode,
@@ -224,9 +237,7 @@ async function createLeaveRequest(
   reason: string,
   leaveType: string
 ): Promise<{ approvalCode: string; requestId: string }> {
-  const countResult = await storage.getLeaveRequestsCount();
-  const nextNumber = (countResult || 0) + 1;
-  const approvalCode = `LV${String(nextNumber).padStart(3, '0')}`;
+  const approvalCode = generateUniqueApprovalCode('LV');
 
   const leaveData: InsertLeaveRequest = {
     employeeId,
@@ -238,9 +249,7 @@ async function createLeaveRequest(
   };
 
   const leave = await storage.createLeaveRequest(leaveData);
-
-  const superadmins = await storage.getUsersByRole('superadmin');
-  const superadminPhone = superadmins[0]?.phone || process.env.SUPERADMIN_WHATSAPP || '';
+  const superadminPhone = await getSuperadminPhone();
 
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -301,10 +310,7 @@ async function notifySuperadmin(
   amount?: number,
   mediaUrl?: string
 ): Promise<void> {
-  const superadmins = await storage.getUsersByRole('superadmin');
-  if (superadmins.length === 0) return;
-
-  const superadminPhone = superadmins[0]?.phone;
+  const superadminPhone = await getSuperadminPhone();
   if (!superadminPhone) return;
 
   let message = '';
@@ -350,8 +356,30 @@ export async function handleOaksyWhatsAppMessage(
   const messageText = body.trim();
   const lowerMessage = messageText.toLowerCase();
   
-  let context: IntentContext = (conversation.intentContext as IntentContext) || {};
-  let history: ConversationMessage[] = (conversation.conversationHistory as ConversationMessage[]) || [];
+  let context: IntentContext = {};
+  let history: ConversationMessage[] = [];
+  
+  try {
+    const rawContext = conversation.intentContext;
+    if (typeof rawContext === 'string') {
+      context = JSON.parse(rawContext) || {};
+    } else if (rawContext && typeof rawContext === 'object') {
+      context = rawContext as IntentContext;
+    }
+  } catch {
+    context = {};
+  }
+  
+  try {
+    const rawHistory = conversation.conversationHistory;
+    if (typeof rawHistory === 'string') {
+      history = JSON.parse(rawHistory) || [];
+    } else if (Array.isArray(rawHistory)) {
+      history = rawHistory as ConversationMessage[];
+    }
+  } catch {
+    history = [];
+  }
   
   history.push({
     role: 'user',
