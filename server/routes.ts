@@ -1735,6 +1735,31 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Pending Vendor Payments
+  app.get('/api/pending-vendor-payments', async (req, res) => {
+    try {
+      const { status } = req.query;
+      if (status) {
+        const payments = await storage.getPendingVendorPaymentsByStatus(status as string);
+        res.json(payments);
+      } else {
+        const payments = await storage.getAllPendingVendorPayments();
+        res.json(payments);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch pending vendor payments' });
+    }
+  });
+
+  app.patch('/api/pending-vendor-payments/:id', async (req, res) => {
+    try {
+      const payment = await storage.updatePendingVendorPayment(req.params.id, req.body);
+      res.json(payment);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update pending vendor payment' });
+    }
+  });
+
   // Leave Requests
   app.get('/api/leave-requests', async (req, res) => {
     const requests = await storage.getAllLeaveRequests();
