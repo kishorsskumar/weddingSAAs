@@ -55,23 +55,31 @@ interface ColumnDef {
   editable?: boolean;
   type?: "number" | "text" | "datetime";
   placeholder?: string;
+  autocompleteUsers?: boolean;
 }
 
 const COLUMNS: ColumnDef[] = [
   { key: "eventDate", label: "Event Date", shortLabel: "Date", width: 90, minWidth: 80 },
   { key: "subEventName", label: "Event", shortLabel: "Event", width: 150, minWidth: 120 },
   { key: "venue", label: "Venue", shortLabel: "Venue", width: 130, minWidth: 100 },
-  { key: "weddingPlanner", label: "Wedding Planner", shortLabel: "Planner", width: 110, minWidth: 90, editable: true, placeholder: "-" },
-  { key: "stageManager", label: "Stage Manager", shortLabel: "Coordinator", width: 120, minWidth: 100, editable: true, placeholder: "-" },
-  { key: "teamLead", label: "Team Lead", shortLabel: "Lead", width: 100, minWidth: 80, editable: true, placeholder: "-" },
+  { key: "weddingPlanner", label: "Wedding Planner", shortLabel: "Planner", width: 110, minWidth: 90, editable: true, placeholder: "-", autocompleteUsers: true },
+  { key: "stageManager", label: "Stage Manager", shortLabel: "Coordinator", width: 120, minWidth: 100, editable: true, placeholder: "-", autocompleteUsers: true },
+  { key: "teamLead", label: "Team Lead", shortLabel: "Lead", width: 100, minWidth: 80, editable: true, placeholder: "-", autocompleteUsers: true },
   { key: "productionTeamCount", label: "Team Count", shortLabel: "Count", width: 70, minWidth: 60, editable: true, type: "number", placeholder: "-" },
-  { key: "florist", label: "Florist", shortLabel: "Florist", width: 100, minWidth: 80, editable: true, placeholder: "-" },
+  { key: "florist", label: "Florist", shortLabel: "Florist", width: 100, minWidth: 80, editable: true, placeholder: "-", autocompleteUsers: true },
   { key: "loadingStartDateTime", label: "Loading Start", shortLabel: "Loading", width: 130, minWidth: 100, editable: true, type: "datetime", placeholder: "-" },
   { key: "productionStartTime", label: "Prod. Start", shortLabel: "Start", width: 130, minWidth: 100, editable: true, type: "datetime", placeholder: "-" },
   { key: "productionEndTime", label: "Prod. End", shortLabel: "End", width: 130, minWidth: 100, editable: true, type: "datetime", placeholder: "-" },
   { key: "dismantlingDateTime", label: "Dismantling", shortLabel: "Dismantle", width: 130, minWidth: 100, editable: true, type: "datetime", placeholder: "-" },
-  { key: "dismantlingTeamLead", label: "Dis. Lead", shortLabel: "Dis. Lead", width: 100, minWidth: 80, editable: true, placeholder: "-" },
+  { key: "dismantlingTeamLead", label: "Dis. Lead", shortLabel: "Dis. Lead", width: 100, minWidth: 80, editable: true, placeholder: "-", autocompleteUsers: true },
 ];
+
+interface UserOption {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+}
 
 export default function MonthlyPlan() {
   const { user } = useAuth();
@@ -86,7 +94,10 @@ export default function MonthlyPlan() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editGroupLabelId, setEditGroupLabelId] = useState<string | null>(null);
   const [groupLabelValue, setGroupLabelValue] = useState("");
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [autocompleteIndex, setAutocompleteIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<HTMLDivElement>(null);
   
   const month = currentDate.getMonth() + 1;
   const year = currentDate.getFullYear();
@@ -101,6 +112,28 @@ export default function MonthlyPlan() {
       return res.json();
     },
   });
+
+  const { data: users = [] } = useQuery<UserOption[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.map((u: any) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+    },
+  });
+
+  const filteredSuggestions = useMemo(() => {
+    if (!editingCell || !editValue.trim()) return [];
+    const [, colKey] = editingCell.split("::") as [string, string];
+    const col = COLUMNS.find(c => c.key === colKey);
+    if (!col?.autocompleteUsers) return [];
+    
+    const searchTerm = editValue.toLowerCase();
+    return users
+      .filter(u => u.name.toLowerCase().includes(searchTerm))
+      .slice(0, 6);
+  }, [editingCell, editValue, users]);
 
   const generateMutation = useMutation({
     mutationFn: async (showToast: boolean = true) => {
@@ -240,8 +273,16 @@ export default function MonthlyPlan() {
     
     setEditingCell(cellKey);
     setEditValue(getCellValue(entry, colKey));
+    setShowAutocomplete(false);
+    setAutocompleteIndex(0);
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [isSuperadmin, entries, getCellValue]);
+
+  const selectSuggestion = useCallback((name: string) => {
+    setEditValue(name);
+    setShowAutocomplete(false);
+    setAutocompleteIndex(0);
+  }, []);
 
   const commitEdit = useCallback(() => {
     if (!editingCell) return;
@@ -263,17 +304,38 @@ export default function MonthlyPlan() {
     
     setEditingCell(null);
     setEditValue("");
+    setShowAutocomplete(false);
+    setAutocompleteIndex(0);
   }, [editingCell, editValue, entries, getCellValue, updateMutation]);
 
   const cancelEdit = useCallback(() => {
     setEditingCell(null);
     setEditValue("");
+    setShowAutocomplete(false);
+    setAutocompleteIndex(0);
   }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>, rowId: string, colKey: string) => {
     const editableColumns = COLUMNS.filter(c => c.editable);
     const currentColIndex = editableColumns.findIndex(c => c.key === colKey);
     const currentRowIndex = sortedEntries.findIndex(e => e.id === rowId);
+    const col = COLUMNS.find(c => c.key === colKey);
+    
+    if (showAutocomplete && filteredSuggestions.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setAutocompleteIndex(prev => Math.min(prev + 1, filteredSuggestions.length - 1));
+        return;
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setAutocompleteIndex(prev => Math.max(prev - 1, 0));
+        return;
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        selectSuggestion(filteredSuggestions[autocompleteIndex].name);
+        return;
+      }
+    }
     
     if (e.key === "Enter") {
       e.preventDefault();
@@ -297,9 +359,28 @@ export default function MonthlyPlan() {
       }
     } else if (e.key === "Escape") {
       e.preventDefault();
-      cancelEdit();
+      if (showAutocomplete) {
+        setShowAutocomplete(false);
+      } else {
+        cancelEdit();
+      }
     }
-  }, [sortedEntries, commitEdit, cancelEdit, startEditing]);
+  }, [sortedEntries, commitEdit, cancelEdit, startEditing, showAutocomplete, filteredSuggestions, autocompleteIndex, selectSuggestion]);
+
+  useEffect(() => {
+    if (editingCell && editValue.trim()) {
+      const [, colKey] = editingCell.split("::") as [string, string];
+      const col = COLUMNS.find(c => c.key === colKey);
+      if (col?.autocompleteUsers && filteredSuggestions.length > 0) {
+        setShowAutocomplete(true);
+        setAutocompleteIndex(0);
+      } else {
+        setShowAutocomplete(false);
+      }
+    } else {
+      setShowAutocomplete(false);
+    }
+  }, [editValue, editingCell, filteredSuggestions.length]);
 
   const toggleComplete = useCallback((entry: MonthlyProductionPlan) => {
     if (!isSuperadmin) return;
@@ -735,16 +816,52 @@ export default function MonthlyPlan() {
                                       data-testid={`cell-${entry.id}-${col.key}`}
                                     >
                                       {isEditing ? (
-                                        <input
-                                          ref={inputRef}
-                                          type={col.type === "number" ? "number" : "text"}
-                                          value={editValue}
-                                          onChange={(e) => setEditValue(e.target.value)}
-                                          onBlur={commitEdit}
-                                          onKeyDown={(e) => handleKeyDown(e, entry.id, col.key)}
-                                          className="w-full h-full px-2 py-1.5 text-xs border-0 outline-none bg-blue-50 focus:ring-2 focus:ring-blue-400"
-                                          data-testid={`input-${entry.id}-${col.key}`}
-                                        />
+                                        <div className="relative">
+                                          <input
+                                            ref={inputRef}
+                                            type={col.type === "number" ? "number" : "text"}
+                                            value={editValue}
+                                            onChange={(e) => setEditValue(e.target.value)}
+                                            onBlur={(e) => {
+                                              const relatedTarget = e.relatedTarget as HTMLElement;
+                                              if (relatedTarget?.closest('.autocomplete-dropdown')) {
+                                                return;
+                                              }
+                                              setTimeout(commitEdit, 150);
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, entry.id, col.key)}
+                                            className="w-full h-full px-2 py-1.5 text-xs border-0 outline-none bg-blue-50 focus:ring-2 focus:ring-blue-400"
+                                            data-testid={`input-${entry.id}-${col.key}`}
+                                            autoComplete="off"
+                                          />
+                                          {col.autocompleteUsers && showAutocomplete && filteredSuggestions.length > 0 && (
+                                            <div 
+                                              ref={autocompleteRef}
+                                              className="autocomplete-dropdown absolute left-0 top-full z-50 w-48 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-48 overflow-auto"
+                                              data-testid={`autocomplete-${col.key}`}
+                                            >
+                                              {filteredSuggestions.map((suggestion, idx) => (
+                                                <button
+                                                  key={suggestion.id}
+                                                  type="button"
+                                                  className={cn(
+                                                    "w-full px-3 py-2 text-left text-xs hover:bg-[#6b9937]/10 transition-colors",
+                                                    idx === autocompleteIndex && "bg-[#6b9937]/20"
+                                                  )}
+                                                  onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    selectSuggestion(suggestion.name);
+                                                    setTimeout(() => inputRef.current?.focus(), 0);
+                                                  }}
+                                                  data-testid={`suggestion-${suggestion.id}`}
+                                                >
+                                                  <div className="font-medium text-gray-900">{suggestion.name}</div>
+                                                  <div className="text-gray-500 text-[10px] capitalize">{suggestion.role.replace('_', ' ')}</div>
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
                                       ) : (
                                         <span className={cn(
                                           "block truncate",
@@ -813,15 +930,48 @@ export default function MonthlyPlan() {
                                       onClick={() => col.editable && isSuperadmin && startEditing(entry.id, col.key)}
                                     >
                                       {isEditing ? (
-                                        <input
-                                          ref={inputRef}
-                                          type={col.type === "number" ? "number" : "text"}
-                                          value={editValue}
-                                          onChange={(e) => setEditValue(e.target.value)}
-                                          onBlur={commitEdit}
-                                          onKeyDown={(e) => handleKeyDown(e, entry.id, col.key)}
-                                          className="w-full h-full px-2 py-1.5 text-xs border-0 outline-none bg-blue-50 focus:ring-2 focus:ring-blue-400"
-                                        />
+                                        <div className="relative">
+                                          <input
+                                            ref={inputRef}
+                                            type={col.type === "number" ? "number" : "text"}
+                                            value={editValue}
+                                            onChange={(e) => setEditValue(e.target.value)}
+                                            onBlur={(e) => {
+                                              const relatedTarget = e.relatedTarget as HTMLElement;
+                                              if (relatedTarget?.closest('.autocomplete-dropdown')) {
+                                                return;
+                                              }
+                                              setTimeout(commitEdit, 150);
+                                            }}
+                                            onKeyDown={(e) => handleKeyDown(e, entry.id, col.key)}
+                                            className="w-full h-full px-2 py-1.5 text-xs border-0 outline-none bg-blue-50 focus:ring-2 focus:ring-blue-400"
+                                            autoComplete="off"
+                                          />
+                                          {col.autocompleteUsers && showAutocomplete && filteredSuggestions.length > 0 && (
+                                            <div 
+                                              className="autocomplete-dropdown absolute left-0 top-full z-50 w-48 bg-white border border-gray-200 rounded-md shadow-lg mt-1 max-h-48 overflow-auto"
+                                            >
+                                              {filteredSuggestions.map((suggestion, idx) => (
+                                                <button
+                                                  key={suggestion.id}
+                                                  type="button"
+                                                  className={cn(
+                                                    "w-full px-3 py-2 text-left text-xs hover:bg-[#6b9937]/10 transition-colors",
+                                                    idx === autocompleteIndex && "bg-[#6b9937]/20"
+                                                  )}
+                                                  onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    selectSuggestion(suggestion.name);
+                                                    setTimeout(() => inputRef.current?.focus(), 0);
+                                                  }}
+                                                >
+                                                  <div className="font-medium text-gray-900">{suggestion.name}</div>
+                                                  <div className="text-gray-500 text-[10px] capitalize">{suggestion.role.replace('_', ' ')}</div>
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
                                       ) : (
                                         <span className={cn(
                                           "block truncate",
