@@ -2219,28 +2219,42 @@ async function notifyKishorQrPayment(
   amount: number,
   qrImageUrl: string
 ): Promise<void> {
-  // First try to get a public URL for the QR image
-  if (qrImageUrl) {
-    try {
-      // Convert Twilio authenticated URL to public URL
-      const publicUrl = await getPublicMediaUrl(qrImageUrl);
-      console.log('[QR Payment] Using public URL:', publicUrl);
-      
-      const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
-      await sendWhatsAppMediaMessage(
-        SUPERADMIN_WHATSAPP, 
-        publicUrl,
-        `💳 *Payment Request ${requestCode}*\n\n👤 From: ${employeeName}\n📝 For: ${description}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "PAID ${requestCode}" after payment_`
-      );
-    } catch (mediaError) {
-      // Fallback to text-only if media fails
-      console.error('[QR Payment] Failed to send media, falling back to text:', mediaError);
-      const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n📷 QR Code: ${qrImageUrl}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
+  console.log(`[QR Payment] Notifying Kishor about ${requestCode} from ${employeeName}`);
+  
+  try {
+    if (qrImageUrl) {
+      try {
+        // Convert Twilio authenticated URL to public URL
+        const publicUrl = getPublicMediaUrl(qrImageUrl);
+        console.log('[QR Payment] Using public URL:', publicUrl);
+        
+        const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+        await sendWhatsAppMediaMessage(
+          SUPERADMIN_WHATSAPP, 
+          publicUrl,
+          `💳 *Payment Request ${requestCode}*\n\n👤 From: ${employeeName}\n📝 For: ${description}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "PAID ${requestCode}" after payment_`
+        );
+        console.log(`[QR Payment] Notification sent successfully for ${requestCode}`);
+      } catch (mediaError: any) {
+        // Fallback to text-only if media fails
+        console.error('[QR Payment] Failed to send media, falling back to text:', mediaError.message);
+        const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n📷 QR Code: ${qrImageUrl}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
+        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+      }
+    } else {
+      const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
       await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+      console.log(`[QR Payment] Text notification sent for ${requestCode}`);
     }
-  } else {
-    const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
-    await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+  } catch (error: any) {
+    console.error(`[QR Payment] CRITICAL: Failed to notify Kishor about ${requestCode}:`, error.message);
+    // Try one more time with just text
+    try {
+      const fallbackMessage = `💳 ${requestCode}: ${employeeName} needs ₹${amount} for ${description}. Reply PAID ${requestCode} after payment.`;
+      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, fallbackMessage);
+    } catch (fallbackError: any) {
+      console.error('[QR Payment] Even fallback failed:', fallbackError.message);
+    }
   }
 }
 
