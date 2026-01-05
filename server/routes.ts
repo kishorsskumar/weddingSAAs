@@ -772,6 +772,7 @@ export async function registerRoutes(
     'employee-portal',
     'oaksy',
     'oak-creative',
+    'whatsapp-inbox',
     'admin',
   ];
 

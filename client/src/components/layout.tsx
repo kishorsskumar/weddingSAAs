@@ -26,7 +26,8 @@ import {
   Check,
   Info,
   AlertTriangle,
-  AlertCircle
+  AlertCircle,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -54,6 +55,7 @@ const ALL_PAGES = [
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
+  { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -73,6 +75,7 @@ const ICONS: Record<string, any> = {
   "employee-portal": UserCircle,
   oaksy: Sparkles,
   "oak-creative": Palette,
+  "whatsapp-inbox": MessageSquare,
   admin: Shield,
 };
 

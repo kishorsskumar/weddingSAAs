@@ -39,7 +39,8 @@ import {
   Pencil,
   Sparkles,
   ClipboardList,
-  Palette
+  Palette,
+  MessageSquare
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -66,6 +67,7 @@ const ALL_PAGES = [
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal", icon: UserCircle, description: "Your profile & requests" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
+  { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox", icon: MessageSquare, description: "Employee requests via WhatsApp" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];
 

@@ -24,6 +24,7 @@ import EmployeePortal from "@/pages/employee-portal";
 import Oaksy from "@/pages/oaksy";
 import OakCreative from "@/pages/oak-creative";
 import MonthlyPlan from "@/pages/monthly-plan";
+import WhatsappInbox from "@/pages/whatsapp-inbox";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -94,6 +95,9 @@ function AppRoutes() {
         </Route>
         <Route path="/oak-creative">
            <PrivateRoute component={OakCreative} path="/oak-creative" />
+        </Route>
+        <Route path="/whatsapp-inbox">
+           <PrivateRoute component={WhatsappInbox} path="/whatsapp-inbox" />
         </Route>
         <Route component={NotFound} />
       </Switch>
