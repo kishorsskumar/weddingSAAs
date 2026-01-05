@@ -1914,3 +1914,25 @@ export const incomeSubmissions = pgTable("income_submissions", {
 export const insertIncomeSubmissionSchema = createInsertSchema(incomeSubmissions).omit({ id: true, createdAt: true });
 export type InsertIncomeSubmission = z.infer<typeof insertIncomeSubmissionSchema>;
 export type IncomeSubmission = typeof incomeSubmissions.$inferSelect;
+
+// Pending Vendor Payments - Employees submit pending vendor payments for tracking
+export const pendingVendorPayments = pgTable("pending_vendor_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestCode: text("request_code").notNull().unique(), // Short code like "VP001"
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  employeeName: text("employee_name").notNull(),
+  employeePhone: text("employee_phone").notNull(),
+  vendorName: text("vendor_name").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  eventId: varchar("event_id").references(() => events.id),
+  eventName: text("event_name"), // Event name for display
+  description: text("description"), // Additional notes
+  status: text("status").notNull().default('pending'), // 'pending', 'paid'
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPendingVendorPaymentSchema = createInsertSchema(pendingVendorPayments).omit({ id: true, createdAt: true });
+export type InsertPendingVendorPayment = z.infer<typeof insertPendingVendorPaymentSchema>;
+export type PendingVendorPayment = typeof pendingVendorPayments.$inferSelect;
