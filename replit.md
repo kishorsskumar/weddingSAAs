@@ -2,7 +2,7 @@
 
 ## Overview
 
-Oak Event Management is a comprehensive full-stack web application designed for event planning and business management. The system provides event calendar management, team scheduling, financial tracking through a daybook, HR management, and administrative controls. Built with a modern tech stack, it serves as an all-in-one platform for managing event-based businesses with role-based access control.
+Oak Event Management is a comprehensive full-stack web application for event planning and business management. It provides event calendar management, team scheduling, financial tracking (daybook), HR management, and administrative controls. The system aims to be an all-in-one platform for event-based businesses, featuring role-based access control and integration with AI and communication tools.
 
 ## User Preferences
 
@@ -27,264 +27,54 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend Architecture
-
-**Framework & Build System**
-- React with TypeScript for type-safe component development
-- Vite as the build tool and development server, configured for fast refresh and optimal bundling
-- React Router (wouter) for lightweight client-side routing
-- TanStack Query for server state management and data fetching with caching
-
-**UI Component System**
-- Radix UI primitives for accessible, unstyled components
-- shadcn/ui design system with Tailwind CSS for styling
-- Custom theming with CSS variables supporting light/dark modes
-- "New York" style variant from shadcn/ui
-- Custom color palette based on natural, earthy tones (oak theme)
-
-**State Management Pattern**
-- React Context API for authentication state
-- TanStack Query for server-side state with automatic background refetching
-- Local component state with React hooks for UI interactions
-- Custom hooks for mobile detection and toast notifications
-
-**Design System Decisions**
-- Component aliases configured for clean imports (@/components, @/lib, @/hooks)
-- Consistent spacing and responsive design using Tailwind's mobile-first approach
-- Lucide React for consistent iconography
-- Custom fonts: Inter for UI, Playfair Display for headings
+- **Framework:** React with TypeScript, Vite for build/development.
+- **Routing:** React Router (wouter).
+- **Data Fetching:** TanStack Query for server state management.
+- **UI:** Radix UI primitives, shadcn/ui with Tailwind CSS (New York style), custom earthy color palette.
+- **State Management:** React Context API for auth, TanStack Query for server state, React hooks for local state.
+- **Design System:** Component aliases, responsive design (mobile-first), Lucide React icons, Inter and Playfair Display fonts.
 
 ### Backend Architecture
-
-**Server Framework**
-- Express.js with TypeScript for the REST API
-- HTTP server created separately for potential WebSocket support
-- Middleware chain: JSON parsing, URL encoding, request logging
-- Custom logging system with timestamps and source tracking
-
-**API Design Pattern**
-- RESTful endpoints organized by resource (/api/events, /api/meetings, etc.)
-- Consistent CRUD operations across all resources
-- Session-based authentication with HTTP-only cookies
-- Request/response logging middleware for debugging
-
-**Authentication & Authorization**
-- Session-based authentication using express-session
-- PostgreSQL session store (connect-pg-simple) for persistent sessions
-- bcrypt for password hashing
-- Role-based access control with dynamic roles stored in database
-- System roles: superadmin, admin, manager, employee, wedding_planner, accountant
-- Super admin can create custom roles through Admin panel
-- Page-level permissions stored in database and checked on each request
-- API endpoints protected with authentication and authorization checks
-- verifyAdminAccess helper function for admin/superadmin route protection
-
-**Build & Deployment Strategy**
-- Separate client and server builds
-- esbuild for server bundling with allowlist for critical dependencies
-- Vite for client bundling with asset optimization
-- Production build outputs to /dist directory
-- Development mode uses Vite dev server with HMR
+- **Server:** Express.js with TypeScript.
+- **API Design:** RESTful endpoints, consistent CRUD operations, session-based authentication.
+- **Authentication & Authorization:** `express-session` with PostgreSQL store, `bcrypt` for password hashing, role-based access control (superadmin, admin, manager, employee, wedding_planner, accountant), dynamic roles, page-level permissions.
+- **Build:** `esbuild` for server, Vite for client.
 
 ### Data Storage
+- **Database:** PostgreSQL with Drizzle ORM for type-safe queries.
+- **Schema:** Users (roles, permissions), Events (financial tracking), Meetings, Employees, Daybook, Banks, Leave Requests, Sessions, Oaksy conversations/messages, WhatsApp conversations/approvals/inbound messages, QR payment requests, Monthly Production Plan.
+- **Validation:** Drizzle-zod integration for schema validation on API endpoints.
 
-**Database**
-- PostgreSQL as primary database
-- Drizzle ORM for type-safe database queries
-- Schema-first approach with migrations stored in /migrations
-- Connection pooling with node-postgres (pg)
+### Key Features
+- **Calendar Integration:** Google Calendar (active, two-way sync), Outlook (planned).
+- **Oaksy AI Assistant:** OpenAI GPT-4o integration, department-specific context, text/voice input, conversation history, context-aware responses.
+- **Two-Way WhatsApp Communication:** Employee expense/leave requests, Superadmin approval workflow, dashboard inbox for management, Superadmin lead submission with AI extraction.
+- **QR Payment Request System:** Employee QR code submission for payments, Superadmin approval/payment flow, automatic daybook recording with event assignment.
+- **Monthly Production Plan:** Macro-level scheduling with inline editing, auto-sync from events, PDF export.
+- **Leave Tracker (Oak HR):** Comprehensive leave monitoring, statistics, manual entry, status management.
 
-**Database Schema Design**
-- Users table with role-based access (admin, manager, employee, etc.)
-- User permissions table for granular page access control
-- Roles table for dynamic role management (system and custom roles)
-- Events table with financial tracking (sales, payments, costs)
-- Meetings table for team scheduling
-- Employees table for HR management
-- Daybook entries for income/expense tracking
-- Banks table for account management
-- Leave requests table for employee leave tracking
-- Session table for authentication persistence
+## External Dependencies
 
-**Data Validation**
-- Drizzle-zod integration for automatic schema validation
-- Zod schemas generated from database schema
-- Runtime validation on all API endpoints
-- Type safety from database to frontend through shared types
+### Third-Party UI/Utilities
+- `@radix-ui/*`: Accessible component primitives.
+- `react-hook-form`, `@hookform/resolvers`: Form management and validation.
+- `date-fns`: Date manipulation.
+- `class-variance-authority` (CVA), `tailwind-merge`, `clsx`: UI utilities.
+- `googleapis`: Google Calendar API access.
+- `twilio`: WhatsApp integration.
+- `openai`: AI assistant.
 
-### External Dependencies
+### Development Tools
+- `vite-plugin-cartographer`, `vite-plugin-dev-banner`, `vite-plugin-meta-images`.
+- `TypeScript`: Strict mode.
 
-**Third-Party UI Libraries**
-- @radix-ui/* family for accessible component primitives
-- react-hook-form with @hookform/resolvers for form management
-- date-fns for date manipulation and formatting
-- class-variance-authority (CVA) for component variant management
-- tailwind-merge and clsx for className utilities
+### Build Dependencies
+- `esbuild`: Server bundling.
+- `PostCSS`, `Tailwind CSS`, `Autoprefixer`.
+- `tsx`: TypeScript execution.
+- `drizzle-kit`: Database migrations.
 
-**Development Tools**
-- Replit-specific plugins: vite-plugin-cartographer, vite-plugin-dev-banner
-- Custom vite-plugin-meta-images for OpenGraph image handling
-- Runtime error modal for better development experience
-- TypeScript strict mode enabled for maximum type safety
-
-**Build Dependencies**
-- esbuild for fast server bundling
-- PostCSS with Tailwind and Autoprefixer
-- tsx for running TypeScript in development
-- drizzle-kit for database migrations
-
-**Security & Session Management**
-- bcryptjs for password hashing (10 rounds)
-- express-session with secure cookie configuration
-- CSRF protection through session management
-- HTTP-only cookies in production
-
-**Design Decisions Rationale**
-- Session-based auth chosen over JWT for better server control and revocation
-- Drizzle ORM selected for type safety and migration management
-- PostgreSQL chosen for ACID compliance and relational data integrity
-- Monorepo structure with shared types reduces duplication and maintains consistency
-- Vite chosen for superior DX with fast HMR and optimized production builds
-- Component-first architecture allows for easy extension and maintenance
-
-### Calendar Integration
-
-**Google Calendar Integration (Active)**
-- Connected via Replit's Google Calendar connector
-- Uses googleapis package for API access
-- Events sync to Google Calendar with customer, venue, planner details
-- Sync available per event or bulk sync all events
-- Admin Panel → Calendar tab for configuration and sync management
-- Events store googleCalendarEventId for tracking sync status
-
-**Outlook Calendar Integration (Not Set Up)**
-- User dismissed the Outlook integration setup
-- Can be enabled later through Replit's connector system
-- Events schema includes outlookCalendarEventId field for future use
-
-**Calendar API Endpoints**
-- GET /api/calendar/google/status - Check connection status
-- GET /api/calendar/google/calendars - List available calendars
-- POST /api/calendar/google/sync/:eventId - Sync single event
-- POST /api/calendar/google/sync-all - Bulk sync all events
-- DELETE /api/calendar/google/event/:eventId - Remove from calendar
-- GET /api/calendar/google/events - Get calendar events
-
-### Oaksy AI Assistant
-
-**Oaksy** is an AI-powered assistant integrated into the app using OpenAI's GPT-4o model. It provides department-specific support across Sales, Wedding Planning, Operations, and Accounts.
-
-**Features:**
-- Department-specific context and prompts
-- Text and voice input support (Web Speech API)
-- Conversation history with auto-generated titles
-- Context-aware responses with access to events, employees, and daybook data
-- Oak & Gold themed UI matching the app design
-
-**Oaksy API Endpoints**
-- GET /api/oaksy/conversations - Get user's conversations
-- GET /api/oaksy/conversations/:id - Get conversation with messages
-- POST /api/oaksy/conversations - Create new conversation
-- DELETE /api/oaksy/conversations/:id - Delete conversation
-- POST /api/oaksy/conversations/:id/messages - Send message and get AI response
-
-**Database Tables**
-- oaksy_conversations - Stores chat conversations with department context
-- oaksy_messages - Stores individual messages with role (user/assistant)
-
-**Files**
-- client/src/pages/oaksy.tsx - Oaksy chat UI
-- server/oaksy-ai.ts - OpenAI integration and context building
-- server/routes.ts - Oaksy API endpoints
-
-### Two-Way WhatsApp Communication
-
-Employees can submit expense requests and leave applications via WhatsApp, with Superadmin approval workflow.
-
-**Employee Flow:**
-1. Employee sends "Hi" to company WhatsApp number
-2. Bot presents menu: (1) Submit Expense, (2) Apply for Leave, (3) Check Status
-3. Expense: Employee provides purpose, amount, and uploads receipt photo
-4. Leave: Employee provides start date, end date (DD/MM/YYYY), and reason
-5. Employee receives confirmation with tracking code (EXP001, LV002, etc.)
-
-**Superadmin Approval:**
-- Superadmin receives WhatsApp notification with request details
-- Reply "A EXP001" to approve or "R EXP001 reason" to reject
-- Employee automatically notified of decision via WhatsApp
-
-**Dashboard Inbox:**
-- WhatsApp Inbox page shows pending approvals, approval history, and inbound messages
-- Manual approve/reject with optional response message
-- All approvals sync to expense_reimbursements and leave_requests tables
-
-**API Endpoints**
-- POST /api/whatsapp/webhook - Twilio webhook for incoming messages
-- GET /api/whatsapp/approvals - Get all pending approvals
-- GET /api/whatsapp/approvals/history - Get approval history
-- POST /api/whatsapp/approvals/:id/respond - Approve/reject from dashboard
-- GET /api/whatsapp/inbound - Get all inbound messages
-
-**Database Tables**
-- whatsapp_conversations - Tracks conversation state for each employee
-- whatsapp_pending_approvals - Pending and completed approval requests
-- whatsapp_inbound_messages - Log of all incoming WhatsApp messages
-
-**Files**
-- client/src/pages/whatsapp-inbox.tsx - Dashboard inbox UI
-- server/oaksy-whatsapp-ai.ts - AI-powered conversation flow and message processing
-- server/whatsapp-service.ts - Twilio integration for sending messages
-
-**Superadmin Lead Submission via WhatsApp:**
-- Superadmin can send leads via WhatsApp with natural language (e.g., "New lead: John Doe, 9876543210, March 15, Grand Hyatt, assign to Fida")
-- AI extracts: customer name, phone, event date, venue, and wedding planner
-- Creates contact and deal in Oak Sales
-- Notifies assigned wedding planner via WhatsApp
-
-**Phone Numbers:**
-- Superadmin approval notifications: +917902373354
-- Fida Fathima notifications: +919895810975
-- Femina KM notifications: +917306687284
-
-### Monthly Production Plan
-
-Macro-level planning page for managing event production schedules across a month.
-
-**Features:**
-- All 13 columns: Event Date, Event, Venue, Wedding Planner, Stage Manager, Team Lead, Team Count, Florist, Loading Start, Prod Start, Prod End, Dismantling, Dis. Lead
-- Grouped sections with customizable labels (e.g., "Dr.Sonia - KTDC Samudra - 15 & 16 Jan 2026")
-- Inline editing for superadmin with Tab/Enter keyboard navigation
-- Auto-sync from events calendar
-- Statistics dashboard showing total events, completed, and team assignments
-- PDF export with Oakstreet Events branding (green header, gold accent)
-
-**Database Schema:**
-- monthly_production_plan table with fields: eventDate, subEventName, venue, weddingPlanner, stageManager, teamLead, productionTeamCount, florist, loadingStartDateTime, productionStartTime, productionEndTime, dismantlingDateTime, dismantlingTeamLead, groupLabel, isComplete
-
-**API Endpoints**
-- GET /api/monthly-plan?month=&year= - Get plan entries for month
-- POST /api/monthly-plan/generate - Sync entries from events
-- POST /api/monthly-plan - Create new entry
-- PUT /api/monthly-plan/:id - Update entry
-- DELETE /api/monthly-plan/:id - Delete entry
-
-**Files**
-- client/src/pages/monthly-plan.tsx - Monthly Plan UI
-- shared/schema.ts - monthlyProductionPlan table schema
-- server/storage.ts - generateMonthlyPlanFromEvents function
-
-### Leave Tracker (Oak HR)
-
-Tab in Oak HR for monitoring and managing all employee leave records.
-
-**Features:**
-- Statistics dashboard: Total Leaves, Approved, Pending, Rejected
-- Filter by employee, status, and year
-- Manual leave entry with searchable employee dropdown
-- Status management (approve/reject/pending)
-- Includes both current and past employees for complete historical records
-
-**API Endpoints**
-- GET /api/leave-requests - Get all leave requests
-- POST /api/leave-requests - Create new leave request
-- PATCH /api/leave-requests/:id - Update leave request status
-- DELETE /api/leave-requests/:id - Delete leave request
+### Security & Session Management
+- `bcryptjs`: Password hashing.
+- `express-session`: Secure session management.
+- `connect-pg-simple`: PostgreSQL session store.
