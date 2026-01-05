@@ -1009,6 +1009,8 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
   const [selectedBankId, setSelectedBankId] = useState<string>('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedDays, setEditedDays] = useState<Record<string, number>>({});
+  const [editedLopDays, setEditedLopDays] = useState<Record<string, number>>({});
+  const [editedAdvance, setEditedAdvance] = useState<Record<string, number>>({});
 
   const { data: payrollRuns = [] } = useQuery<PayrollRun[]>({
     queryKey: ['/api/payroll-runs'],
@@ -1188,16 +1190,24 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
 
   const startEditMode = () => {
     const daysMap: Record<string, number> = {};
+    const lopMap: Record<string, number> = {};
+    const advanceMap: Record<string, number> = {};
     payrollItems.forEach(item => {
       daysMap[item.id] = item.daysWorked;
+      lopMap[item.id] = (item as any).lossOfPayDays || 0;
+      advanceMap[item.id] = Number((item as any).salaryAdvance || 0);
     });
     setEditedDays(daysMap);
+    setEditedLopDays(lopMap);
+    setEditedAdvance(advanceMap);
     setIsEditMode(true);
   };
 
   const cancelEditMode = () => {
     setIsEditMode(false);
     setEditedDays({});
+    setEditedLopDays({});
+    setEditedAdvance({});
   };
 
   const savePayrollChanges = () => {
@@ -1205,6 +1215,8 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
     const items = payrollItems.map(item => ({
       id: item.id,
       daysWorked: editedDays[item.id] ?? item.daysWorked,
+      lossOfPayDays: editedLopDays[item.id] ?? (item as any).lossOfPayDays ?? 0,
+      salaryAdvance: editedAdvance[item.id] ?? Number((item as any).salaryAdvance || 0),
     }));
     updatePayrollMutation.mutate({ runId: selectedRun.id, items });
   };
@@ -1388,7 +1400,9 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                         <TableHead className="text-xs sm:text-sm">Employee</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Monthly Salary</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Days Worked</TableHead>
-                        <TableHead className="text-right text-xs sm:text-sm">Daily Rate</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">LOP Days</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Advance</TableHead>
+                        <TableHead className="text-right text-xs sm:text-sm">Deductions</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Net Pay</TableHead>
                         {isSuperAdmin && selectedRun?.status !== 'paid' && (
                           <TableHead className="text-right text-xs sm:text-sm w-12"></TableHead>
@@ -1398,8 +1412,13 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                     <TableBody>
                       {payrollItems.map(item => {
                         const daysWorked = isEditMode ? (editedDays[item.id] ?? item.daysWorked) : item.daysWorked;
+                        const lopDays = isEditMode ? (editedLopDays[item.id] ?? (item as any).lossOfPayDays ?? 0) : ((item as any).lossOfPayDays ?? 0);
+                        const advance = isEditMode ? (editedAdvance[item.id] ?? Number((item as any).salaryAdvance || 0)) : Number((item as any).salaryAdvance || 0);
                         const dailyRate = Number(item.monthlySalary) / 30;
-                        const calculatedPay = isEditMode ? dailyRate * daysWorked : Number(item.netPay);
+                        const lopDeduction = dailyRate * lopDays;
+                        const totalDeductions = lopDeduction + advance;
+                        const grossPay = dailyRate * daysWorked;
+                        const calculatedPay = isEditMode ? (grossPay - totalDeductions) : Number(item.netPay);
                         return (
                           <TableRow key={item.id}>
                             <TableCell className="text-xs sm:text-sm font-medium">{item.employeeName}</TableCell>
@@ -1424,8 +1443,43 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                                 daysWorked
                               )}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-xs sm:text-sm">
-                              ₹{dailyRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            <TableCell className="text-right text-xs sm:text-sm">
+                              {isEditMode ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max="31"
+                                  value={editedLopDays[item.id] ?? (item as any).lossOfPayDays ?? 0}
+                                  onChange={e => setEditedLopDays(prev => ({
+                                    ...prev,
+                                    [item.id]: Math.min(31, Math.max(0, Number(e.target.value)))
+                                  }))}
+                                  className="w-16 text-center text-xs sm:text-sm ml-auto"
+                                  data-testid={`input-edit-lop-${item.id}`}
+                                />
+                              ) : (
+                                lopDays > 0 ? lopDays : '-'
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right text-xs sm:text-sm">
+                              {isEditMode ? (
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={editedAdvance[item.id] ?? Number((item as any).salaryAdvance || 0)}
+                                  onChange={e => setEditedAdvance(prev => ({
+                                    ...prev,
+                                    [item.id]: Math.max(0, Number(e.target.value))
+                                  }))}
+                                  className="w-20 text-center text-xs sm:text-sm ml-auto"
+                                  data-testid={`input-edit-advance-${item.id}`}
+                                />
+                              ) : (
+                                advance > 0 ? `₹${advance.toLocaleString()}` : '-'
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-xs sm:text-sm text-red-600">
+                              {totalDeductions > 0 ? `₹${totalDeductions.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '-'}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs sm:text-sm font-bold">
                               ₹{calculatedPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}
@@ -1898,13 +1952,14 @@ function SalarySlipsSection() {
       doc.setFont('helvetica', 'normal');
       doc.rect(15 + (pageWidth - 30) / 2, y, (pageWidth - 30) / 2, 45);
       const lossOfPayAmount = parseFloat(slip.lossOfPay || '0');
+      const salaryAdvanceAmount = parseFloat((slip as any).salaryAdvance || '0');
       const transportDeductionAmount = parseFloat(slip.transportDeduction || '0');
-      const calculatedTotalDeductions = lossOfPayAmount + transportDeductionAmount;
+      const calculatedTotalDeductions = lossOfPayAmount + salaryAdvanceAmount + transportDeductionAmount;
       
-      doc.text('Professional Tax:', 110, y + 8);
-      doc.text('0.00', 180, y + 8, { align: 'right' });
-      doc.text('Loss of Pay:', 110, y + 16);
-      doc.text(lossOfPayAmount.toFixed(2), 180, y + 16, { align: 'right' });
+      doc.text('Loss of Pay:', 110, y + 8);
+      doc.text(lossOfPayAmount.toFixed(2), 180, y + 8, { align: 'right' });
+      doc.text('Salary Advance:', 110, y + 16);
+      doc.text(salaryAdvanceAmount.toFixed(2), 180, y + 16, { align: 'right' });
       doc.text('Transport Deduction:', 110, y + 24);
       doc.text(transportDeductionAmount.toFixed(2), 180, y + 24, { align: 'right' });
       doc.setFont('helvetica', 'bold');

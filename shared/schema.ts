@@ -516,6 +516,8 @@ export const payrollItems = pgTable("payroll_items", {
   employeeName: text("employee_name").notNull(), // Snapshot of name at time of payroll
   monthlySalary: decimal("monthly_salary", { precision: 10, scale: 2 }).notNull(), // Snapshot of salary
   daysWorked: integer("days_worked").notNull().default(30),
+  lossOfPayDays: integer("loss_of_pay_days").notNull().default(0), // Days absent beyond allowed leaves
+  salaryAdvance: decimal("salary_advance", { precision: 10, scale: 2 }).default('0'), // Advance deduction
   dailyRate: decimal("daily_rate", { precision: 10, scale: 2 }).notNull(),
   grossPay: decimal("gross_pay", { precision: 10, scale: 2 }).notNull(),
   deductions: decimal("deductions", { precision: 10, scale: 2 }).default('0'),
@@ -551,6 +553,7 @@ export const salarySlips = pgTable("salary_slips", {
   totalEarnings: decimal("total_earnings", { precision: 10, scale: 2 }).notNull(),
   professionalTax: decimal("professional_tax", { precision: 10, scale: 2 }).default('0'),
   lossOfPay: decimal("loss_of_pay", { precision: 10, scale: 2 }).default('0'),
+  salaryAdvance: decimal("salary_advance", { precision: 10, scale: 2 }).default('0'),
   transportDeduction: decimal("transport_deduction", { precision: 10, scale: 2 }).default('0'),
   totalDeductions: decimal("total_deductions", { precision: 10, scale: 2 }).notNull(),
   netPayment: decimal("net_payment", { precision: 10, scale: 2 }).notNull(),

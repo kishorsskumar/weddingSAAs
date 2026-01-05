@@ -5081,15 +5081,21 @@ export async function registerRoutes(
           const item = existingItems.find(i => i.id === itemUpdate.id);
           if (item) {
             const dailyRate = parseFloat(item.monthlySalary) / 30;
-            const daysWorked = itemUpdate.daysWorked ?? item.daysWorked;
+            const daysWorked = Number(itemUpdate.daysWorked ?? item.daysWorked);
+            const lossOfPayDays = Number(itemUpdate.lossOfPayDays ?? (item as any).lossOfPayDays ?? 0);
+            const salaryAdvance = Number(itemUpdate.salaryAdvance ?? (item as any).salaryAdvance ?? 0);
             const grossPay = dailyRate * daysWorked;
-            const deductions = parseFloat(item.deductions || '0');
-            const netPay = grossPay - deductions;
+            const lopDeduction = dailyRate * lossOfPayDays;
+            const totalDeductions = lopDeduction + salaryAdvance;
+            const netPay = grossPay - totalDeductions;
             
             await storage.updatePayrollItem(itemUpdate.id, {
               daysWorked,
+              lossOfPayDays,
+              salaryAdvance: salaryAdvance.toFixed(2),
               dailyRate: dailyRate.toFixed(2),
               grossPay: grossPay.toFixed(2),
+              deductions: totalDeductions.toFixed(2),
               netPay: netPay.toFixed(2),
             });
             newTotal += netPay;
@@ -5267,10 +5273,13 @@ export async function registerRoutes(
         const basicDa = basicPay; // Basic + DA combined
         const hra = grossPay * 0.2; // 20% as HRA
         const otherAllowances = grossPay - basicDa - hra; // Rest as allowances
-        const professionalTax = 200; // Standard PT
-        const deductions = parseFloat(item.deductions || '0');
-        const lossOfPay = deductions - professionalTax > 0 ? deductions - professionalTax : 0;
-        const totalDeductions = professionalTax + lossOfPay;
+        
+        // Get LOP and advance from payroll item
+        const lossOfPayDays = (item as any).lossOfPayDays || 0;
+        const salaryAdvance = parseFloat((item as any).salaryAdvance || '0');
+        const dailyRate = parseFloat(item.monthlySalary) / 30;
+        const lossOfPay = dailyRate * lossOfPayDays;
+        const totalDeductions = lossOfPay + salaryAdvance; // No professional tax as per user preference
         const netPayment = parseFloat(item.netPay);
 
         // Convert net payment to words
@@ -5297,15 +5306,16 @@ export async function registerRoutes(
           month: run.month,
           year: run.year,
           totalDays: 30,
-          daysPresent: item.daysWorked,
+          daysPresent: item.daysWorked - lossOfPayDays, // Actual days present (worked - LOP)
           daysPaid: item.daysWorked,
           basicPay: basicPay.toFixed(2),
           basicDa: basicDa.toFixed(2),
           hra: hra.toFixed(2),
           otherAllowances: otherAllowances.toFixed(2),
           totalEarnings: grossPay.toFixed(2),
-          professionalTax: professionalTax.toFixed(2),
+          professionalTax: '0.00', // Professional tax shown as 0 per user preference
           lossOfPay: lossOfPay.toFixed(2),
+          salaryAdvance: salaryAdvance.toFixed(2),
           totalDeductions: totalDeductions.toFixed(2),
           netPayment: netPayment.toFixed(2),
           amountInWords,
@@ -5372,6 +5382,10 @@ export async function registerRoutes(
       const monthLabel = `${monthNames[slip.month - 1]} ${slip.year}`;
 
       // Create salary slip message
+      const lossOfPay = parseFloat(slip.lossOfPay || '0');
+      const salaryAdvance = parseFloat((slip as any).salaryAdvance || '0');
+      const totalDeductions = lossOfPay + salaryAdvance;
+      
       const message = `*SALARY SLIP - ${monthLabel}*\n\n` +
         `Dear ${slip.employeeName},\n\n` +
         `Your salary slip for ${monthLabel} is ready.\n\n` +
@@ -5381,9 +5395,9 @@ export async function registerRoutes(
         `Other Allowances: Rs. ${slip.otherAllowances || '0.00'}\n` +
         `Total Earnings: Rs. ${slip.totalEarnings}\n\n` +
         `*DEDUCTIONS*\n` +
-        `Professional Tax: Rs. 0.00\n` +
-        `Loss of Pay: Rs. ${slip.lossOfPay || '0.00'}\n` +
-        `Total Deductions: Rs. ${parseFloat(slip.lossOfPay || '0').toFixed(2)}\n\n` +
+        `Loss of Pay: Rs. ${lossOfPay.toFixed(2)}\n` +
+        `Salary Advance: Rs. ${salaryAdvance.toFixed(2)}\n` +
+        `Total Deductions: Rs. ${totalDeductions.toFixed(2)}\n\n` +
         `*NET PAYMENT: Rs. ${slip.netPayment}*\n\n` +
         `Thank you for your service.\n` +
         `- Yepman International`;
