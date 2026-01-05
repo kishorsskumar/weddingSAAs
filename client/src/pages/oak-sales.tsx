@@ -1084,80 +1084,236 @@ function DealDetailPanel({
   companies: SalesCompany[];
   onClose: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: deal.title,
+    value: deal.value?.toString() || '0',
+    eventType: deal.eventType || '',
+    eventDate: deal.eventDate || '',
+    venue: deal.venue || '',
+    notes: deal.notes || '',
+    status: deal.status || 'open',
+  });
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const contact = contacts.find(c => c.id === deal.contactId);
   const company = companies.find(c => c.id === deal.companyId);
+
+  const updateDealMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return apiRequest('PATCH', `/api/sales/deals/${deal.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/deals'] });
+      setIsEditing(false);
+      toast({ title: 'Deal updated successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to update deal', variant: 'destructive' });
+    },
+  });
+
+  const deleteDealMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', `/api/sales/deals/${deal.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/deals'] });
+      onClose();
+      toast({ title: 'Deal deleted successfully' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to delete deal', variant: 'destructive' });
+    },
+  });
+
+  const handleSave = () => {
+    updateDealMutation.mutate({
+      title: editForm.title,
+      value: parseFloat(editForm.value) || 0,
+      eventType: editForm.eventType || null,
+      eventDate: editForm.eventDate || null,
+      venue: editForm.venue || null,
+      notes: editForm.notes || null,
+      status: editForm.status,
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this lead?')) {
+      deleteDealMutation.mutate();
+    }
+  };
 
   return (
     <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-card border-l shadow-xl z-50">
       <div className="h-full flex flex-col">
         <div className="p-4 border-b flex items-center justify-between">
-          <h2 className="font-semibold">Deal Details</h2>
+          <h2 className="font-semibold">{isEditing ? 'Edit Deal' : 'Deal Details'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
         <ScrollArea className="flex-1 p-4">
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold">{deal.title}</h3>
-              <p className="text-2xl font-bold text-amber-600 mt-1">
-                {formatCurrency(deal.value)}
-              </p>
-            </div>
-
-            <Separator />
-
+          {isEditing ? (
             <div className="space-y-4">
               <div>
-                <Label className="text-muted-foreground">Status</Label>
-                <Badge className="mt-1">{deal.status}</Badge>
+                <Label>Title</Label>
+                <Input
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  data-testid="input-deal-title"
+                />
               </div>
               <div>
-                <Label className="text-muted-foreground">Event Type</Label>
-                <p className="font-medium">{deal.eventType || 'Not specified'}</p>
+                <Label>Value (₹)</Label>
+                <Input
+                  type="number"
+                  value={editForm.value}
+                  onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
+                  data-testid="input-deal-value"
+                />
               </div>
-              {deal.eventDate && (
-                <div>
-                  <Label className="text-muted-foreground">Event Date</Label>
-                  <p className="font-medium">{format(new Date(deal.eventDate), 'MMM d, yyyy')}</p>
-                </div>
-              )}
-              {deal.venue && (
-                <div>
-                  <Label className="text-muted-foreground">Venue</Label>
-                  <p className="font-medium">{deal.venue}</p>
-                </div>
-              )}
-              {contact && (
-                <div>
-                  <Label className="text-muted-foreground">Contact</Label>
-                  <p className="font-medium">{contact.firstName} {contact.lastName}</p>
-                  {contact.email && <p className="text-sm text-muted-foreground">{contact.email}</p>}
-                </div>
-              )}
-              {company && (
-                <div>
-                  <Label className="text-muted-foreground">Company</Label>
-                  <p className="font-medium">{company.name}</p>
-                </div>
-              )}
-              {deal.notes && (
-                <div>
-                  <Label className="text-muted-foreground">Notes</Label>
-                  <p className="text-sm mt-1">{deal.notes}</p>
-                </div>
-              )}
+              <div>
+                <Label>Event Type</Label>
+                <Input
+                  value={editForm.eventType}
+                  onChange={(e) => setEditForm({ ...editForm, eventType: e.target.value })}
+                  placeholder="e.g., Wedding, Corporate Event"
+                  data-testid="input-deal-event-type"
+                />
+              </div>
+              <div>
+                <Label>Event Date</Label>
+                <Input
+                  type="date"
+                  value={editForm.eventDate}
+                  onChange={(e) => setEditForm({ ...editForm, eventDate: e.target.value })}
+                  data-testid="input-deal-event-date"
+                />
+              </div>
+              <div>
+                <Label>Venue</Label>
+                <Input
+                  value={editForm.venue}
+                  onChange={(e) => setEditForm({ ...editForm, venue: e.target.value })}
+                  data-testid="input-deal-venue"
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select
+                  value={editForm.status}
+                  onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                >
+                  <SelectTrigger data-testid="select-deal-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="won">Won</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  rows={4}
+                  data-testid="input-deal-notes"
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold">{deal.title}</h3>
+                <p className="text-2xl font-bold text-amber-600 mt-1">
+                  {formatCurrency(deal.value)}
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <Badge className="mt-1">{deal.status}</Badge>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Event Type</Label>
+                  <p className="font-medium">{deal.eventType || 'Not specified'}</p>
+                </div>
+                {deal.eventDate && (
+                  <div>
+                    <Label className="text-muted-foreground">Event Date</Label>
+                    <p className="font-medium">{format(new Date(deal.eventDate), 'MMM d, yyyy')}</p>
+                  </div>
+                )}
+                {deal.venue && (
+                  <div>
+                    <Label className="text-muted-foreground">Venue</Label>
+                    <p className="font-medium">{deal.venue}</p>
+                  </div>
+                )}
+                {contact && (
+                  <div>
+                    <Label className="text-muted-foreground">Contact</Label>
+                    <p className="font-medium">{contact.firstName} {contact.lastName}</p>
+                    {contact.email && <p className="text-sm text-muted-foreground">{contact.email}</p>}
+                  </div>
+                )}
+                {company && (
+                  <div>
+                    <Label className="text-muted-foreground">Company</Label>
+                    <p className="font-medium">{company.name}</p>
+                  </div>
+                )}
+                {deal.notes && (
+                  <div>
+                    <Label className="text-muted-foreground">Notes</Label>
+                    <p className="text-sm mt-1">{deal.notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </ScrollArea>
         <div className="p-4 border-t flex gap-2">
-          <Button variant="outline" className="flex-1">
-            <Edit className="w-4 h-4 mr-2" />
-            Edit
-          </Button>
-          <Button variant="destructive" size="icon">
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          {isEditing ? (
+            <>
+              <Button variant="outline" className="flex-1" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={handleSave}
+                disabled={updateDealMutation.isPending}
+                data-testid="button-save-deal"
+              >
+                {updateDealMutation.isPending ? 'Saving...' : 'Save'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" className="flex-1" onClick={() => setIsEditing(true)} data-testid="button-edit-deal">
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="icon" 
+                onClick={handleDelete}
+                disabled={deleteDealMutation.isPending}
+                data-testid="button-delete-deal"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
