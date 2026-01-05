@@ -5362,6 +5362,7 @@ export async function registerRoutes(
           employeeName: item.employeeName,
           designation: employee.designation || 'Staff',
           department: employee.department || 'General',
+          joinDate: employee.joinDate,
           month: run.month,
           year: run.year,
           totalDays: 30,
