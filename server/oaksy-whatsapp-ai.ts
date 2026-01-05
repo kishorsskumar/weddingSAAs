@@ -1042,11 +1042,12 @@ export async function handleOaksyWhatsAppMessage(
         return `⚠️ ${qrCode} already ${qrRequest.status}.`;
       }
       
-      // Mark as paid immediately
+      // Mark as paid immediately, store payment screenshot if provided
       await storage.updateQrPaymentRequest(qrRequest.id, {
         status: 'paid',
         paidAt: new Date(),
         eventAssignment: eventName,
+        paymentScreenshotUrl: mediaUrl || null,
       });
       
       // Record in daybook
@@ -1063,17 +1064,28 @@ export async function handleOaksyWhatsAppMessage(
         approvedBy: 'Kishor',
       });
       
-      // Notify employee
+      // Notify employee with payment screenshot if available
       const employeePhone = qrRequest.employeePhone;
       if (employeePhone) {
         try {
-          await sendWhatsAppMessage(employeePhone, `✅ *${qrCode} Paid!*\n₹${amount.toLocaleString('en-IN')} for ${qrRequest.description}`);
+          const confirmMessage = `✅ *${qrCode} Paid!*\n₹${amount.toLocaleString('en-IN')} for ${qrRequest.description}`;
+          
+          if (mediaUrl) {
+            // Send with payment screenshot
+            const publicUrl = getPublicMediaUrl(mediaUrl);
+            const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+            await sendWhatsAppMediaMessage(employeePhone, publicUrl, confirmMessage);
+            console.log(`[QR] Sent payment screenshot to ${qrRequest.employeeName}`);
+          } else {
+            // Send text only
+            await sendWhatsAppMessage(employeePhone, confirmMessage);
+          }
         } catch (e) {
           console.error('[QR] Failed to notify employee:', e);
         }
       }
       
-      return `✅ *${qrCode}* paid → ${qrRequest.employeeName}\n₹${amount.toLocaleString('en-IN')} • ${eventName}`;
+      return `✅ *${qrCode}* paid → ${qrRequest.employeeName}\n₹${amount.toLocaleString('en-IN')} • ${eventName}${mediaUrl ? '\n📸 Screenshot sent to employee' : ''}`;
     }
     
     if (rejectQrMatch) {
