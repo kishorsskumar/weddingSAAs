@@ -195,3 +195,41 @@ Preferred communication style: Simple, everyday language.
 - client/src/pages/oaksy.tsx - Oaksy chat UI
 - server/oaksy-ai.ts - OpenAI integration and context building
 - server/routes.ts - Oaksy API endpoints
+
+### Two-Way WhatsApp Communication
+
+Employees can submit expense requests and leave applications via WhatsApp, with Superadmin approval workflow.
+
+**Employee Flow:**
+1. Employee sends "Hi" to company WhatsApp number
+2. Bot presents menu: (1) Submit Expense, (2) Apply for Leave, (3) Check Status
+3. Expense: Employee provides purpose, amount, and uploads receipt photo
+4. Leave: Employee provides start date, end date (DD/MM/YYYY), and reason
+5. Employee receives confirmation with tracking code (EXP001, LV002, etc.)
+
+**Superadmin Approval:**
+- Superadmin receives WhatsApp notification with request details
+- Reply "A EXP001" to approve or "R EXP001 reason" to reject
+- Employee automatically notified of decision via WhatsApp
+
+**Dashboard Inbox:**
+- WhatsApp Inbox page shows pending approvals, approval history, and inbound messages
+- Manual approve/reject with optional response message
+- All approvals sync to expense_reimbursements and leave_requests tables
+
+**API Endpoints**
+- POST /api/whatsapp/webhook - Twilio webhook for incoming messages
+- GET /api/whatsapp/approvals - Get all pending approvals
+- GET /api/whatsapp/approvals/history - Get approval history
+- POST /api/whatsapp/approvals/:id/respond - Approve/reject from dashboard
+- GET /api/whatsapp/inbound - Get all inbound messages
+
+**Database Tables**
+- whatsapp_conversations - Tracks conversation state for each employee
+- whatsapp_pending_approvals - Pending and completed approval requests
+- whatsapp_inbound_messages - Log of all incoming WhatsApp messages
+
+**Files**
+- client/src/pages/whatsapp-inbox.tsx - Dashboard inbox UI
+- server/whatsapp-handler.ts - Conversation flow and message processing
+- server/whatsapp-service.ts - Twilio integration for sending messages
