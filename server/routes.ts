@@ -5215,6 +5215,65 @@ export async function registerRoutes(
     }
   });
 
+  // Mark individual payroll item as paid and create daybook entry
+  app.post('/api/payroll-items/:id/mark-paid', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can mark payroll items as paid' });
+      }
+
+      const { bankId } = req.body;
+      const item = await storage.getPayrollItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: 'Payroll item not found' });
+      }
+
+      if ((item as any).isPaid) {
+        return res.status(400).json({ error: 'This payroll item is already paid' });
+      }
+
+      // Get payroll run info for month/year
+      const run = await storage.getPayrollRun(item.payrollRunId);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthName = monthNames[run.month - 1];
+      const today = new Date().toISOString().split('T')[0];
+
+      // Create daybook entry for this employee's salary payment
+      const daybookEntry = await storage.createDaybookEntry({
+        date: today,
+        description: `Salary - ${item.employeeName} (${monthName} ${run.year})`,
+        type: 'expense',
+        amount: item.netPay,
+        category: 'Salaries',
+        paymentMethod: bankId ? 'bank_transfer' : 'cash',
+        bankId: bankId || undefined,
+      });
+
+      // Update payroll item with paid status
+      await storage.updatePayrollItem(req.params.id, {
+        isPaid: true,
+        paidAt: new Date(),
+        paidBankId: bankId,
+        daybookEntryId: daybookEntry.id,
+      } as any);
+
+      res.json({ success: true, daybookEntryId: daybookEntry.id });
+    } catch (error: any) {
+      console.error('Mark payroll item paid error:', error);
+      res.status(500).json({ error: error.message || 'Failed to mark as paid' });
+    }
+  });
+
   // Salary Slips
   app.get('/api/salary-slips/payroll/:runId', async (req, res) => {
     try {

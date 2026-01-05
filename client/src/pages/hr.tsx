@@ -1404,8 +1404,9 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                         <TableHead className="text-right text-xs sm:text-sm">Advance</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Deductions</TableHead>
                         <TableHead className="text-right text-xs sm:text-sm">Net Pay</TableHead>
-                        {isSuperAdmin && selectedRun?.status !== 'paid' && (
-                          <TableHead className="text-right text-xs sm:text-sm w-12"></TableHead>
+                        <TableHead className="text-center text-xs sm:text-sm">Status</TableHead>
+                        {isSuperAdmin && (
+                          <TableHead className="text-right text-xs sm:text-sm w-20">Actions</TableHead>
                         )}
                       </TableRow>
                     </TableHeader>
@@ -1484,42 +1485,89 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                             <TableCell className="text-right font-mono text-xs sm:text-sm font-bold">
                               ₹{calculatedPay.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </TableCell>
-                            {isSuperAdmin && selectedRun?.status !== 'paid' && (
+                            <TableCell className="text-center">
+                              {(item as any).isPaid ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                                  <Check className="h-3 w-3" /> Paid
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                                  <Clock className="h-3 w-3" /> Pending
+                                </span>
+                              )}
+                            </TableCell>
+                            {isSuperAdmin && (
                               <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                  onClick={async () => {
-                                    if (confirm(`Remove ${item.employeeName} from this payroll?`)) {
-                                      try {
-                                        const response = await fetch(`/api/payroll-items/${item.id}`, { 
-                                          method: 'DELETE',
-                                          credentials: 'include'
-                                        });
-                                        if (!response.ok) {
-                                          const error = await response.json();
-                                          throw new Error(error.error || 'Failed to delete');
+                                <div className="flex items-center justify-end gap-1">
+                                  {!(item as any).isPaid && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+                                      onClick={async () => {
+                                        if (confirm(`Mark ${item.employeeName}'s salary as paid and add to daybook?`)) {
+                                          try {
+                                            const response = await fetch(`/api/payroll-items/${item.id}/mark-paid`, { 
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              credentials: 'include',
+                                              body: JSON.stringify({})
+                                            });
+                                            if (!response.ok) {
+                                              const error = await response.json();
+                                              throw new Error(error.error || 'Failed to mark as paid');
+                                            }
+                                            queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+                                            queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs', selectedRun.id, 'items'] });
+                                            queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+                                            toast({ title: `${item.employeeName} marked as paid` });
+                                          } catch (error: any) {
+                                            toast({ title: error.message || 'Failed to mark as paid', variant: 'destructive' });
+                                          }
                                         }
-                                        queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
-                                        queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs', selectedRun.id, 'items'] });
-                                        toast({ title: 'Employee removed from payroll' });
-                                      } catch (error: any) {
-                                        toast({ title: error.message || 'Failed to remove employee', variant: 'destructive' });
-                                      }
-                                    }
-                                  }}
-                                  data-testid={`button-delete-payroll-item-${item.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                      }}
+                                      data-testid={`button-mark-paid-${item.id}`}
+                                    >
+                                      <DollarSign className="h-3 w-3 mr-1" /> Pay
+                                    </Button>
+                                  )}
+                                  {selectedRun?.status !== 'paid' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                      onClick={async () => {
+                                        if (confirm(`Remove ${item.employeeName} from this payroll?`)) {
+                                          try {
+                                            const response = await fetch(`/api/payroll-items/${item.id}`, { 
+                                              method: 'DELETE',
+                                              credentials: 'include'
+                                            });
+                                            if (!response.ok) {
+                                              const error = await response.json();
+                                              throw new Error(error.error || 'Failed to delete');
+                                            }
+                                            queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+                                            queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs', selectedRun.id, 'items'] });
+                                            toast({ title: 'Employee removed from payroll' });
+                                          } catch (error: any) {
+                                            toast({ title: error.message || 'Failed to remove employee', variant: 'destructive' });
+                                          }
+                                        }
+                                      }}
+                                      data-testid={`button-delete-payroll-item-${item.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             )}
                           </TableRow>
                         );
                       })}
                       <TableRow className="bg-muted/50 font-bold">
-                        <TableCell colSpan={4} className="text-xs sm:text-sm">Total Payroll</TableCell>
+                        <TableCell colSpan={6} className="text-xs sm:text-sm">Total Payroll</TableCell>
                         <TableCell className="text-right text-primary font-mono text-xs sm:text-sm">
                           {isEditMode ? (
                             `₹${payrollItems.reduce((sum, item) => {
@@ -1531,7 +1579,10 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                             `₹${Number(selectedRun.totalAmount).toLocaleString()}`
                           )}
                         </TableCell>
-                        {isSuperAdmin && selectedRun?.status !== 'paid' && <TableCell />}
+                        <TableCell className="text-center text-xs">
+                          {payrollItems.filter(i => (i as any).isPaid).length}/{payrollItems.length} paid
+                        </TableCell>
+                        {isSuperAdmin && <TableCell />}
                       </TableRow>
                     </TableBody>
                   </Table>

@@ -522,6 +522,10 @@ export const payrollItems = pgTable("payroll_items", {
   grossPay: decimal("gross_pay", { precision: 10, scale: 2 }).notNull(),
   deductions: decimal("deductions", { precision: 10, scale: 2 }).default('0'),
   netPay: decimal("net_pay", { precision: 10, scale: 2 }).notNull(),
+  isPaid: boolean("is_paid").default(false),
+  paidAt: timestamp("paid_at"),
+  paidBankId: varchar("paid_bank_id"),
+  daybookEntryId: varchar("daybook_entry_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
