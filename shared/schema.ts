@@ -1797,3 +1797,62 @@ export const monthlyProductionPlan = pgTable("monthly_production_plan", {
 export const insertMonthlyProductionPlanSchema = createInsertSchema(monthlyProductionPlan).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertMonthlyProductionPlan = z.infer<typeof insertMonthlyProductionPlanSchema>;
 export type MonthlyProductionPlan = typeof monthlyProductionPlan.$inferSelect;
+
+// ============ WhatsApp Two-Way Communication ============
+
+// WhatsApp Conversations - tracks conversation state for each phone number
+export const whatsappConversations = pgTable("whatsapp_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phoneNumber: text("phone_number").notNull(), // Normalized phone number
+  employeeId: varchar("employee_id").references(() => employees.id, { onDelete: 'set null' }),
+  currentState: text("current_state").notNull().default('idle'), // idle, menu, expense_purpose, expense_amount, expense_photo, leave_start, leave_end, leave_reason, awaiting_approval_response
+  currentDepartment: text("current_department"), // accounts, hr
+  pendingData: jsonb("pending_data"), // Temporary data being collected (purpose, amount, dates, etc.)
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWhatsappConversationSchema = createInsertSchema(whatsappConversations).omit({ id: true, createdAt: true });
+export type InsertWhatsappConversation = z.infer<typeof insertWhatsappConversationSchema>;
+export type WhatsappConversation = typeof whatsappConversations.$inferSelect;
+
+// WhatsApp Pending Approvals - tracks approvals sent to superadmin via WhatsApp
+export const whatsappPendingApprovals = pgTable("whatsapp_pending_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  approvalCode: text("approval_code").notNull().unique(), // Short code like "EXP001", "LV002" for easy reply
+  type: text("type").notNull(), // expense, leave
+  requestId: varchar("request_id").notNull(), // ID of the expense or leave request
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  employeeName: text("employee_name").notNull(),
+  description: text("description").notNull(), // Summary of the request
+  amount: decimal("amount", { precision: 10, scale: 2 }), // For expenses
+  mediaUrl: text("media_url"), // URL of the invoice/receipt image
+  status: text("status").notNull().default('pending'), // pending, approved, rejected
+  approverPhone: text("approver_phone").notNull(), // Superadmin's WhatsApp number
+  sentAt: timestamp("sent_at").defaultNow(),
+  respondedAt: timestamp("responded_at"),
+  responseMessage: text("response_message"), // Optional rejection reason
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWhatsappPendingApprovalSchema = createInsertSchema(whatsappPendingApprovals).omit({ id: true, createdAt: true });
+export type InsertWhatsappPendingApproval = z.infer<typeof insertWhatsappPendingApprovalSchema>;
+export type WhatsappPendingApproval = typeof whatsappPendingApprovals.$inferSelect;
+
+// WhatsApp Inbound Messages - log of all incoming messages for audit
+export const whatsappInboundMessages = pgTable("whatsapp_inbound_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: text("message_id").notNull(), // Twilio message SID
+  fromNumber: text("from_number").notNull(),
+  toNumber: text("to_number").notNull(),
+  body: text("body"),
+  mediaUrl: text("media_url"),
+  mediaContentType: text("media_content_type"),
+  conversationId: varchar("conversation_id").references(() => whatsappConversations.id),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWhatsappInboundMessageSchema = createInsertSchema(whatsappInboundMessages).omit({ id: true, createdAt: true });
+export type InsertWhatsappInboundMessage = z.infer<typeof insertWhatsappInboundMessageSchema>;
+export type WhatsappInboundMessage = typeof whatsappInboundMessages.$inferSelect;
