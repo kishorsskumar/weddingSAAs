@@ -174,15 +174,29 @@ Analyze this message and respond as Oaksy AI. Remember to be friendly and helpfu
   }
 }
 
+// Superadmin WhatsApp number for approval notifications
+const SUPERADMIN_WHATSAPP = '+917902373354';
+
+// Wedding Planner phone numbers for lead notifications
+const WEDDING_PLANNER_PHONES: Record<string, string> = {
+  'fida fathima': '+919895810975',
+  'fida': '+919895810975',
+  'femina km': '+917306687284',
+  'femina': '+917306687284',
+};
+
 async function getSuperadminPhone(): Promise<string> {
-  const superadmins = await storage.getUsersByRole('superadmin');
-  for (const user of superadmins) {
-    const employee = await storage.getEmployeeByUserId(user.id);
-    if (employee?.phone) {
-      return employee.phone;
+  return SUPERADMIN_WHATSAPP;
+}
+
+function getWeddingPlannerPhone(plannerName: string): string | null {
+  const normalized = plannerName.toLowerCase().trim();
+  for (const [key, phone] of Object.entries(WEDDING_PLANNER_PHONES)) {
+    if (normalized.includes(key)) {
+      return phone;
     }
   }
-  return process.env.SUPERADMIN_WHATSAPP || '';
+  return null;
 }
 
 function generateUniqueApprovalCode(prefix: string): string {
@@ -199,15 +213,17 @@ async function createExpenseRequest(
   mediaUrl?: string
 ): Promise<{ approvalCode: string; requestId: string }> {
   const approvalCode = generateUniqueApprovalCode('EXP');
+  const today = new Date().toISOString().split('T')[0];
 
   const expenseData: InsertExpenseReimbursement = {
     employeeId,
-    date: new Date().toISOString().split('T')[0],
-    purpose,
+    requestDate: today,
+    expenseDate: today,
+    category: 'other',
+    description: purpose,
     amount: amount.toString(),
     status: 'pending',
-    receiptUrl: mediaUrl || null,
-    submittedVia: 'whatsapp',
+    voucherPath: mediaUrl || null,
   };
 
   const expense = await storage.createExpenseReimbursement(expenseData);
@@ -323,6 +339,309 @@ async function notifySuperadmin(
   await sendWhatsAppMessage(superadminPhone, message);
 }
 
+// Superadmin Lead System Prompt
+const SUPERADMIN_LEAD_PROMPT = `You are Oaksy AI, helping the Superadmin of Oakstreet Events add leads to Oak Sales via WhatsApp.
+
+When the superadmin sends a message about a potential client/lead, extract:
+1. Customer Name (required)
+2. Customer Phone (if available) 
+3. Event Date (if available)
+4. Venue (if available)
+5. Assigned Wedding Planner - must be either "Fida Fathima" or "Femina KM"
+
+PERSONALITY:
+- Professional and efficient
+- Quick to extract and confirm information
+- Use simple confirmations
+
+RESPONSE FORMAT - Always respond with valid JSON:
+{
+  "isLead": true/false,
+  "extractedData": {
+    "customerName": string or null,
+    "customerPhone": string or null,
+    "eventDate": "YYYY-MM-DD" or null,
+    "venue": string or null,
+    "weddingPlanner": "Fida Fathima" | "Femina KM" | null
+  },
+  "needsMoreInfo": ["customerName", "weddingPlanner"] or [],
+  "isComplete": boolean,
+  "message": "Your response to the superadmin"
+}
+
+If the message doesn't look like a lead (e.g., approval commands), set isLead: false.`;
+
+interface LeadContext {
+  customerName?: string;
+  customerPhone?: string;
+  eventDate?: string;
+  venue?: string;
+  weddingPlanner?: string;
+  confirmed?: boolean;
+}
+
+async function analyzeLeadWithAI(
+  message: string,
+  context: LeadContext,
+  conversationHistory: ConversationMessage[]
+): Promise<{
+  isLead: boolean;
+  extractedData: Partial<LeadContext>;
+  needsMoreInfo: string[];
+  isComplete: boolean;
+  message: string;
+}> {
+  const recentHistory = conversationHistory.slice(-6);
+  
+  const historyText = recentHistory.map(m => 
+    `${m.role === 'user' ? 'Superadmin' : 'Oaksy'}: ${m.content}`
+  ).join('\n');
+  
+  const userPrompt = `Current context: ${JSON.stringify(context)}
+Recent conversation:
+${historyText}
+
+Superadmin's message: "${message}"
+
+Extract lead information and respond.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: SUPERADMIN_LEAD_PROMPT },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.5,
+      max_tokens: 500,
+    });
+
+    const content = response.choices[0]?.message?.content || '';
+    
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    return {
+      isLead: false,
+      extractedData: {},
+      needsMoreInfo: [],
+      isComplete: false,
+      message: content || "I can help you add leads. Send me customer details!"
+    };
+  } catch (error: any) {
+    console.error('[Oaksy AI Lead] Error:', error.message);
+    return {
+      isLead: false,
+      extractedData: {},
+      needsMoreInfo: [],
+      isComplete: false,
+      message: "Sorry, I had trouble processing that. Please try again."
+    };
+  }
+}
+
+async function createLeadInOakSales(
+  leadContext: LeadContext,
+  createdBy: string
+): Promise<{ dealId: string; contactId: string }> {
+  // Get or create the default pipeline and first stage
+  const pipelines = await storage.getAllSalesPipelines();
+  let pipeline = pipelines.find(p => p.isDefault) || pipelines[0];
+  
+  if (!pipeline) {
+    // Create a default pipeline if none exists
+    pipeline = await storage.createSalesPipeline({
+      name: 'Bookings',
+      description: 'Default sales pipeline',
+      isDefault: true,
+    });
+  }
+  
+  const stages = await storage.getSalesStagesByPipelineId(pipeline.id);
+  let firstStage = stages.sort((a, b) => a.order - b.order)[0];
+  
+  if (!firstStage) {
+    // Create default stages
+    firstStage = await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Lead',
+      order: 1,
+      color: '#6B7280',
+      probability: 10,
+    });
+  }
+  
+  // Find the wedding planner user ID
+  let ownerId: string | null = null;
+  if (leadContext.weddingPlanner) {
+    const users = await storage.getAllUsers();
+    const plannerUser = users.find(u => 
+      u.name.toLowerCase().includes(leadContext.weddingPlanner!.toLowerCase().split(' ')[0])
+    );
+    if (plannerUser) {
+      ownerId = plannerUser.id;
+    }
+  }
+  
+  // Create the contact
+  const nameParts = (leadContext.customerName || 'Unknown').split(' ');
+  const contact = await storage.createSalesContact({
+    firstName: nameParts[0],
+    lastName: nameParts.slice(1).join(' ') || null,
+    phone: leadContext.customerPhone || null,
+    source: 'WhatsApp',
+    ownerId,
+  });
+  
+  // Create the deal
+  const deal = await storage.createSalesDeal({
+    title: `${leadContext.customerName || 'New Lead'} - ${leadContext.venue || 'TBD'}`,
+    pipelineId: pipeline.id,
+    stageId: firstStage.id,
+    contactId: contact.id,
+    ownerId,
+    eventDate: leadContext.eventDate || null,
+    venue: leadContext.venue || null,
+    source: 'WhatsApp',
+    status: 'open',
+    eventType: 'wedding',
+  });
+  
+  return { dealId: deal.id, contactId: contact.id };
+}
+
+async function notifyWeddingPlanner(
+  plannerName: string,
+  leadDetails: LeadContext
+): Promise<boolean> {
+  const plannerPhone = getWeddingPlannerPhone(plannerName);
+  if (!plannerPhone) {
+    console.log('[Oaksy] No phone number found for planner:', plannerName);
+    return false;
+  }
+  
+  const message = `🌳 *New Lead Assigned*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Customer:* ${leadDetails.customerName || 'Not specified'}\n📞 *Phone:* ${leadDetails.customerPhone || 'Not provided'}\n📅 *Event Date:* ${leadDetails.eventDate || 'TBD'}\n📍 *Venue:* ${leadDetails.venue || 'TBD'}\n\n_Added via WhatsApp by Superadmin_\n\nCheck Oak Sales for more details 🌿`;
+  
+  try {
+    await sendWhatsAppMessage(plannerPhone, message);
+    return true;
+  } catch (error) {
+    console.error('[Oaksy] Failed to notify planner:', error);
+    return false;
+  }
+}
+
+async function handleSuperadminLeadMessage(
+  messageText: string,
+  fromNumber: string
+): Promise<string | null> {
+  // Get or create conversation for superadmin
+  const conversation = await storage.getOrCreateWhatsappConversation(fromNumber);
+  
+  let leadContext: LeadContext = {};
+  let history: ConversationMessage[] = [];
+  
+  try {
+    const rawContext = conversation.intentContext;
+    if (typeof rawContext === 'string') {
+      leadContext = JSON.parse(rawContext) || {};
+    } else if (rawContext && typeof rawContext === 'object') {
+      leadContext = rawContext as LeadContext;
+    }
+  } catch {
+    leadContext = {};
+  }
+  
+  try {
+    const rawHistory = conversation.conversationHistory;
+    if (typeof rawHistory === 'string') {
+      history = JSON.parse(rawHistory) || [];
+    } else if (Array.isArray(rawHistory)) {
+      history = rawHistory as ConversationMessage[];
+    }
+  } catch {
+    history = [];
+  }
+  
+  history.push({ role: 'user', content: messageText, timestamp: Date.now() });
+  if (history.length > 10) history = history.slice(-10);
+  
+  // Analyze the message for lead content
+  const analysis = await analyzeLeadWithAI(messageText, leadContext, history);
+  
+  // If it's not a lead message, return null to let other handlers process it
+  if (!analysis.isLead) {
+    return null;
+  }
+  
+  // Merge extracted data into context
+  leadContext = { ...leadContext, ...analysis.extractedData };
+  
+  // Check if user is confirming
+  const lowerMessage = messageText.toLowerCase();
+  if ((lowerMessage === 'yes' || lowerMessage === 'confirm' || lowerMessage === 'ok') && 
+      leadContext.customerName && leadContext.weddingPlanner) {
+    leadContext.confirmed = true;
+  }
+  
+  // If complete and confirmed, create the lead
+  if (analysis.isComplete && leadContext.confirmed && leadContext.customerName && leadContext.weddingPlanner) {
+    try {
+      const { dealId } = await createLeadInOakSales(leadContext, 'superadmin');
+      
+      // Notify the wedding planner
+      await notifyWeddingPlanner(leadContext.weddingPlanner, leadContext);
+      
+      // Reset context
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: {},
+        conversationHistory: [],
+        currentState: 'idle',
+      });
+      
+      const response = `✅ *Lead Added Successfully!*\n\n👤 ${leadContext.customerName}\n📍 ${leadContext.venue || 'TBD'}\n📅 ${leadContext.eventDate || 'TBD'}\n👰 Assigned to: ${leadContext.weddingPlanner}\n\n_${leadContext.weddingPlanner} has been notified via WhatsApp!_ 🌳`;
+      
+      return response;
+    } catch (error: any) {
+      console.error('[Oaksy] Error creating lead:', error.message);
+      return `❌ Sorry, I couldn't create this lead. Error: ${error.message}\n\nPlease try again or add it directly in Oak Sales.`;
+    }
+  }
+  
+  // If we have enough info but not confirmed, ask for confirmation
+  if (leadContext.customerName && leadContext.weddingPlanner && !leadContext.confirmed) {
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: 'lead',
+      intentContext: leadContext,
+      conversationHistory: history,
+      currentState: 'awaiting_lead_confirmation',
+    });
+    
+    const response = `📝 *Confirm Lead Details:*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Customer:* ${leadContext.customerName}\n📞 *Phone:* ${leadContext.customerPhone || 'Not provided'}\n📅 *Event Date:* ${leadContext.eventDate || 'TBD'}\n📍 *Venue:* ${leadContext.venue || 'TBD'}\n👰 *Wedding Planner:* ${leadContext.weddingPlanner}\n\n_Reply "Yes" to add this lead_ 🌳`;
+    
+    history.push({ role: 'assistant', content: response, timestamp: Date.now() });
+    await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
+    
+    return response;
+  }
+  
+  // Need more information
+  await storage.updateWhatsappConversation(conversation.id, {
+    activeIntent: 'lead',
+    intentContext: leadContext,
+    conversationHistory: history,
+    currentState: 'collecting_lead_info',
+  });
+  
+  history.push({ role: 'assistant', content: analysis.message, timestamp: Date.now() });
+  await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
+  
+  return analysis.message;
+}
+
 export async function handleOaksyWhatsAppMessage(
   fromNumber: string,
   body: string,
@@ -390,11 +709,29 @@ export async function handleOaksyWhatsAppMessage(
     history = history.slice(-10);
   }
 
+  // Check if this is from the superadmin
+  const user = await storage.getUserByPhone(normalizedPhone);
+  const isSuperadmin = user?.role === 'superadmin';
+
+  // Handle superadmin approval commands
   if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
       lowerMessage.match(/^(r|reject)\s+([a-z]{2,3}\d+)/i)) {
-    const user = await storage.getUserByPhone(normalizedPhone);
-    if (user?.role === 'superadmin') {
+    if (isSuperadmin) {
       return handleSuperadminApproval(messageText, normalizedPhone);
+    }
+  }
+
+  // Handle superadmin lead submissions
+  if (isSuperadmin) {
+    // Check if already in lead flow or this looks like a lead
+    const isInLeadFlow = conversation.activeIntent === 'lead';
+    const looksLikeLead = /lead|customer|client|new enquiry|enquiry|assign|fida|femina/i.test(messageText);
+    
+    if (isInLeadFlow || looksLikeLead) {
+      const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
+      if (leadResponse) {
+        return leadResponse;
+      }
     }
   }
 
