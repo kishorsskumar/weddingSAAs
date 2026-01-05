@@ -7557,6 +7557,43 @@ Respond with a JSON array only, no markdown formatting.`;
     }
   });
 
+  // Media proxy endpoint - serves Twilio media with authentication
+  // This creates a public URL that WhatsApp can use to access images
+  app.get('/api/media-proxy/:messageId/:mediaId', async (req, res) => {
+    try {
+      const { messageId, mediaId } = req.params;
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken = process.env.TWILIO_AUTH_TOKEN;
+      
+      if (!accountSid || !authToken) {
+        return res.status(500).json({ error: 'Twilio not configured' });
+      }
+      
+      // Construct the Twilio media URL
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages/${messageId}/Media/${mediaId}`;
+      
+      // Download from Twilio with basic auth
+      const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+      const response = await fetch(twilioUrl, {
+        headers: { 'Authorization': authHeader }
+      });
+      
+      if (!response.ok) {
+        return res.status(response.status).json({ error: 'Failed to fetch media' });
+      }
+      
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+      
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error: any) {
+      console.error('[Media Proxy] Error:', error.message);
+      res.status(500).json({ error: 'Failed to proxy media' });
+    }
+  });
+
   // WhatsApp Messaging Routes
   app.get('/api/whatsapp/status', async (req, res) => {
     if (!req.session.userId) {

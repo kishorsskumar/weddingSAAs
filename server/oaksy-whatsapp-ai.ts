@@ -2,8 +2,41 @@ import OpenAI from "openai";
 import { storage } from './storage';
 import { sendWhatsAppMessage, isWhatsAppConfigured } from './whatsapp-service';
 import type { WhatsappConversation, InsertExpenseReimbursement, InsertLeaveRequest } from '@shared/schema';
+import { objectStorageClient } from './objectStorage';
+import { randomUUID } from 'crypto';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Helper to convert Twilio media URL to our proxy URL for public access
+function getPublicMediaUrl(twilioMediaUrl: string): string {
+  if (!twilioMediaUrl || !twilioMediaUrl.includes('twilio.com')) {
+    return twilioMediaUrl; // Return as-is if not a Twilio URL
+  }
+  
+  try {
+    // Parse the Twilio URL to extract message ID and media ID
+    // URL format: https://api.twilio.com/2010-04-01/Accounts/{SID}/Messages/{MessageId}/Media/{MediaId}
+    const match = twilioMediaUrl.match(/Messages\/([^/]+)\/Media\/([^/?]+)/);
+    if (!match) {
+      console.log('[Media] Could not parse Twilio URL:', twilioMediaUrl);
+      return twilioMediaUrl;
+    }
+    
+    const [, messageId, mediaId] = match;
+    
+    // Get the base URL from environment - use REPLIT_DEV_DOMAIN for development
+    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+      : 'http://localhost:5000';
+    
+    const proxyUrl = `${baseUrl}/api/media-proxy/${messageId}/${mediaId}`;
+    console.log('[Media] Created proxy URL:', proxyUrl);
+    return proxyUrl;
+  } catch (error: any) {
+    console.error('[Media] Error creating proxy URL:', error.message);
+    return twilioMediaUrl; // Fallback to original URL
+  }
+}
 
 interface IntentContext {
   amount?: number;
@@ -2142,13 +2175,17 @@ async function notifyKishorQrPayment(
   amount: number,
   qrImageUrl: string
 ): Promise<void> {
-  // First send the QR image with Twilio media message
+  // First try to get a public URL for the QR image
   if (qrImageUrl) {
     try {
+      // Convert Twilio authenticated URL to public URL
+      const publicUrl = await getPublicMediaUrl(qrImageUrl);
+      console.log('[QR Payment] Using public URL:', publicUrl);
+      
       const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
       await sendWhatsAppMediaMessage(
         SUPERADMIN_WHATSAPP, 
-        qrImageUrl,
+        publicUrl,
         `💳 *Payment Request ${requestCode}*\n\n👤 From: ${employeeName}\n📝 For: ${description}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "PAID ${requestCode}" after payment_`
       );
     } catch (mediaError) {
@@ -2177,10 +2214,14 @@ async function notifyKishorIncomeSubmission(
   
   if (screenshotUrl) {
     try {
+      // Convert Twilio authenticated URL to public URL
+      const publicUrl = await getPublicMediaUrl(screenshotUrl);
+      console.log('[Income] Using public URL:', publicUrl);
+      
       const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
       await sendWhatsAppMediaMessage(
         SUPERADMIN_WHATSAPP, 
-        screenshotUrl,
+        publicUrl,
         `📥 *Income Submission ${requestCode}*\n\n👤 From: ${employeeName}\n📁 Type: ${typeLabel}\n👥 Client: ${clientName}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "A ${requestCode}" to approve_`
       );
     } catch (mediaError) {
