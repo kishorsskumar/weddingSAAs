@@ -231,8 +231,19 @@ Employees can submit expense requests and leave applications via WhatsApp, with 
 
 **Files**
 - client/src/pages/whatsapp-inbox.tsx - Dashboard inbox UI
-- server/whatsapp-handler.ts - Conversation flow and message processing
+- server/oaksy-whatsapp-ai.ts - AI-powered conversation flow and message processing
 - server/whatsapp-service.ts - Twilio integration for sending messages
+
+**Superadmin Lead Submission via WhatsApp:**
+- Superadmin can send leads via WhatsApp with natural language (e.g., "New lead: John Doe, 9876543210, March 15, Grand Hyatt, assign to Fida")
+- AI extracts: customer name, phone, event date, venue, and wedding planner
+- Creates contact and deal in Oak Sales
+- Notifies assigned wedding planner via WhatsApp
+
+**Phone Numbers:**
+- Superadmin approval notifications: +917902373354
+- Fida Fathima notifications: +919895810975
+- Femina KM notifications: +917306687284
 
 ### Monthly Production Plan
 
