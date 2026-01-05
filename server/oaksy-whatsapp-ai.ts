@@ -664,6 +664,37 @@ export async function handleOaksyWhatsAppMessage(
 
   const conversation = await storage.getOrCreateWhatsappConversation(normalizedPhone);
   
+  const messageText = body.trim();
+  const lowerMessage = messageText.toLowerCase();
+  
+  // Check if this is from the superadmin FIRST (before employee check)
+  const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
+                              normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10)) ||
+                              SUPERADMIN_WHATSAPP.endsWith(normalizedPhone.slice(-10));
+  
+  // Handle superadmin messages directly (approval commands and lead submissions)
+  if (isSuperadminByPhone) {
+    // Handle approval commands
+    if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
+        lowerMessage.match(/^(r|reject)\s+([a-z]{2,3}\w+)/i)) {
+      return handleSuperadminApproval(messageText, normalizedPhone);
+    }
+    
+    // Handle lead submissions
+    const isInLeadFlow = conversation.activeIntent === 'lead';
+    const looksLikeLead = /lead|customer|client|enquiry|assign|fida|femina|\d{10}/i.test(messageText);
+    
+    if (isInLeadFlow || looksLikeLead) {
+      const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
+      if (leadResponse) {
+        return leadResponse;
+      }
+    }
+    
+    // Default superadmin greeting
+    return `👋 Hi! I'm Oaksy AI.\n\n*As Superadmin, you can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n_How can I help you today?_ 🌳`;
+  }
+  
   const employee = conversation.employeeId 
     ? await storage.getEmployee(conversation.employeeId)
     : null;
@@ -671,9 +702,6 @@ export async function handleOaksyWhatsAppMessage(
   if (!employee) {
     return `👋 Hi! I'm Oaksy, your AI companion at Oakstreet Events.\n\n❌ I couldn't find your employee record. Please contact HR to ensure your phone number is registered.\n\n_Once registered, I can help you submit expenses and apply for leave!_ 🌳`;
   }
-
-  const messageText = body.trim();
-  const lowerMessage = messageText.toLowerCase();
   
   let context: IntentContext = {};
   let history: ConversationMessage[] = [];
@@ -707,35 +735,6 @@ export async function handleOaksyWhatsAppMessage(
   });
   if (history.length > 10) {
     history = history.slice(-10);
-  }
-
-  // Check if this is from the superadmin (by role or by known phone number)
-  const user = await storage.getUserByPhone(normalizedPhone);
-  const isSuperadminByRole = user?.role === 'superadmin';
-  const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
-                              normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10));
-  const isSuperadmin = isSuperadminByRole || isSuperadminByPhone;
-
-  // Handle superadmin approval commands
-  if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
-      lowerMessage.match(/^(r|reject)\s+([a-z]{2,3}\d+)/i)) {
-    if (isSuperadmin) {
-      return handleSuperadminApproval(messageText, normalizedPhone);
-    }
-  }
-
-  // Handle superadmin lead submissions
-  if (isSuperadmin) {
-    // Check if already in lead flow or this looks like a lead
-    const isInLeadFlow = conversation.activeIntent === 'lead';
-    const looksLikeLead = /lead|customer|client|new enquiry|enquiry|assign|fida|femina/i.test(messageText);
-    
-    if (isInLeadFlow || looksLikeLead) {
-      const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
-      if (leadResponse) {
-        return leadResponse;
-      }
-    }
   }
 
   if (lowerMessage === 'status' || lowerMessage === 'my status' || lowerMessage.includes('check status')) {
