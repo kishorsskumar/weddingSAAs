@@ -709,9 +709,12 @@ export async function handleOaksyWhatsAppMessage(
     history = history.slice(-10);
   }
 
-  // Check if this is from the superadmin
+  // Check if this is from the superadmin (by role or by known phone number)
   const user = await storage.getUserByPhone(normalizedPhone);
-  const isSuperadmin = user?.role === 'superadmin';
+  const isSuperadminByRole = user?.role === 'superadmin';
+  const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
+                              normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10));
+  const isSuperadmin = isSuperadminByRole || isSuperadminByPhone;
 
   // Handle superadmin approval commands
   if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
