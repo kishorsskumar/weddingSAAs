@@ -729,7 +729,7 @@ export async function handleOaksyWhatsAppMessage(
                               normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10)) ||
                               SUPERADMIN_WHATSAPP.endsWith(normalizedPhone.slice(-10));
   
-  // Handle superadmin messages directly (approval commands and lead submissions)
+  // Handle superadmin (Kishor) messages directly
   if (isSuperadminByPhone) {
     // Handle approval commands (A/R for expenses/leave)
     if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
@@ -737,12 +737,89 @@ export async function handleOaksyWhatsAppMessage(
       return handleSuperadminApproval(messageText, normalizedPhone);
     }
     
-    // Handle QR payment commands (PAID QR001 [event name])
-    const paidMatch = lowerMessage.match(/^paid\s+(qr\d+)(?:\s+(.+))?/i);
+    // Check if Kishor is in a QR payment flow (awaiting screenshot or event)
+    if (conversation.activeIntent === 'kishor_qr_payment') {
+      let kishorContext: any = {};
+      try {
+        if (typeof conversation.intentContext === 'string') {
+          kishorContext = JSON.parse(conversation.intentContext) || {};
+        } else if (conversation.intentContext) {
+          kishorContext = conversation.intentContext;
+        }
+      } catch { kishorContext = {}; }
+      
+      // Waiting for screenshot
+      if (conversation.currentState === 'awaiting_payment_screenshot') {
+        if (mediaUrl) {
+          // Got screenshot, now ask for event assignment
+          kishorContext.paymentScreenshotUrl = mediaUrl;
+          
+          await storage.updateWhatsappConversation(conversation.id, {
+            intentContext: kishorContext,
+            currentState: 'awaiting_event_assignment',
+          });
+          
+          return `📸 Got your payment screenshot!\n\nWhich event should this expense be recorded under?\n\n_Type the customer/event name, or "general" for general expenses_`;
+        } else {
+          return `Please send your payment screenshot so I can forward it to the employee.`;
+        }
+      }
+      
+      // Waiting for event assignment
+      if (conversation.currentState === 'awaiting_event_assignment') {
+        const eventName = messageText.trim();
+        const qrCode = kishorContext.qrCode;
+        const paymentScreenshotUrl = kishorContext.paymentScreenshotUrl;
+        
+        // Reject empty/whitespace input or media-only messages
+        if (!eventName || eventName.length === 0) {
+          return `Please type the event/customer name, or "general" for general expenses.`;
+        }
+        
+        // Complete the QR payment with screenshot and event
+        const result = await handleQrPaymentComplete(qrCode, eventName, paymentScreenshotUrl);
+        
+        // Reset Kishor's conversation
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+        });
+        
+        return result;
+      }
+    }
+    
+    // Handle QR payment PAID command - start screenshot collection flow
+    const paidMatch = lowerMessage.match(/^paid\s+(qr\d+)/i);
     const rejectQrMatch = lowerMessage.match(/^reject\s+(qr\d+)(?:\s+(.+))?/i);
     
     if (paidMatch) {
-      return handleQrPaymentPaid(paidMatch[1], paidMatch[2], mediaUrl);
+      const qrCode = paidMatch[1].toUpperCase();
+      const qrRequest = await storage.getQrPaymentRequestByCode(qrCode);
+      
+      if (!qrRequest) {
+        return `❌ QR Payment Request ${qrCode} not found.`;
+      }
+      
+      if (qrRequest.status !== 'pending') {
+        return `⚠️ QR Request ${qrCode} was already ${qrRequest.status}.`;
+      }
+      
+      // Mark as paid (awaiting screenshot)
+      await storage.updateQrPaymentRequest(qrRequest.id, {
+        status: 'paid',
+        paidAt: new Date(),
+      });
+      
+      // Store QR code in Kishor's conversation context and ask for screenshot
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'kishor_qr_payment',
+        intentContext: { qrCode },
+        currentState: 'awaiting_payment_screenshot',
+      });
+      
+      return `✅ Payment marked for *${qrCode}*\n\n📸 Please send your payment screenshot so I can forward it to ${qrRequest.employeeName}.`;
     }
     
     if (rejectQrMatch) {
@@ -760,8 +837,8 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Default superadmin greeting
-    return `👋 Hi! I'm Oaksy AI.\n\n*As Superadmin, you can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001 [event name]" with screenshot\n\n_How can I help you today?_ 🌳`;
+    // Default Kishor greeting
+    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after making payment\n\n_How can I help you today?_ 🌳`;
   }
   
   const employee = conversation.employeeId 
@@ -810,222 +887,172 @@ export async function handleOaksyWhatsAppMessage(
     return await getEmployeeStatus(employee.id, employee.name);
   }
 
-  // Detect explicit QR payment request (employee sends with "pay", "qr", or "payment")
-  const isExplicitQrPaymentRequest = (lowerMessage.includes('pay ') || lowerMessage.includes('qr') || 
-                               lowerMessage === 'pay' || lowerMessage.includes('payment request') ||
-                               lowerMessage.startsWith('pay for')) && mediaUrl;
-  
-  if (isExplicitQrPaymentRequest && !conversation.activeIntent) {
+  // SIMPLIFIED QR PAYMENT FLOW - Any image is treated as QR payment request
+  if (mediaUrl && !conversation.activeIntent) {
     context.qrImageUrl = mediaUrl;
     
-    // Extract amount if provided in the message
+    // Try to extract amount and purpose from the message
     const providedAmount = extractAmount(messageText);
-    if (providedAmount) {
+    // Remove the amount from the message to get the purpose
+    const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim();
+    
+    if (providedAmount && purposeText.length > 2) {
+      // Got both amount and purpose - submit immediately!
       context.amount = providedAmount;
-    }
-    
-    await storage.updateWhatsappConversation(conversation.id, {
-      activeIntent: 'qr_payment',
-      intentContext: context,
-      conversationHistory: history,
-      currentState: 'awaiting_qr_category',
-    });
-
-    const amountNote = providedAmount ? `\n\n💰 Amount noted: ₹${providedAmount.toLocaleString('en-IN')}` : '';
-    const response = `💳 *QR Payment Request*\n\nGot your QR code!${amountNote}\n\n*What category is this expense?*\n\n1️⃣ Food\n2️⃣ Travel\n3️⃣ Accommodation\n4️⃣ Supplies\n5️⃣ Other\n\n_Just type the number or category name_`;
-    
-    history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-    await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-    
-    return response;
-  }
-  
-  // When image with amount is sent, ask to clarify: receipt or QR payment
-  if (mediaUrl && !conversation.activeIntent) {
-    const hasAmount = extractAmount(messageText);
-    
-    // Store the image and amount for later use
-    context.pendingMediaUrl = mediaUrl;
-    if (hasAmount) {
-      context.pendingAmount = hasAmount;
-    }
-    context.pendingPurpose = messageText;
-    
-    await storage.updateWhatsappConversation(conversation.id, {
-      activeIntent: 'clarify_image_type',
-      intentContext: context,
-      conversationHistory: history,
-      currentState: 'awaiting_image_type',
-    });
-
-    const response = `📸 Got your image!\n\n*Is this a:*\n\n1️⃣ *Receipt* - For expense reimbursement\n2️⃣ *QR Code* - For direct payment request\n\n_Reply 1 or 2_`;
-    
-    history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-    await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-    
-    return response;
-  }
-  
-  // Handle image type clarification
-  if (conversation.activeIntent === 'clarify_image_type' && conversation.currentState === 'awaiting_image_type') {
-    const isReceipt = lowerMessage === '1' || lowerMessage === 'receipt' || lowerMessage.includes('receipt');
-    const isQrCode = lowerMessage === '2' || lowerMessage === 'qr' || lowerMessage.includes('qr') || lowerMessage.includes('payment');
-    
-    if (isReceipt) {
-      // Transition to expense flow
-      context.mediaUrl = context.pendingMediaUrl;
-      context.amount = context.pendingAmount;
+      context.qrPaymentDescription = purposeText;
+      context.qrPaymentCategory = 'Other'; // Default category
       
+      const { requestCode } = await createQrPaymentRequest(
+        employee.id,
+        employee.name,
+        employee.phone || normalizedPhone,
+        'Other',
+        purposeText,
+        providedAmount,
+        mediaUrl
+      );
+
+      await notifyKishorQrPayment(
+        requestCode,
+        employee.name,
+        purposeText,
+        providedAmount,
+        mediaUrl
+      );
+
       await storage.updateWhatsappConversation(conversation.id, {
-        activeIntent: 'expense',
-        intentContext: context,
-        conversationHistory: history,
-        currentState: context.pendingAmount ? 'awaiting_expense_purpose' : 'awaiting_expense_details',
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
       });
-      
-      if (context.pendingAmount) {
-        const response = `💰 Got it! ₹${context.pendingAmount.toLocaleString('en-IN')} with receipt.\n\nWhat was this expense for? 📝`;
-        history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-        await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-        return response;
-      } else {
-        const response = `📸 Got your receipt!\n\nPlease tell me:\n1️⃣ The amount\n2️⃣ What it was for\n\n_Example: "500 for taxi to venue"_`;
-        history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-        await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-        return response;
-      }
-    } else if (isQrCode) {
-      // Transition to QR payment flow
-      context.qrImageUrl = context.pendingMediaUrl;
-      if (context.pendingAmount) {
-        context.amount = context.pendingAmount;
-      }
+
+      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n📝 For: ${purposeText}\n\n_You'll be notified once payment is done!_ 🌳`;
+    } else if (providedAmount) {
+      // Got amount but no purpose - just ask for purpose
+      context.amount = providedAmount;
       
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'qr_payment',
         intentContext: context,
         conversationHistory: history,
-        currentState: 'awaiting_qr_category',
+        currentState: 'awaiting_qr_purpose_only',
       });
-      
-      const amountNote = context.pendingAmount ? `\n\n💰 Amount noted: ₹${context.pendingAmount.toLocaleString('en-IN')}` : '';
-      const response = `💳 *QR Payment Request*\n\nGot your QR code!${amountNote}\n\n*What category is this expense?*\n\n1️⃣ Food\n2️⃣ Travel\n3️⃣ Accommodation\n4️⃣ Supplies\n5️⃣ Other\n\n_Just type the number or category name_`;
+
+      const response = `💳 Got your QR! Amount: *₹${providedAmount.toLocaleString('en-IN')}*\n\nWhat's this payment for? 📝`;
       
       history.push({ role: 'assistant', content: response, timestamp: Date.now() });
       await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
       
       return response;
     } else {
-      return `Please reply with *1* for Receipt (expense reimbursement) or *2* for QR Code (payment request).`;
+      // Got QR but no amount - ask for amount and purpose together
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'qr_payment',
+        intentContext: context,
+        conversationHistory: history,
+        currentState: 'awaiting_qr_details',
+      });
+
+      const response = `💳 Got your QR code!\n\nPlease send amount and purpose.\n_Example: "500 for taxi" or "1200 lunch"_`;
+      
+      history.push({ role: 'assistant', content: response, timestamp: Date.now() });
+      await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
+      
+      return response;
     }
   }
   
-  // Handle QR payment flow states
+  // Handle simplified QR payment flow states
   if (conversation.activeIntent === 'qr_payment') {
-    if (conversation.currentState === 'awaiting_qr_category') {
-      const categories: Record<string, string> = {
-        '1': 'Food', 'food': 'Food',
-        '2': 'Travel', 'travel': 'Travel',
-        '3': 'Accommodation', 'accommodation': 'Accommodation',
-        '4': 'Supplies', 'supplies': 'Supplies',
-        '5': 'Other', 'other': 'Other',
-      };
+    // Waiting for just purpose (amount already provided)
+    if (conversation.currentState === 'awaiting_qr_purpose_only') {
+      context.qrPaymentDescription = messageText;
+      context.qrPaymentCategory = 'Other';
       
-      const category = categories[lowerMessage] || categories[lowerMessage.split(' ')[0]] || 'Other';
-      context.qrPaymentCategory = category;
-      
+      const { requestCode } = await createQrPaymentRequest(
+        employee.id,
+        employee.name,
+        employee.phone || normalizedPhone,
+        'Other',
+        messageText,
+        context.amount || 0,
+        context.qrImageUrl || ''
+      );
+
+      await notifyKishorQrPayment(
+        requestCode,
+        employee.name,
+        messageText,
+        context.amount || 0,
+        context.qrImageUrl || ''
+      );
+
       await storage.updateWhatsappConversation(conversation.id, {
-        intentContext: context,
-        currentState: 'awaiting_qr_amount',
-        conversationHistory: history,
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
       });
 
-      const response = `📁 Category: *${category}*\n\n💰 *How much is the payment?*\n\n_Just send the amount, like "500" or "₹1200"_`;
-      
-      history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-      await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-      
-      return response;
+      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${context.amount?.toLocaleString('en-IN')}\n📝 For: ${messageText}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
-    if (conversation.currentState === 'awaiting_qr_amount') {
+    // Waiting for both amount and purpose
+    if (conversation.currentState === 'awaiting_qr_details') {
       const amount = extractAmount(messageText);
       if (!amount) {
-        return `❓ I couldn't understand the amount. Please enter a number like "500" or "₹1200"`;
+        return `Please include the amount. Example: "500 for taxi" or "₹1200 for lunch"`;
       }
+      
+      const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').replace(/for\s+/i, '').trim() || 'Payment';
       
       context.amount = amount;
+      context.qrPaymentDescription = purposeText;
+      context.qrPaymentCategory = 'Other';
       
+      const { requestCode } = await createQrPaymentRequest(
+        employee.id,
+        employee.name,
+        employee.phone || normalizedPhone,
+        'Other',
+        purposeText,
+        amount,
+        context.qrImageUrl || ''
+      );
+
+      await notifyKishorQrPayment(
+        requestCode,
+        employee.name,
+        purposeText,
+        amount,
+        context.qrImageUrl || ''
+      );
+
       await storage.updateWhatsappConversation(conversation.id, {
-        intentContext: context,
-        currentState: 'awaiting_qr_description',
-        conversationHistory: history,
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
       });
 
-      const response = `💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n📝 *What is this payment for?*\n\n_Example: "Lunch for team" or "Taxi to event venue"_`;
-      
-      history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-      await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-      
-      return response;
+      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${purposeText}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
-    if (conversation.currentState === 'awaiting_qr_description') {
-      context.qrPaymentDescription = messageText;
-      
+    // Legacy states - reset and ask to start over
+    if (conversation.currentState === 'awaiting_qr_description' || 
+        conversation.currentState === 'awaiting_qr_confirmation' ||
+        conversation.currentState === 'awaiting_qr_category' ||
+        conversation.currentState === 'awaiting_qr_amount') {
+      // Reset to idle and ask to resend
       await storage.updateWhatsappConversation(conversation.id, {
-        intentContext: context,
-        currentState: 'awaiting_qr_confirmation',
-        conversationHistory: history,
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
       });
-
-      const response = `✨ *Confirm Payment Request:*\n━━━━━━━━━━━━━━━━━━\n\n📁 Category: ${context.qrPaymentCategory}\n💰 Amount: ₹${context.amount?.toLocaleString('en-IN')}\n📝 Purpose: ${context.qrPaymentDescription}\n📷 QR Code: Attached\n\n*Send this to Superadmin for payment?*\n_Reply "yes" or "no"_`;
       
-      history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-      await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
-      
-      return response;
-    }
-    
-    if (conversation.currentState === 'awaiting_qr_confirmation') {
-      if (lowerMessage === 'yes' || lowerMessage === 'y' || lowerMessage === 'ok' || lowerMessage === 'confirm') {
-        const { requestCode } = await createQrPaymentRequest(
-          employee.id,
-          employee.name,
-          employee.phone || normalizedPhone,
-          context.qrPaymentCategory || 'Other',
-          context.qrPaymentDescription || 'Payment request',
-          context.amount || 0,
-          context.qrImageUrl || ''
-        );
-
-        await notifySuperadminQrPayment(
-          requestCode,
-          employee.name,
-          context.qrPaymentCategory || 'Other',
-          context.qrPaymentDescription || 'Payment request',
-          context.amount || 0,
-          context.qrImageUrl || ''
-        );
-
-        await storage.updateWhatsappConversation(conversation.id, {
-          activeIntent: null,
-          intentContext: null,
-          currentState: 'idle',
-          conversationHistory: [],
-        });
-
-        return `✅ *Payment Request Submitted!*\n━━━━━━━━━━━━━━━━━━\n\n📋 Reference: *${requestCode}*\n💰 Amount: ₹${context.amount?.toLocaleString('en-IN')}\n📝 Purpose: ${context.qrPaymentDescription}\n\n_I've sent your QR code to Superadmin for payment. You'll be notified once it's processed!_ 🌳`;
-      } else if (lowerMessage === 'no' || lowerMessage === 'n' || lowerMessage === 'cancel') {
-        await storage.updateWhatsappConversation(conversation.id, {
-          activeIntent: null,
-          intentContext: null,
-          currentState: 'idle',
-          conversationHistory: [],
-        });
-
-        return `👍 No problem! I've cancelled that request.\n\nNeed anything else? 🌳`;
-      }
+      return `Let's start fresh! Please send your QR code again with the amount and purpose.\n\n_Example: Send QR image with "500 for taxi"_`;
     }
   }
 
@@ -1467,6 +1494,87 @@ async function handleQrPaymentReject(
   return `❌ *Rejected* - ${qrRequest.requestCode}\n*Reason:* ${rejectReason}\n\n_Employee notified._`;
 }
 
+async function handleQrPaymentComplete(
+  code: string,
+  eventNameOrGeneral: string,
+  paymentScreenshotUrl?: string
+): Promise<string> {
+  const qrRequest = await storage.getQrPaymentRequestByCode(code.toUpperCase());
+  
+  if (!qrRequest) {
+    return `❌ QR Payment Request ${code.toUpperCase()} not found.`;
+  }
+  
+  if (qrRequest.status !== 'paid') {
+    return `⚠️ QR Request ${code.toUpperCase()} is in ${qrRequest.status} state.`;
+  }
+  
+  // Determine event assignment - treat empty/blank as "General"
+  const rawEventName = eventNameOrGeneral?.trim() || '';
+  const isGeneralExpense = !rawEventName || rawEventName.toLowerCase() === 'general';
+  const eventName = isGeneralExpense ? 'General' : rawEventName;
+  
+  // Try to find event if specified (only if not general and has meaningful search term)
+  let eventId: string | null = null;
+  if (!isGeneralExpense && eventName.length >= 2) {
+    const events = await storage.getAllEvents();
+    const matchingEvent = events.find(e => 
+      e.customer?.toLowerCase().includes(eventName.toLowerCase()) ||
+      e.venue?.toLowerCase().includes(eventName.toLowerCase())
+    );
+    if (matchingEvent) {
+      eventId = matchingEvent.id;
+    }
+  }
+  
+  // Update QR request with screenshot and event
+  await storage.updateQrPaymentRequest(qrRequest.id, {
+    paymentScreenshotUrl: paymentScreenshotUrl || null,
+    eventId,
+    eventName: isGeneralExpense ? 'General' : eventName,
+  });
+  
+  // Create daybook entry
+  const today = new Date().toISOString().split('T')[0];
+  const daybookEntry = await storage.createDaybookEntry({
+    date: today,
+    type: 'expense',
+    amount: qrRequest.amount,
+    category: qrRequest.category || 'Other',
+    description: `QR Payment: ${qrRequest.description} (${qrRequest.employeeName})`,
+    eventId,
+    eventName: isGeneralExpense ? null : eventName,
+  });
+  
+  // Update QR request with daybook entry link
+  await storage.updateQrPaymentRequest(qrRequest.id, {
+    status: 'recorded',
+    daybookEntryId: daybookEntry.id,
+    recordedAt: new Date(),
+  });
+  
+  // Send screenshot to employee with confirmation
+  if (paymentScreenshotUrl) {
+    try {
+      const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+      await sendWhatsAppMediaMessage(
+        qrRequest.employeePhone,
+        paymentScreenshotUrl,
+        `🎉 *Payment Complete!*\n\n✅ Your request *${qrRequest.requestCode}* has been paid!\n\n💰 Amount: ₹${parseFloat(qrRequest.amount).toLocaleString('en-IN')}\n📝 For: ${qrRequest.description}\n📋 Recorded under: ${isGeneralExpense ? 'General Expenses' : eventName}\n\n_Thank you!_ 🌳`
+      );
+    } catch (error) {
+      // Fallback to text message if media fails
+      const notifyMessage = `🎉 *Payment Complete!*\n\n✅ Your request *${qrRequest.requestCode}* has been paid!\n\n💰 Amount: ₹${parseFloat(qrRequest.amount).toLocaleString('en-IN')}\n📝 For: ${qrRequest.description}\n📋 Recorded under: ${isGeneralExpense ? 'General Expenses' : eventName}\n\n_Thank you!_ 🌳`;
+      await sendWhatsAppMessage(qrRequest.employeePhone, notifyMessage);
+    }
+  } else {
+    const notifyMessage = `🎉 *Payment Complete!*\n\n✅ Your request *${qrRequest.requestCode}* has been paid!\n\n💰 Amount: ₹${parseFloat(qrRequest.amount).toLocaleString('en-IN')}\n📝 For: ${qrRequest.description}\n📋 Recorded under: ${isGeneralExpense ? 'General Expenses' : eventName}\n\n_Thank you!_ 🌳`;
+    await sendWhatsAppMessage(qrRequest.employeePhone, notifyMessage);
+  }
+  
+  return `✅ *Payment Recorded* - ${qrRequest.requestCode}\n\n💰 ₹${parseFloat(qrRequest.amount).toLocaleString('en-IN')}\n📝 ${qrRequest.description}\n📋 Added to: ${isGeneralExpense ? 'General Expenses' : eventName}\n\n_Employee notified with screenshot & Daybook updated!_`;
+}
+
 async function createQrPaymentRequest(
   employeeId: string,
   employeeName: string,
@@ -1493,22 +1601,30 @@ async function createQrPaymentRequest(
   return { requestCode };
 }
 
-async function notifySuperadminQrPayment(
+async function notifyKishorQrPayment(
   requestCode: string,
   employeeName: string,
-  category: string,
   description: string,
   amount: number,
   qrImageUrl: string
 ): Promise<void> {
-  const message = `💳 *New QR Payment Request*\n━━━━━━━━━━━━━━━━━━\n\n📋 *Code:* ${requestCode}\n👤 *From:* ${employeeName}\n📁 *Category:* ${category}\n📝 *Purpose:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_To process:_\n• Make payment using QR above\n• Reply "PAID ${requestCode} [event name]" with screenshot\n• Or reply "REJECT ${requestCode} [reason]"\n\n🌳 Oaksy`;
-  
-  await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
-  
-  // Send QR image separately if available
+  // First send the QR image with Twilio media message
   if (qrImageUrl) {
-    // Note: Sending media requires Twilio media message support
-    // For now we include the URL in the message
-    await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, `📷 QR Code Image: ${qrImageUrl}`);
+    try {
+      const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+      await sendWhatsAppMediaMessage(
+        SUPERADMIN_WHATSAPP, 
+        qrImageUrl,
+        `💳 *Payment Request ${requestCode}*\n\n👤 From: ${employeeName}\n📝 For: ${description}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "PAID ${requestCode}" after payment_`
+      );
+    } catch (mediaError) {
+      // Fallback to text-only if media fails
+      console.error('[QR Payment] Failed to send media, falling back to text:', mediaError);
+      const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n📷 QR Code: ${qrImageUrl}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
+      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+    }
+  } else {
+    const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
+    await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
   }
 }

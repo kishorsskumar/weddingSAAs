@@ -93,6 +93,46 @@ export async function sendWhatsAppMessage(
   }
 }
 
+export async function sendWhatsAppMediaMessage(
+  to: string,
+  mediaUrl: string,
+  caption?: string
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const client = getTwilioClient();
+  if (!client) {
+    return { success: false, error: 'Twilio not configured' };
+  }
+  if (!fromNumber) {
+    return { success: false, error: 'WhatsApp from number not configured' };
+  }
+
+  try {
+    const formattedTo = formatPhoneForWhatsApp(to);
+    const cleanFromNumber = fromNumber.replace(/^whatsapp:/i, '');
+    const formattedFrom = `whatsapp:${cleanFromNumber}`;
+    
+    console.log('[WhatsApp] Sending media message:', { from: formattedFrom, to: formattedTo, mediaUrl });
+    
+    const messageParams: any = {
+      from: formattedFrom,
+      to: formattedTo,
+      mediaUrl: [mediaUrl],
+    };
+    
+    if (caption) {
+      messageParams.body = caption;
+    }
+    
+    const response = await client.messages.create(messageParams);
+
+    console.log('[WhatsApp] Media message sent successfully:', response.sid);
+    return { success: true, messageId: response.sid };
+  } catch (error: any) {
+    console.error('[WhatsApp] Media send error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 export async function processWhatsAppJob(jobId: string): Promise<{
   success: boolean;
   successCount: number;
