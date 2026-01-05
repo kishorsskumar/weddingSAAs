@@ -233,3 +233,47 @@ Employees can submit expense requests and leave applications via WhatsApp, with 
 - client/src/pages/whatsapp-inbox.tsx - Dashboard inbox UI
 - server/whatsapp-handler.ts - Conversation flow and message processing
 - server/whatsapp-service.ts - Twilio integration for sending messages
+
+### Monthly Production Plan
+
+Macro-level planning page for managing event production schedules across a month.
+
+**Features:**
+- All 13 columns: Event Date, Event, Venue, Wedding Planner, Stage Manager, Team Lead, Team Count, Florist, Loading Start, Prod Start, Prod End, Dismantling, Dis. Lead
+- Grouped sections with customizable labels (e.g., "Dr.Sonia - KTDC Samudra - 15 & 16 Jan 2026")
+- Inline editing for superadmin with Tab/Enter keyboard navigation
+- Auto-sync from events calendar
+- Statistics dashboard showing total events, completed, and team assignments
+- PDF export with Oakstreet Events branding (green header, gold accent)
+
+**Database Schema:**
+- monthly_production_plan table with fields: eventDate, subEventName, venue, weddingPlanner, stageManager, teamLead, productionTeamCount, florist, loadingStartDateTime, productionStartTime, productionEndTime, dismantlingDateTime, dismantlingTeamLead, groupLabel, isComplete
+
+**API Endpoints**
+- GET /api/monthly-plan?month=&year= - Get plan entries for month
+- POST /api/monthly-plan/generate - Sync entries from events
+- POST /api/monthly-plan - Create new entry
+- PUT /api/monthly-plan/:id - Update entry
+- DELETE /api/monthly-plan/:id - Delete entry
+
+**Files**
+- client/src/pages/monthly-plan.tsx - Monthly Plan UI
+- shared/schema.ts - monthlyProductionPlan table schema
+- server/storage.ts - generateMonthlyPlanFromEvents function
+
+### Leave Tracker (Oak HR)
+
+Tab in Oak HR for monitoring and managing all employee leave records.
+
+**Features:**
+- Statistics dashboard: Total Leaves, Approved, Pending, Rejected
+- Filter by employee, status, and year
+- Manual leave entry with searchable employee dropdown
+- Status management (approve/reject/pending)
+- Includes both current and past employees for complete historical records
+
+**API Endpoints**
+- GET /api/leave-requests - Get all leave requests
+- POST /api/leave-requests - Create new leave request
+- PATCH /api/leave-requests/:id - Update leave request status
+- DELETE /api/leave-requests/:id - Delete leave request
