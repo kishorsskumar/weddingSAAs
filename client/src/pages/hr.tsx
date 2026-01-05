@@ -886,6 +886,12 @@ export default function HR() {
             </TabsTrigger>
           )}
           {isAdmin && (
+            <TabsTrigger value="leave-tracker" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
+              <Calendar className="h-4 w-4" />
+              Leave Tracker
+            </TabsTrigger>
+          )}
+          {isAdmin && (
             <TabsTrigger value="report" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2" data-testid="tab-consolidated-report">
               <FileBarChart className="h-4 w-4" />
               Report
@@ -950,6 +956,12 @@ export default function HR() {
         {(isAdmin || user?.role === 'manager') && (
           <TabsContent value="approvals">
             <ManagerApprovalsSection isAdmin={isAdmin} approvalTab={approvalTab} setApprovalTab={setApprovalTab} />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
+          <TabsContent value="leave-tracker">
+            <LeaveTrackerSection employees={employees} />
           </TabsContent>
         )}
 
@@ -3848,6 +3860,470 @@ function ConsolidatedReportSection() {
         )}
       </CardContent>
     </Card>
+    </div>
+  );
+}
+
+interface LeaveRecord {
+  id: string;
+  employeeId: string;
+  employeeName?: string;
+  startDate: string;
+  endDate: string;
+  leaveType: string;
+  reason: string | null;
+  status: string;
+  createdAt: string;
+  isManualEntry?: boolean;
+}
+
+function LeaveTrackerSection({ employees }: { employees: Employee[] }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [filterEmployee, setFilterEmployee] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
+  const [filterEmployeeSearchOpen, setFilterEmployeeSearchOpen] = useState(false);
+
+  const { data: leaveRecords = [], isLoading } = useQuery<LeaveRecord[]>({
+    queryKey: ['/api/leave-requests'],
+    queryFn: async () => {
+      const res = await fetch('/api/leave-requests');
+      if (!res.ok) throw new Error('Failed to fetch leave records');
+      return res.json();
+    },
+  });
+
+  const enrichedLeaves = useMemo(() => {
+    return leaveRecords.map(leave => {
+      const employee = employees.find(e => e.id === leave.employeeId);
+      return {
+        ...leave,
+        employeeName: employee?.name || 'Unknown Employee',
+      };
+    });
+  }, [leaveRecords, employees]);
+
+  const filteredLeaves = useMemo(() => {
+    return enrichedLeaves.filter(leave => {
+      if (filterEmployee !== 'all' && leave.employeeId !== filterEmployee) return false;
+      if (filterStatus !== 'all' && leave.status !== filterStatus) return false;
+      if (filterYear !== 'all') {
+        const leaveYear = new Date(leave.startDate).getFullYear().toString();
+        if (leaveYear !== filterYear) return false;
+      }
+      return true;
+    }).sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+  }, [enrichedLeaves, filterEmployee, filterStatus, filterYear]);
+
+  const leaveStats = useMemo(() => {
+    const yearLeaves = enrichedLeaves.filter(l => {
+      if (filterYear === 'all') return true;
+      return new Date(l.startDate).getFullYear().toString() === filterYear;
+    });
+    
+    const approved = yearLeaves.filter(l => l.status === 'approved').length;
+    const pending = yearLeaves.filter(l => l.status === 'pending').length;
+    const rejected = yearLeaves.filter(l => l.status === 'rejected').length;
+    
+    return { total: yearLeaves.length, approved, pending, rejected };
+  }, [enrichedLeaves, filterYear]);
+
+  const years = useMemo(() => {
+    const yearsSet = new Set<string>();
+    enrichedLeaves.forEach(leave => {
+      yearsSet.add(new Date(leave.startDate).getFullYear().toString());
+    });
+    return Array.from(yearsSet).sort((a, b) => parseInt(b) - parseInt(a));
+  }, [enrichedLeaves]);
+
+  const createLeaveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/leave-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create leave record');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      toast({ title: "Leave record added successfully" });
+      setIsAddDialogOpen(false);
+      setSelectedEmployeeId("");
+    },
+    onError: () => {
+      toast({ title: "Failed to add leave record", variant: "destructive" });
+    },
+  });
+
+  const deleteLeaveMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/leave-requests/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete leave record');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      toast({ title: "Leave record deleted" });
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await fetch(`/api/leave-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('Failed to update status');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
+      toast({ title: "Status updated" });
+    },
+  });
+
+  const handleAddLeave = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    if (!selectedEmployeeId) {
+      toast({ title: "Please select an employee", variant: "destructive" });
+      return;
+    }
+
+    createLeaveMutation.mutate({
+      employeeId: selectedEmployeeId,
+      startDate: formData.get('startDate'),
+      endDate: formData.get('endDate'),
+      leaveType: formData.get('leaveType'),
+      reason: formData.get('reason') || null,
+      status: formData.get('status') || 'approved',
+    });
+  };
+
+  const calculateDays = (start: string, end: string) => {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  const selectedEmployee = employees.find(e => e.id === selectedEmployeeId);
+  const filterSelectedEmployee = employees.find(e => e.id === filterEmployee);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Leaves</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{leaveStats.total}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Approved</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{leaveStats.approved}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-amber-600">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{leaveStats.pending}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-red-600">Rejected</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{leaveStats.rejected}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Leave Tracker
+              </CardTitle>
+              <CardDescription>Monitor and manage employee leaves</CardDescription>
+            </div>
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-leave">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Leave Entry
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Leave Entry</DialogTitle>
+                  <DialogDescription>Manually record an employee's leave</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddLeave} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Employee *</Label>
+                    <Popover open={employeeSearchOpen} onOpenChange={setEmployeeSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={employeeSearchOpen}
+                          className="w-full justify-between"
+                          data-testid="select-leave-employee"
+                        >
+                          {selectedEmployee ? selectedEmployee.name : "Select employee..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search employee..." />
+                          <CommandList>
+                            <CommandEmpty>No employee found.</CommandEmpty>
+                            <CommandGroup>
+                              {employees.map((emp) => (
+                                <CommandItem
+                                  key={emp.id}
+                                  value={emp.name}
+                                  onSelect={() => {
+                                    setSelectedEmployeeId(emp.id);
+                                    setEmployeeSearchOpen(false);
+                                  }}
+                                >
+                                  <Check className={cn("mr-2 h-4 w-4", selectedEmployeeId === emp.id ? "opacity-100" : "opacity-0")} />
+                                  {emp.name}
+                                  <span className="ml-2 text-xs text-muted-foreground">{emp.employeeId}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startDate">Start Date *</Label>
+                      <Input type="date" id="startDate" name="startDate" required data-testid="input-leave-start" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endDate">End Date *</Label>
+                      <Input type="date" id="endDate" name="endDate" required data-testid="input-leave-end" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="leaveType">Leave Type</Label>
+                      <Select name="leaveType" defaultValue="casual">
+                        <SelectTrigger data-testid="select-leave-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="casual">Casual Leave</SelectItem>
+                          <SelectItem value="sick">Sick Leave</SelectItem>
+                          <SelectItem value="earned">Earned Leave</SelectItem>
+                          <SelectItem value="lop">Loss of Pay</SelectItem>
+                          <SelectItem value="maternity">Maternity Leave</SelectItem>
+                          <SelectItem value="paternity">Paternity Leave</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select name="status" defaultValue="approved">
+                        <SelectTrigger data-testid="select-leave-status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="approved">Approved</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="reason">Reason</Label>
+                    <Textarea id="reason" name="reason" placeholder="Optional reason for leave" data-testid="input-leave-reason" />
+                  </div>
+
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" disabled={createLeaveMutation.isPending} data-testid="button-submit-leave">
+                      {createLeaveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Add Leave
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Employee:</Label>
+              <Popover open={filterEmployeeSearchOpen} onOpenChange={setFilterEmployeeSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-[200px] justify-between" data-testid="filter-employee">
+                    {filterEmployee === 'all' ? "All Employees" : filterSelectedEmployee?.name || "Select..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search..." />
+                    <CommandList>
+                      <CommandEmpty>No employee found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem onSelect={() => { setFilterEmployee('all'); setFilterEmployeeSearchOpen(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", filterEmployee === 'all' ? "opacity-100" : "opacity-0")} />
+                          All Employees
+                        </CommandItem>
+                        {employees.map((emp) => (
+                          <CommandItem
+                            key={emp.id}
+                            value={emp.name}
+                            onSelect={() => { setFilterEmployee(emp.id); setFilterEmployeeSearchOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", filterEmployee === emp.id ? "opacity-100" : "opacity-0")} />
+                            {emp.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Status:</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[130px]" data-testid="filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Year:</Label>
+              <Select value={filterYear} onValueChange={setFilterYear}>
+                <SelectTrigger className="w-[100px]" data-testid="filter-year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  {years.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>From</TableHead>
+                  <TableHead>To</TableHead>
+                  <TableHead className="text-center">Days</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : filteredLeaves.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                      No leave records found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLeaves.map((leave) => (
+                    <TableRow key={leave.id} data-testid={`row-leave-${leave.id}`}>
+                      <TableCell className="font-medium">{leave.employeeName}</TableCell>
+                      <TableCell className="capitalize">{leave.leaveType?.replace('_', ' ') || 'Casual'}</TableCell>
+                      <TableCell>{format(parseISO(leave.startDate), 'dd MMM yyyy')}</TableCell>
+                      <TableCell>{format(parseISO(leave.endDate), 'dd MMM yyyy')}</TableCell>
+                      <TableCell className="text-center font-medium">{calculateDays(leave.startDate, leave.endDate)}</TableCell>
+                      <TableCell className="max-w-[150px] truncate">{leave.reason || '-'}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={leave.status}
+                          onValueChange={(status) => updateStatusMutation.mutate({ id: leave.id, status })}
+                        >
+                          <SelectTrigger className="w-[100px] h-7">
+                            <Badge
+                              variant={leave.status === 'approved' ? 'default' : leave.status === 'pending' ? 'secondary' : 'destructive'}
+                              className="text-xs"
+                            >
+                              {leave.status}
+                            </Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="rejected">Rejected</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => deleteLeaveMutation.mutate(leave.id)}
+                          data-testid={`button-delete-leave-${leave.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
