@@ -5751,6 +5751,41 @@ export async function registerRoutes(
   app.post('/api/sales/deals', async (req, res) => {
     try {
       const deal = await storage.createSalesDeal(req.body);
+      
+      // Send WhatsApp notification to the deal owner (wedding planner)
+      if (deal.ownerId) {
+        try {
+          const owner = await storage.getUser(deal.ownerId);
+          if (owner && (owner.role === 'wedding_planner' || owner.role === 'admin')) {
+            // Map owner name to phone number
+            const plannerPhones: Record<string, string> = {
+              'fida fathima': '+919895810975',
+              'fida': '+919895810975',
+              'femina km': '+917306687284',
+              'femina': '+917306687284',
+            };
+            
+            const plannerPhone = plannerPhones[owner.name.toLowerCase()];
+            if (plannerPhone) {
+              const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
+              if (isWhatsAppConfigured()) {
+                const contact = deal.contactId ? await storage.getSalesContact(deal.contactId) : null;
+                const customerName = contact ? `${contact.firstName} ${contact.lastName}`.trim() : 'New Customer';
+                const customerPhone = contact?.phone || contact?.mobile || 'Not provided';
+                
+                const message = `🌳 *New Lead Assigned*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Customer:* ${customerName}\n📞 *Phone:* ${customerPhone}\n💰 *Value:* ₹${deal.value ? parseFloat(deal.value).toLocaleString('en-IN') : '0'}\n📝 *Notes:* ${deal.notes || 'None'}\n\n_Lead added to your pipeline. Check Oak Sales for details!_\n\n🌳 Oaksy`;
+                
+                await sendWhatsAppMessage(plannerPhone, message);
+                console.log(`[Sales] WhatsApp notification sent to ${owner.name} for new deal`);
+              }
+            }
+          }
+        } catch (notifyError) {
+          console.error('[Sales] Failed to send WhatsApp notification:', notifyError);
+          // Don't fail the deal creation if notification fails
+        }
+      }
+      
       res.json(deal);
     } catch (error) {
       res.status(400).json({ error: 'Failed to create deal' });
