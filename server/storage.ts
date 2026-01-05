@@ -275,6 +275,9 @@ import {
   incomeSubmissions,
   type IncomeSubmission,
   type InsertIncomeSubmission,
+  pendingVendorPayments,
+  type PendingVendorPayment,
+  type InsertPendingVendorPayment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4286,6 +4289,51 @@ export class DatabaseStorage implements IStorage {
       if (!isNaN(num) && num > maxNum) maxNum = num;
     }
     return `INC${String(maxNum + 1).padStart(3, '0')}`;
+  }
+
+  // Pending Vendor Payments
+  async createPendingVendorPayment(data: InsertPendingVendorPayment): Promise<PendingVendorPayment> {
+    const [created] = await db.insert(pendingVendorPayments).values(data).returning();
+    return created;
+  }
+
+  async getPendingVendorPaymentByCode(code: string): Promise<PendingVendorPayment | undefined> {
+    const [payment] = await db.select().from(pendingVendorPayments)
+      .where(eq(pendingVendorPayments.requestCode, code.toUpperCase()));
+    return payment;
+  }
+
+  async getAllPendingVendorPayments(): Promise<PendingVendorPayment[]> {
+    return await db.select().from(pendingVendorPayments)
+      .orderBy(desc(pendingVendorPayments.createdAt));
+  }
+
+  async getPendingVendorPaymentsByStatus(status: string): Promise<PendingVendorPayment[]> {
+    return await db.select().from(pendingVendorPayments)
+      .where(eq(pendingVendorPayments.status, status))
+      .orderBy(desc(pendingVendorPayments.createdAt));
+  }
+
+  async updatePendingVendorPayment(id: string, data: Partial<PendingVendorPayment>): Promise<PendingVendorPayment | undefined> {
+    const [updated] = await db.update(pendingVendorPayments)
+      .set(data)
+      .where(eq(pendingVendorPayments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateVendorPaymentCode(): Promise<string> {
+    const existing = await db.select({ requestCode: pendingVendorPayments.requestCode })
+      .from(pendingVendorPayments)
+      .where(sql`${pendingVendorPayments.requestCode} LIKE 'VP%'`)
+      .orderBy(desc(pendingVendorPayments.createdAt));
+    
+    let maxNum = 0;
+    for (const e of existing) {
+      const num = parseInt(e.requestCode.replace('VP', ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return `VP${String(maxNum + 1).padStart(3, '0')}`;
   }
 }
 
