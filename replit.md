@@ -24,6 +24,11 @@ Preferred communication style: Simple, everyday language.
 - Event dropdowns should be searchable and scrollable using a Combobox pattern (Command + Popover)
 - Use the same searchable dropdown pattern for any long lists throughout the app
 
+**Official WhatsApp Numbers:**
+- Kishor (Superadmin): +91 7902373354
+- Fida Fathima PK: +91 9895810975
+- Femina KM: +91 7306687284
+
 ## System Architecture
 
 ### Frontend Architecture
