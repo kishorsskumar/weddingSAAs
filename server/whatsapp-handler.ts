@@ -11,39 +11,48 @@ interface PendingData {
   reason?: string;
 }
 
-const MENU_MESSAGE = `👋 Welcome to Oakstreet Events!
+const MENU_MESSAGE = `🌳 *Welcome to Oakstreet Events!*
+━━━━━━━━━━━━━━━━━━━━━
 
-Please select an option:
-1️⃣ Submit Expense
-2️⃣ Apply for Leave
-3️⃣ Check My Status
+How can we help you today?
 
-Reply with the number (1, 2, or 3)`;
+*1️⃣  Submit Expenses*
+*2️⃣  Apply for Leave*
+*3️⃣  Check my Status*
 
-const EXPENSE_PURPOSE_MESSAGE = `📝 *Submit Expense*
+━━━━━━━━━━━━━━━━━━━━━
+_Reply with 1, 2, or 3_`;
 
-Please describe the purpose of this expense.
-Example: "Taxi to venue for client meeting"`;
+const EXPENSE_PROMPT_MESSAGE = `💰 *Submit Expense*
+━━━━━━━━━━━━━━━━━━━━━
 
-const EXPENSE_AMOUNT_MESSAGE = `💰 Got it! Now please enter the expense amount in ₹.
-Example: "1500" or "2500.50"`;
+Please provide the following details in *one message*:
 
-const EXPENSE_PHOTO_MESSAGE = `📸 Great! Now please send a photo of the invoice/receipt.
+📝 *Purpose:* What was the expense for?
+💵 *Amount:* How much in ₹?
+📸 *Receipt:* Attach invoice/receipt photo
 
-Just attach the image to your message.`;
+━━━━━━━━━━━━━━━━━━━━━
+*Example:*
+_Taxi to client venue - 1500_
+(with receipt photo attached)
 
-const LEAVE_START_MESSAGE = `📅 *Apply for Leave*
+_Type "menu" to go back_`;
 
-Please enter your leave start date.
-Format: DD/MM/YYYY
-Example: "15/01/2026"`;
+const LEAVE_PROMPT_MESSAGE = `📅 *Apply for Leave*
+━━━━━━━━━━━━━━━━━━━━━
 
-const LEAVE_END_MESSAGE = `📅 Now enter your leave end date.
-Format: DD/MM/YYYY
-Example: "17/01/2026"`;
+Please provide the following details in *one message*:
 
-const LEAVE_REASON_MESSAGE = `✍️ Please provide a reason for your leave.
-Example: "Family function" or "Medical appointment"`;
+📆 *Start Date:* DD/MM/YYYY
+📆 *End Date:* DD/MM/YYYY
+📝 *Reason:* Why do you need leave?
+
+━━━━━━━━━━━━━━━━━━━━━
+*Example:*
+_01/02/2026 - 03/02/2026 - Family function_
+
+_Type "menu" to go back_`;
 
 export async function handleIncomingWhatsAppMessage(
   fromNumber: string,
@@ -90,57 +99,79 @@ export async function handleIncomingWhatsAppMessage(
   if (conversation.currentState === 'menu') {
     if (messageText === '1' || messageText.includes('expense')) {
       await storage.updateWhatsappConversation(conversation.id, {
-        currentState: 'expense_purpose',
+        currentState: 'awaiting_expense',
         currentDepartment: 'accounts',
         pendingData: {},
       });
-      return EXPENSE_PURPOSE_MESSAGE;
+      return EXPENSE_PROMPT_MESSAGE;
     } else if (messageText === '2' || messageText.includes('leave')) {
       await storage.updateWhatsappConversation(conversation.id, {
-        currentState: 'leave_start',
+        currentState: 'awaiting_leave',
         currentDepartment: 'hr',
         pendingData: {},
       });
-      return LEAVE_START_MESSAGE;
+      return LEAVE_PROMPT_MESSAGE;
     } else if (messageText === '3' || messageText.includes('status')) {
       return await getEmployeeStatus(employee.id, employee.name);
     } else {
-      return `❓ I didn't understand that. Please reply with:\n1 for Expense\n2 for Leave\n3 for Status\n\nOr type "menu" to see options again.`;
+      return `❓ _I didn't understand that._
+
+Please reply with:
+*1* - Submit Expenses
+*2* - Apply for Leave
+*3* - Check my Status
+
+_Or type "menu" to see options again_`;
     }
   }
 
-  if (conversation.currentState === 'expense_purpose') {
-    await storage.updateWhatsappConversation(conversation.id, {
-      currentState: 'expense_amount',
-      pendingData: { ...pendingData, purpose: body.trim() },
-    });
-    return EXPENSE_AMOUNT_MESSAGE;
-  }
-
-  if (conversation.currentState === 'expense_amount') {
-    const amount = parseFloat(body.replace(/[^0-9.]/g, ''));
-    if (isNaN(amount) || amount <= 0) {
-      return `❌ Please enter a valid amount. Example: "1500" or "2500.50"`;
+  // Handle single-message expense submission
+  if (conversation.currentState === 'awaiting_expense') {
+    // Check if user wants to go back
+    if (messageText === 'menu' || messageText === '0') {
+      await storage.updateWhatsappConversation(conversation.id, {
+        currentState: 'menu',
+        pendingData: null,
+      });
+      return MENU_MESSAGE;
     }
-    await storage.updateWhatsappConversation(conversation.id, {
-      currentState: 'expense_photo',
-      pendingData: { ...pendingData, amount: amount.toString() },
-    });
-    return EXPENSE_PHOTO_MESSAGE;
-  }
 
-  if (conversation.currentState === 'expense_photo') {
+    // Must have a receipt photo attached
     if (!mediaUrl) {
-      return `📸 Please attach a photo of your invoice/receipt. Just send an image with this message.`;
+      return `📸 *Receipt Required!*
+━━━━━━━━━━━━━━━━━━━━━
+
+Please send your expense details *with a receipt photo attached*.
+
+*Example:*
+_Taxi to venue - 1500_
+(with receipt attached)
+
+_Type "menu" to go back_`;
     }
+
+    // Parse expense: "Purpose - Amount" or "Purpose Amount" format
+    const expenseData = parseExpenseMessage(body.trim());
     
-    const finalData = { ...pendingData, mediaUrl };
-    
+    if (!expenseData.purpose || !expenseData.amount) {
+      return `❌ *Could not understand your expense*
+━━━━━━━━━━━━━━━━━━━━━
+
+Please send in this format:
+_Purpose - Amount_
+
+*Example:*
+_Taxi to client venue - 1500_
+(with receipt photo attached)
+
+_Type "menu" to go back_`;
+    }
+
     const expenseRequest = await createExpenseRequest(
       employee.id,
       employee.name,
-      finalData.purpose || 'Expense',
-      parseFloat(finalData.amount || '0'),
+      expenseData.purpose,
+      expenseData.amount,
       mediaUrl
     );
 
@@ -149,58 +180,64 @@ export async function handleIncomingWhatsAppMessage(
       pendingData: null,
     });
 
-    await notifySuperadminOfExpense(expenseRequest.approvalCode, employee.name, finalData.purpose || 'Expense', finalData.amount || '0', mediaUrl);
+    await notifySuperadminOfExpense(expenseRequest.approvalCode, employee.name, expenseData.purpose, expenseData.amount.toString(), mediaUrl);
 
-    return `✅ *Expense Submitted Successfully!*
+    return `✅ *Expense Submitted!*
+━━━━━━━━━━━━━━━━━━━━━
 
-📝 Purpose: ${finalData.purpose}
-💰 Amount: ₹${finalData.amount}
-📸 Receipt: Attached
+📝 *Purpose:* ${expenseData.purpose}
+💰 *Amount:* ₹${expenseData.amount.toLocaleString('en-IN')}
+📸 *Receipt:* Attached
+🔖 *Reference:* ${expenseRequest.approvalCode}
 
-Your request has been sent to management for approval. You'll receive a notification once it's processed.
+━━━━━━━━━━━━━━━━━━━━━
+_Your request has been sent for approval. You'll be notified once processed._
 
-Reference: ${expenseRequest.approvalCode}
-
-Type "menu" for more options.`;
+_Type "menu" for more options_`;
   }
 
-  if (conversation.currentState === 'leave_start') {
-    const startDate = parseDate(body.trim());
-    if (!startDate) {
-      return `❌ Invalid date format. Please use DD/MM/YYYY format.\nExample: "15/01/2026"`;
+  // Handle single-message leave submission
+  if (conversation.currentState === 'awaiting_leave') {
+    // Check if user wants to go back
+    if (messageText === 'menu' || messageText === '0') {
+      await storage.updateWhatsappConversation(conversation.id, {
+        currentState: 'menu',
+        pendingData: null,
+      });
+      return MENU_MESSAGE;
     }
-    await storage.updateWhatsappConversation(conversation.id, {
-      currentState: 'leave_end',
-      pendingData: { ...pendingData, startDate: startDate.toISOString().split('T')[0] },
-    });
-    return LEAVE_END_MESSAGE;
-  }
 
-  if (conversation.currentState === 'leave_end') {
-    const endDate = parseDate(body.trim());
-    if (!endDate) {
-      return `❌ Invalid date format. Please use DD/MM/YYYY format.\nExample: "17/01/2026"`;
-    }
-    const startDate = new Date(pendingData.startDate!);
-    if (endDate < startDate) {
-      return `❌ End date cannot be before start date. Please enter a valid end date.`;
-    }
-    await storage.updateWhatsappConversation(conversation.id, {
-      currentState: 'leave_reason',
-      pendingData: { ...pendingData, endDate: endDate.toISOString().split('T')[0] },
-    });
-    return LEAVE_REASON_MESSAGE;
-  }
-
-  if (conversation.currentState === 'leave_reason') {
-    const finalData = { ...pendingData, reason: body.trim() };
+    // Parse leave: "DD/MM/YYYY - DD/MM/YYYY - Reason" format
+    const leaveData = parseLeaveMessage(body.trim());
     
+    if (!leaveData.startDate || !leaveData.endDate || !leaveData.reason) {
+      return `❌ *Could not understand your leave request*
+━━━━━━━━━━━━━━━━━━━━━
+
+Please send in this format:
+_Start Date - End Date - Reason_
+
+*Example:*
+_01/02/2026 - 03/02/2026 - Family function_
+
+_Type "menu" to go back_`;
+    }
+
+    if (leaveData.endDate < leaveData.startDate) {
+      return `❌ *End date cannot be before start date*
+
+Please try again with valid dates.`;
+    }
+
+    const startDateStr = leaveData.startDate.toISOString().split('T')[0];
+    const endDateStr = leaveData.endDate.toISOString().split('T')[0];
+
     const leaveRequest = await createLeaveRequest(
       employee.id,
       employee.name,
-      finalData.startDate!,
-      finalData.endDate!,
-      finalData.reason!
+      startDateStr,
+      endDateStr,
+      leaveData.reason
     );
 
     await storage.updateWhatsappConversation(conversation.id, {
@@ -208,27 +245,95 @@ Type "menu" for more options.`;
       pendingData: null,
     });
 
-    const startFormatted = formatDateForDisplay(finalData.startDate!);
-    const endFormatted = formatDateForDisplay(finalData.endDate!);
-    const days = calculateDays(finalData.startDate!, finalData.endDate!);
+    const startFormatted = formatDateForDisplay(startDateStr);
+    const endFormatted = formatDateForDisplay(endDateStr);
+    const days = calculateDays(startDateStr, endDateStr);
 
-    await notifySuperadminOfLeave(leaveRequest.approvalCode, employee.name, startFormatted, endFormatted, days, finalData.reason!);
+    await notifySuperadminOfLeave(leaveRequest.approvalCode, employee.name, startFormatted, endFormatted, days, leaveData.reason);
 
     return `✅ *Leave Request Submitted!*
+━━━━━━━━━━━━━━━━━━━━━
 
-📅 From: ${startFormatted}
-📅 To: ${endFormatted}
-📊 Days: ${days}
-📝 Reason: ${finalData.reason}
+📅 *From:* ${startFormatted}
+📅 *To:* ${endFormatted}
+📊 *Days:* ${days}
+📝 *Reason:* ${leaveData.reason}
+🔖 *Reference:* ${leaveRequest.approvalCode}
 
-Your request has been sent for approval. You'll be notified once it's processed.
+━━━━━━━━━━━━━━━━━━━━━
+_Your request has been sent for approval. You'll be notified once processed._
 
-Reference: ${leaveRequest.approvalCode}
-
-Type "menu" for more options.`;
+_Type "menu" for more options_`;
   }
 
   return MENU_MESSAGE;
+}
+
+// Parse expense message: "Purpose - Amount" or "Purpose Amount"
+function parseExpenseMessage(message: string): { purpose: string | null; amount: number | null } {
+  // Try "Purpose - Amount" format first
+  const dashMatch = message.match(/^(.+?)\s*[-–—]\s*(\d+(?:\.\d{1,2})?)$/);
+  if (dashMatch) {
+    return {
+      purpose: dashMatch[1].trim(),
+      amount: parseFloat(dashMatch[2])
+    };
+  }
+
+  // Try "Purpose Amount" format (amount at end)
+  const spaceMatch = message.match(/^(.+?)\s+(\d+(?:\.\d{1,2})?)$/);
+  if (spaceMatch) {
+    return {
+      purpose: spaceMatch[1].trim(),
+      amount: parseFloat(spaceMatch[2])
+    };
+  }
+
+  // Try extracting any number as amount
+  const numbers = message.match(/(\d+(?:\.\d{1,2})?)/g);
+  if (numbers && numbers.length > 0) {
+    const amount = parseFloat(numbers[numbers.length - 1]);
+    const purpose = message.replace(numbers[numbers.length - 1], '').replace(/[-–—]/g, '').trim();
+    if (purpose && amount > 0) {
+      return { purpose, amount };
+    }
+  }
+
+  return { purpose: null, amount: null };
+}
+
+// Parse leave message: "DD/MM/YYYY - DD/MM/YYYY - Reason"
+function parseLeaveMessage(message: string): { startDate: Date | null; endDate: Date | null; reason: string | null } {
+  // Match pattern: date - date - reason
+  const parts = message.split(/\s*[-–—]\s*/);
+  
+  if (parts.length >= 3) {
+    const startDate = parseDate(parts[0].trim());
+    const endDate = parseDate(parts[1].trim());
+    const reason = parts.slice(2).join(' - ').trim();
+    
+    if (startDate && endDate && reason) {
+      return { startDate, endDate, reason };
+    }
+  }
+
+  // Try to find two dates and remaining text
+  const datePattern = /(\d{1,2}\/\d{1,2}\/\d{4})/g;
+  const dates = message.match(datePattern);
+  
+  if (dates && dates.length >= 2) {
+    const startDate = parseDate(dates[0]);
+    const endDate = parseDate(dates[1]);
+    let reason = message;
+    dates.forEach(d => { reason = reason.replace(d, ''); });
+    reason = reason.replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    if (startDate && endDate && reason) {
+      return { startDate, endDate, reason };
+    }
+  }
+
+  return { startDate: null, endDate: null, reason: null };
 }
 
 export async function handleSuperadminApprovalResponse(
