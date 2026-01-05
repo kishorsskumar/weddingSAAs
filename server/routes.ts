@@ -1261,7 +1261,11 @@ export async function registerRoutes(
     if (!auth) return;
     
     try {
-      const data = insertEmployeeSchema.parse(req.body);
+      // Make employeeId optional since it will be auto-generated
+      const createEmployeeSchema = insertEmployeeSchema.extend({
+        employeeId: insertEmployeeSchema.shape.employeeId.optional(),
+      });
+      const data = createEmployeeSchema.parse(req.body);
       
       // Generate employee code if not provided
       const employeeId = data.employeeId || await storage.generateEmployeeCode();
