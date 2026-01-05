@@ -156,6 +156,61 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
   return { isIncome: false, type: 'client_payment' };
 }
 
+// Detect if message is a pending vendor payment submission
+function detectPendingVendorPayment(text: string): { isPending: boolean; vendorName?: string; amount?: number; eventName?: string } {
+  const lowerText = text.toLowerCase();
+  
+  // Look for "pending payment" or "pending payments" heading
+  if (!lowerText.includes('pending payment')) {
+    return { isPending: false };
+  }
+  
+  // Parse the message structure - looking for patterns like:
+  // "Pending payment for [vendor] Rs.[amount] for [event]"
+  // "Pending payments\nVendor: XYZ\nAmount: 5000\nEvent: Wedding"
+  // "Pending payment - vendor name - 5000 - event name"
+  
+  // Extract vendor name
+  let vendorName: string | undefined;
+  const vendorPatterns = [
+    /vendor[\s:]+([^\n\-,₹]+)/i,
+    /for\s+([^₹\d\n]+?)(?:\s+(?:rs|₹|amount|event)|\d|$)/i,
+    /pending\s+payment[s]?\s*[:\-]?\s*([^\n₹\d]+?)(?:\s+(?:rs|₹|amount)|\d|$)/i,
+  ];
+  for (const pattern of vendorPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      vendorName = match[1].replace(/^[\s\-:]+|[\s\-:]+$/g, '').trim();
+      if (vendorName && vendorName.length > 1) break;
+    }
+  }
+  
+  // Extract amount
+  const amount = extractAmount(text);
+  
+  // Extract event name
+  let eventName: string | undefined;
+  const eventPatterns = [
+    /event[\s:]+([^\n]+)/i,
+    /for\s+event[\s:]+([^\n]+)/i,
+    /(?:wedding|function|party|ceremony)[\s:]+([^\n]+)/i,
+  ];
+  for (const pattern of eventPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      eventName = match[1].trim();
+      break;
+    }
+  }
+  
+  return { 
+    isPending: true, 
+    vendorName: vendorName || undefined,
+    amount: amount || undefined,
+    eventName: eventName || undefined
+  };
+}
+
 function parseDate(text: string): string | null {
   const patterns = [
     /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/,
@@ -946,6 +1001,25 @@ export async function handleOaksyWhatsAppMessage(
       return handleQrPaymentReject(rejectQrMatch[1], rejectQrMatch[2]);
     }
     
+    // Handle Vendor Payment PAID command
+    const paidVpMatch = lowerMessage.match(/^paid\s+(vp\d+)/i);
+    
+    if (paidVpMatch) {
+      const vpCode = paidVpMatch[1].toUpperCase();
+      const payment = await storage.getPendingVendorPaymentByCode(vpCode);
+      
+      if (!payment) {
+        return `❌ Vendor payment ${vpCode} not found.`;
+      }
+      
+      if (payment.status === 'paid') {
+        return `⚠️ Vendor payment ${vpCode} was already marked as paid.`;
+      }
+      
+      // Mark as paid and record in daybook
+      return handleVendorPaymentPaid(vpCode);
+    }
+    
     // Handle lead submissions
     const isInLeadFlow = conversation.activeIntent === 'lead';
     const looksLikeLead = /lead|customer|client|enquiry|assign|fida|femina|\d{10}/i.test(messageText);
@@ -958,7 +1032,7 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     // Default Kishor greeting
-    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after payment\n📥 *Income* - Reply "A INC001" to approve income submissions\n\n_How can I help you today?_ 🌳`;
+    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after payment\n📥 *Income* - Reply "A INC001" to approve income submissions\n🏪 *Vendor Payments* - Reply "PAID VP001" to mark as paid\n\n_How can I help you today?_ 🌳`;
   }
   
   const employee = conversation.employeeId 
@@ -1072,6 +1146,87 @@ export async function handleOaksyWhatsAppMessage(
 
         return `📥 Got your payment screenshot from ${clientName}!\n\nHow much was received? 💰`;
       }
+    }
+  }
+
+  // PENDING VENDOR PAYMENT FLOW - Detect "pending payment" messages
+  const pendingCheck = detectPendingVendorPayment(messageText);
+  if (pendingCheck.isPending) {
+    const { vendorName, amount, eventName } = pendingCheck;
+    
+    if (vendorName && amount) {
+      // Got vendor and amount - create the pending payment entry
+      const requestCode = await storage.generateVendorPaymentCode();
+      
+      // Try to find the event if specified
+      let eventId: string | undefined;
+      let resolvedEventName = eventName;
+      
+      if (eventName) {
+        const events = await storage.getAllEvents();
+        const matchingEvent = events.find(e => 
+          e.title.toLowerCase().includes(eventName.toLowerCase()) ||
+          (e.customer && e.customer.toLowerCase().includes(eventName.toLowerCase()))
+        );
+        if (matchingEvent) {
+          eventId = matchingEvent.id;
+          resolvedEventName = matchingEvent.title;
+        }
+      }
+      
+      await storage.createPendingVendorPayment({
+        requestCode,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeePhone: employee.phone || normalizedPhone,
+        vendorName,
+        amount: amount.toString(),
+        eventId: eventId || null,
+        eventName: resolvedEventName || null,
+        description: messageText,
+        status: 'pending',
+      });
+
+      // Notify Kishor about the pending vendor payment
+      await notifyKishorPendingVendorPayment(
+        requestCode,
+        employee.name,
+        vendorName,
+        amount,
+        resolvedEventName || 'Not specified'
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
+    } else if (vendorName) {
+      // Got vendor but no amount - ask for amount
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_vendor_payment',
+        intentContext: { 
+          vendorPaymentVendor: vendorName,
+          vendorPaymentEvent: eventName,
+        },
+        conversationHistory: history,
+        currentState: 'awaiting_vendor_amount',
+      });
+
+      return `📋 Pending payment for *${vendorName}*\n\nWhat's the amount? 💰`;
+    } else {
+      // Got "pending payment" but no vendor - ask for details
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_vendor_payment',
+        intentContext: {},
+        conversationHistory: history,
+        currentState: 'awaiting_vendor_details',
+      });
+
+      return `📋 *Pending Vendor Payment*\n\nPlease provide:\n• Vendor name\n• Amount\n• Event (optional)\n\n_Example: "Vendor: Flower shop Rs.5000 Event: Sharma Wedding"_`;
     }
   }
 
@@ -1297,6 +1452,140 @@ export async function handleOaksyWhatsAppMessage(
       const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
       return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
     }
+  }
+
+  // Handle pending vendor payment state - awaiting amount
+  if (conversation.currentState === 'awaiting_vendor_amount') {
+    const amount = extractAmount(messageText);
+    if (!amount) {
+      return `Please provide the payment amount. Example: "₹5000" or "5000"`;
+    }
+    
+    const vendorContext = context as any;
+    const vendorName = vendorContext.vendorPaymentVendor || 'Unknown Vendor';
+    const eventName = vendorContext.vendorPaymentEvent || undefined;
+    
+    // Create the pending payment entry
+    const requestCode = await storage.generateVendorPaymentCode();
+    
+    // Try to find the event if specified
+    let eventId: string | undefined;
+    let resolvedEventName = eventName;
+    
+    if (eventName) {
+      const events = await storage.getAllEvents();
+      const matchingEvent = events.find(e => 
+        e.title.toLowerCase().includes(eventName.toLowerCase()) ||
+        (e.customer && e.customer.toLowerCase().includes(eventName.toLowerCase()))
+      );
+      if (matchingEvent) {
+        eventId = matchingEvent.id;
+        resolvedEventName = matchingEvent.title;
+      }
+    }
+    
+    await storage.createPendingVendorPayment({
+      requestCode,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeePhone: employee.phone || normalizedPhone,
+      vendorName,
+      amount: amount.toString(),
+      eventId: eventId || null,
+      eventName: resolvedEventName || null,
+      description: `Pending payment for ${vendorName}`,
+      status: 'pending',
+    });
+
+    // Notify Kishor
+    await notifyKishorPendingVendorPayment(
+      requestCode,
+      employee.name,
+      vendorName,
+      amount,
+      resolvedEventName || 'Not specified'
+    );
+
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: null,
+      currentState: 'idle',
+      conversationHistory: [],
+    });
+
+    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
+  }
+
+  // Handle pending vendor payment state - awaiting full details
+  if (conversation.currentState === 'awaiting_vendor_details') {
+    // Try to parse full details from message
+    const parsedDetails = detectPendingVendorPayment(messageText);
+    const amount = parsedDetails.amount || extractAmount(messageText);
+    
+    // Try to extract vendor name if not detected
+    let vendorName = parsedDetails.vendorName;
+    if (!vendorName) {
+      // Simple extraction - first part before any number
+      const vendorMatch = messageText.match(/^([^₹\d]+)/);
+      if (vendorMatch) {
+        vendorName = vendorMatch[1].replace(/^[\s\-:]+|[\s\-:]+$/g, '').trim();
+      }
+    }
+    
+    if (!vendorName || !amount) {
+      return `❌ I need both vendor name and amount.\n\n*Please send like:*\n"Flower shop Rs.5000"\nor\n"Vendor: ABC Caterers, Amount: 25000"`;
+    }
+    
+    // Create the pending payment entry
+    const requestCode = await storage.generateVendorPaymentCode();
+    const eventName = parsedDetails.eventName;
+    
+    // Try to find the event if specified
+    let eventId: string | undefined;
+    let resolvedEventName = eventName;
+    
+    if (eventName) {
+      const events = await storage.getAllEvents();
+      const matchingEvent = events.find(e => 
+        e.title.toLowerCase().includes(eventName.toLowerCase()) ||
+        (e.customer && e.customer.toLowerCase().includes(eventName.toLowerCase()))
+      );
+      if (matchingEvent) {
+        eventId = matchingEvent.id;
+        resolvedEventName = matchingEvent.title;
+      }
+    }
+    
+    await storage.createPendingVendorPayment({
+      requestCode,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeePhone: employee.phone || normalizedPhone,
+      vendorName,
+      amount: amount.toString(),
+      eventId: eventId || null,
+      eventName: resolvedEventName || null,
+      description: messageText,
+      status: 'pending',
+    });
+
+    // Notify Kishor
+    await notifyKishorPendingVendorPayment(
+      requestCode,
+      employee.name,
+      vendorName,
+      amount,
+      resolvedEventName || 'Not specified'
+    );
+
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: null,
+      currentState: 'idle',
+      conversationHistory: [],
+    });
+
+    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
   }
 
   // Handle amount without image (text-only expense submission)
@@ -1901,6 +2190,83 @@ async function notifyKishorIncomeSubmission(
     const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
     await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
   }
+}
+
+// Notify Kishor about a new pending vendor payment
+async function notifyKishorPendingVendorPayment(
+  requestCode: string,
+  employeeName: string,
+  vendorName: string,
+  amount: number,
+  eventName: string
+): Promise<void> {
+  const message = `🏪 *Pending Vendor Payment ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Submitted by:* ${employeeName}\n🏢 *Vendor:* ${vendorName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n📅 *Event:* ${eventName}\n\n_Reply "PAID ${requestCode}" when payment is made_\n\n🌳 Oaksy`;
+  await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+}
+
+// Mark vendor payment as paid and record in daybook
+async function handleVendorPaymentPaid(
+  code: string,
+  eventNameOrGeneral?: string
+): Promise<string> {
+  const payment = await storage.getPendingVendorPaymentByCode(code.toUpperCase());
+  
+  if (!payment) {
+    return `❌ Vendor payment ${code.toUpperCase()} not found.`;
+  }
+  
+  if (payment.status === 'paid') {
+    return `⚠️ Vendor payment ${code.toUpperCase()} was already marked as paid.`;
+  }
+  
+  // Determine event assignment
+  const rawEventName = eventNameOrGeneral?.trim() || payment.eventName || '';
+  const isGeneralExpense = !rawEventName || rawEventName.toLowerCase() === 'general';
+  const eventName = isGeneralExpense ? 'General' : rawEventName;
+  
+  // Try to find event if specified
+  let eventId: string | null = payment.eventId || null;
+  if (!isGeneralExpense && eventName.length >= 2 && !eventId) {
+    const events = await storage.getAllEvents();
+    const matchingEvent = events.find(e => 
+      e.customer?.toLowerCase().includes(eventName.toLowerCase()) ||
+      e.venue?.toLowerCase().includes(eventName.toLowerCase()) ||
+      e.title?.toLowerCase().includes(eventName.toLowerCase())
+    );
+    if (matchingEvent) {
+      eventId = matchingEvent.id;
+    }
+  }
+  
+  // Create daybook entry as expense
+  const today = new Date().toISOString().split('T')[0];
+  const daybookEntry = await storage.createDaybookEntry({
+    date: today,
+    type: 'expense',
+    amount: payment.amount,
+    category: 'Vendor Payment',
+    description: `Payment to ${payment.vendorName} (via ${payment.employeeName})`,
+    eventId,
+    eventName: isGeneralExpense ? null : eventName,
+    vendorName: payment.vendorName,
+  });
+  
+  // Update payment as paid
+  await storage.updatePendingVendorPayment(payment.id, {
+    status: 'paid',
+    eventId,
+    eventName: isGeneralExpense ? 'General' : eventName,
+    daybookEntryId: daybookEntry.id,
+    paidAt: new Date(),
+  });
+
+  // Notify employee
+  await sendWhatsAppMessage(
+    payment.employeePhone,
+    `✅ *Payment Made!*\n\nYour pending vendor payment *${payment.requestCode}* to *${payment.vendorName}* for ₹${parseFloat(payment.amount).toLocaleString('en-IN')} has been paid.\n\n🌳 Oaksy`
+  );
+  
+  return `✅ Vendor payment ${code.toUpperCase()} marked as PAID!\n\n🏪 Vendor: ${payment.vendorName}\n💰 Amount: ₹${parseFloat(payment.amount).toLocaleString('en-IN')}\n📅 Event: ${eventName}\n📒 Recorded in daybook\n\n_${payment.employeeName} has been notified._`;
 }
 
 // Complete income approval with event assignment
