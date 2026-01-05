@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-type CellKey = `${string}-${string}`;
+type CellKey = `${string}::${string}`;
 
 interface ColumnDef {
   key: string;
@@ -184,7 +184,7 @@ export default function MonthlyPlan() {
     const col = COLUMNS.find(c => c.key === colKey);
     if (!col?.editable) return;
     
-    const cellKey: CellKey = `${rowId}-${colKey}`;
+    const cellKey: CellKey = `${rowId}::${colKey}`;
     const entry = entries.find(e => e.id === rowId);
     if (!entry) return;
     
@@ -197,7 +197,7 @@ export default function MonthlyPlan() {
   const commitEdit = useCallback(() => {
     if (!editingCell) return;
     
-    const [rowId, colKey] = editingCell.split("-") as [string, string];
+    const [rowId, colKey] = editingCell.split("::") as [string, string];
     const entry = entries.find(e => e.id === rowId);
     if (!entry) return;
     
@@ -513,7 +513,7 @@ export default function MonthlyPlan() {
                       
                       {/* Data Cells */}
                       {COLUMNS.map((col, idx) => {
-                        const cellKey: CellKey = `${entry.id}-${col.key}`;
+                        const cellKey: CellKey = `${entry.id}::${col.key}`;
                         const isEditing = editingCell === cellKey;
                         const isFocused = focusedCell === cellKey;
                         const value = getCellValue(entry, col.key);
