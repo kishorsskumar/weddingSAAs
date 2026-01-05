@@ -4226,6 +4226,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(qrPaymentRequests.createdAt));
   }
 
+  async getPendingQrPaymentByEmployeeName(firstName: string): Promise<QrPaymentRequest | undefined> {
+    const [request] = await db.select().from(qrPaymentRequests)
+      .where(and(
+        eq(qrPaymentRequests.status, 'pending'),
+        sql`LOWER(${qrPaymentRequests.employeeName}) LIKE LOWER(${firstName + '%'})`
+      ))
+      .orderBy(desc(qrPaymentRequests.createdAt))
+      .limit(1);
+    return request;
+  }
+
   async getAllQrPaymentRequests(): Promise<QrPaymentRequest[]> {
     return await db.select().from(qrPaymentRequests)
       .orderBy(desc(qrPaymentRequests.createdAt));
