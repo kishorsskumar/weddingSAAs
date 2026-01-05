@@ -121,11 +121,30 @@ export default function OakSales() {
     queryKey: ['/api/users'],
   });
 
-  useEffect(() => {
-    if (pipelines.length > 0 && !selectedPipelineId) {
-      setSelectedPipelineId(pipelines[0].id);
+  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
+  const isWeddingPlanner = user?.role === 'wedding_planner';
+  const weddingPlanners = users.filter(u => u.role === 'wedding_planner');
+  
+  // Filter pipelines based on user role - wedding planners only see their own pipeline
+  const filteredPipelines = useMemo(() => {
+    if (isSuperAdmin) {
+      return pipelines; // Superadmin/admin sees all pipelines
     }
-  }, [pipelines, selectedPipelineId]);
+    if (isWeddingPlanner && user?.name) {
+      // Wedding planner sees only their pipeline (matching their first name)
+      const firstName = user.name.split(' ')[0].toLowerCase();
+      return pipelines.filter(p => 
+        p.name.toLowerCase().includes(firstName)
+      );
+    }
+    return pipelines;
+  }, [pipelines, isSuperAdmin, isWeddingPlanner, user?.name]);
+
+  useEffect(() => {
+    if (filteredPipelines.length > 0 && !selectedPipelineId) {
+      setSelectedPipelineId(filteredPipelines[0].id);
+    }
+  }, [filteredPipelines, selectedPipelineId]);
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -138,9 +157,6 @@ export default function OakSales() {
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
-
-  const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
-  const weddingPlanners = users.filter(u => u.role === 'wedding_planner');
 
   const SidebarContent = ({ onNavClick }: { onNavClick?: () => void }) => (
     <>
@@ -280,7 +296,7 @@ export default function OakSales() {
           )}
           {activeSection === 'pipeline' && (
             <PipelineSection
-              pipelines={pipelines}
+              pipelines={filteredPipelines}
               stages={stages}
               deals={deals}
               contacts={contacts}
@@ -316,7 +332,7 @@ export default function OakSales() {
           )}
           {activeSection === 'pipeline-setup' && (
             <PipelineSetupSection
-              pipelines={pipelines}
+              pipelines={filteredPipelines}
               stages={stages}
             />
           )}

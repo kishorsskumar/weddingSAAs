@@ -446,24 +446,44 @@ async function createLeadInOakSales(
   leadContext: LeadContext,
   createdBy: string
 ): Promise<{ dealId: string; contactId: string }> {
-  // Get or create the default pipeline and first stage
+  // Find the wedding planner user ID first
+  let ownerId: string | null = null;
+  let plannerUser: any = null;
+  
+  if (leadContext.weddingPlanner) {
+    const users = await storage.getAllUsers();
+    plannerUser = users.find(u => 
+      u.name.toLowerCase().includes(leadContext.weddingPlanner!.toLowerCase().split(' ')[0])
+    );
+    if (plannerUser) {
+      ownerId = plannerUser.id;
+    }
+  }
+  
+  // Get or create a pipeline for the wedding planner
   const pipelines = await storage.getAllSalesPipelines();
-  let pipeline = pipelines.find(p => p.isDefault) || pipelines[0];
+  const plannerName = leadContext.weddingPlanner || 'General';
+  
+  // Look for existing pipeline matching the planner's name
+  let pipeline = pipelines.find(p => 
+    p.name.toLowerCase().includes(plannerName.toLowerCase().split(' ')[0])
+  );
   
   if (!pipeline) {
-    // Create a default pipeline if none exists
+    // Create a new pipeline for this wedding planner
     pipeline = await storage.createSalesPipeline({
-      name: 'Bookings',
-      description: 'Default sales pipeline',
-      isDefault: true,
+      name: plannerName,
+      description: `Pipeline for ${plannerName}`,
+      isDefault: false,
     });
+    console.log(`[Oaksy] Created new pipeline for ${plannerName}: ${pipeline.id}`);
   }
   
   const stages = await storage.getSalesStagesByPipelineId(pipeline.id);
   let firstStage = stages.sort((a, b) => a.order - b.order)[0];
   
   if (!firstStage) {
-    // Create default stages
+    // Create default stages for the pipeline
     firstStage = await storage.createSalesStage({
       pipelineId: pipeline.id,
       name: 'Lead',
@@ -471,18 +491,47 @@ async function createLeadInOakSales(
       color: '#6B7280',
       probability: 10,
     });
-  }
-  
-  // Find the wedding planner user ID
-  let ownerId: string | null = null;
-  if (leadContext.weddingPlanner) {
-    const users = await storage.getAllUsers();
-    const plannerUser = users.find(u => 
-      u.name.toLowerCase().includes(leadContext.weddingPlanner!.toLowerCase().split(' ')[0])
-    );
-    if (plannerUser) {
-      ownerId = plannerUser.id;
-    }
+    
+    // Add more stages
+    await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Contacted',
+      order: 2,
+      color: '#3B82F6',
+      probability: 30,
+    });
+    
+    await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Meeting Scheduled',
+      order: 3,
+      color: '#F59E0B',
+      probability: 50,
+    });
+    
+    await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Proposal Sent',
+      order: 4,
+      color: '#8B5CF6',
+      probability: 70,
+    });
+    
+    await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Won',
+      order: 5,
+      color: '#10B981',
+      probability: 100,
+    });
+    
+    await storage.createSalesStage({
+      pipelineId: pipeline.id,
+      name: 'Lost',
+      order: 6,
+      color: '#EF4444',
+      probability: 0,
+    });
   }
   
   // Create the contact
