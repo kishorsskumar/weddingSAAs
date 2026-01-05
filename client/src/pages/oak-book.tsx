@@ -108,6 +108,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "payments-received", label: "Payments Received" },
     ]
   },
+  { id: "pending-vendor-payments", label: "Pending Vendor Payments", icon: Wallet },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -194,6 +195,23 @@ type Bill = {
   balanceDue: string;
 };
 
+type PendingVendorPayment = {
+  id: string;
+  requestCode: string;
+  employeeId: string;
+  employeeName: string;
+  employeePhone: string;
+  vendorName: string;
+  amount: string;
+  description: string | null;
+  eventId: string | null;
+  eventName: string | null;
+  status: string;
+  createdAt: string;
+  paidAt: string | null;
+  daybookEntryId: string | null;
+};
+
 type Bank = {
   id: string;
   name: string;
@@ -275,6 +293,10 @@ export default function OakBook() {
 
   const { data: banks = [] } = useQuery<Bank[]>({
     queryKey: ["/api/banks"],
+  });
+
+  const { data: pendingVendorPayments = [] } = useQuery<PendingVendorPayment[]>({
+    queryKey: ["/api/pending-vendor-payments"],
   });
 
   const { data: companySettings } = useQuery<any>({
@@ -2108,6 +2130,159 @@ export default function OakBook() {
     );
   };
 
+  const renderPendingVendorPayments = () => {
+    const pendingPayments = pendingVendorPayments.filter(p => p.status === 'pending');
+    const paidPayments = pendingVendorPayments.filter(p => p.status === 'paid');
+    
+    const totalPending = pendingPayments.reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+    
+    return (
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold">Pending Vendor Payments</h2>
+            <p className="text-sm text-muted-foreground">Vendor payments awaiting processing via WhatsApp</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending</p>
+                  <p className="text-2xl font-bold text-orange-600">{pendingPayments.length}</p>
+                </div>
+                <Wallet className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Pending Amount</p>
+                  <p className="text-2xl font-bold text-orange-600">₹{totalPending.toLocaleString('en-IN')}</p>
+                </div>
+                <IndianRupee className="h-8 w-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Paid</p>
+                  <p className="text-2xl font-bold text-green-600">{paidPayments.length}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-orange-500" />
+              Pending Payments ({pendingPayments.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pendingPayments.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No pending vendor payments. Payments submitted via WhatsApp will appear here.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {pendingPayments.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors"
+                    data-testid={`pending-vendor-payment-${payment.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-orange-600 border-orange-600">
+                          {payment.requestCode}
+                        </Badge>
+                        <span className="font-medium">{payment.vendorName}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        By {payment.employeeName} • {payment.eventName || 'No event assigned'}
+                      </p>
+                      {payment.description && (
+                        <p className="text-sm text-muted-foreground">{payment.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Submitted: {format(new Date(payment.createdAt), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    </div>
+                    <div className="mt-2 sm:mt-0 text-right">
+                      <p className="text-xl font-bold text-orange-600">
+                        ₹{parseFloat(payment.amount).toLocaleString('en-IN')}
+                      </p>
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                        Pending
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {paidPayments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-green-500" />
+                Recently Paid ({paidPayments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {paidPayments.slice(0, 10).map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg bg-green-50/50"
+                    data-testid={`paid-vendor-payment-${payment.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          {payment.requestCode}
+                        </Badge>
+                        <span className="font-medium">{payment.vendorName}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Paid for: {payment.eventName || 'General'}
+                      </p>
+                      {payment.paidAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Paid: {format(new Date(payment.paidAt), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="mt-2 sm:mt-0 text-right">
+                      <p className="text-xl font-bold text-green-600">
+                        ₹{parseFloat(payment.amount).toLocaleString('en-IN')}
+                      </p>
+                      <Badge className="bg-green-100 text-green-700">
+                        Paid
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   const renderSettings = () => (
     <SettingsSection 
       companySettings={companySettings} 
@@ -2133,6 +2308,8 @@ export default function OakBook() {
         return renderPaymentsReceived();
       case "reports":
         return renderReports();
+      case "pending-vendor-payments":
+        return renderPendingVendorPayments();
       case "settings":
         return renderSettings();
       default:
