@@ -272,6 +272,9 @@ import {
   qrPaymentRequests,
   type QrPaymentRequest,
   type InsertQrPaymentRequest,
+  incomeSubmissions,
+  type IncomeSubmission,
+  type InsertIncomeSubmission,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4238,6 +4241,51 @@ export class DatabaseStorage implements IStorage {
       if (!isNaN(num) && num > maxNum) maxNum = num;
     }
     return `QR${String(maxNum + 1).padStart(3, '0')}`;
+  }
+
+  // Income Submissions
+  async createIncomeSubmission(data: InsertIncomeSubmission): Promise<IncomeSubmission> {
+    const [created] = await db.insert(incomeSubmissions).values(data).returning();
+    return created;
+  }
+
+  async getIncomeSubmissionByCode(code: string): Promise<IncomeSubmission | undefined> {
+    const [submission] = await db.select().from(incomeSubmissions)
+      .where(eq(incomeSubmissions.requestCode, code.toUpperCase()));
+    return submission;
+  }
+
+  async getPendingIncomeSubmissions(): Promise<IncomeSubmission[]> {
+    return await db.select().from(incomeSubmissions)
+      .where(eq(incomeSubmissions.status, 'pending'))
+      .orderBy(desc(incomeSubmissions.createdAt));
+  }
+
+  async getAllIncomeSubmissions(): Promise<IncomeSubmission[]> {
+    return await db.select().from(incomeSubmissions)
+      .orderBy(desc(incomeSubmissions.createdAt));
+  }
+
+  async updateIncomeSubmission(id: string, data: Partial<IncomeSubmission>): Promise<IncomeSubmission | undefined> {
+    const [updated] = await db.update(incomeSubmissions)
+      .set(data)
+      .where(eq(incomeSubmissions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateIncomeCode(): Promise<string> {
+    const existing = await db.select({ requestCode: incomeSubmissions.requestCode })
+      .from(incomeSubmissions)
+      .where(sql`${incomeSubmissions.requestCode} LIKE 'INC%'`)
+      .orderBy(desc(incomeSubmissions.createdAt));
+    
+    let maxNum = 0;
+    for (const e of existing) {
+      const num = parseInt(e.requestCode.replace('INC', ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return `INC${String(maxNum + 1).padStart(3, '0')}`;
   }
 }
 

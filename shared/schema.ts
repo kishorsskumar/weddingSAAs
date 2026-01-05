@@ -1889,3 +1889,28 @@ export const qrPaymentRequests = pgTable("qr_payment_requests", {
 export const insertQrPaymentRequestSchema = createInsertSchema(qrPaymentRequests).omit({ id: true, createdAt: true });
 export type InsertQrPaymentRequest = z.infer<typeof insertQrPaymentRequestSchema>;
 export type QrPaymentRequest = typeof qrPaymentRequests.$inferSelect;
+
+// Income Submissions - Employee submits payment received screenshot for approval
+export const incomeSubmissions = pgTable("income_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestCode: text("request_code").notNull().unique(), // Short code like "INC001"
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  employeeName: text("employee_name").notNull(),
+  employeePhone: text("employee_phone").notNull(),
+  type: text("type").notNull(), // 'client_payment' | 'bank_transfer'
+  clientName: text("client_name"), // Client name for income
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  screenshotUrl: text("screenshot_url").notNull(), // URL of payment screenshot
+  status: text("status").notNull().default('pending'), // 'pending', 'approved', 'rejected'
+  eventId: varchar("event_id").references(() => events.id), // Assigned event for daybook
+  eventName: text("event_name"), // Event name for display
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id),
+  rejectionReason: text("rejection_reason"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIncomeSubmissionSchema = createInsertSchema(incomeSubmissions).omit({ id: true, createdAt: true });
+export type InsertIncomeSubmission = z.infer<typeof insertIncomeSubmissionSchema>;
+export type IncomeSubmission = typeof incomeSubmissions.$inferSelect;

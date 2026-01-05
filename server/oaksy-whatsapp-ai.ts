@@ -100,6 +100,62 @@ function extractAmount(text: string): number | null {
   return null;
 }
 
+// Detect if message is an income/payment received submission (not expense/QR payment)
+function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?: string; type: 'client_payment' | 'bank_transfer' } {
+  const lowerText = text.toLowerCase();
+  
+  // First check for explicit income patterns (these take priority)
+  const incomePatterns = [
+    /income\s+from\s+(.+)/i,
+    /received\s+from\s+(.+)/i,
+    /payment\s+received\s*(?:from\s+)?(.+)?/i,
+    /client\s+payment\s*(?:from\s+)?(.+)?/i,
+    /credited\s+(?:by|from)\s+(.+)/i,
+    /bank\s+(?:to\s+bank|transfer)\s*(?:from\s+)?(.+)?/i,
+    /transfer\s+received\s*(?:from\s+)?(.+)?/i,
+    /advance\s+(?:from|received)\s*(.+)?/i,
+    /amount\s+received\s*(?:from\s+)?(.+)?/i,
+  ];
+  
+  // Check for income patterns first
+  for (const pattern of incomePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      // Extract client name, clean it up
+      let clientName = match[1]?.trim() || undefined;
+      // Remove amount from client name if present
+      if (clientName) {
+        clientName = clientName.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim() || clientName;
+      }
+      const isBankTransfer = /bank\s+(?:to\s+bank|transfer)/i.test(text);
+      return { 
+        isIncome: true, 
+        clientName: clientName || 'Client',
+        type: isBankTransfer ? 'bank_transfer' : 'client_payment'
+      };
+    }
+  }
+  
+  // Expense phrases that indicate outgoing payment request (NOT income)
+  // These are specific phrases, not substrings that would block "payment received"
+  const expensePhrases = [
+    /\bplease\s+pay\b/i,
+    /\bneed\s+(?:to\s+)?pay\b/i,
+    /\bfor\s+payment\b/i,
+    /\bpay\s+(?:for|to|this)\b/i,
+    /\bpending\s+payment\b/i,
+  ];
+  
+  // Check for expense phrases - these indicate NOT income
+  for (const phrase of expensePhrases) {
+    if (phrase.test(lowerText)) {
+      return { isIncome: false, type: 'client_payment' };
+    }
+  }
+  
+  return { isIncome: false, type: 'client_payment' };
+}
+
 function parseDate(text: string): string | null {
   const patterns = [
     /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/,
@@ -790,6 +846,70 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
+    // Check if Kishor is in income approval flow (awaiting event assignment)
+    if (conversation.activeIntent === 'kishor_income_approval') {
+      let kishorContext: any = {};
+      try {
+        if (typeof conversation.intentContext === 'string') {
+          kishorContext = JSON.parse(conversation.intentContext) || {};
+        } else if (conversation.intentContext) {
+          kishorContext = conversation.intentContext;
+        }
+      } catch { kishorContext = {}; }
+      
+      // Waiting for event assignment
+      if (conversation.currentState === 'awaiting_income_event') {
+        const eventName = messageText.trim();
+        const incCode = kishorContext.incCode;
+        
+        if (!eventName || eventName.length === 0) {
+          return `Please type the event/customer name, or "general" for general income.`;
+        }
+        
+        // Complete the income approval with event
+        const result = await handleIncomeApprovalComplete(incCode, eventName);
+        
+        // Reset Kishor's conversation
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+        });
+        
+        return result;
+      }
+    }
+    
+    // Handle Income approval commands (A INC001)
+    const approveIncMatch = lowerMessage.match(/^a\s+(inc\d+)/i);
+    const rejectIncMatch = lowerMessage.match(/^(?:r|reject)\s+(inc\d+)(?:\s+(.+))?/i);
+    
+    if (approveIncMatch) {
+      const incCode = approveIncMatch[1].toUpperCase();
+      const incomeSubmission = await storage.getIncomeSubmissionByCode(incCode);
+      
+      if (!incomeSubmission) {
+        return `❌ Income submission ${incCode} not found.`;
+      }
+      
+      if (incomeSubmission.status !== 'pending') {
+        return `⚠️ Income ${incCode} was already ${incomeSubmission.status}.`;
+      }
+      
+      // Start event assignment flow for income
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'kishor_income_approval',
+        intentContext: { incCode },
+        currentState: 'awaiting_income_event',
+      });
+      
+      return `✅ Approving *${incCode}*\n\n📋 ${incomeSubmission.description}\n💰 ₹${parseFloat(incomeSubmission.amount).toLocaleString('en-IN')}\n\nWhich event should this income be recorded under?\n\n_Type the customer/event name, or "general" for general income_`;
+    }
+    
+    if (rejectIncMatch) {
+      return handleIncomeReject(rejectIncMatch[1], rejectIncMatch[2]);
+    }
+    
     // Handle QR payment PAID command - start screenshot collection flow
     const paidMatch = lowerMessage.match(/^paid\s+(qr\d+)/i);
     const rejectQrMatch = lowerMessage.match(/^reject\s+(qr\d+)(?:\s+(.+))?/i);
@@ -838,7 +958,7 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     // Default Kishor greeting
-    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after making payment\n\n_How can I help you today?_ 🌳`;
+    return `👋 Hi Kishor! I'm Oaksy AI.\n\n*You can:*\n\n📝 *Add Leads* - Send customer details like:\n"Vijay Menon, 9876543210, Feb 7, Marriott, assign to Fida"\n\n✅ *Approve Requests* - Reply "A CODE"\n❌ *Reject Requests* - Reply "R CODE reason"\n\n💳 *QR Payments* - Reply "PAID QR001" after payment\n📥 *Income* - Reply "A INC001" to approve income submissions\n\n_How can I help you today?_ 🌳`;
   }
   
   const employee = conversation.employeeId 
@@ -885,6 +1005,74 @@ export async function handleOaksyWhatsAppMessage(
 
   if (lowerMessage === 'status' || lowerMessage === 'my status' || lowerMessage.includes('check status')) {
     return await getEmployeeStatus(employee.id, employee.name);
+  }
+
+  // INCOME SUBMISSION FLOW - Check if message indicates income/payment received
+  if (mediaUrl && !conversation.activeIntent) {
+    const incomeCheck = detectIncomeSubmission(messageText);
+    
+    if (incomeCheck.isIncome) {
+      // This is an income submission (payment received screenshot)
+      const providedAmount = extractAmount(messageText);
+      const clientName = incomeCheck.clientName || 'Unknown Client';
+      const incomeType = incomeCheck.type;
+      
+      if (providedAmount) {
+        // Got amount - submit income for approval
+        const requestCode = await storage.generateIncomeCode();
+        const description = incomeType === 'bank_transfer' 
+          ? `Bank transfer from ${clientName}`
+          : `Payment received from ${clientName}`;
+        
+        await storage.createIncomeSubmission({
+          requestCode,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: employee.phone || normalizedPhone,
+          type: incomeType,
+          clientName,
+          description,
+          amount: providedAmount.toString(),
+          screenshotUrl: mediaUrl,
+          status: 'pending',
+        });
+
+        // Notify Kishor for approval
+        await notifyKishorIncomeSubmission(
+          requestCode,
+          employee.name,
+          incomeType,
+          clientName,
+          description,
+          providedAmount,
+          mediaUrl
+        );
+
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+
+        const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
+      } else {
+        // No amount - ask for amount
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'income_submission',
+          intentContext: { 
+            incomeScreenshotUrl: mediaUrl,
+            incomeClientName: clientName,
+            incomeType: incomeType,
+          },
+          conversationHistory: history,
+          currentState: 'awaiting_income_amount',
+        });
+
+        return `📥 Got your payment screenshot from ${clientName}!\n\nHow much was received? 💰`;
+      }
+    }
   }
 
   // SIMPLIFIED QR PAYMENT FLOW - Any image is treated as QR payment request
@@ -1053,6 +1241,61 @@ export async function handleOaksyWhatsAppMessage(
       });
       
       return `Let's start fresh! Please send your QR code again with the amount and purpose.\n\n_Example: Send QR image with "500 for taxi"_`;
+    }
+  }
+
+  // Handle income submission flow states
+  if (conversation.activeIntent === 'income_submission') {
+    // Waiting for amount after sending income screenshot
+    if (conversation.currentState === 'awaiting_income_amount') {
+      const amount = extractAmount(messageText);
+      if (!amount) {
+        return `Please tell me the amount received. Example: "₹50000" or "25000"`;
+      }
+      
+      const incomeContext = context as any;
+      const clientName = incomeContext.incomeClientName || 'Client';
+      const incomeType = incomeContext.incomeType || 'client_payment';
+      const screenshotUrl = incomeContext.incomeScreenshotUrl || '';
+      
+      const requestCode = await storage.generateIncomeCode();
+      const description = incomeType === 'bank_transfer' 
+        ? `Bank transfer from ${clientName}`
+        : `Payment received from ${clientName}`;
+      
+      await storage.createIncomeSubmission({
+        requestCode,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeePhone: employee.phone || normalizedPhone,
+        type: incomeType,
+        clientName,
+        description,
+        amount: amount.toString(),
+        screenshotUrl,
+        status: 'pending',
+      });
+
+      // Notify Kishor for approval
+      await notifyKishorIncomeSubmission(
+        requestCode,
+        employee.name,
+        incomeType,
+        clientName,
+        description,
+        amount,
+        screenshotUrl
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+      return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
     }
   }
 
@@ -1627,4 +1870,126 @@ async function notifyKishorQrPayment(
     const message = `💳 *Payment Request ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📝 *For:* ${description}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "PAID ${requestCode}" after payment_\n\n🌳 Oaksy`;
     await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
   }
+}
+
+// Income submission notification to Kishor
+async function notifyKishorIncomeSubmission(
+  requestCode: string,
+  employeeName: string,
+  type: 'client_payment' | 'bank_transfer',
+  clientName: string,
+  description: string,
+  amount: number,
+  screenshotUrl: string
+): Promise<void> {
+  const typeLabel = type === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+  
+  if (screenshotUrl) {
+    try {
+      const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+      await sendWhatsAppMediaMessage(
+        SUPERADMIN_WHATSAPP, 
+        screenshotUrl,
+        `📥 *Income Submission ${requestCode}*\n\n👤 From: ${employeeName}\n📁 Type: ${typeLabel}\n👥 Client: ${clientName}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "A ${requestCode}" to approve_`
+      );
+    } catch (mediaError) {
+      console.error('[Income] Failed to send media, falling back to text:', mediaError);
+      const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n📷 Screenshot: ${screenshotUrl}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
+      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+    }
+  } else {
+    const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
+    await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+  }
+}
+
+// Complete income approval with event assignment
+async function handleIncomeApprovalComplete(
+  code: string,
+  eventNameOrGeneral: string
+): Promise<string> {
+  const incomeSubmission = await storage.getIncomeSubmissionByCode(code.toUpperCase());
+  
+  if (!incomeSubmission) {
+    return `❌ Income submission ${code.toUpperCase()} not found.`;
+  }
+  
+  if (incomeSubmission.status !== 'pending') {
+    return `⚠️ Income ${code.toUpperCase()} was already ${incomeSubmission.status}.`;
+  }
+  
+  // Determine event assignment
+  const rawEventName = eventNameOrGeneral?.trim() || '';
+  const isGeneralIncome = !rawEventName || rawEventName.toLowerCase() === 'general';
+  const eventName = isGeneralIncome ? 'General' : rawEventName;
+  
+  // Try to find event if specified
+  let eventId: string | null = null;
+  if (!isGeneralIncome && eventName.length >= 2) {
+    const events = await storage.getAllEvents();
+    const matchingEvent = events.find(e => 
+      e.customer?.toLowerCase().includes(eventName.toLowerCase()) ||
+      e.venue?.toLowerCase().includes(eventName.toLowerCase())
+    );
+    if (matchingEvent) {
+      eventId = matchingEvent.id;
+    }
+  }
+  
+  // Create daybook entry as income
+  const today = new Date().toISOString().split('T')[0];
+  const category = incomeSubmission.type === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+  const daybookEntry = await storage.createDaybookEntry({
+    date: today,
+    type: 'income',
+    amount: incomeSubmission.amount,
+    category,
+    description: `${incomeSubmission.description} (via ${incomeSubmission.employeeName})`,
+    eventId,
+    eventName: isGeneralIncome ? null : eventName,
+  });
+  
+  // Update income submission as approved
+  await storage.updateIncomeSubmission(incomeSubmission.id, {
+    status: 'approved',
+    eventId,
+    eventName: isGeneralIncome ? 'General' : eventName,
+    daybookEntryId: daybookEntry.id,
+    approvedAt: new Date(),
+  });
+  
+  // Notify employee
+  const notifyMessage = `🎉 *Income Approved!*\n\n✅ Your submission *${incomeSubmission.requestCode}* has been approved!\n\n💰 Amount: ₹${parseFloat(incomeSubmission.amount).toLocaleString('en-IN')}\n📋 Recorded under: ${isGeneralIncome ? 'General Income' : eventName}\n\n_Thank you!_ 🌳`;
+  await sendWhatsAppMessage(incomeSubmission.employeePhone, notifyMessage);
+  
+  return `✅ *Income Recorded* - ${incomeSubmission.requestCode}\n\n💰 ₹${parseFloat(incomeSubmission.amount).toLocaleString('en-IN')}\n📝 ${incomeSubmission.description}\n📋 Added to: ${isGeneralIncome ? 'General Income' : eventName}\n\n_Employee notified & Daybook updated!_`;
+}
+
+// Reject income submission
+async function handleIncomeReject(
+  code: string,
+  reason?: string
+): Promise<string> {
+  const incomeSubmission = await storage.getIncomeSubmissionByCode(code.toUpperCase());
+  
+  if (!incomeSubmission) {
+    return `❌ Income submission ${code.toUpperCase()} not found.`;
+  }
+  
+  if (incomeSubmission.status !== 'pending') {
+    return `⚠️ Income ${code.toUpperCase()} was already ${incomeSubmission.status}.`;
+  }
+  
+  const rejectReason = reason?.trim() || 'Not approved';
+  
+  await storage.updateIncomeSubmission(incomeSubmission.id, {
+    status: 'rejected',
+    rejectionReason: rejectReason,
+  });
+  
+  // Notify employee
+  const notifyMessage = `ℹ️ *Income Submission Update*\n\nYour submission *${incomeSubmission.requestCode}* was not approved.\n\n*Reason:* ${rejectReason}\n\n_Please contact management if you have questions._`;
+  await sendWhatsAppMessage(incomeSubmission.employeePhone, notifyMessage);
+  
+  return `❌ *Rejected* - ${incomeSubmission.requestCode}\n*Reason:* ${rejectReason}\n\n_Employee notified._`;
 }

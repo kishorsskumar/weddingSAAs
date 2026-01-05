@@ -49,7 +49,8 @@ Preferred communication style: Simple, everyday language.
 - **Calendar Integration:** Google Calendar (active, two-way sync), Outlook (planned).
 - **Oaksy AI Assistant:** OpenAI GPT-4o integration, department-specific context, text/voice input, conversation history, context-aware responses.
 - **Two-Way WhatsApp Communication:** Employee expense/leave requests, Superadmin approval workflow, dashboard inbox for management, Superadmin lead submission with AI extraction.
-- **QR Payment Request System:** Employee QR code submission for payments, Superadmin approval/payment flow, automatic daybook recording with event assignment.
+- **QR Payment Request System:** Employee QR code submission for payments, Kishor approval/payment flow with screenshot collection, event assignment, automatic daybook recording.
+- **Income Submission System:** Employee submits payment received screenshots with text like "Income from [client]" or "Bank transfer from [client]", Kishor approves with event assignment, automatic daybook recording as income.
 - **Monthly Production Plan:** Macro-level scheduling with inline editing, auto-sync from events, PDF export.
 - **Leave Tracker (Oak HR):** Comprehensive leave monitoring, statistics, manual entry, status management.
 
