@@ -2068,11 +2068,11 @@ function SalarySlipsSection() {
                         <Download className="h-4 w-4 mr-1" />
                         PDF
                       </Button>
-                      {isSuperAdmin && !slip.sentViaWhatsapp && (
+                      {isSuperAdmin && (
                         <Button
                           size="sm"
-                          variant="default"
-                          className="bg-green-600 hover:bg-green-700"
+                          variant={slip.sentViaWhatsapp ? "outline" : "default"}
+                          className={slip.sentViaWhatsapp ? "" : "bg-green-600 hover:bg-green-700"}
                           onClick={() => sendWhatsAppMutation.mutate(slip.id)}
                           disabled={sendingSlipId === slip.id}
                         >
@@ -2081,7 +2081,7 @@ function SalarySlipsSection() {
                           ) : (
                             <>
                               <Send className="h-4 w-4 mr-1" />
-                              Send
+                              {slip.sentViaWhatsapp ? "Resend" : "Send"}
                             </>
                           )}
                         </Button>
