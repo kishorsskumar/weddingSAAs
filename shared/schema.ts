@@ -1779,6 +1779,8 @@ export const monthlyProductionPlan = pgTable("monthly_production_plan", {
   eventDate: date("event_date").notNull(),
   subEventName: text("sub_event_name").notNull(), // e.g., "Haldi", "Sangeeth", "Wedding"
   venue: text("venue"),
+  weddingPlanner: text("wedding_planner"), // Wedding Planner name
+  stageManager: text("stage_manager"), // Stage Manager/Event Coordinator
   teamLead: text("team_lead"),
   productionTeamCount: integer("production_team_count"),
   florist: text("florist"),
@@ -1787,6 +1789,7 @@ export const monthlyProductionPlan = pgTable("monthly_production_plan", {
   productionEndTime: text("production_end_time"),
   dismantlingDateTime: text("dismantling_date_time"),
   dismantlingTeamLead: text("dismantling_team_lead"),
+  groupLabel: text("group_label"), // Section header like "Dr.Sonia - KTDC Samudra - 15 & 16 Jan 2026"
   isComplete: boolean("is_complete").default(false),
   sortOrder: integer("sort_order").default(0),
   createdBy: varchar("created_by").references(() => users.id),
