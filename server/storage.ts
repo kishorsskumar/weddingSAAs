@@ -269,6 +269,9 @@ import {
   type InsertWhatsappPendingApproval,
   type WhatsappInboundMessage,
   type InsertWhatsappInboundMessage,
+  qrPaymentRequests,
+  type QrPaymentRequest,
+  type InsertQrPaymentRequest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4190,6 +4193,51 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(whatsappInboundMessages)
       .orderBy(desc(whatsappInboundMessages.createdAt))
       .limit(limit);
+  }
+
+  // QR Payment Requests
+  async createQrPaymentRequest(data: InsertQrPaymentRequest): Promise<QrPaymentRequest> {
+    const [created] = await db.insert(qrPaymentRequests).values(data).returning();
+    return created;
+  }
+
+  async getQrPaymentRequestByCode(code: string): Promise<QrPaymentRequest | undefined> {
+    const [request] = await db.select().from(qrPaymentRequests)
+      .where(eq(qrPaymentRequests.requestCode, code.toUpperCase()));
+    return request;
+  }
+
+  async getPendingQrPaymentRequests(): Promise<QrPaymentRequest[]> {
+    return await db.select().from(qrPaymentRequests)
+      .where(eq(qrPaymentRequests.status, 'pending'))
+      .orderBy(desc(qrPaymentRequests.createdAt));
+  }
+
+  async getAllQrPaymentRequests(): Promise<QrPaymentRequest[]> {
+    return await db.select().from(qrPaymentRequests)
+      .orderBy(desc(qrPaymentRequests.createdAt));
+  }
+
+  async updateQrPaymentRequest(id: string, data: Partial<QrPaymentRequest>): Promise<QrPaymentRequest | undefined> {
+    const [updated] = await db.update(qrPaymentRequests)
+      .set(data)
+      .where(eq(qrPaymentRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateQrPaymentCode(): Promise<string> {
+    const existing = await db.select({ requestCode: qrPaymentRequests.requestCode })
+      .from(qrPaymentRequests)
+      .where(sql`${qrPaymentRequests.requestCode} LIKE 'QR%'`)
+      .orderBy(desc(qrPaymentRequests.createdAt));
+    
+    let maxNum = 0;
+    for (const e of existing) {
+      const num = parseInt(e.requestCode.replace('QR', ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return `QR${String(maxNum + 1).padStart(3, '0')}`;
   }
 }
 

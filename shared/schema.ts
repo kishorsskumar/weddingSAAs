@@ -1862,3 +1862,30 @@ export const whatsappInboundMessages = pgTable("whatsapp_inbound_messages", {
 export const insertWhatsappInboundMessageSchema = createInsertSchema(whatsappInboundMessages).omit({ id: true, createdAt: true });
 export type InsertWhatsappInboundMessage = z.infer<typeof insertWhatsappInboundMessageSchema>;
 export type WhatsappInboundMessage = typeof whatsappInboundMessages.$inferSelect;
+
+// QR Payment Requests - Employee submits QR for payment, routed to superadmin
+export const qrPaymentRequests = pgTable("qr_payment_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestCode: text("request_code").notNull().unique(), // Short code like "QR001" for tracking
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  employeeName: text("employee_name").notNull(),
+  employeePhone: text("employee_phone").notNull(),
+  category: text("category").notNull(), // 'food', 'travel', 'accommodation', 'supplies', 'other'
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  qrImageUrl: text("qr_image_url").notNull(), // URL of the QR code image from employee
+  paymentScreenshotUrl: text("payment_screenshot_url"), // URL of payment confirmation from superadmin
+  status: text("status").notNull().default('pending'), // 'pending', 'paid', 'rejected', 'recorded'
+  eventId: varchar("event_id").references(() => events.id), // Assigned event for daybook
+  eventName: text("event_name"), // Event name for display
+  daybookEntryId: varchar("daybook_entry_id").references(() => daybookEntries.id), // Link to daybook entry
+  superadminNotes: text("superadmin_notes"), // Notes from superadmin
+  rejectionReason: text("rejection_reason"),
+  paidAt: timestamp("paid_at"),
+  recordedAt: timestamp("recorded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQrPaymentRequestSchema = createInsertSchema(qrPaymentRequests).omit({ id: true, createdAt: true });
+export type InsertQrPaymentRequest = z.infer<typeof insertQrPaymentRequestSchema>;
+export type QrPaymentRequest = typeof qrPaymentRequests.$inferSelect;
