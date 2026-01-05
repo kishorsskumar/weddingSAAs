@@ -146,6 +146,41 @@ export default function Dashboard() {
 
   const totalPendingApprovals = pendingLeaves.length + pendingAdvances.length + pendingExpenses.length + pendingQuickEntries.length;
 
+  // Fetch sales deals to count active leads
+  const { data: salesDeals = [] } = useQuery<any[]>({
+    queryKey: ['/api/sales/deals'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales/deals', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  const { data: salesStages = [] } = useQuery<any[]>({
+    queryKey: ['/api/sales/stages'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales/stages', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAdmin,
+  });
+
+  // Calculate active leads (deals not in Won or Lost stages)
+  const activeLeads = useMemo(() => {
+    const closedStageIds = salesStages
+      .filter((s: any) => s.name?.toLowerCase() === 'won' || s.name?.toLowerCase() === 'lost' || s.name?.toLowerCase() === 'closed')
+      .map((s: any) => s.id);
+    return salesDeals.filter((d: any) => !closedStageIds.includes(d.stageId));
+  }, [salesDeals, salesStages]);
+
+  // Count leads created today
+  const todayStr = new Date().toISOString().split('T')[0];
+  const newLeadsToday = activeLeads.filter((d: any) => 
+    d.createdAt && d.createdAt.split('T')[0] === todayStr
+  ).length;
+
   const queryClient = useQueryClient();
   
   // Check if user has access to milestones
