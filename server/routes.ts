@@ -7700,21 +7700,12 @@ Respond with a JSON array only, no markdown formatting.`;
         return res.status(400).send('<Response></Response>');
       }
 
-      console.log('[WhatsApp Webhook] Incoming message:', { From, Body: Body?.substring(0, 50), hasMedia: !!MediaUrl0 });
+      console.log('[Oaksy WhatsApp] Incoming message:', { From, Body: Body?.substring(0, 50), hasMedia: !!MediaUrl0 });
 
-      const { handleIncomingWhatsAppMessage, handleSuperadminApprovalResponse } = await import('./whatsapp-handler');
+      const { handleOaksyWhatsAppMessage } = await import('./oaksy-whatsapp-ai');
       
-      // First check if this is a superadmin approval response (A EXP001 or R LV002)
-      const approvalMatch = Body?.toUpperCase()?.match(/^(A|R)\s*(EXP\d+|LV\d+)/i) || Body?.toUpperCase()?.match(/^(EXP\d+|LV\d+)\s*(A|R)/i);
-      
-      let responseMessage: string;
-      
-      if (approvalMatch) {
-        const approvalResponse = await handleSuperadminApprovalResponse(From, Body);
-        responseMessage = approvalResponse || await handleIncomingWhatsAppMessage(From, Body, MediaUrl0, MediaContentType0, MessageSid);
-      } else {
-        responseMessage = await handleIncomingWhatsAppMessage(From, Body, MediaUrl0, MediaContentType0, MessageSid);
-      }
+      // Oaksy AI handles all messages - including superadmin approvals
+      const responseMessage = await handleOaksyWhatsAppMessage(From, Body || '', MediaUrl0, MediaContentType0, MessageSid);
 
       // Return TwiML response
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>

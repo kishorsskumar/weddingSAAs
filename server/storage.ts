@@ -277,6 +277,8 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPhone(phone: string): Promise<User | undefined>;
+  getUsersByRole(role: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<void>;
@@ -686,12 +688,15 @@ export interface IStorage {
 
   // Employee Portal - Leave Requests (employee-scoped)
   getLeaveRequestsByEmployee(employeeId: string): Promise<LeaveRequest[]>;
+  getLeaveRequestsCount(): Promise<number>;
   getPendingLeaveRequestsForManager(managerUserId: string): Promise<LeaveRequest[]>;
   getPendingSalaryAdvancesForManager(managerUserId: string): Promise<SalaryAdvanceRequest[]>;
 
   // Employee Portal - Expense Reimbursements
   getExpenseReimbursements(employeeId: string): Promise<ExpenseReimbursement[]>;
+  getExpenseReimbursementsByEmployee(employeeId: string): Promise<ExpenseReimbursement[]>;
   getAllExpenseReimbursements(): Promise<ExpenseReimbursement[]>;
+  getExpenseReimbursementsCount(): Promise<number>;
   getExpenseReimbursement(id: string): Promise<ExpenseReimbursement | undefined>;
   createExpenseReimbursement(reimbursement: InsertExpenseReimbursement): Promise<ExpenseReimbursement>;
   updateExpenseReimbursement(id: string, reimbursement: Partial<InsertExpenseReimbursement>): Promise<ExpenseReimbursement | undefined>;
@@ -917,6 +922,25 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async getUserByPhone(phone: string): Promise<User | undefined> {
+    const cleanedPhone = phone.replace(/[^0-9+]/g, '');
+    const allEmployees = await db.select().from(employees);
+    const employee = allEmployees.find(e => {
+      if (!e.phone) return false;
+      const empPhone = e.phone.replace(/[^0-9+]/g, '');
+      return empPhone === cleanedPhone || 
+             empPhone.endsWith(cleanedPhone.slice(-10)) || 
+             cleanedPhone.endsWith(empPhone.slice(-10));
+    });
+    if (!employee?.userId) return undefined;
+    const [user] = await db.select().from(users).where(eq(users.id, employee.userId));
+    return user || undefined;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
   }
 
   // User Permissions
@@ -2892,6 +2916,11 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(leaveRequests.createdAt));
   }
 
+  async getLeaveRequestsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(leaveRequests);
+    return Number(result[0]?.count || 0);
+  }
+
   async getPendingLeaveRequestsForManager(managerUserId: string): Promise<LeaveRequest[]> {
     const managedEmployees = await this.getEmployeesByManager(managerUserId);
     const employeeIds = managedEmployees.map(e => e.id);
@@ -2925,8 +2954,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(expenseReimbursements.requestDate));
   }
 
+  async getExpenseReimbursementsByEmployee(employeeId: string): Promise<ExpenseReimbursement[]> {
+    return this.getExpenseReimbursements(employeeId);
+  }
+
   async getAllExpenseReimbursements(): Promise<ExpenseReimbursement[]> {
     return await db.select().from(expenseReimbursements).orderBy(desc(expenseReimbursements.requestDate));
+  }
+
+  async getExpenseReimbursementsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(expenseReimbursements);
+    return Number(result[0]?.count || 0);
   }
 
   async getExpenseReimbursement(id: string): Promise<ExpenseReimbursement | undefined> {
