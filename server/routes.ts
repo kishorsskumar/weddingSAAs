@@ -30,6 +30,16 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const PgSession = connectPgSimple(session);
 
+// Helper function to escape XML special characters for TwiML responses
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 // Helper function to get current Indian fiscal year (April to March)
 function getCurrentFiscalYear(): string {
   const now = new Date();
@@ -7678,6 +7688,152 @@ Respond with a JSON array only, no markdown formatting.`;
     // Show employees who have a WhatsApp number OR (phone + opted-in)
     const optedInEmployees = employees.filter(e => e.whatsappNumber || (e.phone && e.whatsappOptIn));
     res.json(optedInEmployees);
+  });
+
+  // WhatsApp Two-Way Communication Webhook (receives incoming messages from Twilio)
+  app.post('/api/webhooks/twilio-whatsapp', async (req, res) => {
+    try {
+      const { From, Body, MediaUrl0, MediaContentType0, MessageSid } = req.body;
+      
+      if (!From) {
+        return res.status(400).send('<Response></Response>');
+      }
+
+      console.log('[WhatsApp Webhook] Incoming message:', { From, Body: Body?.substring(0, 50), hasMedia: !!MediaUrl0 });
+
+      const { handleIncomingWhatsAppMessage, handleSuperadminApprovalResponse } = await import('./whatsapp-handler');
+      
+      // First check if this is a superadmin approval response (A EXP001 or R LV002)
+      const approvalMatch = Body?.toUpperCase()?.match(/^(A|R)\s*(EXP\d+|LV\d+)/i) || Body?.toUpperCase()?.match(/^(EXP\d+|LV\d+)\s*(A|R)/i);
+      
+      let responseMessage: string;
+      
+      if (approvalMatch) {
+        const approvalResponse = await handleSuperadminApprovalResponse(From, Body);
+        responseMessage = approvalResponse || await handleIncomingWhatsAppMessage(From, Body, MediaUrl0, MediaContentType0, MessageSid);
+      } else {
+        responseMessage = await handleIncomingWhatsAppMessage(From, Body, MediaUrl0, MediaContentType0, MessageSid);
+      }
+
+      // Return TwiML response
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${escapeXml(responseMessage)}</Message>
+</Response>`;
+
+      res.type('text/xml').send(twiml);
+    } catch (error: any) {
+      console.error('[WhatsApp Webhook] Error:', error.message);
+      res.type('text/xml').send('<Response><Message>Sorry, something went wrong. Please try again.</Message></Response>');
+    }
+  });
+
+  // Get pending WhatsApp approvals (for dashboard)
+  app.get('/api/whatsapp/pending-approvals', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin', 'accountant'].includes(user.role)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    const approvals = await storage.getPendingWhatsappApprovals();
+    res.json(approvals);
+  });
+
+  // Get all WhatsApp approvals history
+  app.get('/api/whatsapp/approvals', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin', 'accountant'].includes(user.role)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    const approvals = await storage.getAllWhatsappApprovals();
+    res.json(approvals);
+  });
+
+  // Manually approve/reject from dashboard
+  app.post('/api/whatsapp/approvals/:id/respond', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin', 'accountant'].includes(user.role)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const { action, responseMessage } = req.body;
+    if (!action || !['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be approve or reject' });
+    }
+
+    const approval = await storage.getWhatsappPendingApprovalByCode(req.params.id) || 
+                     await storage.getAllWhatsappApprovals().then(all => all.find(a => a.id === req.params.id));
+    
+    if (!approval) {
+      return res.status(404).json({ error: 'Approval not found' });
+    }
+
+    if (approval.status !== 'pending') {
+      return res.status(400).json({ error: 'Approval already processed' });
+    }
+
+    const status = action === 'approve' ? 'approved' : 'rejected';
+    
+    await storage.updateWhatsappPendingApproval(approval.id, {
+      status,
+      respondedAt: new Date(),
+      responseMessage: responseMessage || null,
+    });
+
+    // Update the actual request
+    if (approval.type === 'expense') {
+      await storage.updateExpenseReimbursement(approval.requestId, {
+        status,
+        approvedAt: action === 'approve' ? new Date() : undefined,
+        approvedBy: req.session.userId,
+        managerComments: responseMessage || null,
+      });
+    } else if (approval.type === 'leave') {
+      await storage.updateLeaveRequest(approval.requestId, {
+        status,
+        approvedAt: action === 'approve' ? new Date() : undefined,
+        managerId: req.session.userId,
+        managerComments: responseMessage || null,
+      });
+    }
+
+    // Notify employee via WhatsApp
+    const employee = await storage.getEmployee(approval.employeeId);
+    if (employee?.whatsappNumber || employee?.phone) {
+      const { sendWhatsAppMessage } = await import('./whatsapp-service');
+      const employeePhone = employee.whatsappNumber || employee.phone!;
+      const statusEmoji = action === 'approve' ? '✅' : '❌';
+      const statusText = action === 'approve' ? 'APPROVED' : 'REJECTED';
+      const requestType = approval.type === 'expense' ? 'Expense' : 'Leave';
+      
+      await sendWhatsAppMessage(
+        employeePhone,
+        `${statusEmoji} Your ${requestType} request (${approval.approvalCode}) has been *${statusText}*!\n\n${approval.description}${responseMessage ? `\n\nComment: ${responseMessage}` : ''}`
+      );
+    }
+
+    res.json({ success: true, status });
+  });
+
+  // Get inbound messages history
+  app.get('/api/whatsapp/inbound-messages', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || !['superadmin', 'admin'].includes(user.role)) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+    const messages = await storage.getWhatsappInboundMessages(100);
+    res.json(messages);
   });
 
   // ===========================

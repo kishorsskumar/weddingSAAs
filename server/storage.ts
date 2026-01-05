@@ -260,6 +260,15 @@ import {
   monthlyProductionPlan,
   type MonthlyProductionPlan,
   type InsertMonthlyProductionPlan,
+  whatsappConversations,
+  whatsappPendingApprovals,
+  whatsappInboundMessages,
+  type WhatsappConversation,
+  type InsertWhatsappConversation,
+  type WhatsappPendingApproval,
+  type InsertWhatsappPendingApproval,
+  type WhatsappInboundMessage,
+  type InsertWhatsappInboundMessage,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4040,6 +4049,106 @@ export class DatabaseStorage implements IStorage {
     return [...existingEntries, ...newEntries].sort((a, b) => 
       new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
     );
+  }
+
+  // WhatsApp Conversations
+  async getWhatsappConversationByPhone(phoneNumber: string): Promise<WhatsappConversation | undefined> {
+    const [conv] = await db.select().from(whatsappConversations)
+      .where(eq(whatsappConversations.phoneNumber, phoneNumber));
+    return conv;
+  }
+
+  async createWhatsappConversation(data: InsertWhatsappConversation): Promise<WhatsappConversation> {
+    const [created] = await db.insert(whatsappConversations).values(data).returning();
+    return created;
+  }
+
+  async updateWhatsappConversation(id: string, data: Partial<InsertWhatsappConversation>): Promise<WhatsappConversation | undefined> {
+    const [updated] = await db.update(whatsappConversations)
+      .set({ ...data, lastMessageAt: new Date() })
+      .where(eq(whatsappConversations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getOrCreateWhatsappConversation(phoneNumber: string): Promise<WhatsappConversation> {
+    let conv = await this.getWhatsappConversationByPhone(phoneNumber);
+    if (!conv) {
+      // Try to find employee by phone number
+      const allEmployees = await this.getAllEmployees();
+      const employee = allEmployees.find(e => 
+        e.phone?.replace(/[^0-9]/g, '') === phoneNumber.replace(/[^0-9]/g, '') ||
+        e.whatsappNumber?.replace(/[^0-9]/g, '') === phoneNumber.replace(/[^0-9]/g, '')
+      );
+      
+      conv = await this.createWhatsappConversation({
+        phoneNumber,
+        employeeId: employee?.id || null,
+        currentState: 'idle',
+        currentDepartment: null,
+        pendingData: null,
+        lastMessageAt: new Date(),
+      });
+    }
+    return conv;
+  }
+
+  // WhatsApp Pending Approvals
+  async getWhatsappPendingApprovalByCode(code: string): Promise<WhatsappPendingApproval | undefined> {
+    const [approval] = await db.select().from(whatsappPendingApprovals)
+      .where(eq(whatsappPendingApprovals.approvalCode, code.toUpperCase()));
+    return approval;
+  }
+
+  async getPendingWhatsappApprovals(): Promise<WhatsappPendingApproval[]> {
+    return await db.select().from(whatsappPendingApprovals)
+      .where(eq(whatsappPendingApprovals.status, 'pending'))
+      .orderBy(desc(whatsappPendingApprovals.sentAt));
+  }
+
+  async getAllWhatsappApprovals(): Promise<WhatsappPendingApproval[]> {
+    return await db.select().from(whatsappPendingApprovals)
+      .orderBy(desc(whatsappPendingApprovals.sentAt));
+  }
+
+  async createWhatsappPendingApproval(data: InsertWhatsappPendingApproval): Promise<WhatsappPendingApproval> {
+    const [created] = await db.insert(whatsappPendingApprovals).values(data).returning();
+    return created;
+  }
+
+  async updateWhatsappPendingApproval(id: string, data: Partial<WhatsappPendingApproval>): Promise<WhatsappPendingApproval | undefined> {
+    const [updated] = await db.update(whatsappPendingApprovals)
+      .set(data)
+      .where(eq(whatsappPendingApprovals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async generateApprovalCode(type: 'expense' | 'leave'): Promise<string> {
+    const prefix = type === 'expense' ? 'EXP' : 'LV';
+    const existing = await db.select({ approvalCode: whatsappPendingApprovals.approvalCode })
+      .from(whatsappPendingApprovals)
+      .where(sql`${whatsappPendingApprovals.approvalCode} LIKE ${prefix + '%'}`)
+      .orderBy(desc(whatsappPendingApprovals.createdAt));
+    
+    let maxNum = 0;
+    for (const e of existing) {
+      const num = parseInt(e.approvalCode.replace(prefix, ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+  }
+
+  // WhatsApp Inbound Messages
+  async createWhatsappInboundMessage(data: InsertWhatsappInboundMessage): Promise<WhatsappInboundMessage> {
+    const [created] = await db.insert(whatsappInboundMessages).values(data).returning();
+    return created;
+  }
+
+  async getWhatsappInboundMessages(limit = 100): Promise<WhatsappInboundMessage[]> {
+    return await db.select().from(whatsappInboundMessages)
+      .orderBy(desc(whatsappInboundMessages.createdAt))
+      .limit(limit);
   }
 }
 
