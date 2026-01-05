@@ -4124,12 +4124,19 @@ export class DatabaseStorage implements IStorage {
   async getOrCreateWhatsappConversation(phoneNumber: string): Promise<WhatsappConversation> {
     let conv = await this.getWhatsappConversationByPhone(phoneNumber);
     if (!conv) {
-      // Try to find employee by phone number
+      // Try to find employee by phone number - handle country codes
+      const incomingDigits = phoneNumber.replace(/[^0-9]/g, '');
+      const incomingLast10 = incomingDigits.slice(-10); // Last 10 digits (without country code)
+      
       const allEmployees = await this.getAllEmployees();
-      const employee = allEmployees.find(e => 
-        e.phone?.replace(/[^0-9]/g, '') === phoneNumber.replace(/[^0-9]/g, '') ||
-        e.whatsappNumber?.replace(/[^0-9]/g, '') === phoneNumber.replace(/[^0-9]/g, '')
-      );
+      const employee = allEmployees.find(e => {
+        const empPhone = e.phone?.replace(/[^0-9]/g, '') || '';
+        const empWhatsapp = e.whatsappNumber?.replace(/[^0-9]/g, '') || '';
+        const empPhoneLast10 = empPhone.slice(-10);
+        const empWhatsappLast10 = empWhatsapp.slice(-10);
+        
+        return empPhoneLast10 === incomingLast10 || empWhatsappLast10 === incomingLast10;
+      });
       
       conv = await this.createWhatsappConversation({
         phoneNumber,
