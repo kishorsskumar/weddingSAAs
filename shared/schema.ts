@@ -1810,6 +1810,9 @@ export const whatsappConversations = pgTable("whatsapp_conversations", {
   employeeId: varchar("employee_id").references(() => employees.id, { onDelete: 'set null' }),
   currentState: text("current_state").notNull().default('idle'), // idle, menu, expense_purpose, expense_amount, expense_photo, leave_start, leave_end, leave_reason, awaiting_approval_response
   currentDepartment: text("current_department"), // accounts, hr
+  activeIntent: text("active_intent"), // expense, leave, status, general - AI detected intent
+  intentContext: jsonb("intent_context"), // Context for AI conversation (extracted amounts, dates, etc.)
+  conversationHistory: jsonb("conversation_history"), // Recent messages for AI context
   pendingData: jsonb("pending_data"), // Temporary data being collected (purpose, amount, dates, etc.)
   lastMessageAt: timestamp("last_message_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
