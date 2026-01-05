@@ -4031,6 +4031,8 @@ export class DatabaseStorage implements IStorage {
           eventDate: event.date,
           subEventName: event.title || event.type,
           venue: event.venue,
+          weddingPlanner: event.planner || null,
+          stageManager: null,
           teamLead: null,
           productionTeamCount: null,
           florist: null,
@@ -4039,6 +4041,7 @@ export class DatabaseStorage implements IStorage {
           productionEndTime: null,
           dismantlingDateTime: null,
           dismantlingTeamLead: null,
+          groupLabel: null,
           sortOrder: 0,
           createdBy: null,
         });
