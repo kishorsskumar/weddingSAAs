@@ -141,8 +141,14 @@ export default function OakSales() {
   }, [pipelines, isSuperAdmin, isWeddingPlanner, user?.name]);
 
   useEffect(() => {
-    if (filteredPipelines.length > 0 && !selectedPipelineId) {
+    // Reset selectedPipelineId if it's not in the filtered list or if no selection exists
+    const isCurrentSelectionValid = selectedPipelineId && 
+      filteredPipelines.some(p => p.id === selectedPipelineId);
+    
+    if (filteredPipelines.length > 0 && !isCurrentSelectionValid) {
       setSelectedPipelineId(filteredPipelines[0].id);
+    } else if (filteredPipelines.length === 0) {
+      setSelectedPipelineId(null);
     }
   }, [filteredPipelines, selectedPipelineId]);
 
