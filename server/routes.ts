@@ -5065,6 +5065,71 @@ export async function registerRoutes(
     }
   });
 
+  // Sync missing employees to an existing draft payroll
+  app.post('/api/payroll-runs/:id/sync-employees', async (req, res) => {
+    try {
+      const run = await storage.getPayrollRun(req.params.id);
+      if (!run) {
+        return res.status(404).json({ error: 'Payroll run not found' });
+      }
+      if (run.status === 'paid') {
+        return res.status(400).json({ error: 'Cannot modify paid payroll' });
+      }
+
+      const existingItems = await storage.getPayrollItemsByRunId(req.params.id);
+      const existingEmployeeIds = new Set(existingItems.map(item => item.employeeId));
+      
+      const allEmployees = await storage.getAllEmployees();
+      const excludedNames = ['oaksy ai', 'test employee', 'test'];
+      
+      // Find active employees not already in payroll
+      const missingEmployees = allEmployees.filter(emp => {
+        if (existingEmployeeIds.has(emp.id)) return false;
+        if (emp.isActive === false) return false;
+        const nameLower = emp.name.toLowerCase();
+        if (excludedNames.some(excluded => nameLower.includes(excluded))) return false;
+        return true;
+      });
+
+      if (missingEmployees.length === 0) {
+        return res.json({ message: 'All employees already in payroll', added: 0 });
+      }
+
+      let addedAmount = 0;
+      for (const emp of missingEmployees) {
+        const salary = parseFloat(emp.salary || '0');
+        const dailyRate = salary / 30;
+        const grossPay = dailyRate * 30;
+        const netPay = grossPay;
+        addedAmount += netPay;
+
+        await storage.createPayrollItem({
+          payrollRunId: req.params.id,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          monthlySalary: salary.toFixed(2),
+          daysWorked: 30,
+          dailyRate: dailyRate.toFixed(2),
+          grossPay: grossPay.toFixed(2),
+          deductions: '0.00',
+          netPay: netPay.toFixed(2),
+        });
+      }
+
+      const newTotal = parseFloat(run.totalAmount || '0') + addedAmount;
+      await storage.updatePayrollRun(req.params.id, { totalAmount: newTotal.toFixed(2) });
+
+      res.json({ 
+        message: `Added ${missingEmployees.length} employee(s) to payroll`,
+        added: missingEmployees.length,
+        employees: missingEmployees.map(e => e.name)
+      });
+    } catch (error) {
+      console.error('Sync employees error:', error);
+      res.status(400).json({ error: 'Failed to sync employees' });
+    }
+  });
+
   app.patch('/api/payroll-runs/:id', async (req, res) => {
     try {
       const run = await storage.getPayrollRun(req.params.id);

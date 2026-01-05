@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload, Send } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, UserMinus, Calendar, CheckCircle, DollarSign, Wallet, Building2, Download, Save, X, ClipboardCheck, Clock, CheckCircle2, XCircle, Receipt, Banknote, FileBarChart, TrendingUp, AlertCircle, Loader2, Copy, Key, BookOpen, Check, ChevronsUpDown, Upload, Send, RefreshCw } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUploader } from "@/components/PhotoUploader";
 import { format, parseISO } from "date-fns";
@@ -1156,6 +1156,31 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
     },
   });
 
+  const syncEmployeesMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      const res = await fetch(`/api/payroll-runs/${runId}/sync-employees`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to sync employees');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/payroll-runs'] });
+      if (data.added > 0) {
+        toast({ title: `Added ${data.added} new employee(s)`, description: data.employees?.join(', ') });
+      } else {
+        toast({ title: 'All employees already in payroll' });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
                       'July', 'August', 'September', 'October', 'November', 'December'];
   
@@ -1353,6 +1378,16 @@ function PayrollSection({ currentEmployees, allEmployees, totalCurrentSalary, is
                       </Button>
                       {selectedRun.status === 'draft' && isAdmin && (
                         <>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => syncEmployeesMutation.mutate(selectedRun.id)}
+                            disabled={syncEmployeesMutation.isPending}
+                            data-testid="button-sync-employees"
+                          >
+                            <RefreshCw className={cn("h-4 w-4 mr-1", syncEmployeesMutation.isPending && "animate-spin")} /> 
+                            {syncEmployeesMutation.isPending ? 'Syncing...' : 'Sync Employees'}
+                          </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
