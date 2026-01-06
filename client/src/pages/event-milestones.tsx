@@ -176,6 +176,24 @@ export default function EventMilestones() {
     },
   });
 
+  const isSuperAdmin = user?.role === 'superadmin';
+
+  const markEventCompleteMutation = useMutation({
+    mutationFn: async (eventId: string) => {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      if (!res.ok) throw new Error('Failed to mark event as complete');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/milestones/pending-by-planner'] });
+    },
+  });
+
   const formatDate = (dateStr: string) => {
     try {
       return format(parseISO(dateStr), 'dd/MM/yyyy');
@@ -643,6 +661,29 @@ export default function EventMilestones() {
               <RefreshCw className={cn("h-4 w-4", generateMilestonesMutation.isPending && "animate-spin")} />
               {generateMilestonesMutation.isPending ? 'Generating...' : 'Regenerate'}
             </Button>
+          )}
+          {isSuperAdmin && selectedEventId && selectedEvent?.status !== 'completed' && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => {
+                if (confirm('Mark this event as complete? This will close the event.')) {
+                  markEventCompleteMutation.mutate(selectedEventId);
+                }
+              }}
+              disabled={markEventCompleteMutation.isPending}
+              className="gap-2 bg-green-600 hover:bg-green-700"
+              data-testid="button-mark-event-complete"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              {markEventCompleteMutation.isPending ? 'Completing...' : 'Mark Complete'}
+            </Button>
+          )}
+          {selectedEvent?.status === 'completed' && (
+            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Event Completed
+            </Badge>
           )}
         </div>
       </div>

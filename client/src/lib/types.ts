@@ -10,6 +10,7 @@ export interface Event {
   salesValue: string;
   paymentReceived: string;
   cost: string;
+  status?: "active" | "completed";
   createdAt?: string;
 }
 
