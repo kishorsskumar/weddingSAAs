@@ -4054,49 +4054,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generateMonthlyPlanFromEvents(month: number, year: number): Promise<MonthlyProductionPlan[]> {
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-    
-    const monthEvents = await db.select().from(events)
-      .where(and(
-        gte(events.date, startDate.toISOString().split('T')[0]),
-        lte(events.date, endDate.toISOString().split('T')[0])
-      ))
-      .orderBy(events.date);
-
+    // Just return existing entries - don't auto-sync from events table
+    // This prevents duplicate entries when data is manually imported from Excel
     const existingEntries = await this.getMonthlyProductionPlan(month, year);
-    const existingEventIds = new Set(existingEntries.map(e => e.eventId));
-
-    const newEntries: MonthlyProductionPlan[] = [];
-    
-    for (const event of monthEvents) {
-      if (!existingEventIds.has(event.id)) {
-        const entry = await this.createMonthlyProductionPlanEntry({
-          eventId: event.id,
-          month,
-          year,
-          eventDate: event.date,
-          subEventName: event.title || event.type,
-          venue: event.venue,
-          weddingPlanner: event.planner || null,
-          stageManager: null,
-          teamLead: null,
-          productionTeamCount: null,
-          florist: null,
-          loadingStartDateTime: null,
-          productionStartTime: null,
-          productionEndTime: null,
-          dismantlingDateTime: null,
-          dismantlingTeamLead: null,
-          groupLabel: null,
-          sortOrder: 0,
-          createdBy: null,
-        });
-        newEntries.push(entry);
-      }
-    }
-
-    return [...existingEntries, ...newEntries].sort((a, b) => 
+    return existingEntries.sort((a, b) => 
       new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
     );
   }
