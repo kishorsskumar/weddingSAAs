@@ -192,19 +192,27 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
 }
 
 // Detect if message is a vendor payment submission
-// Simplified: triggers on "vendor payment" or "vendor payments"
+// Simplified: triggers on "vendor payment", "vendor payments", or "vendor pending payment"
 // Format: vendor name, amount (optional event)
 // Example: "vendor payments\nFlower shop 5000" or "vendor payment flower shop 5000 sharma wedding"
 function detectPendingVendorPayment(text: string): { isPending: boolean; vendorName?: string; amount?: number; eventName?: string } {
   const lowerText = text.toLowerCase().trim();
   
-  // Trigger on "vendor payment" or "vendor payments" (with or without "pending")
-  if (!lowerText.includes('vendor payment')) {
+  // Trigger on variations: "vendor payment(s)", "pending vendor payment", "vendor pending payment"
+  const triggerPatterns = [
+    /vendor\s+payment[s]?/i,
+    /pending\s+vendor\s+payment[s]?/i,
+    /vendor\s+pending\s+payment[s]?/i,
+  ];
+  
+  const hasTrigger = triggerPatterns.some(p => p.test(lowerText));
+  if (!hasTrigger) {
     return { isPending: false };
   }
   
   // Remove the trigger phrase to parse the rest
   let remainingText = text
+    .replace(/vendor\s+pending\s+payment[s]?/gi, '')
     .replace(/pending\s+vendor\s+payment[s]?/gi, '')
     .replace(/vendor\s+payment[s]?/gi, '')
     .trim();
