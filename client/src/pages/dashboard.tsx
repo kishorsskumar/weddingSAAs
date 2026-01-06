@@ -341,8 +341,8 @@ export default function Dashboard() {
                   <Users className="h-4 w-4 text-chart-3 hidden sm:block" />
                 </CardHeader>
                 <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                  <div className="text-xl sm:text-2xl font-bold">12</div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">+2 new today</p>
+                  <div className="text-xl sm:text-2xl font-bold">{activeLeads.length}</div>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">{newLeadsToday > 0 ? `+${newLeadsToday} new today` : 'From Oak Sales'}</p>
                 </CardContent>
               </Card>
             </motion.div>
