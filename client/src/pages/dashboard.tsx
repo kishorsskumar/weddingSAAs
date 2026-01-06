@@ -167,10 +167,13 @@ export default function Dashboard() {
     enabled: isAdmin,
   });
 
-  // Calculate active leads (deals not in Won or Lost stages)
+  // Calculate active leads (deals not in Closed Won or Closed Lost stages)
   const activeLeads = useMemo(() => {
     const closedStageIds = salesStages
-      .filter((s: any) => s.name?.toLowerCase() === 'won' || s.name?.toLowerCase() === 'lost' || s.name?.toLowerCase() === 'closed')
+      .filter((s: any) => {
+        const name = s.name?.toLowerCase() || '';
+        return name.includes('won') || name.includes('lost') || name === 'closed';
+      })
       .map((s: any) => s.id);
     return salesDeals.filter((d: any) => !closedStageIds.includes(d.stageId));
   }, [salesDeals, salesStages]);
