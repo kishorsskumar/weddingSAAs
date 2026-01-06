@@ -19,6 +19,9 @@ import {
   MapPin,
   Maximize2,
   Minimize2,
+  Send,
+  MessageCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +37,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Tooltip,
   TooltipContent,
@@ -100,6 +115,10 @@ export default function MonthlyPlan() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [whatsappCaption, setWhatsappCaption] = useState("");
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
   
@@ -126,6 +145,84 @@ export default function MonthlyPlan() {
       return data.map((u: any) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
     },
   });
+
+  interface Employee {
+    id: string;
+    name: string;
+    phone: string | null;
+    department: string | null;
+    designation: string | null;
+  }
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ["/api/employees"],
+    queryFn: async () => {
+      const res = await fetch("/api/employees", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isSuperadmin || user?.role === 'admin',
+  });
+
+  const employeesWithPhone = useMemo(() => 
+    employees.filter(e => e.phone), 
+    [employees]
+  );
+
+  const filteredEmployees = useMemo(() => {
+    if (!employeeSearchQuery.trim()) return employeesWithPhone;
+    const search = employeeSearchQuery.toLowerCase();
+    return employeesWithPhone.filter(e => 
+      e.name.toLowerCase().includes(search) ||
+      e.department?.toLowerCase().includes(search) ||
+      e.designation?.toLowerCase().includes(search)
+    );
+  }, [employeesWithPhone, employeeSearchQuery]);
+
+  const sendWhatsAppMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/monthly-plan/send-whatsapp", {
+        month,
+        year,
+        employeeIds: selectedEmployeeIds,
+        caption: whatsappCaption || undefined,
+      });
+    },
+    onSuccess: async (response) => {
+      const data = await response.json();
+      toast({ 
+        title: "Monthly Plan Sent", 
+        description: data.message 
+      });
+      setWhatsappDialogOpen(false);
+      setSelectedEmployeeIds([]);
+      setWhatsappCaption("");
+      setEmployeeSearchQuery("");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to send", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const toggleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployeeIds(prev => 
+      prev.includes(employeeId) 
+        ? prev.filter(id => id !== employeeId)
+        : [...prev, employeeId]
+    );
+  };
+
+  const selectAllEmployees = () => {
+    if (selectedEmployeeIds.length === filteredEmployees.length) {
+      setSelectedEmployeeIds([]);
+    } else {
+      setSelectedEmployeeIds(filteredEmployees.map(e => e.id));
+    }
+  };
 
   const filteredSuggestions = useMemo(() => {
     if (!editingCell || !editValue.trim()) return [];
@@ -633,6 +730,18 @@ export default function MonthlyPlan() {
             <Download className="h-4 w-4" />
             Download PDF
           </Button>
+          {(isSuperadmin || user?.role === 'admin') && employeesWithPhone.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setWhatsappDialogOpen(true)}
+              className="h-9 gap-2 border-green-500 text-green-600 hover:bg-green-50"
+              data-testid="button-send-whatsapp"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Send via WhatsApp
+            </Button>
+          )}
           {isSuperadmin && (
             <Button
               variant="outline"
@@ -1084,6 +1193,124 @@ export default function MonthlyPlan() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={whatsappDialogOpen} onOpenChange={setWhatsappDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5 text-green-600" />
+              Send Monthly Plan via WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              Send the {format(currentDate, "MMMM yyyy")} production plan PDF to selected employees.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Select Employees</Label>
+              <div className="mt-2 space-y-2">
+                <Input
+                  placeholder="Search employees..."
+                  value={employeeSearchQuery}
+                  onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                  className="h-9"
+                  data-testid="input-employee-search"
+                />
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>{selectedEmployeeIds.length} selected</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={selectAllEmployees}
+                    className="h-7 text-xs"
+                    data-testid="button-select-all"
+                  >
+                    {selectedEmployeeIds.length === filteredEmployees.length ? "Deselect All" : "Select All"}
+                  </Button>
+                </div>
+                <ScrollArea className="h-[200px] border rounded-md p-2">
+                  {filteredEmployees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No employees with phone numbers found
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {filteredEmployees.map((employee) => (
+                        <div
+                          key={employee.id}
+                          className={cn(
+                            "flex items-center gap-3 p-2 rounded-md cursor-pointer hover:bg-gray-50 transition-colors",
+                            selectedEmployeeIds.includes(employee.id) && "bg-green-50"
+                          )}
+                          onClick={() => toggleEmployeeSelection(employee.id)}
+                          data-testid={`employee-item-${employee.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedEmployeeIds.includes(employee.id)}
+                            onCheckedChange={() => toggleEmployeeSelection(employee.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{employee.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {employee.department || employee.designation || employee.phone}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="caption">Message (optional)</Label>
+              <Textarea
+                id="caption"
+                placeholder="Add a custom message..."
+                value={whatsappCaption}
+                onChange={(e) => setWhatsappCaption(e.target.value)}
+                className="mt-2 resize-none"
+                rows={2}
+                data-testid="input-caption"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWhatsappDialogOpen(false);
+                setSelectedEmployeeIds([]);
+                setWhatsappCaption("");
+                setEmployeeSearchQuery("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => sendWhatsAppMutation.mutate()}
+              disabled={selectedEmployeeIds.length === 0 || sendWhatsAppMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-send"
+            >
+              {sendWhatsAppMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send to {selectedEmployeeIds.length} Employee{selectedEmployeeIds.length !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
