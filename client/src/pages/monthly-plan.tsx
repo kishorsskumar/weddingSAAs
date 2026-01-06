@@ -413,7 +413,7 @@ export default function MonthlyPlan() {
     doc.setFillColor(201, 169, 97);
     doc.rect(0, 28, pageWidth, 3, "F");
     
-    // Add logo image
+    // Add logo image with correct aspect ratio
     try {
       const img = new Image();
       img.crossOrigin = "anonymous";
@@ -422,7 +422,11 @@ export default function MonthlyPlan() {
         img.onerror = reject;
         img.src = logoWhite;
       });
-      doc.addImage(img, "PNG", 10, 4, 50, 20);
+      // Calculate proper dimensions maintaining aspect ratio
+      const logoHeight = 18; // Fixed height in mm
+      const aspectRatio = img.width / img.height;
+      const logoWidth = logoHeight * aspectRatio;
+      doc.addImage(img, "PNG", 10, 5, logoWidth, logoHeight);
     } catch (e) {
       // Fallback to text if logo fails
       doc.setTextColor(255, 255, 255);
