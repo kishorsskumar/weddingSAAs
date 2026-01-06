@@ -449,15 +449,18 @@ export default function MonthlyPlan() {
     let startY = 38;
     
     groupedEntries.forEach((group, groupIndex) => {
+      // Calculate exact table width from column widths
+      const tableWidth = 17 + 32 + 28 + 22 + 20 + 12 + 18 + 24 + 24 + 24 + 24 + 18; // 263mm
+      
       if (group.label) {
         if (startY > pageHeight - 30) {
           doc.addPage();
           startY = 20;
         }
         
-        // Match table margins (8mm on each side)
+        // Match exact table width
         doc.setFillColor(74, 122, 37);
-        doc.roundedRect(8, startY - 5, pageWidth - 16, 8, 1, 1, "F");
+        doc.roundedRect(8, startY - 5, tableWidth, 8, 1, 1, "F");
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
