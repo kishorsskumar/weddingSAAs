@@ -57,6 +57,7 @@ Preferred communication style: Simple, everyday language.
 - **QR Payment Request System:** Employee QR code submission for payments, Kishor approval/payment flow with screenshot collection, event assignment, automatic daybook recording.
 - **Income Submission System:** Employee submits payment received screenshots with text like "Income from [client]" or "Bank transfer from [client]", Kishor approves with event assignment, automatic daybook recording as income.
 - **Monthly Production Plan:** Macro-level scheduling with inline editing, auto-sync from events, PDF export.
+  - **PDF Settings (for single-page fit):** A4 landscape, fontSize: 7pt, cellPadding: 2.5, minCellHeight: 8mm, 13 columns with optimized widths (16+30+26+18+18+20+12+18+24+24+24+24+20 = 274mm), margins: 8mm
 - **Leave Tracker (Oak HR):** Comprehensive leave monitoring, statistics, manual entry, status management.
 
 ## External Dependencies
