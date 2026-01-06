@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { parseTransactionScreenshot } from "./transaction-scanner";
+import { sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
+import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { 
   insertUserSchema,
   insertRoleSchema,
@@ -8930,6 +8932,80 @@ Respond with a JSON array only, no markdown formatting.`;
       res.json({ success: true });
     } catch (error: any) {
       console.error('[Monthly Plan] Delete error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/monthly-plan/send-whatsapp', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (!isWhatsAppConfigured()) {
+      return res.status(400).json({ error: 'WhatsApp is not configured' });
+    }
+
+    try {
+      const { month, year, employeeIds, caption } = req.body;
+
+      if (!month || !year || !employeeIds || !Array.isArray(employeeIds) || employeeIds.length === 0) {
+        return res.status(400).json({ error: 'Month, year, and employeeIds are required' });
+      }
+
+      const entries = await storage.getMonthlyProductionPlan(month, year);
+      if (entries.length === 0) {
+        return res.status(400).json({ error: 'No entries found for the selected month' });
+      }
+
+      const pdfBuffer = generateMonthlyPlanPDF(entries, month, year);
+      
+      const objectStorage = new ObjectStorageService();
+      const timestamp = Date.now();
+      const filename = `monthly-plan/Oakstreet_Production_Plan_${year}_${month}_${timestamp}.pdf`;
+      const pdfUrl = await objectStorage.uploadPublicBuffer(pdfBuffer, filename, 'application/pdf');
+
+      const allEmployees = await storage.getAllEmployees();
+      const selectedEmployees = allEmployees.filter(e => 
+        employeeIds.includes(e.id) && e.phone
+      );
+
+      if (selectedEmployees.length === 0) {
+        return res.status(400).json({ error: 'No valid employees with phone numbers found' });
+      }
+
+      const results: { employeeId: string; name: string; success: boolean; error?: string }[] = [];
+      const monthName = new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      const messageCaption = caption || `Oakstreet Events - Monthly Production Plan for ${monthName}`;
+
+      for (const employee of selectedEmployees) {
+        const result = await sendWhatsAppMediaMessage(
+          employee.phone!,
+          pdfUrl,
+          messageCaption
+        );
+        results.push({
+          employeeId: employee.id,
+          name: employee.name,
+          success: result.success,
+          error: result.error,
+        });
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const failureCount = results.filter(r => !r.success).length;
+
+      res.json({
+        success: true,
+        message: `Sent to ${successCount} employee(s)${failureCount > 0 ? `, ${failureCount} failed` : ''}`,
+        results,
+        pdfUrl,
+      });
+    } catch (error: any) {
+      console.error('[Monthly Plan] Send WhatsApp error:', error);
       res.status(500).json({ error: error.message });
     }
   });

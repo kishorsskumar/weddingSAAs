@@ -198,6 +198,36 @@ export class ObjectStorageService {
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
   }
+
+  async uploadPublicBuffer(
+    buffer: Buffer,
+    filename: string,
+    contentType: string = "application/pdf"
+  ): Promise<string> {
+    const publicPaths = this.getPublicObjectSearchPaths();
+    if (publicPaths.length === 0) {
+      throw new Error("No public object search paths configured");
+    }
+    const publicDir = publicPaths[0];
+    const fullPath = `${publicDir}/${filename}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    await file.save(buffer, {
+      contentType,
+      resumable: false,
+    });
+    
+    const signedUrl = await signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec: 86400 * 7,
+    });
+    
+    return signedUrl;
+  }
 }
 
 function parseObjectPath(path: string): {
