@@ -448,62 +448,47 @@ export default function MonthlyPlan() {
     
     let startY = 38;
     
-    // Combine all entries into one table for cleaner layout
-    const allTableData: any[] = [];
-    
-    groupedEntries.forEach((group) => {
-      // Add group header row if exists
-      if (group.label) {
-        allTableData.push({
-          isHeader: true,
-          label: group.label,
-        });
-      }
-      
-      // Add event rows
-      group.entries.forEach(entry => {
-        allTableData.push({
-          isHeader: false,
-          data: [
-            format(new Date(entry.eventDate), "dd-MMM"),
-            entry.subEventName || "-",
-            entry.venue || "-",
-            entry.weddingPlanner || "-",
-            entry.teamLead || "-",
-            entry.florist || "-",
-            entry.productionStartTime || "-",
-            entry.productionEndTime || "-",
-            entry.dismantlingDateTime || "-",
-          ],
-          isComplete: entry.isComplete,
-        });
-      });
-    });
-
-    // Prepare body rows (excluding headers which will be handled separately)
-    const bodyRows = allTableData.filter(r => !r.isHeader).map(r => r.data);
+    // Combine all entries into one table for cleaner single-page layout
+    const allTableData = groupedEntries.flatMap(group => 
+      group.entries.map(entry => [
+        format(new Date(entry.eventDate), "dd-MMM"),
+        entry.subEventName || "-",
+        entry.venue || "-",
+        entry.weddingPlanner || "-",
+        entry.stageManager || "-",
+        entry.teamLead || "-",
+        entry.productionTeamCount?.toString() || "-",
+        entry.florist || "-",
+        entry.loadingStartDateTime || "-",
+        entry.productionStartTime || "-",
+        entry.productionEndTime || "-",
+        entry.dismantlingDateTime || "-",
+        entry.dismantlingTeamLead || "-",
+      ])
+    );
     
     autoTable(doc, {
       startY,
       head: [[
-        "Date", "Event", "Venue", "Planner", "Lead", "Florist", "Prod Start", "Prod End", "Dismantle"
+        "Date", "Event", "Venue", "Planner", "Stg Mgr", "Lead", "Team", "Florist",
+        "Loading", "Start", "End", "Dismantle", "Dis.Lead"
       ]],
-      body: bodyRows,
+      body: allTableData,
       theme: "grid",
       headStyles: {
         fillColor: [107, 153, 55],
         textColor: [255, 255, 255],
-        fontSize: 7,
+        fontSize: 5.5,
         fontStyle: "bold",
-        cellPadding: 1.2,
+        cellPadding: 1,
         halign: "center",
         valign: "middle",
         lineWidth: 0.1,
         lineColor: [80, 120, 45],
       },
       bodyStyles: { 
-        fontSize: 6.5, 
-        cellPadding: 1.2,
+        fontSize: 5.5, 
+        cellPadding: 1,
         lineWidth: 0.1,
         lineColor: [200, 200, 200],
         valign: "middle",
@@ -512,20 +497,24 @@ export default function MonthlyPlan() {
         fillColor: [248, 252, 245],
       },
       columnStyles: {
-        0: { cellWidth: 18, halign: "center" },
-        1: { cellWidth: 40 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 28 },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 30 },
-        7: { cellWidth: 30 },
-        8: { cellWidth: 30 },
+        0: { cellWidth: 14, halign: "center" },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 24 },
+        3: { cellWidth: 16 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 10, halign: "center" },
+        7: { cellWidth: 16 },
+        8: { cellWidth: 22 },
+        9: { cellWidth: 22 },
+        10: { cellWidth: 22 },
+        11: { cellWidth: 22 },
+        12: { cellWidth: 18 },
       },
       styles: {
         overflow: "ellipsize",
       },
-      margin: { left: 8, right: 8 },
+      margin: { left: 10, right: 10 },
     });
 
     const pageCount = doc.getNumberOfPages();
