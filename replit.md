@@ -52,7 +52,16 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Features
 - **Calendar Integration:** Google Calendar (active, two-way sync), Outlook (planned).
-- **Oaksy AI Assistant:** OpenAI GPT-4o integration, department-specific context, text/voice input, conversation history, context-aware responses.
+- **Oaksy AI Assistant:** Intelligent, flexible companion using OpenAI GPT-4o:
+  - **Role-Aware Responses:** Adapts to user role (Employee, Wedding Planner, Accountant, Superadmin)
+  - **Natural Language Understanding:** Uses AI to understand intent - no strict formats required
+  - **Flexible Amount Parsing:** Accepts "5k", "5 thousand", "1 lakh", "Rs 5000", "₹5000" etc.
+  - **Security:** Never shares sensitive data (salaries, profits) with non-superadmins
+  - **Capabilities by Role:**
+    - Employees: Expenses, leave requests, QR payments, status checks
+    - Wedding Planners (Fida/Femina): Vendor payments, event coordination, production planning
+    - Accountant: Financial queries, daybook entries, payment tracking
+    - Superadmin: Full business assistant with complete access
 - **Two-Way WhatsApp Communication:** Employee expense/leave requests, Superadmin approval workflow, dashboard inbox for management, Superadmin lead submission with AI extraction.
 - **QR Payment Request System:** Employee QR code submission for payments, Kishor approval/payment flow with screenshot collection, event assignment, automatic daybook recording.
 - **Income Submission System:** Employee submits payment received screenshots with text like "Income from [client]" or "Bank transfer from [client]", Kishor approves with event assignment, automatic daybook recording as income.

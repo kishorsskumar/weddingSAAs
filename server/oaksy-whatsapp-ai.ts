@@ -47,6 +47,9 @@ interface IntentContext {
   leaveType?: string;
   reason?: string;
   confirmed?: boolean;
+  // Vendor payment fields
+  vendorName?: string;
+  eventName?: string;
   // QR Payment specific fields
   qrPaymentCategory?: string;
   qrPaymentDescription?: string;
@@ -63,39 +66,57 @@ interface ConversationMessage {
   timestamp: number;
 }
 
-const OAKSY_SYSTEM_PROMPT = `You are Oaksy AI, a friendly and helpful HR companion for Oakstreet Events employees via WhatsApp. You help employees with:
+const OAKSY_SYSTEM_PROMPT = `You are Oaksy AI, the intelligent companion for Oakstreet Events. You are a versatile assistant who adapts to each user's role and needs.
 
-1. EXPENSE SUBMISSIONS: When employees share amounts (like "Rs.200", "₹500", "200", "1500/-") or describe expenses
-2. LEAVE REQUESTS: When employees mention "leave", "sick", "vacation", "time off", "holiday", etc.
-3. STATUS CHECKS: When employees ask about their pending requests
+YOUR ROLES (based on who you're talking to):
+- For EMPLOYEES: HR assistant, expense helper, leave manager
+- For WEDDING PLANNERS (Fida, Femina): Event coordinator, vendor liaison, production assistant
+- For ACCOUNTANTS: Financial assistant, daybook helper, payment tracker
+- For SUPERADMIN (Kishor): Full business assistant with complete access to all data
 
 PERSONALITY:
-- Warm, friendly, and supportive like a helpful colleague
-- Use simple language, occasionally with emojis
-- Be concise - this is WhatsApp, not email
-- Always acknowledge their message first
+- Warm, friendly, and professional like a trusted colleague
+- Use simple, conversational language with occasional emojis
+- Be flexible - understand what they mean, not just what they say
+- Be proactive - anticipate needs and suggest helpful actions
+- Keep responses concise for WhatsApp
 
-IMPORTANT RULES:
-1. When you detect an expense amount, ask what it's for
-2. When you detect a leave request, ask for dates and reason
-3. Always confirm before submitting: "Should I send this for approval?"
-4. After submission: "Thank you! I'll send this for approval. Sit back and relax 🌳"
-5. Keep responses short and conversational
+CAPABILITIES:
+1. EXPENSES & PAYMENTS: Help submit expenses, track vendor payments, record income
+2. LEAVE MANAGEMENT: Process leave requests, check balances, track approvals
+3. EVENT COORDINATION: Help with event details, production schedules, team assignments
+4. FINANCIAL QUERIES: Daybook entries, payment status, vendor management
+5. STATUS CHECKS: Any pending requests, approvals, or action items
+
+FLEXIBILITY GUIDELINES:
+- Understand natural language - don't require specific formats
+- If someone says "need to pay vendor" or "pending payment" or "vendor owes money" - understand it's about vendor payments
+- Parse amounts flexibly: "5000", "5k", "5 thousand", "Rs 5000", "₹5000" all mean 5000
+- Accept dates in any format: "tomorrow", "next Monday", "15th Jan", "15/1"
+- If unclear, ask a simple clarifying question
+
+SECURITY RULES (CRITICAL):
+- NEVER share salary details, profit margins, or financial summaries with non-superadmins
+- Employees can only see their own requests and data
+- Wedding planners can see event-related data for their assigned events
+- Only superadmin can see company-wide financial data
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "event_query" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null,
     "purpose": string or null,
+    "vendorName": string or null,
+    "eventName": string or null,
     "leaveType": "sick" | "casual" | "vacation" | "personal" | null,
     "startDate": "DD/MM/YYYY" or null,
     "endDate": "DD/MM/YYYY" or null,
     "reason": string or null
   },
-  "needsMoreInfo": ["purpose", "amount", "dates", "reason", "confirmation"] or [],
+  "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation"] or [],
   "isComplete": boolean,
-  "message": "Your friendly response to the user"
+  "message": "Your friendly, helpful response"
 }`;
 
 function normalizePhoneNumber(phone: string): string {
@@ -114,20 +135,37 @@ function normalizePhoneNumber(phone: string): string {
 }
 
 function extractAmount(text: string): number | null {
+  // Handle shorthand notations first: "5k" = 5000, "1 lakh" = 100000, "5 thousand" = 5000
+  const shorthandPatterns = [
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:lakh|lac|lakhs)/i, multiplier: 100000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:k|thousand)/i, multiplier: 1000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:cr|crore)/i, multiplier: 10000000 },
+  ];
+  
+  for (const { pattern, multiplier } of shorthandPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const baseAmount = parseFloat(match[1].replace(/,/g, ''));
+      const amount = baseAmount * multiplier;
+      if (amount > 0 && amount < 100000000) {
+        return amount;
+      }
+    }
+  }
+  
+  // Standard patterns
   const patterns = [
     /(?:Rs\.?|₹|INR)\s*([0-9,]+(?:\.[0-9]+)?)/i,
     /([0-9,]+(?:\.[0-9]+)?)\s*(?:Rs\.?|₹|INR|rupees?)/i,
     /([0-9,]+(?:\.[0-9]+)?)\s*\/-/,
-    /^([0-9,]+(?:\.[0-9]+)?)$/,
-    /^([0-9,]+(?:\.[0-9]+)?)\s+(?:for|to|towards)/i,
-    /^([0-9,]+(?:\.[0-9]+)?)\s+\w/i,
+    /([0-9,]+(?:\.[0-9]+)?)/,
   ];
   
   for (const pattern of patterns) {
     const match = text.match(pattern);
     if (match) {
       const amount = parseFloat(match[1].replace(/,/g, ''));
-      if (amount > 0 && amount < 10000000) {
+      if (amount > 0 && amount < 100000000) {
         return amount;
       }
     }
@@ -297,7 +335,9 @@ async function analyzeWithAI(
   message: string,
   context: IntentContext,
   conversationHistory: ConversationMessage[],
-  hasMedia: boolean
+  hasMedia: boolean,
+  userRole?: string,
+  userName?: string
 ): Promise<{
   intent: string;
   extractedData: Partial<IntentContext>;
@@ -308,20 +348,33 @@ async function analyzeWithAI(
   const recentHistory = conversationHistory.slice(-6);
   
   const historyText = recentHistory.map(m => 
-    `${m.role === 'user' ? 'Employee' : 'Oaksy'}: ${m.content}`
+    `${m.role === 'user' ? 'User' : 'Oaksy'}: ${m.content}`
   ).join('\n');
 
   const currentContext = context ? JSON.stringify(context) : '{}';
   
+  // Determine role context
+  let roleContext = 'Employee';
+  if (userRole === 'superadmin') {
+    roleContext = 'Superadmin (full access to all data)';
+  } else if (userRole === 'wedding_planner' || userName?.toLowerCase().includes('fida') || userName?.toLowerCase().includes('femina')) {
+    roleContext = 'Wedding Planner (can manage events, vendors, production)';
+  } else if (userRole === 'accountant') {
+    roleContext = 'Accountant (can manage finances, daybook)';
+  } else if (userRole === 'manager' || userRole === 'admin') {
+    roleContext = 'Manager (can view team data)';
+  }
+  
   const userPrompt = `Current conversation context: ${currentContext}
-Has receipt/image attached: ${hasMedia ? 'Yes' : 'No'}
+User: ${userName || 'Unknown'} (Role: ${roleContext})
+Has image attached: ${hasMedia ? 'Yes' : 'No'}
 
 Recent conversation:
 ${historyText}
 
-New message from employee: "${message}"
+New message: "${message}"
 
-Analyze this message and respond as Oaksy AI. Remember to be friendly and helpful.`;
+Understand the intent flexibly - don't require specific formats. Be helpful and conversational.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -346,7 +399,7 @@ Analyze this message and respond as Oaksy AI. Remember to be friendly and helpfu
       extractedData: {},
       needsMoreInfo: [],
       isComplete: false,
-      message: content || "Hi! I'm Oaksy, your HR companion. How can I help you today? 🌳"
+      message: content || "Hi! I'm Oaksy, your companion at Oakstreet Events. How can I help you today? 🌳"
     };
   } catch (error: any) {
     console.error('[Oaksy AI] Error:', error.message);
@@ -355,7 +408,7 @@ Analyze this message and respond as Oaksy AI. Remember to be friendly and helpfu
       extractedData: {},
       needsMoreInfo: [],
       isComplete: false,
-      message: "Hi! I'm Oaksy, your HR companion at Oakstreet Events. I can help you submit expenses or apply for leave. Just tell me what you need! 🌳"
+      message: "Hi! I'm Oaksy, your companion at Oakstreet Events. How can I help you? 🌳"
     };
   }
 }
@@ -1999,10 +2052,130 @@ export async function handleOaksyWhatsAppMessage(
       conversationHistory: [],
     });
 
-    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your HR companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n\n_Just tell me what you need!_`;
+    // Role-aware greeting
+    const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+    
+    if (isWeddingPlanner) {
+      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
+    }
+
+    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n\n_Just tell me what you need!_`;
   }
 
-  return `👋 Hi ${employee.name}! I'm Oaksy, your HR companion 🌳\n\n*Quick tips:*\n• Send an amount like "500" to submit expenses\n• Send QR code + "pay" for direct payment requests\n• Say "sick leave" or "vacation" to apply for leave\n• Type "status" to check your requests\n\n_How can I help you today?_`;
+  // Use AI to understand the message when no pattern matches
+  // Determine employee role based on name or job title
+  let employeeRole = 'employee';
+  if (employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina')) {
+    employeeRole = 'wedding_planner';
+  } else if (employee.jobTitle?.toLowerCase().includes('accountant')) {
+    employeeRole = 'accountant';
+  } else if (employee.jobTitle?.toLowerCase().includes('manager')) {
+    employeeRole = 'manager';
+  }
+  
+  const aiAnalysis = await analyzeWithAI(
+    messageText,
+    context,
+    history,
+    !!mediaUrl,
+    employeeRole,
+    employee.name
+  );
+
+  // Handle AI-detected vendor payment intent
+  if (aiAnalysis.intent === 'vendor_payment') {
+    const vendorName = aiAnalysis.extractedData.vendorName;
+    const amount = aiAnalysis.extractedData.amount || extractAmount(messageText);
+    const eventName = aiAnalysis.extractedData.eventName;
+    
+    if (vendorName && amount) {
+      // Got vendor and amount - create the pending payment entry
+      const requestCode = await storage.generateVendorPaymentCode();
+      
+      // Try to find the event if specified
+      let eventId: string | undefined;
+      let resolvedEventName = eventName;
+      
+      if (eventName) {
+        const events = await storage.getAllEvents();
+        const matchingEvent = events.find(e => 
+          e.title.toLowerCase().includes(eventName.toLowerCase()) ||
+          (e.customer && e.customer.toLowerCase().includes(eventName.toLowerCase()))
+        );
+        if (matchingEvent) {
+          eventId = matchingEvent.id;
+          resolvedEventName = matchingEvent.title;
+        }
+      }
+      
+      await storage.createPendingVendorPayment({
+        requestCode,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeePhone: employee.phone || normalizedPhone,
+        vendorName,
+        amount: amount.toString(),
+        eventId: eventId || null,
+        eventName: resolvedEventName || null,
+        description: messageText,
+        status: 'pending',
+      });
+
+      await notifyKishorPendingVendorPayment(
+        requestCode,
+        employee.name,
+        vendorName,
+        amount,
+        resolvedEventName || 'Not specified'
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      return `✅ *Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Kishor will be notified._ 🌳`;
+    } else if (vendorName) {
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_vendor_payment',
+        intentContext: { 
+          vendorPaymentVendor: vendorName,
+          vendorPaymentEvent: eventName,
+        },
+        conversationHistory: history,
+        currentState: 'awaiting_vendor_amount',
+      });
+
+      return `📋 Vendor payment for *${vendorName}*\n\nWhat's the amount? 💰`;
+    } else {
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_vendor_payment',
+        intentContext: {},
+        conversationHistory: history,
+        currentState: 'awaiting_vendor_details',
+      });
+
+      return aiAnalysis.message || `📋 *Vendor Payment*\n\nWhich vendor and how much?\n\n_Example: "Flower shop 5000"_`;
+    }
+  }
+
+  // Return AI's response for other intents
+  if (aiAnalysis.message && aiAnalysis.intent !== 'general') {
+    history.push({ role: 'assistant', content: aiAnalysis.message, timestamp: Date.now() });
+    await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
+    return aiAnalysis.message;
+  }
+
+  // Default greeting with role-aware tips
+  const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+  
+  if (isWeddingPlanner) {
+    return `👋 Hi ${employee.name}! I'm Oaksy 🌳\n\n*Quick tips:*\n• "vendor payment [name] [amount]" for payments\n• Send receipt photo for expenses\n• Say "leave" to apply for time off\n\n_How can I help?_`;
+  }
+
+  return `👋 Hi ${employee.name}! I'm Oaksy 🌳\n\n*Quick tips:*\n• Send an amount like "500" for expenses\n• Send QR code for payment requests\n• Say "leave" to apply for time off\n\n_How can I help you today?_`;
 }
 
 async function handleSuperadminApproval(message: string, fromPhone: string): Promise<string> {
