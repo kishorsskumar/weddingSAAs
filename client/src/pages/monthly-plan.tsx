@@ -17,6 +17,8 @@ import {
   X,
   Users,
   MapPin,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +99,7 @@ export default function MonthlyPlan() {
   const [groupLabelValue, setGroupLabelValue] = useState("");
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteIndex, setAutocompleteIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<HTMLDivElement>(null);
   
@@ -556,7 +559,12 @@ export default function MonthlyPlan() {
   }, [entries]);
 
   return (
-    <div className="h-full flex flex-col gap-4 p-4 bg-gradient-to-br from-stone-50 to-amber-50/30">
+    <div className={cn(
+      "flex flex-col gap-4 p-4 bg-gradient-to-br from-stone-50 to-amber-50/30",
+      isFullscreen 
+        ? "fixed inset-0 z-50 h-screen overflow-auto" 
+        : "h-full"
+    )}>
       <motion.div
         className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"
         initial={{ opacity: 0, y: -10 }}
@@ -625,6 +633,27 @@ export default function MonthlyPlan() {
             <Download className="h-4 w-4" />
             Download PDF
           </Button>
+          {isSuperadmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-9 gap-2"
+              data-testid="button-fullscreen"
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-4 w-4" />
+                  Exit Fullscreen
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-4 w-4" />
+                  Fullscreen Edit
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </motion.div>
 
