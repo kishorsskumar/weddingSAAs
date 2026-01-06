@@ -191,51 +191,75 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
   return { isIncome: false, type: 'client_payment' };
 }
 
-// Detect if message is a pending vendor payment submission
+// Detect if message is a vendor payment submission
+// Simplified: triggers on "vendor payment" or "vendor payments"
+// Format: vendor name, amount (optional event)
+// Example: "vendor payments\nFlower shop 5000" or "vendor payment flower shop 5000 sharma wedding"
 function detectPendingVendorPayment(text: string): { isPending: boolean; vendorName?: string; amount?: number; eventName?: string } {
-  const lowerText = text.toLowerCase();
+  const lowerText = text.toLowerCase().trim();
   
-  // Look for "pending payment" or "pending payments" heading
-  if (!lowerText.includes('pending payment')) {
+  // Trigger on "vendor payment" or "vendor payments" (with or without "pending")
+  if (!lowerText.includes('vendor payment')) {
     return { isPending: false };
   }
   
-  // Parse the message structure - looking for patterns like:
-  // "Pending payment for [vendor] Rs.[amount] for [event]"
-  // "Pending payments\nVendor: XYZ\nAmount: 5000\nEvent: Wedding"
-  // "Pending payment - vendor name - 5000 - event name"
+  // Remove the trigger phrase to parse the rest
+  let remainingText = text
+    .replace(/pending\s+vendor\s+payment[s]?/gi, '')
+    .replace(/vendor\s+payment[s]?/gi, '')
+    .trim();
   
-  // Extract vendor name
-  let vendorName: string | undefined;
-  const vendorPatterns = [
-    /vendor[\s:]+([^\n\-,₹]+)/i,
-    /for\s+([^₹\d\n]+?)(?:\s+(?:rs|₹|amount|event)|\d|$)/i,
-    /pending\s+payment[s]?\s*[:\-]?\s*([^\n₹\d]+?)(?:\s+(?:rs|₹|amount)|\d|$)/i,
-  ];
-  for (const pattern of vendorPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      vendorName = match[1].replace(/^[\s\-:]+|[\s\-:]+$/g, '').trim();
-      if (vendorName && vendorName.length > 1) break;
-    }
+  // If nothing after trigger, just starting the flow
+  if (!remainingText) {
+    return { isPending: true };
   }
   
-  // Extract amount
-  const amount = extractAmount(text);
+  // Parse simple format: "vendor name amount [event]"
+  // Examples:
+  // "Flower shop 5000"
+  // "Flower shop 5000 sharma wedding"
+  // "Ajish Flowers 25000 Megha Wedding"
   
-  // Extract event name
+  // Extract amount (any number, no Rs prefix needed)
+  const amount = extractAmount(remainingText);
+  
+  // Extract vendor name (text before the amount)
+  let vendorName: string | undefined;
   let eventName: string | undefined;
-  const eventPatterns = [
-    /event[\s:]+([^\n]+)/i,
-    /for\s+event[\s:]+([^\n]+)/i,
-    /(?:wedding|function|party|ceremony)[\s:]+([^\n]+)/i,
-  ];
-  for (const pattern of eventPatterns) {
-    const match = text.match(pattern);
-    if (match && match[1]) {
-      eventName = match[1].trim();
-      break;
+  
+  if (amount) {
+    // Find the amount in text and split around it
+    const amountMatch = remainingText.match(/(\d{1,3}(?:[,\d]*)?(?:\.\d+)?)/);
+    if (amountMatch) {
+      const amountIndex = remainingText.indexOf(amountMatch[0]);
+      const beforeAmount = remainingText.substring(0, amountIndex).trim();
+      const afterAmount = remainingText.substring(amountIndex + amountMatch[0].length).trim();
+      
+      // Clean up vendor name (remove Rs, ₹, etc.)
+      vendorName = beforeAmount
+        .replace(/[\-:,]+$/g, '')
+        .replace(/^[\-:,]+/g, '')
+        .replace(/\brs\.?\s*$/gi, '')
+        .replace(/₹\s*$/g, '')
+        .trim();
+      
+      // Event name is anything after the amount
+      if (afterAmount && afterAmount.length > 1) {
+        eventName = afterAmount
+          .replace(/^[\-:,\s]+/g, '')
+          .replace(/\bfor\s+/gi, '')
+          .replace(/\bevent[\s:]+/gi, '')
+          .trim();
+      }
     }
+  } else {
+    // No amount found - treat entire text as vendor name
+    vendorName = remainingText.replace(/^[\-:,\s]+/g, '').trim();
+  }
+  
+  // Clean up vendor name
+  if (vendorName && vendorName.length < 2) {
+    vendorName = undefined;
   }
   
   return { 
@@ -1316,9 +1340,9 @@ export async function handleOaksyWhatsAppMessage(
         currentState: 'awaiting_vendor_amount',
       });
 
-      return `📋 Pending payment for *${vendorName}*\n\nWhat's the amount? 💰`;
+      return `📋 Vendor payment for *${vendorName}*\n\nWhat's the amount? 💰`;
     } else {
-      // Got "pending payment" but no vendor - ask for details
+      // Got "vendor payment" but no vendor - ask for details
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'pending_vendor_payment',
         intentContext: {},
@@ -1326,7 +1350,7 @@ export async function handleOaksyWhatsAppMessage(
         currentState: 'awaiting_vendor_details',
       });
 
-      return `📋 *Pending Vendor Payment*\n\nPlease provide:\n• Vendor name\n• Amount\n• Event (optional)\n\n_Example: "Vendor: Flower shop Rs.5000 Event: Sharma Wedding"_`;
+      return `📋 *Vendor Payment*\n\nSend: Vendor name, Amount\n\n_Example: "Flower shop 5000"_\n_Or with event: "Flower shop 5000 Sharma Wedding"_`;
     }
   }
 
@@ -1558,7 +1582,7 @@ export async function handleOaksyWhatsAppMessage(
   if (conversation.currentState === 'awaiting_vendor_amount') {
     const amount = extractAmount(messageText);
     if (!amount) {
-      return `Please provide the payment amount. Example: "₹5000" or "5000"`;
+      return `Please send the amount. Example: "5000"`;
     }
     
     const vendorContext = context as any;
@@ -1618,27 +1642,52 @@ export async function handleOaksyWhatsAppMessage(
 
   // Handle pending vendor payment state - awaiting full details
   if (conversation.currentState === 'awaiting_vendor_details') {
-    // Try to parse full details from message
-    const parsedDetails = detectPendingVendorPayment(messageText);
-    const amount = parsedDetails.amount || extractAmount(messageText);
+    // Parse format: "vendor name amount [event]"
+    // Example: "Flower shop 5000" or "Flower shop 5000 Sharma Wedding"
+    const amount = extractAmount(messageText);
     
-    // Try to extract vendor name if not detected
-    let vendorName = parsedDetails.vendorName;
-    if (!vendorName) {
-      // Simple extraction - first part before any number
+    let vendorName: string | undefined;
+    let eventName: string | undefined;
+    
+    if (amount) {
+      // Find the amount in text and split around it
+      const amountMatch = messageText.match(/(\d{1,3}(?:[,\d]*)?(?:\.\d+)?)/);
+      if (amountMatch) {
+        const amountIndex = messageText.indexOf(amountMatch[0]);
+        const beforeAmount = messageText.substring(0, amountIndex).trim();
+        const afterAmount = messageText.substring(amountIndex + amountMatch[0].length).trim();
+        
+        // Vendor name is before the amount
+        vendorName = beforeAmount
+          .replace(/[\-:,]+$/g, '')
+          .replace(/^[\-:,]+/g, '')
+          .replace(/\brs\.?\s*$/gi, '')
+          .replace(/₹\s*$/g, '')
+          .trim();
+        
+        // Event name is anything after the amount
+        if (afterAmount && afterAmount.length > 1) {
+          eventName = afterAmount
+            .replace(/^[\-:,\s]+/g, '')
+            .replace(/\bfor\s+/gi, '')
+            .replace(/\bevent[\s:]+/gi, '')
+            .trim();
+        }
+      }
+    } else {
+      // No amount - treat first part as vendor name
       const vendorMatch = messageText.match(/^([^₹\d]+)/);
       if (vendorMatch) {
         vendorName = vendorMatch[1].replace(/^[\s\-:]+|[\s\-:]+$/g, '').trim();
       }
     }
     
-    if (!vendorName || !amount) {
-      return `❌ I need both vendor name and amount.\n\n*Please send like:*\n"Flower shop Rs.5000"\nor\n"Vendor: ABC Caterers, Amount: 25000"`;
+    if (!vendorName || vendorName.length < 2 || !amount) {
+      return `❌ I need both vendor name and amount.\n\n_Example: "Flower shop 5000"_`;
     }
     
     // Create the pending payment entry
     const requestCode = await storage.generateVendorPaymentCode();
-    const eventName = parsedDetails.eventName;
     
     // Try to find the event if specified
     let eventId: string | undefined;
