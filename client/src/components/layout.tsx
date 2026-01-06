@@ -465,10 +465,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b h-14 flex items-center justify-between px-4">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b h-14 flex items-center justify-between px-4">
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
+            <Button variant="ghost" size="icon" className="text-sidebar-foreground">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -476,6 +476,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavContent />
           </SheetContent>
         </Sheet>
+        <img src={logo} alt="Oakstreet Events" className="h-8 w-auto" />
         <NotificationBell />
       </div>
 
