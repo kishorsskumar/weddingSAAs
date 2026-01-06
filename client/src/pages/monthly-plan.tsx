@@ -484,40 +484,53 @@ export default function MonthlyPlan() {
       autoTable(doc, {
         startY,
         head: [[
-          "Date", "Event", "Venue", "Planner", "Coordinator", "Lead", "Count", "Florist",
+          "Date", "Event", "Venue", "Planner", "Lead", "Team", "Florist",
           "Loading", "Prod Start", "Prod End", "Dismantle", "Dis.Lead",
         ]],
-        body: tableData,
+        body: tableData.map(row => [
+          row[0], row[1], row[2], row[3], row[5], row[6], row[7],
+          row[8], row[9], row[10], row[11], row[12],
+        ]),
         theme: "grid",
+        tableWidth: "auto",
         headStyles: {
           fillColor: [107, 153, 55],
           textColor: [255, 255, 255],
-          fontSize: 7,
+          fontSize: 6.5,
           fontStyle: "bold",
-          cellPadding: 2,
+          cellPadding: 1.5,
           halign: "center",
+          valign: "middle",
+          lineWidth: 0.1,
+          lineColor: [80, 120, 45],
         },
         bodyStyles: { 
-          fontSize: 7, 
-          cellPadding: 2,
+          fontSize: 6.5, 
+          cellPadding: 1.5,
+          lineWidth: 0.1,
+          lineColor: [200, 200, 200],
+          valign: "middle",
         },
         alternateRowStyles: {
-          fillColor: [245, 250, 240],
+          fillColor: [248, 252, 245],
         },
         columnStyles: {
-          0: { cellWidth: 18, halign: "center" },
-          1: { cellWidth: 28 },
-          2: { cellWidth: 22 },
-          3: { cellWidth: 20 },
-          4: { cellWidth: 22 },
-          5: { cellWidth: 18 },
-          6: { cellWidth: 12, halign: "center" },
-          7: { cellWidth: 18 },
-          8: { cellWidth: 22 },
-          9: { cellWidth: 22 },
-          10: { cellWidth: 22 },
-          11: { cellWidth: 22 },
-          12: { cellWidth: 18 },
+          0: { cellWidth: 17, halign: "center" },
+          1: { cellWidth: 32 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 22 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 12, halign: "center" },
+          6: { cellWidth: 18 },
+          7: { cellWidth: 24 },
+          8: { cellWidth: 24 },
+          9: { cellWidth: 24 },
+          10: { cellWidth: 24 },
+          11: { cellWidth: 18 },
+        },
+        styles: {
+          overflow: "linebreak",
+          cellWidth: "wrap",
         },
         didParseCell: function(data) {
           if (data.section === 'body' && data.row.raw) {
@@ -527,7 +540,7 @@ export default function MonthlyPlan() {
             }
           }
         },
-        margin: { left: 10, right: 10 },
+        margin: { left: 8, right: 8 },
       });
 
       startY = (doc as any).lastAutoTable.finalY + 8;
