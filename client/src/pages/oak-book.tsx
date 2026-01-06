@@ -108,7 +108,14 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "payments-received", label: "Payments Received" },
     ]
   },
-  { id: "pending-vendor-payments", label: "Pending Vendor Payments", icon: Wallet },
+  { 
+    id: "vendor-management", 
+    label: "Vendor Management", 
+    icon: Building2,
+    children: [
+      { id: "pending-vendor-payments", label: "Pending Vendor Payments" },
+    ]
+  },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
