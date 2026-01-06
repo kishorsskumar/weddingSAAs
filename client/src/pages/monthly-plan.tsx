@@ -43,6 +43,7 @@ import { MonthlyProductionPlan } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import logoWhite from "@assets/oakstreet_white_1764858814551.png";
 
 type CellKey = `${string}::${string}`;
 
@@ -400,7 +401,7 @@ export default function MonthlyPlan() {
     setGroupLabelValue("");
   }, [editGroupLabelId, groupLabelValue, updateMutation]);
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     const doc = new jsPDF("landscape", "mm", "a4");
     const monthName = format(currentDate, "MMMM yyyy");
     const pageWidth = doc.internal.pageSize.width;
@@ -412,14 +413,28 @@ export default function MonthlyPlan() {
     doc.setFillColor(201, 169, 97);
     doc.rect(0, 28, pageWidth, 3, "F");
     
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("Oakstreet Events", 14, 15);
+    // Add logo image
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = logoWhite;
+      });
+      doc.addImage(img, "PNG", 10, 4, 50, 20);
+    } catch (e) {
+      // Fallback to text if logo fails
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("Oakstreet Events", 14, 15);
+    }
     
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
-    doc.text("Monthly Production Plan", 14, 23);
+    doc.text("Monthly Production Plan", 14, 26);
     
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
