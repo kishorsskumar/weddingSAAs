@@ -197,20 +197,42 @@ function extractAmount(text: string): number | null {
 function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?: string; type: 'client_payment' | 'bank_transfer' } {
   const lowerText = text.toLowerCase();
   
-  // First check for explicit income patterns (these take priority)
+  // Expense phrases that indicate outgoing payment request (NOT income) - check first
+  const expensePhrases = [
+    /\bplease\s+pay\b/i,
+    /\bneed\s+(?:to\s+)?pay\b/i,
+    /\bfor\s+payment\b/i,
+    /\bpay\s+(?:for|to|this)\b/i,
+    /\bpending\s+payment\b/i,
+    /\bqr\s*(?:code)?\b/i,  // QR code mentions are NOT income
+    /\bvendor\s+payment\b/i, // Vendor payments are NOT income
+  ];
+  
+  // Check for expense/QR phrases first - these indicate NOT income
+  for (const phrase of expensePhrases) {
+    if (phrase.test(lowerText)) {
+      return { isIncome: false, type: 'client_payment' };
+    }
+  }
+  
+  // Income patterns with client name extraction
   const incomePatterns = [
     /income\s+from\s+(.+)/i,
     /received\s+from\s+(.+)/i,
     /payment\s+received\s*(?:from\s+)?(.+)?/i,
     /client\s+payment\s*(?:from\s+)?(.+)?/i,
+    /customer\s+payment\s*(?:from\s+)?(.+)?/i,  // Added
     /credited\s+(?:by|from)\s+(.+)/i,
     /bank\s+(?:to\s+bank|transfer)\s*(?:from\s+)?(.+)?/i,
     /transfer\s+received\s*(?:from\s+)?(.+)?/i,
     /advance\s+(?:from|received)\s*(.+)?/i,
     /amount\s+received\s*(?:from\s+)?(.+)?/i,
+    /payment\s+from\s+(.+)/i,  // Added - "payment from X"
+    /received\s+payment\s*(?:from\s+)?(.+)?/i,  // Added
+    /got\s+payment\s*(?:from\s+)?(.+)?/i,  // Added - "got payment from X"
   ];
   
-  // Check for income patterns first
+  // Check for income patterns with client name
   for (const pattern of incomePatterns) {
     const match = text.match(pattern);
     if (match) {
@@ -229,20 +251,26 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
     }
   }
   
-  // Expense phrases that indicate outgoing payment request (NOT income)
-  // These are specific phrases, not substrings that would block "payment received"
-  const expensePhrases = [
-    /\bplease\s+pay\b/i,
-    /\bneed\s+(?:to\s+)?pay\b/i,
-    /\bfor\s+payment\b/i,
-    /\bpay\s+(?:for|to|this)\b/i,
-    /\bpending\s+payment\b/i,
+  // Simple keyword triggers (no client name extraction needed)
+  const simpleIncomeKeywords = [
+    /\bcustomer\s+payment\b/i,
+    /\bclient\s+payment\b/i,
+    /\bincome\s+screenshot\b/i,
+    /\bpayment\s+screenshot\b/i,
+    /\breceived\s+amount\b/i,
+    /\bamount\s+credited\b/i,
+    /\bmoney\s+received\b/i,
+    /\bfunds\s+received\b/i,
+    /\bincome\b/i,  // Simple "income" keyword
   ];
   
-  // Check for expense phrases - these indicate NOT income
-  for (const phrase of expensePhrases) {
-    if (phrase.test(lowerText)) {
-      return { isIncome: false, type: 'client_payment' };
+  for (const keyword of simpleIncomeKeywords) {
+    if (keyword.test(lowerText)) {
+      return { 
+        isIncome: true, 
+        clientName: 'Client',
+        type: 'client_payment'
+      };
     }
   }
   
