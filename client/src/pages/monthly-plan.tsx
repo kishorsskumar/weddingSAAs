@@ -455,12 +455,13 @@ export default function MonthlyPlan() {
           startY = 20;
         }
         
+        // Match table margins (8mm on each side)
         doc.setFillColor(74, 122, 37);
-        doc.roundedRect(10, startY - 5, pageWidth - 20, 8, 1, 1, "F");
+        doc.roundedRect(8, startY - 5, pageWidth - 16, 8, 1, 1, "F");
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "bold");
-        doc.text(group.label, 14, startY);
+        doc.text(group.label, 12, startY);
         doc.setTextColor(0, 0, 0);
         startY += 8;
       }
