@@ -448,106 +448,84 @@ export default function MonthlyPlan() {
     
     let startY = 38;
     
-    groupedEntries.forEach((group, groupIndex) => {
-      // Calculate exact table width from column widths
-      const tableWidth = 17 + 32 + 28 + 22 + 20 + 12 + 18 + 24 + 24 + 24 + 24 + 18; // 263mm
-      
+    // Combine all entries into one table for cleaner layout
+    const allTableData: any[] = [];
+    
+    groupedEntries.forEach((group) => {
+      // Add group header row if exists
       if (group.label) {
-        if (startY > pageHeight - 30) {
-          doc.addPage();
-          startY = 20;
-        }
-        
-        // Match exact table width
-        doc.setFillColor(74, 122, 37);
-        doc.roundedRect(8, startY - 5, tableWidth, 8, 1, 1, "F");
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.text(group.label, 12, startY);
-        doc.setTextColor(0, 0, 0);
-        startY += 8;
+        allTableData.push({
+          isHeader: true,
+          label: group.label,
+        });
       }
       
-      const tableData = group.entries.map(entry => [
-        format(new Date(entry.eventDate), "dd-MMM-yy"),
-        entry.subEventName || "-",
-        entry.venue || "-",
-        entry.weddingPlanner || "-",
-        entry.stageManager || "-",
-        entry.teamLead || "-",
-        entry.productionTeamCount?.toString() || "-",
-        entry.florist || "-",
-        entry.loadingStartDateTime || "-",
-        entry.productionStartTime || "-",
-        entry.productionEndTime || "-",
-        entry.dismantlingDateTime || "-",
-        entry.dismantlingTeamLead || "-",
-      ]);
-
-      autoTable(doc, {
-        startY,
-        head: [[
-          "Date", "Event", "Venue", "Planner", "Lead", "Team", "Florist",
-          "Loading", "Prod Start", "Prod End", "Dismantle", "Dis.Lead",
-        ]],
-        body: tableData.map(row => [
-          row[0], row[1], row[2], row[3], row[5], row[6], row[7],
-          row[8], row[9], row[10], row[11], row[12],
-        ]),
-        theme: "grid",
-        tableWidth: "auto",
-        headStyles: {
-          fillColor: [107, 153, 55],
-          textColor: [255, 255, 255],
-          fontSize: 6.5,
-          fontStyle: "bold",
-          cellPadding: 1.5,
-          halign: "center",
-          valign: "middle",
-          lineWidth: 0.1,
-          lineColor: [80, 120, 45],
-        },
-        bodyStyles: { 
-          fontSize: 6.5, 
-          cellPadding: 1.5,
-          lineWidth: 0.1,
-          lineColor: [200, 200, 200],
-          valign: "middle",
-        },
-        alternateRowStyles: {
-          fillColor: [248, 252, 245],
-        },
-        columnStyles: {
-          0: { cellWidth: 17, halign: "center" },
-          1: { cellWidth: 32 },
-          2: { cellWidth: 28 },
-          3: { cellWidth: 22 },
-          4: { cellWidth: 20 },
-          5: { cellWidth: 12, halign: "center" },
-          6: { cellWidth: 18 },
-          7: { cellWidth: 24 },
-          8: { cellWidth: 24 },
-          9: { cellWidth: 24 },
-          10: { cellWidth: 24 },
-          11: { cellWidth: 18 },
-        },
-        styles: {
-          overflow: "linebreak",
-          cellWidth: "wrap",
-        },
-        didParseCell: function(data) {
-          if (data.section === 'body' && data.row.raw) {
-            const entry = group.entries[data.row.index];
-            if (entry?.isComplete) {
-              data.cell.styles.fillColor = [220, 252, 231];
-            }
-          }
-        },
-        margin: { left: 8, right: 8 },
+      // Add event rows
+      group.entries.forEach(entry => {
+        allTableData.push({
+          isHeader: false,
+          data: [
+            format(new Date(entry.eventDate), "dd-MMM"),
+            entry.subEventName || "-",
+            entry.venue || "-",
+            entry.weddingPlanner || "-",
+            entry.teamLead || "-",
+            entry.florist || "-",
+            entry.productionStartTime || "-",
+            entry.productionEndTime || "-",
+            entry.dismantlingDateTime || "-",
+          ],
+          isComplete: entry.isComplete,
+        });
       });
+    });
 
-      startY = (doc as any).lastAutoTable.finalY + 8;
+    // Prepare body rows (excluding headers which will be handled separately)
+    const bodyRows = allTableData.filter(r => !r.isHeader).map(r => r.data);
+    
+    autoTable(doc, {
+      startY,
+      head: [[
+        "Date", "Event", "Venue", "Planner", "Lead", "Florist", "Prod Start", "Prod End", "Dismantle"
+      ]],
+      body: bodyRows,
+      theme: "grid",
+      headStyles: {
+        fillColor: [107, 153, 55],
+        textColor: [255, 255, 255],
+        fontSize: 7,
+        fontStyle: "bold",
+        cellPadding: 1.2,
+        halign: "center",
+        valign: "middle",
+        lineWidth: 0.1,
+        lineColor: [80, 120, 45],
+      },
+      bodyStyles: { 
+        fontSize: 6.5, 
+        cellPadding: 1.2,
+        lineWidth: 0.1,
+        lineColor: [200, 200, 200],
+        valign: "middle",
+      },
+      alternateRowStyles: {
+        fillColor: [248, 252, 245],
+      },
+      columnStyles: {
+        0: { cellWidth: 18, halign: "center" },
+        1: { cellWidth: 40 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 28 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 30 },
+        7: { cellWidth: 30 },
+        8: { cellWidth: 30 },
+      },
+      styles: {
+        overflow: "ellipsize",
+      },
+      margin: { left: 8, right: 8 },
     });
 
     const pageCount = doc.getNumberOfPages();
