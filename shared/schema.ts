@@ -61,6 +61,7 @@ export const events = pgTable("events", {
   salesValue: decimal("sales_value", { precision: 12, scale: 2 }).notNull().default('0'),
   paymentReceived: decimal("payment_received", { precision: 12, scale: 2 }).notNull().default('0'),
   cost: decimal("cost", { precision: 12, scale: 2 }).notNull().default('0'),
+  status: text("status").notNull().default('active'), // 'active' | 'completed'
   googleCalendarEventId: text("google_calendar_event_id"), // Google Calendar sync
   outlookCalendarEventId: text("outlook_calendar_event_id"), // Outlook Calendar sync
   createdAt: timestamp("created_at").defaultNow(),
