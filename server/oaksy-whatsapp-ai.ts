@@ -50,6 +50,11 @@ interface IntentContext {
   // Vendor payment fields
   vendorName?: string;
   eventName?: string;
+  vendorPaymentVendor?: string;
+  vendorPaymentEvent?: string;
+  // Vendor payment correction fields
+  lastVendorPaymentCode?: string;
+  lastVendorPaymentAmount?: number;
   // QR Payment specific fields
   qrPaymentCategory?: string;
   qrPaymentDescription?: string;
@@ -58,6 +63,10 @@ interface IntentContext {
   pendingMediaUrl?: string;
   pendingAmount?: number;
   pendingPurpose?: string;
+  // Income submission fields
+  incomeScreenshotUrl?: string;
+  incomeClientName?: string;
+  incomeType?: string;
 }
 
 interface ConversationMessage {
@@ -136,12 +145,14 @@ function normalizePhoneNumber(phone: string): string {
 
 function extractAmount(text: string): number | null {
   // Handle shorthand notations first: "5k" = 5000, "1 lakh" = 100000, "5 thousand" = 5000
+  // Use flexible regex to handle various spellings: lakh, lakhs, lakkh, lakkhs, lac, lacs
   const shorthandPatterns = [
-    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:lakh|lac|lakhs)/i, multiplier: 100000 },
-    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:k|thousand)/i, multiplier: 1000 },
-    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:cr|crore)/i, multiplier: 10000000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:la+k+h?s?|lacs?)/i, multiplier: 100000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:k|thousand|thousands)/i, multiplier: 1000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:cr|crore|crores)/i, multiplier: 10000000 },
   ];
   
+  // Check shorthand patterns FIRST before any generic number extraction
   for (const { pattern, multiplier } of shorthandPatterns) {
     const match = text.match(pattern);
     if (match) {
@@ -153,15 +164,14 @@ function extractAmount(text: string): number | null {
     }
   }
   
-  // Standard patterns
-  const patterns = [
+  // Standard patterns with currency symbols
+  const currencyPatterns = [
     /(?:Rs\.?|₹|INR)\s*([0-9,]+(?:\.[0-9]+)?)/i,
     /([0-9,]+(?:\.[0-9]+)?)\s*(?:Rs\.?|₹|INR|rupees?)/i,
     /([0-9,]+(?:\.[0-9]+)?)\s*\/-/,
-    /([0-9,]+(?:\.[0-9]+)?)/,
   ];
   
-  for (const pattern of patterns) {
+  for (const pattern of currencyPatterns) {
     const match = text.match(pattern);
     if (match) {
       const amount = parseFloat(match[1].replace(/,/g, ''));
@@ -170,6 +180,16 @@ function extractAmount(text: string): number | null {
       }
     }
   }
+  
+  // Last resort: plain numbers (but only if they look like amounts - at least 2 digits or has decimal)
+  const plainNumberMatch = text.match(/\b([0-9]{2,}(?:,[0-9]+)*(?:\.[0-9]+)?)\b/);
+  if (plainNumberMatch) {
+    const amount = parseFloat(plainNumberMatch[1].replace(/,/g, ''));
+    if (amount > 0 && amount < 100000000) {
+      return amount;
+    }
+  }
+  
   return null;
 }
 
@@ -1266,6 +1286,80 @@ export async function handleOaksyWhatsAppMessage(
     return await getEmployeeStatus(employee.id, employee.name);
   }
 
+  // VENDOR PAYMENT CORRECTION FLOW - Handle "no", "change", or amount corrections after vendor payment
+  if (conversation.currentState === 'vendor_payment_recorded') {
+    const lastCode = context.lastVendorPaymentCode as string | undefined;
+    const lastAmount = context.lastVendorPaymentAmount as number | undefined;
+    
+    if (lastCode) {
+      // Check for confirmation
+      if (lowerMessage === 'ok' || lowerMessage === 'yes' || lowerMessage === 'confirm' || lowerMessage === 'correct') {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        return `✅ *Confirmed!* Vendor payment ${lastCode} has been recorded.\n\n_Kishor will be notified._ 🌳`;
+      }
+      
+      // Check for correction - "no", "change to X", "make it X", or just a new amount
+      const correctionPatterns = [
+        /^no[,.]?\s*/i,
+        /^change\s*(?:to|it)?\s*/i,
+        /^make\s*it\s*/i,
+        /^correct\s*(?:to|it)?\s*/i,
+        /^update\s*(?:to|it)?\s*/i,
+        /^wrong[,.]?\s*/i,
+      ];
+      
+      let textAfterCorrection = messageText;
+      let isCorrection = false;
+      
+      for (const pattern of correctionPatterns) {
+        if (pattern.test(lowerMessage)) {
+          textAfterCorrection = messageText.replace(pattern, '').trim();
+          isCorrection = true;
+          break;
+        }
+      }
+      
+      // Also treat any plain amount as a correction attempt
+      const newAmount = extractAmount(textAfterCorrection) || extractAmount(messageText);
+      
+      if (newAmount && (isCorrection || newAmount !== lastAmount)) {
+        // Update the vendor payment with new amount
+        const payment = await storage.getPendingVendorPaymentByCode(lastCode);
+        if (payment) {
+          await storage.updatePendingVendorPayment(payment.id, {
+            amount: newAmount.toString(),
+          });
+          
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          
+          return `✅ *Amount Updated!*\n\n📋 Code: *${lastCode}*\n💰 New Amount: ₹${newAmount.toLocaleString('en-IN')}\n\n_Vendor payment has been corrected._ 🌳`;
+        }
+      }
+      
+      if (isCorrection && !newAmount) {
+        return `What's the correct amount? 💰\n\n_Just send the number, e.g., "50000" or "1 lakh"_`;
+      }
+    }
+    
+    // If none of the above, reset and continue with normal flow
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: null,
+      currentState: 'idle',
+      conversationHistory: [],
+    });
+  }
+
   // INCOME SUBMISSION FLOW - Check if message indicates income/payment received
   if (mediaUrl && !conversation.activeIntent) {
     const incomeCheck = detectIncomeSubmission(messageText);
@@ -1383,12 +1477,12 @@ export async function handleOaksyWhatsAppMessage(
 
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: null,
-        intentContext: null,
-        currentState: 'idle',
+        intentContext: { lastVendorPaymentCode: requestCode, lastVendorPaymentAmount: amount },
+        currentState: 'vendor_payment_recorded',
         conversationHistory: [],
       });
 
-      return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
+      return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Say "change to [amount]" to correct it, or type "ok" to confirm._`;
     } else if (vendorName) {
       // Got vendor but no amount - ask for amount
       await storage.updateWhatsappConversation(conversation.id, {
@@ -1693,12 +1787,12 @@ export async function handleOaksyWhatsAppMessage(
 
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: null,
-      intentContext: null,
-      currentState: 'idle',
+      intentContext: { lastVendorPaymentCode: requestCode, lastVendorPaymentAmount: amount },
+      currentState: 'vendor_payment_recorded',
       conversationHistory: [],
     });
 
-    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
+    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Say "change to [amount]" to correct it, or type "ok" to confirm._`;
   }
 
   // Handle pending vendor payment state - awaiting full details
@@ -1790,12 +1884,12 @@ export async function handleOaksyWhatsAppMessage(
 
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: null,
-      intentContext: null,
-      currentState: 'idle',
+      intentContext: { lastVendorPaymentCode: requestCode, lastVendorPaymentAmount: amount },
+      currentState: 'vendor_payment_recorded',
       conversationHistory: [],
     });
 
-    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_This will appear in Oak Book until marked as paid._ 🌳`;
+    return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Say "change to [amount]" to correct it, or type "ok" to confirm._`;
   }
 
   // Handle amount without image (text-only expense submission)
@@ -2131,12 +2225,12 @@ export async function handleOaksyWhatsAppMessage(
 
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: null,
-        intentContext: null,
-        currentState: 'idle',
+        intentContext: { lastVendorPaymentCode: requestCode, lastVendorPaymentAmount: amount },
+        currentState: 'vendor_payment_recorded',
         conversationHistory: [],
       });
 
-      return `✅ *Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Kishor will be notified._ 🌳`;
+      return `✅ *Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Say "change to [amount]" to correct it, or type "ok" to confirm._`;
     } else if (vendorName) {
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'pending_vendor_payment',
