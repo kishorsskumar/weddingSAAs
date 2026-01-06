@@ -194,7 +194,7 @@ function extractAmount(text: string): number | null {
 }
 
 // Detect if message is an income/payment received submission (not expense/QR payment)
-function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?: string; type: 'client_payment' | 'bank_transfer' } {
+function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?: string; bankName?: string; type: 'client_payment' | 'bank_transfer' } {
   const lowerText = text.toLowerCase();
   
   // Expense phrases that indicate outgoing payment request (NOT income) - check first
@@ -215,43 +215,63 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
     }
   }
   
+  // Extract bank name from message - patterns like "bank Kishor", "to Kishor bank", "Kishor account"
+  let bankName: string | undefined;
+  const bankPatterns = [
+    /bank\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i,  // "bank Kishor" or "bank HDFC"
+    /(?:to|in)\s+([a-zA-Z]+)\s+(?:bank|account)/i,  // "to Kishor bank" or "in Kishor account"
+    /([a-zA-Z]+)\s+(?:bank|account)\b/i,  // "Kishor bank" or "HDFC account"
+  ];
+  
+  for (const pattern of bankPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      // Don't capture income-related keywords as bank names
+      const captured = match[1].trim().toLowerCase();
+      if (!['income', 'transfer', 'payment', 'received', 'from', 'to', 'the'].includes(captured)) {
+        bankName = match[1].trim();
+        break;
+      }
+    }
+  }
+  
   // Income patterns with client name extraction
   const incomePatterns = [
     /income\s+from\s+(.+)/i,
     /received\s+from\s+(.+)/i,
     /payment\s+received\s*(?:from\s+)?(.+)?/i,
     /client\s+payment\s*(?:from\s+)?(.+)?/i,
-    /customer\s+payment\s*(?:from\s+)?(.+)?/i,  // Added
+    /customer\s+payment\s*(?:from\s+)?(.+)?/i,
     /credited\s+(?:by|from)\s+(.+)/i,
     /bank\s+(?:to\s+bank|transfer)\s*(?:from\s+)?(.+)?/i,
     /transfer\s+received\s*(?:from\s+)?(.+)?/i,
     /advance\s+(?:from|received)\s*(.+)?/i,
     /amount\s+received\s*(?:from\s+)?(.+)?/i,
-    /payment\s+from\s+(.+)/i,  // Added - "payment from X"
-    /received\s+payment\s*(?:from\s+)?(.+)?/i,  // Added
-    /got\s+payment\s*(?:from\s+)?(.+)?/i,  // Added - "got payment from X"
+    /payment\s+from\s+(.+)/i,
+    /received\s+payment\s*(?:from\s+)?(.+)?/i,
+    /got\s+payment\s*(?:from\s+)?(.+)?/i,
   ];
   
   // Check for income patterns with client name
   for (const pattern of incomePatterns) {
     const match = text.match(pattern);
     if (match) {
-      // Extract client name, clean it up
       let clientName = match[1]?.trim() || undefined;
-      // Remove amount from client name if present
       if (clientName) {
-        clientName = clientName.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim() || clientName;
+        // Remove amount and bank references from client name
+        clientName = clientName.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').replace(/\bbank\s+\w+/gi, '').trim() || clientName;
       }
       const isBankTransfer = /bank\s+(?:to\s+bank|transfer)/i.test(text);
       return { 
         isIncome: true, 
         clientName: clientName || 'Client',
+        bankName,
         type: isBankTransfer ? 'bank_transfer' : 'client_payment'
       };
     }
   }
   
-  // Simple keyword triggers (no client name extraction needed)
+  // Simple keyword triggers - "income" keyword is primary indicator
   const simpleIncomeKeywords = [
     /\bcustomer\s+payment\b/i,
     /\bclient\s+payment\b/i,
@@ -261,7 +281,7 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
     /\bamount\s+credited\b/i,
     /\bmoney\s+received\b/i,
     /\bfunds\s+received\b/i,
-    /\bincome\b/i,  // Simple "income" keyword
+    /\bincome\b/i,  // Simple "income" keyword - highest priority
   ];
   
   for (const keyword of simpleIncomeKeywords) {
@@ -269,6 +289,7 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
       return { 
         isIncome: true, 
         clientName: 'Client',
+        bankName,
         type: 'client_payment'
       };
     }
@@ -1138,6 +1159,7 @@ export async function handleOaksyWhatsAppMessage(
         person: incomeSubmission.clientName,
         eventName: eventName === 'General' ? 'General' : eventName,
         approvedBy: 'Kishor',
+        bankId: (incomeSubmission as any).bankId || null,
       });
       
       // Notify employee
@@ -1452,6 +1474,95 @@ export async function handleOaksyWhatsAppMessage(
         });
 
         return `📥 Got your payment screenshot from ${clientName}!\n\nHow much was received? 💰`;
+      }
+    }
+  }
+
+  // TEXT-ONLY INCOME SUBMISSION - Detect income messages without screenshot
+  // This runs for text-only messages (no mediaUrl) before falling through to other flows
+  if (!mediaUrl && !conversation.activeIntent) {
+    const incomeCheck = detectIncomeSubmission(messageText);
+    
+    if (incomeCheck.isIncome) {
+      const providedAmount = extractAmount(messageText);
+      const clientName = incomeCheck.clientName || 'Client';
+      const incomeType = incomeCheck.type;
+      const extractedBankName = incomeCheck.bankName;
+      
+      if (providedAmount) {
+        // Got amount - submit income for approval
+        const requestCode = await storage.generateIncomeCode();
+        const description = incomeType === 'bank_transfer' 
+          ? `Bank transfer from ${clientName}`
+          : `Payment received from ${clientName}`;
+        
+        // Try to match bank name to existing banks
+        let bankId: string | undefined;
+        let resolvedBankName = extractedBankName;
+        
+        if (extractedBankName) {
+          const banks = await storage.getAllBanks();
+          const matchingBank = banks.find(b => 
+            b.name.toLowerCase().includes(extractedBankName.toLowerCase()) ||
+            extractedBankName.toLowerCase().includes(b.name.toLowerCase())
+          );
+          if (matchingBank) {
+            bankId = matchingBank.id;
+            resolvedBankName = matchingBank.name;
+          }
+        }
+        
+        await storage.createIncomeSubmission({
+          requestCode,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: employee.phone || normalizedPhone,
+          type: incomeType,
+          clientName,
+          description,
+          amount: providedAmount.toString(),
+          screenshotUrl: null,
+          bankId: bankId || null,
+          bankName: resolvedBankName || null,
+          status: 'pending',
+        });
+
+        // Notify Kishor for approval
+        await notifyKishorIncomeSubmission(
+          requestCode,
+          employee.name,
+          incomeType,
+          clientName,
+          description,
+          providedAmount,
+          undefined,  // No screenshot
+          resolvedBankName
+        );
+
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+
+        const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+        const bankLabel = resolvedBankName ? `\n🏦 Bank: ${resolvedBankName}` : '';
+        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}${bankLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
+      } else {
+        // No amount - ask for amount
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'income_submission',
+          intentContext: { 
+            incomeClientName: clientName,
+            incomeType: incomeType,
+            incomeBankName: extractedBankName,
+          },
+          conversationHistory: history,
+          currentState: 'awaiting_income_amount',
+        });
+
+        return `📥 *Income Submission*\n\n👤 From: ${clientName}\n\nHow much was received? 💰`;
       }
     }
   }
@@ -2642,9 +2753,11 @@ async function notifyKishorIncomeSubmission(
   clientName: string,
   description: string,
   amount: number,
-  screenshotUrl: string
+  screenshotUrl?: string,
+  bankName?: string
 ): Promise<void> {
   const typeLabel = type === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
+  const bankLabel = bankName ? `\n🏦 *Bank:* ${bankName}` : '';
   
   if (screenshotUrl) {
     try {
@@ -2656,15 +2769,15 @@ async function notifyKishorIncomeSubmission(
       await sendWhatsAppMediaMessage(
         SUPERADMIN_WHATSAPP, 
         publicUrl,
-        `📥 *Income Submission ${requestCode}*\n\n👤 From: ${employeeName}\n📁 Type: ${typeLabel}\n👥 Client: ${clientName}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*\n\n_Reply "A ${requestCode}" to approve_`
+        `📥 *Income Submission ${requestCode}*\n\n👤 From: ${employeeName}\n📁 Type: ${typeLabel}\n👥 Client: ${clientName}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*${bankLabel}\n\n_Reply "A ${requestCode}" to approve_`
       );
     } catch (mediaError) {
       console.error('[Income] Failed to send media, falling back to text:', mediaError);
-      const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n📷 Screenshot: ${screenshotUrl}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
+      const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}${bankLabel}\n\n📷 Screenshot: ${screenshotUrl}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
       await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
     }
   } else {
-    const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
+    const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}${bankLabel}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
     await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
   }
 }

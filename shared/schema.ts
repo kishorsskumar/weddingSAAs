@@ -1891,7 +1891,7 @@ export const insertQrPaymentRequestSchema = createInsertSchema(qrPaymentRequests
 export type InsertQrPaymentRequest = z.infer<typeof insertQrPaymentRequestSchema>;
 export type QrPaymentRequest = typeof qrPaymentRequests.$inferSelect;
 
-// Income Submissions - Employee submits payment received screenshot for approval
+// Income Submissions - Employee submits payment received (with or without screenshot) for approval
 export const incomeSubmissions = pgTable("income_submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   requestCode: text("request_code").notNull().unique(), // Short code like "INC001"
@@ -1902,7 +1902,9 @@ export const incomeSubmissions = pgTable("income_submissions", {
   clientName: text("client_name"), // Client name for income
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
-  screenshotUrl: text("screenshot_url").notNull(), // URL of payment screenshot
+  screenshotUrl: text("screenshot_url"), // URL of payment screenshot (optional)
+  bankId: varchar("bank_id").references(() => banks.id), // Bank to deposit to
+  bankName: text("bank_name"), // Bank name for display
   status: text("status").notNull().default('pending'), // 'pending', 'approved', 'rejected'
   eventId: varchar("event_id").references(() => events.id), // Assigned event for daybook
   eventName: text("event_name"), // Event name for display
