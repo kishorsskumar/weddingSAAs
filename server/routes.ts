@@ -1760,6 +1760,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/pending-vendor-payments/:id', async (req, res) => {
+    try {
+      // Only superadmin can delete
+      const userRole = (req.session as any).userRole;
+      if (userRole !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can delete pending vendor payments' });
+      }
+      await storage.deletePendingVendorPayment(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete pending vendor payment' });
+    }
+  });
+
   // Leave Requests
   app.get('/api/leave-requests', async (req, res) => {
     const requests = await storage.getAllLeaveRequests();

@@ -553,6 +553,21 @@ export default function OakBook() {
     },
   });
 
+  const deletePendingVendorPayment = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/pending-vendor-payments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/pending-vendor-payments"] });
+      toast({ title: "Pending vendor payment deleted" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to delete", 
+        description: error?.message || "Only superadmins can delete vendor payments",
+        variant: "destructive" 
+      });
+    },
+  });
+
   const handlePreview = (type: "invoice" | "quote" | "receipt", id: string) => {
     setPreviewType(type);
     setPreviewId(id);
@@ -2218,13 +2233,30 @@ export default function OakBook() {
                         Submitted: {format(new Date(payment.createdAt), 'MMM d, yyyy h:mm a')}
                       </p>
                     </div>
-                    <div className="mt-2 sm:mt-0 text-right">
-                      <p className="text-xl font-bold text-orange-600">
-                        ₹{parseFloat(payment.amount).toLocaleString('en-IN')}
-                      </p>
-                      <Badge variant="secondary" className="bg-orange-100 text-orange-700">
-                        Pending
-                      </Badge>
+                    <div className="mt-2 sm:mt-0 flex items-center gap-2">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-orange-600">
+                          ₹{parseFloat(payment.amount).toLocaleString('en-IN')}
+                        </p>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-700">
+                          Pending
+                        </Badge>
+                      </div>
+                      {user?.role === 'superadmin' && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => {
+                            if (confirm(`Delete vendor payment ${payment.requestCode} for ${payment.vendorName}?`)) {
+                              deletePendingVendorPayment.mutate(payment.id);
+                            }
+                          }}
+                          data-testid={`delete-vendor-payment-${payment.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}

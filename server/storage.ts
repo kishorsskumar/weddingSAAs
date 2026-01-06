@@ -4301,6 +4301,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deletePendingVendorPayment(id: string): Promise<void> {
+    await db.delete(pendingVendorPayments).where(eq(pendingVendorPayments.id, id));
+  }
+
   async generateVendorPaymentCode(): Promise<string> {
     const existing = await db.select({ requestCode: pendingVendorPayments.requestCode })
       .from(pendingVendorPayments)
