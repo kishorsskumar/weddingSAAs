@@ -51,8 +51,16 @@ import {
   Calendar,
   Menu,
   X,
-  UserPlus
+  UserPlus,
+  Send,
+  Printer,
+  MoreHorizontal,
+  ArrowLeft,
+  Home,
+  PanelLeftClose,
+  PanelLeft
 } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
   AreaChart,
   Area,
@@ -244,6 +252,8 @@ export default function OakBook() {
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<{ type: string; id: string; data: any } | null>(null);
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
     
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
@@ -747,6 +757,7 @@ export default function OakBook() {
     setActiveSection(sectionId);
     setMobileMenuOpen(false);
     clearSelectedDocument();
+    setSelectedRecord(null);
   };
 
   const totalIncome = useMemo(() => {
@@ -1187,7 +1198,15 @@ export default function OakBook() {
               </thead>
               <tbody>
                 {filteredCustomers.map((customer) => (
-                  <tr key={customer.id} className="border-b hover:bg-muted/50" data-testid={`row-customer-${customer.id}`}>
+                  <tr 
+                    key={customer.id} 
+                    className={cn(
+                      "border-b hover:bg-muted/50 cursor-pointer transition-colors",
+                      selectedRecord?.type === "customer" && selectedRecord.id === customer.id && "bg-primary/10"
+                    )}
+                    onClick={() => setSelectedRecord({ type: "customer", id: customer.id, data: customer })}
+                    data-testid={`row-customer-${customer.id}`}
+                  >
                     <td className="p-4 font-medium">{customer.name}</td>
                     <td className="p-4 text-muted-foreground hidden sm:table-cell">{customer.email || "-"}</td>
                     <td className="p-4 text-muted-foreground hidden md:table-cell">{customer.phone || "-"}</td>
@@ -1197,7 +1216,7 @@ export default function OakBook() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => { setEditingCustomer(customer); setCustomerModalOpen(true); }}
+                          onClick={(e) => { e.stopPropagation(); setEditingCustomer(customer); setCustomerModalOpen(true); }}
                           data-testid={`btn-edit-customer-${customer.id}`}
                         >
                           <Edit className="h-4 w-4" />
@@ -1205,7 +1224,7 @@ export default function OakBook() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteCustomer.mutate(customer.id)}
+                          onClick={(e) => { e.stopPropagation(); deleteCustomer.mutate(customer.id); }}
                           data-testid={`btn-delete-customer-${customer.id}`}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -1424,7 +1443,7 @@ export default function OakBook() {
     
     const renderEstimateRow = (estimate: any) => {
       const customer = customers.find((c) => c.id === estimate.customerId);
-      const isSelected = selectedDocType === "quote" && selectedDocId === estimate.id;
+      const isSelected = selectedRecord?.type === "estimate" && selectedRecord.id === estimate.id;
       return (
         <tr 
           key={estimate.id} 
@@ -1432,7 +1451,7 @@ export default function OakBook() {
             "border-b cursor-pointer transition-colors",
             isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
           )}
-          onClick={() => handleSelectDocument("quote", estimate.id)}
+          onClick={() => { handleSelectDocument("quote", estimate.id); setSelectedRecord({ type: "estimate", id: estimate.id, data: estimate }); }}
         >
           <td className="p-3 font-medium text-sm">{estimate.number}</td>
           <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
@@ -1611,7 +1630,7 @@ export default function OakBook() {
     
     const renderInvoiceRow = (invoice: any) => {
       const customer = customers.find((c) => c.id === invoice.customerId);
-      const isSelected = selectedDocType === "invoice" && selectedDocId === invoice.id;
+      const isSelected = selectedRecord?.type === "invoice" && selectedRecord.id === invoice.id;
       return (
         <tr 
           key={invoice.id} 
@@ -1619,7 +1638,7 @@ export default function OakBook() {
             "border-b cursor-pointer transition-colors",
             isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
           )}
-          onClick={() => handleSelectDocument("invoice", invoice.id)}
+          onClick={() => { handleSelectDocument("invoice", invoice.id); setSelectedRecord({ type: "invoice", id: invoice.id, data: invoice }); }}
         >
           <td className="p-3 font-medium text-sm">{invoice.number}</td>
           <td className="p-3 text-muted-foreground text-sm hidden sm:table-cell">
@@ -1816,8 +1835,16 @@ export default function OakBook() {
             <tbody>
               {payments.map((payment) => {
                 const customer = customers.find((c) => c.id === payment.customerId);
+                const isSelected = selectedRecord?.type === "payment" && selectedRecord.id === payment.id;
                 return (
-                  <tr key={payment.id} className="border-b hover:bg-muted/50">
+                  <tr 
+                    key={payment.id} 
+                    className={cn(
+                      "border-b cursor-pointer transition-colors",
+                      isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+                    )}
+                    onClick={() => setSelectedRecord({ type: "payment", id: payment.id, data: payment })}
+                  >
                     <td className="p-4 font-medium">{payment.number}</td>
                     <td className="p-4 text-muted-foreground hidden sm:table-cell">
                       {format(new Date(payment.date), "dd MMM yyyy")}
@@ -1831,19 +1858,19 @@ export default function OakBook() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handlePreview("receipt", payment.id)} title="Preview">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handlePreview("receipt", payment.id); }} title="Preview">
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setEditingPayment(payment); setPaymentModalOpen(true); }} title="Edit">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setEditingPayment(payment); setPaymentModalOpen(true); }} title="Edit">
                           <Edit className="h-4 w-4" />
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" title="Download PDF">
+                            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} title="Download PDF">
                               <Download className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent>
+                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
                             <DropdownMenuItem onClick={() => handleDownloadPdf("receipt", payment.id, false)}>
                               With Header
                             </DropdownMenuItem>
@@ -1852,7 +1879,7 @@ export default function OakBook() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button variant="ghost" size="icon" onClick={() => deletePayment.mutate(payment.id)} title="Delete">
+                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deletePayment.mutate(payment.id); }} title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -2217,10 +2244,16 @@ export default function OakBook() {
               </p>
             ) : (
               <div className="space-y-3">
-                {pendingPayments.map((payment) => (
+                {pendingPayments.map((payment) => {
+                  const isSelected = selectedRecord?.type === "vendor-payment" && selectedRecord.id === payment.id;
+                  return (
                   <div
                     key={payment.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors"
+                    className={cn(
+                      "flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg cursor-pointer transition-colors",
+                      isSelected ? "bg-primary/10 border-primary/30" : "hover:bg-muted/30"
+                    )}
+                    onClick={() => setSelectedRecord({ type: "vendor-payment", id: payment.id, data: payment })}
                     data-testid={`pending-vendor-payment-${payment.id}`}
                   >
                     <div className="flex-1">
@@ -2266,7 +2299,8 @@ export default function OakBook() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -2736,8 +2770,318 @@ export default function OakBook() {
     );
   };
 
+  const renderPreviewPanel = () => {
+    if (!selectedRecord) {
+      return (
+        <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-6">
+          <FileText className="h-16 w-16 mb-4 opacity-30" />
+          <p className="text-lg font-medium">No item selected</p>
+          <p className="text-sm text-center mt-2">Select an item from the list to view details</p>
+        </div>
+      );
+    }
+
+    if (selectedRecord.type === "customer") {
+      const customer = selectedRecord.data as Customer;
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden h-8 w-8"
+                onClick={() => setSelectedRecord(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h3 className="font-semibold text-lg">{customer.name}</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setEditingCustomer(customer); setCustomerModalOpen(true); }}>
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => deleteCustomer.mutate(customer.id)} className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <p className="text-sm">{customer.email || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Phone</Label>
+                  <p className="text-sm">{customer.phone || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">GST Number</Label>
+                  <p className="text-sm">{customer.gstNumber || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Billing Address</Label>
+                  <p className="text-sm">{customer.billingAddress || "-"}</p>
+                </div>
+              </div>
+              <div className="pt-4 border-t">
+                <h4 className="font-medium mb-3">Related Documents</h4>
+                <div className="space-y-2">
+                  <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => { setActiveSection("standard-estimates"); setEditingEstimate(null); setEstimateModalOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Estimate
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => { setActiveSection("standard-invoices"); setEditingInvoice(null); setInvoiceModalOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Invoice
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedRecord.type === "estimate") {
+      const estimate = selectedRecord.data as Estimate;
+      const customer = customers.find(c => c.id === estimate.customerId);
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden h-8 w-8"
+                onClick={() => setSelectedRecord(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h3 className="font-semibold">{estimate.number}</h3>
+                <Badge variant={estimate.status === "sent" ? "default" : "secondary"} className="mt-1">
+                  {estimate.status}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setEditingEstimate(estimate as any); setEstimateModalOpen(true); }}>
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setPreviewType("quote"); setPreviewId(estimate.id); setPreviewModalOpen(true); }}>
+                <Eye className="h-4 w-4 mr-1" />
+                View
+              </Button>
+            </div>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              <div>
+                <p className="text-3xl font-bold text-green-600">₹{parseFloat(estimate.total).toLocaleString('en-IN')}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Customer</Label>
+                  <p className="text-sm font-medium">{customer?.name || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{format(new Date(estimate.date), "dd MMM yyyy")}</p>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedRecord.type === "invoice") {
+      const invoice = selectedRecord.data as Invoice;
+      const customer = customers.find(c => c.id === invoice.customerId);
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden h-8 w-8"
+                onClick={() => setSelectedRecord(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h3 className="font-semibold">{invoice.number}</h3>
+                <Badge variant={invoice.status === "paid" ? "default" : "secondary"} className="mt-1">
+                  {invoice.status}
+                </Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setEditingInvoice(invoice as any); setInvoiceModalOpen(true); }}>
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setPreviewType("invoice"); setPreviewId(invoice.id); setPreviewModalOpen(true); }}>
+                <Eye className="h-4 w-4 mr-1" />
+                View
+              </Button>
+            </div>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              <div>
+                <p className="text-3xl font-bold text-green-600">₹{parseFloat(invoice.total).toLocaleString('en-IN')}</p>
+                {parseFloat(invoice.balanceDue) > 0 && (
+                  <p className="text-sm text-orange-500 mt-1">Balance Due: ₹{parseFloat(invoice.balanceDue).toLocaleString('en-IN')}</p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Customer</Label>
+                  <p className="text-sm font-medium">{customer?.name || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{format(new Date(invoice.date), "dd MMM yyyy")}</p>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedRecord.type === "payment") {
+      const payment = selectedRecord.data as CustomerPayment;
+      const customer = customers.find(c => c.id === payment.customerId);
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden h-8 w-8"
+                onClick={() => setSelectedRecord(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h3 className="font-semibold">{payment.number}</h3>
+                <Badge className="bg-green-100 text-green-700 mt-1">Paid</Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setEditingPayment(payment); setPaymentModalOpen(true); }}>
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            </div>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              <div>
+                <p className="text-3xl font-bold text-green-600">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Customer</Label>
+                  <p className="text-sm font-medium">{customer?.name || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{format(new Date(payment.date), "dd MMM yyyy")}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Payment Mode</Label>
+                  <p className="text-sm capitalize">{payment.paymentMode}</p>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    if (selectedRecord.type === "vendor-payment") {
+      const vp = selectedRecord.data as PendingVendorPayment;
+      return (
+        <div className="h-full flex flex-col">
+          <div className="flex items-center justify-between p-4 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="md:hidden h-8 w-8"
+                onClick={() => setSelectedRecord(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div>
+                <h3 className="font-semibold">{vp.requestCode}</h3>
+                <Badge variant={vp.status === "paid" ? "default" : vp.status === "pending" ? "secondary" : "destructive"} className="mt-1">
+                  {vp.status}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-4">
+              <div>
+                <p className="text-3xl font-bold">₹{parseFloat(vp.amount).toLocaleString('en-IN')}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Vendor</Label>
+                  <p className="text-sm font-medium">{vp.vendorName}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Requested By</Label>
+                  <p className="text-sm">{vp.employeeName}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Event</Label>
+                  <p className="text-sm">{vp.eventName || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{format(new Date(vp.createdAt), "dd MMM yyyy")}</p>
+                </div>
+                {vp.description && (
+                  <div className="col-span-2">
+                    <Label className="text-xs text-muted-foreground">Description</Label>
+                    <p className="text-sm">{vp.description}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollArea>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden bg-background">
+      {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-3 border-b bg-card">
         <Button
           variant="outline"
@@ -2754,6 +3098,7 @@ export default function OakBook() {
         </span>
       </div>
 
+      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}>
           <div className="fixed inset-y-0 left-0 w-72 bg-background shadow-lg border-r" onClick={(e) => e.stopPropagation()}>
@@ -2768,12 +3113,185 @@ export default function OakBook() {
         </div>
       )}
 
-      <div className="hidden md:block w-64 border-r flex-shrink-0 bg-card">
-        {renderSidebar()}
+      {/* Desktop 3-Panel Layout */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
+        <ResizablePanelGroup direction="horizontal" className="h-full">
+          {/* Left Panel - Navigation */}
+          <ResizablePanel 
+            defaultSize={leftPanelCollapsed ? 4 : 18} 
+            minSize={4} 
+            maxSize={25}
+            className="bg-sidebar"
+          >
+            <div className="flex flex-col h-full">
+              <div className={cn(
+                "flex items-center border-b border-sidebar-border p-3",
+                leftPanelCollapsed ? "justify-center" : "justify-between"
+              )}>
+                {!leftPanelCollapsed && (
+                  <div>
+                    <h2 className="text-lg font-serif font-semibold text-primary">Oak Book</h2>
+                    <p className="text-xs text-sidebar-foreground/60">Accounting</p>
+                  </div>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-sidebar-foreground/60"
+                  onClick={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+                >
+                  {leftPanelCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+                </Button>
+              </div>
+              <ScrollArea className="flex-1">
+                <div className="p-2 space-y-1">
+                  <Link href="/">
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground",
+                        leftPanelCollapsed ? "justify-center px-2" : "justify-start"
+                      )}
+                      size="sm"
+                    >
+                      <Home className="h-4 w-4 flex-shrink-0" />
+                      {!leftPanelCollapsed && <span>Dashboard</span>}
+                    </Button>
+                  </Link>
+                  {SIDEBAR_SECTIONS.map((section) => (
+                    <div key={section.id}>
+                      {section.children ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            className={cn(
+                              "w-full text-sm font-medium",
+                              leftPanelCollapsed ? "justify-center px-2" : "justify-between",
+                              expandedMenus.includes(section.id) && "bg-sidebar-accent/50"
+                            )}
+                            onClick={() => leftPanelCollapsed ? setLeftPanelCollapsed(false) : toggleMenu(section.id)}
+                            data-testid={`nav-${section.id}`}
+                          >
+                            <span className={cn("flex items-center gap-2", leftPanelCollapsed && "justify-center")}>
+                              <section.icon className="h-4 w-4 flex-shrink-0" />
+                              {!leftPanelCollapsed && section.label}
+                            </span>
+                            {!leftPanelCollapsed && (
+                              expandedMenus.includes(section.id) ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )
+                            )}
+                          </Button>
+                          {!leftPanelCollapsed && expandedMenus.includes(section.id) && (
+                            <div className="ml-6 space-y-1 mt-1">
+                              {section.children.map((child) => (
+                                <div key={child.id}>
+                                  {child.children ? (
+                                    <>
+                                      <Button
+                                        variant="ghost"
+                                        className={cn(
+                                          "w-full justify-between text-sm",
+                                          expandedMenus.includes(child.id) && "bg-sidebar-accent/30"
+                                        )}
+                                        onClick={() => toggleMenu(child.id)}
+                                        data-testid={`nav-${child.id}`}
+                                      >
+                                        {child.label}
+                                        {expandedMenus.includes(child.id) ? (
+                                          <ChevronDown className="h-3 w-3" />
+                                        ) : (
+                                          <ChevronRight className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                      {expandedMenus.includes(child.id) && (
+                                        <div className="ml-4 space-y-1 mt-1">
+                                          {child.children.map((subChild) => (
+                                            <Button
+                                              key={subChild.id}
+                                              variant="ghost"
+                                              size="sm"
+                                              className={cn(
+                                                "w-full justify-start text-xs h-7",
+                                                activeSection === subChild.id &&
+                                                  "bg-sidebar-accent text-sidebar-accent-foreground"
+                                              )}
+                                              onClick={() => { handleNavClick(subChild.id); setSelectedRecord(null); }}
+                                              data-testid={`nav-${subChild.id}`}
+                                            >
+                                              {subChild.label}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      className={cn(
+                                        "w-full justify-start text-sm",
+                                        activeSection === child.id &&
+                                          "bg-sidebar-accent text-sidebar-accent-foreground"
+                                      )}
+                                      onClick={() => { handleNavClick(child.id); setSelectedRecord(null); }}
+                                      data-testid={`nav-${child.id}`}
+                                    >
+                                      {child.label}
+                                    </Button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "w-full gap-2 text-sm font-medium",
+                            leftPanelCollapsed ? "justify-center px-2" : "justify-start",
+                            activeSection === section.id &&
+                              "bg-sidebar-accent text-sidebar-accent-foreground"
+                          )}
+                          onClick={() => { handleNavClick(section.id); setSelectedRecord(null); }}
+                          data-testid={`nav-${section.id}`}
+                        >
+                          <section.icon className="h-4 w-4 flex-shrink-0" />
+                          {!leftPanelCollapsed && section.label}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Middle Panel - List View */}
+          <ResizablePanel defaultSize={42} minSize={30}>
+            <div className="h-full overflow-auto p-4">
+              {renderContent()}
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle withHandle />
+
+          {/* Right Panel - Preview */}
+          <ResizablePanel defaultSize={40} minSize={25}>
+            <div className="h-full border-l bg-card">
+              {renderPreviewPanel()}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 sm:p-6">
-        {renderContent()}
+      {/* Mobile Content */}
+      <div className="md:hidden flex-1 overflow-auto p-4">
+        {selectedRecord ? renderPreviewPanel() : renderContent()}
       </div>
 
       <CustomerModal />
