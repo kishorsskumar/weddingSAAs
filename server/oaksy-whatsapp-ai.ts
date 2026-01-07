@@ -67,6 +67,11 @@ interface IntentContext {
   incomeScreenshotUrl?: string;
   incomeClientName?: string;
   incomeType?: string;
+  // Delivery challan fields
+  deliverTo?: string;
+  deliveryAddress?: string;
+  itemDescription?: string;
+  vehicleNumber?: string;
 }
 
 interface ConversationMessage {
@@ -96,6 +101,7 @@ CAPABILITIES:
 3. EVENT COORDINATION: Help with event details, production schedules, team assignments
 4. FINANCIAL QUERIES: Daybook entries, payment status, vendor management
 5. STATUS CHECKS: Any pending requests, approvals, or action items
+6. DELIVERY CHALLANS: Create delivery challans for goods/materials (wedding planners and accountants only)
 
 FLEXIBILITY GUIDELINES:
 - Understand natural language - don't require specific formats
@@ -112,7 +118,7 @@ SECURITY RULES (CRITICAL):
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "event_query" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null,
     "purpose": string or null,
@@ -121,7 +127,11 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "leaveType": "sick" | "casual" | "vacation" | "personal" | null,
     "startDate": "DD/MM/YYYY" or null,
     "endDate": "DD/MM/YYYY" or null,
-    "reason": string or null
+    "reason": string or null,
+    "deliverTo": string or null,
+    "deliveryAddress": string or null,
+    "itemDescription": string or null,
+    "vehicleNumber": string or null
   },
   "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation"] or [],
   "isComplete": boolean,
@@ -141,6 +151,20 @@ function normalizePhoneNumber(phone: string): string {
     return '+91' + cleaned;
   }
   return '+' + cleaned;
+}
+
+function numberToWords(num: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  
+  if (num === 0) return 'Zero';
+  if (num < 20) return ones[num];
+  if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? ' ' + ones[num % 10] : '');
+  if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + numberToWords(num % 100) : '');
+  if (num < 100000) return numberToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + numberToWords(num % 1000) : '');
+  if (num < 10000000) return numberToWords(Math.floor(num / 100000)) + ' Lakh' + (num % 100000 ? ' ' + numberToWords(num % 100000) : '');
+  return numberToWords(Math.floor(num / 10000000)) + ' Crore' + (num % 10000000 ? ' ' + numberToWords(num % 10000000) : '');
 }
 
 function extractAmount(text: string): number | null {
@@ -2031,6 +2055,241 @@ export async function handleOaksyWhatsAppMessage(
     return `✅ *Pending Vendor Payment Recorded!*\n\n📋 Code: *${requestCode}*\n🏪 Vendor: ${vendorName}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📅 Event: ${resolvedEventName || 'Not specified'}\n\n_Say "change to [amount]" to correct it, or type "ok" to confirm._`;
   }
 
+  // Handle pending delivery challan states
+  if (conversation.activeIntent === 'pending_delivery_challan') {
+    // Handle confirmation state
+    if (conversation.currentState === 'awaiting_dc_confirmation') {
+      if (lowerMessage === 'yes' || lowerMessage === 'y' || lowerMessage === 'ok' || lowerMessage === 'confirm') {
+        const dcContext = context as IntentContext;
+        const deliverTo = dcContext.deliverTo || '';
+        const deliveryAddress = dcContext.deliveryAddress || '';
+        const amount = dcContext.amount;
+        const itemDescription = dcContext.itemDescription || 'Stage Decor Items';
+        const vehicleNumber = dcContext.vehicleNumber;
+        
+        // Validate all required fields are present
+        if (!amount) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'pending_delivery_challan',
+            intentContext: dcContext,
+            currentState: 'awaiting_dc_amount',
+            conversationHistory: history,
+          });
+          return `💰 I need the amount first. Please send the total amount.`;
+        }
+        if (!deliverTo) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'pending_delivery_challan',
+            intentContext: dcContext,
+            currentState: 'awaiting_dc_details',
+            conversationHistory: history,
+          });
+          return `📍 I need the recipient name. Who should this be delivered to?`;
+        }
+        if (!deliveryAddress) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'pending_delivery_challan',
+            intentContext: dcContext,
+            currentState: 'awaiting_dc_address',
+            conversationHistory: history,
+          });
+          return `📍 I need the delivery address. What's the address?`;
+        }
+        
+        try {
+          const challanNumber = await storage.generateDeliveryChallanNumber();
+          const items = [{
+            description: itemDescription,
+            hsnCode: '44219160',
+            quantity: 1,
+            unit: 'nos',
+            rate: amount,
+            amount: amount
+          }];
+          
+          const cgstRate = 9;
+          const sgstRate = 9;
+          const subTotal = amount;
+          const cgstAmount = subTotal * cgstRate / 100;
+          const sgstAmount = subTotal * sgstRate / 100;
+          const totalBeforeRounding = subTotal + cgstAmount + sgstAmount;
+          const totalAmount = Math.round(totalBeforeRounding);
+          const rounding = totalAmount - totalBeforeRounding;
+          
+          await storage.createDeliveryChallan({
+            challanNumber,
+            challanDate: new Date().toISOString().split('T')[0],
+            challanType: 'Job Work',
+            vehicleNumber: vehicleNumber || null,
+            deliverTo,
+            deliveryAddress,
+            placeOfSupply: 'Kerala (32)',
+            items,
+            subTotal: subTotal.toFixed(2),
+            cgstRate: cgstRate.toString(),
+            cgstAmount: cgstAmount.toFixed(2),
+            sgstRate: sgstRate.toString(),
+            sgstAmount: sgstAmount.toFixed(2),
+            rounding: rounding.toFixed(2),
+            totalAmount: totalAmount.toFixed(2),
+            totalInWords: `Indian Rupee ${numberToWords(totalAmount)} Only`,
+            notes: `Created via Oaksy by ${employee.name}`,
+            createdBy: employee.id,
+          });
+
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+
+          const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+            : 'http://localhost:5000';
+          
+          const challans = await storage.getDeliveryChallans();
+          const createdChallan = challans.find(c => c.challanNumber === challanNumber);
+          const printUrl = createdChallan ? `${baseUrl}/print/delivery-challan/${createdChallan.id}` : '';
+
+          return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n${printUrl ? `📄 View PDF: ${printUrl}` : ''}\n\n_Challan created successfully!_`;
+        } catch (error: any) {
+          console.error('[Oaksy] Delivery challan creation error:', error);
+          return `❌ Error creating delivery challan. Please try again or use Oak Book in the app.`;
+        }
+      } else if (lowerMessage === 'no' || lowerMessage === 'n' || lowerMessage === 'cancel') {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        return `👍 Cancelled! Let me know if you need anything else.`;
+      } else {
+        return `Please reply *yes* to create the challan or *no* to cancel.`;
+      }
+    }
+    
+    // Awaiting delivery address
+    if (conversation.currentState === 'awaiting_dc_address') {
+      const dcContext = context as IntentContext;
+      const deliverTo = dcContext.deliverTo || '';
+      const existingAmount = dcContext.amount;
+      
+      // Try to extract amount from message (user might include it with address)
+      const newAmount = extractAmount(messageText);
+      
+      // User provided address (keep all content)
+      const deliveryAddress = messageText.trim();
+      if (deliveryAddress.length < 5) {
+        return `📍 Please provide a valid delivery address (minimum 5 characters).`;
+      }
+      
+      // Use existing amount or newly extracted amount
+      const finalAmount = existingAmount || newAmount;
+      
+      // Immutably merge context - preserve all existing fields and add new ones
+      const updatedContext: IntentContext = { 
+        ...dcContext, 
+        deliveryAddress,
+      };
+      
+      // Only add amount to context if we have one
+      if (finalAmount) {
+        updatedContext.amount = finalAmount;
+      }
+      
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: updatedContext,
+        currentState: finalAmount ? 'awaiting_dc_confirmation' : 'awaiting_dc_amount',
+        conversationHistory: history,
+      });
+      
+      if (finalAmount) {
+        return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm.`;
+      }
+      
+      return `📍 Got the address!\n\nNow, what's the total amount? 💰`;
+    }
+    
+    // Awaiting amount
+    if (conversation.currentState === 'awaiting_dc_amount') {
+      const amount = extractAmount(messageText);
+      if (!amount) {
+        return `Please send the amount. Example: "5000" or "₹15000"`;
+      }
+      
+      const dcContext = context as IntentContext;
+      const deliverTo = dcContext.deliverTo || '';
+      const deliveryAddress = dcContext.deliveryAddress || '';
+      
+      // Immutably merge context with new amount
+      const updatedContext: IntentContext = { ...dcContext, amount };
+      
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: updatedContext,
+        currentState: 'awaiting_dc_confirmation',
+        conversationHistory: history,
+      });
+      
+      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
+    }
+    
+    // Awaiting full details (generic state)
+    if (conversation.currentState === 'awaiting_dc_details') {
+      // Try to parse: "DC to [name], [address], [amount]"
+      const amount = extractAmount(messageText);
+      
+      // Simple parsing - look for "to" keyword
+      let deliverTo = '';
+      let deliveryAddress = '';
+      
+      // Try comma-separated format
+      const parts = messageText.split(',').map(p => p.trim());
+      if (parts.length >= 2) {
+        // First part is deliver to
+        deliverTo = parts[0].replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
+        deliveryAddress = parts.slice(1, -1).join(', ').trim() || parts[1];
+      } else {
+        // Look for "to" pattern
+        const toMatch = messageText.match(/(?:dc|challan|delivery)?\s*to\s+(.+)/i);
+        if (toMatch) {
+          deliverTo = toMatch[1].split(/[\-,]/)[0].trim();
+        } else {
+          deliverTo = messageText.replace(/^(dc|challan|delivery)\s*/i, '').trim().split(/\s+/).slice(0, 3).join(' ');
+        }
+      }
+      
+      const dcContext = context as IntentContext;
+      
+      if (deliverTo && amount) {
+        // Have deliver to and amount, need address - merge with existing context
+        const updatedContext: IntentContext = { ...dcContext, deliverTo, amount };
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'pending_delivery_challan',
+          intentContext: updatedContext,
+          currentState: 'awaiting_dc_address',
+          conversationHistory: history,
+        });
+        return `📋 *Delivery Challan* for *${deliverTo}*\n\nAmount: ₹${amount.toLocaleString('en-IN')}\n\nWhat's the delivery address? 📍`;
+      } else if (deliverTo) {
+        // Have deliver to, need address and amount - merge with existing context
+        const updatedContext: IntentContext = { ...dcContext, deliverTo };
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'pending_delivery_challan',
+          intentContext: updatedContext,
+          currentState: 'awaiting_dc_address',
+          conversationHistory: history,
+        });
+        return `📋 *Delivery Challan* for *${deliverTo}*\n\nWhat's the delivery address? 📍`;
+      }
+      
+      return `❌ I need at least a recipient name.\n\n_Example: "DC to ABC Wedding Hall"_`;
+    }
+  }
+
   // Handle amount without image (text-only expense submission)
   const directAmount = extractAmount(messageText);
   if (directAmount && !context.amount && !mediaUrl && !conversation.activeIntent) {
@@ -2289,7 +2548,7 @@ export async function handleOaksyWhatsAppMessage(
     const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
     
     if (isWeddingPlanner) {
-      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
+      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n📋 *Delivery Challan* - Say "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
     }
 
     return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n\n_Just tell me what you need!_`;
@@ -2391,6 +2650,61 @@ export async function handleOaksyWhatsAppMessage(
       });
 
       return aiAnalysis.message || `📋 *Vendor Payment*\n\nWhich vendor and how much?\n\n_Example: "Flower shop 5000"_`;
+    }
+  }
+
+  // Handle AI-detected delivery challan intent (wedding planners and accountants only)
+  if (aiAnalysis.intent === 'delivery_challan') {
+    const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+    const isAccountant = employee.jobTitle?.toLowerCase().includes('accountant');
+    const isSuperadmin = employee.jobTitle?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+    
+    if (!isWeddingPlanner && !isAccountant && !isSuperadmin) {
+      return `❌ Sorry ${employee.name}, delivery challans can only be created by wedding planners, accountants, or admin.\n\n_Need to create one? Please contact Fida or Femina._`;
+    }
+    
+    const deliverTo = aiAnalysis.extractedData.deliverTo || context.deliverTo;
+    const deliveryAddress = aiAnalysis.extractedData.deliveryAddress || context.deliveryAddress;
+    const amount = aiAnalysis.extractedData.amount || context.amount || extractAmount(messageText);
+    const itemDescription = aiAnalysis.extractedData.itemDescription || context.itemDescription || 'Stage Decor Items';
+    const vehicleNumber = aiAnalysis.extractedData.vehicleNumber || context.vehicleNumber;
+    
+    if (deliverTo && deliveryAddress && amount) {
+      // All required info collected - go to confirmation
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: { deliverTo, deliveryAddress, amount, itemDescription, vehicleNumber },
+        conversationHistory: history,
+        currentState: 'awaiting_dc_confirmation',
+      });
+      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
+    } else if (deliverTo && deliveryAddress) {
+      // Have recipient and address, need amount
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: { deliverTo, deliveryAddress, itemDescription },
+        conversationHistory: history,
+        currentState: 'awaiting_dc_amount',
+      });
+      return `📋 *Delivery Challan*\n\nDelivering to: *${deliverTo}*\n\nWhat's the total amount? 💰`;
+    } else if (deliverTo) {
+      // Have recipient, need address
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: { deliverTo, amount },
+        conversationHistory: history,
+        currentState: 'awaiting_dc_address',
+      });
+      return `📋 *Delivery Challan* for *${deliverTo}*\n\nWhat's the delivery address? 📍`;
+    } else {
+      // Need all details
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'pending_delivery_challan',
+        intentContext: {},
+        conversationHistory: history,
+        currentState: 'awaiting_dc_details',
+      });
+      return aiAnalysis.message || `📋 *Create Delivery Challan*\n\nPlease provide:\n1. Deliver to (name/company)\n2. Delivery address\n3. Amount\n\n_Example: "DC to ABC Wedding Hall, Kochi, 15000"_`;
     }
   }
 
