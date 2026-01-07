@@ -59,6 +59,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch daybook entries');
       return res.json();
     },
+    staleTime: 30000, // Consider data fresh for 30 seconds to reduce refetches
   });
 
   const { data: banks = [] } = useQuery<Bank[]>({
@@ -68,6 +69,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch banks');
       return res.json();
     },
+    staleTime: 30000,
   });
 
   const { data: transfers = [] } = useQuery<BankTransfer[]>({
@@ -77,6 +79,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch bank transfers');
       return res.json();
     },
+    staleTime: 30000,
   });
 
   const { data: events = [] } = useQuery<Event[]>({
@@ -86,6 +89,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
+    staleTime: 60000, // Events change less frequently
   });
 
   const { data: categories = [] } = useQuery<DaybookCategory[]>({
@@ -95,6 +99,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch categories');
       return res.json();
     },
+    staleTime: 60000, // Categories rarely change
   });
 
   const { data: vendors = [] } = useQuery<Vendor[]>({
@@ -104,6 +109,7 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to fetch vendors');
       return res.json();
     },
+    staleTime: 60000,
   });
 
   const formattedDate = format(currentDate, "yyyy-MM-dd");
@@ -116,8 +122,14 @@ export default function Daybook() {
     return transfers.filter(t => t.date === formattedDate);
   }, [transfers, formattedDate]);
 
-  const incomeEntries = todayEntries.filter(e => e.type === "income");
-  const expenseEntries = todayEntries.filter(e => e.type === "expense");
+  const incomeEntries = useMemo(() => 
+    todayEntries.filter(e => e.type === "income"), 
+    [todayEntries]
+  );
+  const expenseEntries = useMemo(() => 
+    todayEntries.filter(e => e.type === "expense"), 
+    [todayEntries]
+  );
 
   const periodDateRange = useMemo(() => {
     switch (periodType) {
@@ -141,13 +153,21 @@ export default function Daybook() {
     });
   }, [entries, periodDateRange]);
 
-  const periodIncome = periodEntries.filter(e => e.type === "income").reduce((acc, curr) => acc + Number(curr.amount), 0);
-  const periodExpense = periodEntries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
-  const periodNetFlow = periodIncome - periodExpense;
+  const { periodIncome, periodExpense, periodNetFlow } = useMemo(() => {
+    const income = periodEntries.filter(e => e.type === "income").reduce((acc, curr) => acc + Number(curr.amount), 0);
+    const expense = periodEntries.filter(e => e.type === "expense").reduce((acc, curr) => acc + Number(curr.amount), 0);
+    return { periodIncome: income, periodExpense: expense, periodNetFlow: income - expense };
+  }, [periodEntries]);
 
-  const totalBankBalance = banks.reduce((acc, bank) => acc + Number(bank.balance), 0);
+  const totalBankBalance = useMemo(() => 
+    banks.reduce((acc, bank) => acc + Number(bank.balance), 0),
+    [banks]
+  );
 
-  const getBankName = (id: string) => banks.find(b => b.id === id)?.name || "Unknown";
+  const getBankName = useMemo(() => {
+    const bankMap = new Map(banks.map(b => [b.id, b.name]));
+    return (id: string) => bankMap.get(id) || "Unknown";
+  }, [banks]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<DaybookEntry>) => {
@@ -159,8 +179,33 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to create entry');
       return res.json();
     },
+    onMutate: async (newEntry) => {
+      // Cancel outgoing refetches to avoid race conditions
+      await queryClient.cancelQueries({ queryKey: ['/api/daybook'] });
+      // Snapshot previous value
+      const previousEntries = queryClient.getQueryData<DaybookEntry[]>(['/api/daybook']);
+      // Optimistically add new entry with temp ID
+      if (previousEntries) {
+        queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], [
+          ...previousEntries,
+          { ...newEntry, id: `temp-${Date.now()}`, createdAt: new Date().toISOString() } as DaybookEntry
+        ]);
+      }
+      return { previousEntries };
+    },
+    onError: (_err, _newEntry, context) => {
+      // Rollback on error
+      if (context?.previousEntries) {
+        queryClient.setQueryData(['/api/daybook'], context.previousEntries);
+      }
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      // Replace temp entry with real one from server
+      queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], (old) => {
+        if (!old) return [data];
+        return old.map(entry => (typeof entry.id === 'string' && entry.id.startsWith('temp-')) ? data : entry);
+      });
+      // Only invalidate banks since balance changed
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
       toast({
         title: "Entry Added",
@@ -175,8 +220,24 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to delete entry');
       return res.json();
     },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/daybook'] });
+      const previousEntries = queryClient.getQueryData<DaybookEntry[]>(['/api/daybook']);
+      // Optimistically remove entry
+      if (previousEntries) {
+        queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], 
+          previousEntries.filter(e => e.id !== id)
+        );
+      }
+      return { previousEntries };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previousEntries) {
+        queryClient.setQueryData(['/api/daybook'], context.previousEntries);
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
     },
   });
 
@@ -190,8 +251,23 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to update entry');
       return res.json();
     },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['/api/daybook'] });
+      const previousEntries = queryClient.getQueryData<DaybookEntry[]>(['/api/daybook']);
+      // Optimistically update entry
+      if (previousEntries) {
+        queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], 
+          previousEntries.map(e => e.id === id ? { ...e, ...data } : e)
+        );
+      }
+      return { previousEntries };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousEntries) {
+        queryClient.setQueryData(['/api/daybook'], context.previousEntries);
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
       setEditingEntry(null);
