@@ -278,6 +278,9 @@ import {
   pendingVendorPayments,
   type PendingVendorPayment,
   type InsertPendingVendorPayment,
+  deliveryChallans,
+  type DeliveryChallan,
+  type InsertDeliveryChallan,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4317,6 +4320,55 @@ export class DatabaseStorage implements IStorage {
       if (!isNaN(num) && num > maxNum) maxNum = num;
     }
     return `VP${String(maxNum + 1).padStart(3, '0')}`;
+  }
+
+  // Delivery Challans
+  async createDeliveryChallan(data: InsertDeliveryChallan): Promise<DeliveryChallan> {
+    const [created] = await db.insert(deliveryChallans).values(data).returning();
+    return created;
+  }
+
+  async getDeliveryChallan(id: string): Promise<DeliveryChallan | undefined> {
+    const [challan] = await db.select().from(deliveryChallans).where(eq(deliveryChallans.id, id));
+    return challan;
+  }
+
+  async getDeliveryChallanByNumber(challanNumber: string): Promise<DeliveryChallan | undefined> {
+    const [challan] = await db.select().from(deliveryChallans)
+      .where(eq(deliveryChallans.challanNumber, challanNumber.toUpperCase()));
+    return challan;
+  }
+
+  async getAllDeliveryChallans(): Promise<DeliveryChallan[]> {
+    return await db.select().from(deliveryChallans)
+      .orderBy(desc(deliveryChallans.createdAt));
+  }
+
+  async updateDeliveryChallan(id: string, data: Partial<DeliveryChallan>): Promise<DeliveryChallan | undefined> {
+    const [updated] = await db.update(deliveryChallans)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(deliveryChallans.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDeliveryChallan(id: string): Promise<void> {
+    await db.delete(deliveryChallans).where(eq(deliveryChallans.id, id));
+  }
+
+  async generateDeliveryChallanNumber(): Promise<string> {
+    // Start from DC-00033 as per requirement
+    const existing = await db.select({ challanNumber: deliveryChallans.challanNumber })
+      .from(deliveryChallans)
+      .where(sql`${deliveryChallans.challanNumber} LIKE 'DC-%'`)
+      .orderBy(desc(deliveryChallans.createdAt));
+    
+    let maxNum = 32; // Start from 32 so next is 33
+    for (const e of existing) {
+      const num = parseInt(e.challanNumber.replace('DC-', ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+    return `DC-${String(maxNum + 1).padStart(5, '0')}`;
   }
 }
 
