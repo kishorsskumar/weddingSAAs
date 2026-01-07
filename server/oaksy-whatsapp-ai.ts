@@ -1392,9 +1392,15 @@ export async function handleOaksyWhatsAppMessage(
     return `👋 Hi ${submitterName}!\n\nI'm *Oaksy AI* from Oakstreet Events 🌳\n\n*I can help you add leads to Oak Sales:*\n• Just send the client details (name, phone, event type)\n• Or forward any enquiry message\n\n_Example: "Lead: John 9876543210 wedding Dec 2025"_`;
   }
   
-  const employee = conversation.employeeId 
+  // Try to get employee from conversation first, then fall back to phone lookup
+  let employee = conversation.employeeId 
     ? await storage.getEmployee(conversation.employeeId)
     : null;
+  
+  // If no employee from conversation, try by phone (important for DC flow from superadmin/authorized users)
+  if (!employee) {
+    employee = await storage.getEmployeeByPhone(normalizedPhone);
+  }
 
   if (!employee) {
     return `👋 Hi! I'm Oaksy, your AI companion at Oakstreet Events.\n\n❌ I couldn't find your employee record. Please contact HR to ensure your phone number is registered.\n\n_Once registered, I can help you submit expenses and apply for leave!_ 🌳`;
