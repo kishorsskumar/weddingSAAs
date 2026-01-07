@@ -2194,8 +2194,7 @@ export async function handleOaksyWhatsAppMessage(
             ? `https://${process.env.REPLIT_DEV_DOMAIN}`
             : 'http://localhost:5000';
           
-          const challans = await storage.getDeliveryChallans();
-          const createdChallan = challans.find(c => c.challanNumber === challanNumber);
+          const createdChallan = await storage.getDeliveryChallanByNumber(challanNumber);
           const printUrl = createdChallan ? `${baseUrl}/print/delivery-challan/${createdChallan.id}` : '';
 
           return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n${printUrl ? `📄 View PDF: ${printUrl}` : ''}\n\n_Challan created successfully!_`;
@@ -2225,8 +2224,17 @@ export async function handleOaksyWhatsAppMessage(
       // Try to extract amount from message (user might include it with address)
       const newAmount = extractAmount(messageText);
       
-      // User provided address (keep all content)
-      const deliveryAddress = messageText.trim();
+      // Extract vehicle number if included (e.g., "Vehicle number KL19C3786" or just "KL19C3786")
+      const vehiclePattern = /(?:vehicle\s*(?:no|number)?\.?\s*)?([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,2}\s*\d{4})/i;
+      const vehicleMatch = messageText.match(vehiclePattern);
+      const vehicleNumber = vehicleMatch ? vehicleMatch[1].replace(/\s/g, '').toUpperCase() : dcContext.vehicleNumber;
+      
+      // Clean address by removing vehicle number mention
+      let deliveryAddress = messageText.trim();
+      if (vehicleMatch) {
+        deliveryAddress = deliveryAddress.replace(vehiclePattern, '').replace(/,\s*$/, '').trim();
+      }
+      
       if (deliveryAddress.length < 5) {
         return `📍 Please provide a valid delivery address (minimum 5 characters).`;
       }
@@ -2238,6 +2246,7 @@ export async function handleOaksyWhatsAppMessage(
       const updatedContext: IntentContext = { 
         ...dcContext, 
         deliveryAddress,
+        vehicleNumber,
       };
       
       // Only add amount to context if we have one
@@ -2253,7 +2262,8 @@ export async function handleOaksyWhatsAppMessage(
       });
       
       if (finalAmount) {
-        return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm.`;
+        const vehicleInfo = vehicleNumber ? `\n🚗 Vehicle: ${vehicleNumber}` : '';
+        return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm.`;
       }
       
       return `📍 Got the address!\n\nNow, what's the total amount? 💰`;
@@ -2280,7 +2290,9 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: history,
       });
       
-      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
+      const vehicleNumber = dcContext.vehicleNumber;
+      const vehicleInfo = vehicleNumber ? `\n🚗 Vehicle: ${vehicleNumber}` : '';
+      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
     }
     
     // Awaiting full details (generic state)
@@ -2724,7 +2736,8 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: history,
         currentState: 'awaiting_dc_confirmation',
       });
-      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
+      const vehicleInfo = vehicleNumber ? `\n🚗 Vehicle: ${vehicleNumber}` : '';
+      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
     } else if (deliverTo && deliveryAddress) {
       // Have recipient and address, need amount
       await storage.updateWhatsappConversation(conversation.id, {
