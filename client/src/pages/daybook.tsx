@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags, Camera, Upload, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, TrendingUp, TrendingDown, Wallet, Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ArrowRightLeft, Building2, CalendarDays, Check, ChevronsUpDown, Tags, Camera, Upload, Loader2, Eye, Printer, X } from "lucide-react";
 import { format, addDays, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isWithinInterval } from "date-fns";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,7 @@ export default function Daybook() {
   const [periodType, setPeriodType] = useState<"day" | "month" | "year" | "custom">("month");
   const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1819,6 +1820,16 @@ export default function Daybook() {
                       />
                     </div>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => setIsPreviewOpen(true)}
+                    data-testid="button-preview-daybook"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Preview
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -2297,6 +2308,168 @@ export default function Daybook() {
                 </div>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:overflow-visible">
+          <DialogHeader className="print:hidden">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Daybook Preview
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6" id="daybook-preview-content">
+            {/* Header for print */}
+            <div className="text-center border-b pb-4">
+              <h1 className="text-2xl font-bold font-serif text-[#7C8B5D]">Oakstreet Events</h1>
+              <h2 className="text-lg font-medium mt-1">Daybook Report</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {format(periodDateRange.start, "dd MMM yyyy")} - {format(periodDateRange.end, "dd MMM yyyy")}
+              </p>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-3 gap-4 print:gap-2">
+              <div className="p-4 rounded-lg bg-green-50 border border-green-200 print:p-2">
+                <p className="text-sm text-green-700 font-medium">Total Income</p>
+                <p className="text-xl font-bold text-green-700 font-mono">₹{periodIncome.toLocaleString()}</p>
+              </div>
+              <div className="p-4 rounded-lg bg-red-50 border border-red-200 print:p-2">
+                <p className="text-sm text-red-700 font-medium">Total Expenses</p>
+                <p className="text-xl font-bold text-red-700 font-mono">₹{periodExpense.toLocaleString()}</p>
+              </div>
+              <div className={cn(
+                "p-4 rounded-lg border print:p-2",
+                periodNetFlow >= 0 ? "bg-primary/5 border-primary/20" : "bg-orange-50 border-orange-200"
+              )}>
+                <p className="text-sm font-medium">Net Cash Flow</p>
+                <p className={cn("text-xl font-bold font-mono", periodNetFlow >= 0 ? "text-primary" : "text-orange-600")}>
+                  ₹{periodNetFlow.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Income Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-green-700 flex items-center gap-2 mb-3">
+                <TrendingUp className="h-4 w-4" />
+                Income Entries ({periodEntries.filter(e => e.type === "income").length})
+              </h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Description</TableHead>
+                    <TableHead className="text-xs">Category</TableHead>
+                    <TableHead className="text-xs">Bank</TableHead>
+                    <TableHead className="text-right text-xs">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {periodEntries.filter(e => e.type === "income").length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-sm">
+                        No income entries for this period
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    periodEntries
+                      .filter(e => e.type === "income")
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="text-xs">{format(parseISO(entry.date), "dd MMM")}</TableCell>
+                          <TableCell className="text-xs">{entry.description}</TableCell>
+                          <TableCell className="text-xs">{entry.category || "-"}</TableCell>
+                          <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                          <TableCell className="text-right text-xs font-mono text-green-600">
+                            +₹{Number(entry.amount).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                  <TableRow className="bg-green-50 font-semibold">
+                    <TableCell colSpan={4} className="text-right text-sm">Total Income:</TableCell>
+                    <TableCell className="text-right text-sm font-mono text-green-700">
+                      ₹{periodIncome.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Expense Section */}
+            <div>
+              <h3 className="text-lg font-semibold text-red-700 flex items-center gap-2 mb-3">
+                <TrendingDown className="h-4 w-4" />
+                Expense Entries ({periodEntries.filter(e => e.type === "expense").length})
+              </h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Description</TableHead>
+                    <TableHead className="text-xs">Category</TableHead>
+                    <TableHead className="text-xs">Bank</TableHead>
+                    <TableHead className="text-right text-xs">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {periodEntries.filter(e => e.type === "expense").length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-4 text-muted-foreground text-sm">
+                        No expense entries for this period
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    periodEntries
+                      .filter(e => e.type === "expense")
+                      .sort((a, b) => a.date.localeCompare(b.date))
+                      .map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="text-xs">{format(parseISO(entry.date), "dd MMM")}</TableCell>
+                          <TableCell className="text-xs">{entry.description}</TableCell>
+                          <TableCell className="text-xs">{entry.category || "-"}</TableCell>
+                          <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                          <TableCell className="text-right text-xs font-mono text-red-600">
+                            -₹{Number(entry.amount).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                  <TableRow className="bg-red-50 font-semibold">
+                    <TableCell colSpan={4} className="text-right text-sm">Total Expenses:</TableCell>
+                    <TableCell className="text-right text-sm font-mono text-red-700">
+                      ₹{periodExpense.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t pt-4 text-center text-xs text-muted-foreground">
+              <p>Generated on {format(new Date(), "dd MMM yyyy 'at' hh:mm a")}</p>
+              <p className="mt-1">Oakstreet Events - Daybook Report</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2 mt-4 print:hidden">
+            <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
+              <X className="h-4 w-4 mr-1" />
+              Close
+            </Button>
+            <Button 
+              onClick={() => window.print()}
+              className="bg-[#7C8B5D] hover:bg-[#6A7850]"
+            >
+              <Printer className="h-4 w-4 mr-1" />
+              Print
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
