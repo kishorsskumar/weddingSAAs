@@ -523,6 +523,14 @@ const WEDDING_PLANNER_PHONES: Record<string, string> = {
   'femina': '+917306687284',
 };
 
+// Authorized DC creators (can create Delivery Challans via WhatsApp)
+const AUTHORIZED_DC_CREATORS: Record<string, string> = {
+  'kishor': '+917902373354',           // Superadmin
+  'fida fathima': '+919895810975',     // Wedding Planner
+  'femina km': '+917306687284',        // Wedding Planner
+  'sabitha': '+918606687286',          // Accountant
+};
+
 async function getSuperadminPhone(): Promise<string> {
   return SUPERADMIN_WHATSAPP;
 }
@@ -554,6 +562,14 @@ function getWeddingPlannerPhone(plannerName: string): string | null {
     }
   }
   return null;
+}
+
+function isAuthorizedDcCreator(phone: string): boolean {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  return Object.values(AUTHORIZED_DC_CREATORS).some(authPhone => {
+    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
+    return normalizedPhone === normalizedAuthPhone;
+  });
 }
 
 function generateUniqueApprovalCode(prefix: string): string {
@@ -2641,10 +2657,10 @@ export async function handleOaksyWhatsAppMessage(
       conversationHistory: [],
     });
 
-    // Role-aware greeting
-    const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+    // Role-aware greeting - check if authorized for DC creation
+    const canCreateDc = isAuthorizedDcCreator(normalizedPhone) || employee.jobTitle?.toLowerCase().includes('accountant');
     
-    if (isWeddingPlanner) {
+    if (canCreateDc) {
       return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n📋 *Delivery Challan* - Say "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
     }
 
@@ -2750,15 +2766,16 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
 
-  // Handle AI-detected delivery challan intent (wedding planners, accountants, superadmin, test employee)
+  // Handle AI-detected delivery challan intent (authorized DC creators only)
   if (aiAnalysis.intent === 'delivery_challan') {
-    const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+    // Check if authorized by phone number or by role
+    const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
     const isAccountant = employee.jobTitle?.toLowerCase().includes('accountant');
     const isSuperadmin = employee.jobTitle?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
     const isTestEmployee = employee.name.toLowerCase().includes('test');
     
-    if (!isWeddingPlanner && !isAccountant && !isSuperadmin && !isTestEmployee) {
-      return `❌ Sorry ${employee.name}, delivery challans can only be created by wedding planners, accountants, or admin.\n\n_Need to create one? Please contact Fida or Femina._`;
+    if (!isAuthorizedByPhone && !isAccountant && !isSuperadmin && !isTestEmployee) {
+      return `❌ Sorry ${employee.name}, delivery challans can only be created by authorized staff.\n\n_Need to create one? Please contact Fida, Femina, or Sabitha._`;
     }
     
     const deliverTo = aiAnalysis.extractedData.deliverTo || context.deliverTo;
