@@ -509,6 +509,12 @@ Understand the intent flexibly - don't require specific formats. Be helpful and 
 // Superadmin WhatsApp number for approval notifications
 const SUPERADMIN_WHATSAPP = '+917902373354';
 
+// Authorized lead submitters (can add leads to Oak Sales via WhatsApp)
+const AUTHORIZED_LEAD_SUBMITTERS: Record<string, string> = {
+  'kishor': '+917902373354',
+  'anjana saji': '+918281569046',
+};
+
 // Wedding Planner phone numbers for lead notifications
 const WEDDING_PLANNER_PHONES: Record<string, string> = {
   'fida fathima': '+919895810975',
@@ -519,6 +525,25 @@ const WEDDING_PLANNER_PHONES: Record<string, string> = {
 
 async function getSuperadminPhone(): Promise<string> {
   return SUPERADMIN_WHATSAPP;
+}
+
+function isAuthorizedLeadSubmitter(phone: string): boolean {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  return Object.values(AUTHORIZED_LEAD_SUBMITTERS).some(authPhone => {
+    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
+    return normalizedPhone === normalizedAuthPhone;
+  });
+}
+
+function getLeadSubmitterName(phone: string): string {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  for (const [name, authPhone] of Object.entries(AUTHORIZED_LEAD_SUBMITTERS)) {
+    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
+    if (normalizedPhone === normalizedAuthPhone) {
+      return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+  }
+  return 'Unknown';
 }
 
 function getWeddingPlannerPhone(plannerName: string): string | null {
@@ -1312,6 +1337,27 @@ export async function handleOaksyWhatsAppMessage(
     
     // Default Kishor greeting - simplified
     return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n\n_Send lead info or ask anything!_ 🌳`;
+  }
+  
+  // Check if this is from an authorized lead submitter (non-superadmin like Anjana)
+  const isLeadSubmitter = isAuthorizedLeadSubmitter(normalizedPhone) && !isSuperadminByPhone;
+  
+  if (isLeadSubmitter) {
+    const submitterName = getLeadSubmitterName(normalizedPhone);
+    
+    // Handle lead submissions for authorized submitters
+    const isInLeadFlow = conversation.activeIntent === 'lead';
+    const looksLikeLead = /lead|customer|client|enquiry|assign|fida|femina|\d{10}/i.test(messageText);
+    
+    if (isInLeadFlow || looksLikeLead) {
+      const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
+      if (leadResponse) {
+        return leadResponse;
+      }
+    }
+    
+    // Default greeting for lead submitters
+    return `👋 Hi ${submitterName}!\n\nI'm *Oaksy AI* from Oakstreet Events 🌳\n\n*I can help you add leads to Oak Sales:*\n• Just send the client details (name, phone, event type)\n• Or forward any enquiry message\n\n_Example: "Lead: John 9876543210 wedding Dec 2025"_`;
   }
   
   const employee = conversation.employeeId 
