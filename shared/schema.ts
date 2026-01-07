@@ -1939,3 +1939,41 @@ export const pendingVendorPayments = pgTable("pending_vendor_payments", {
 export const insertPendingVendorPaymentSchema = createInsertSchema(pendingVendorPayments).omit({ id: true, createdAt: true });
 export type InsertPendingVendorPayment = z.infer<typeof insertPendingVendorPaymentSchema>;
 export type PendingVendorPayment = typeof pendingVendorPayments.$inferSelect;
+
+// Delivery Challans - For tracking goods delivery with challan documents
+export const deliveryChallans = pgTable("delivery_challans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  challanNumber: text("challan_number").notNull().unique(), // DC-00033, etc.
+  challanDate: date("challan_date").notNull(),
+  challanType: text("challan_type").notNull().default('Job Work'), // Job Work, Supply, etc.
+  vehicleNumber: text("vehicle_number"), // Vehicle number for delivery
+  
+  // Recipient/Delivery Address
+  deliverTo: text("deliver_to").notNull(), // Recipient name/company
+  deliveryAddress: text("delivery_address").notNull(),
+  placeOfSupply: text("place_of_supply").default('Kerala (32)'),
+  
+  // Items as JSON array: [{description, hsnCode, quantity, unit, rate, amount}]
+  items: jsonb("items").notNull().default([]),
+  
+  // Tax and totals
+  subTotal: decimal("sub_total", { precision: 12, scale: 2 }).notNull().default('0'),
+  cgstRate: decimal("cgst_rate", { precision: 5, scale: 2 }).default('9'), // 9%
+  cgstAmount: decimal("cgst_amount", { precision: 12, scale: 2 }).default('0'),
+  sgstRate: decimal("sgst_rate", { precision: 5, scale: 2 }).default('9'), // 9%
+  sgstAmount: decimal("sgst_amount", { precision: 12, scale: 2 }).default('0'),
+  rounding: decimal("rounding", { precision: 10, scale: 2 }).default('0'),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  totalInWords: text("total_in_words"),
+  
+  // Metadata
+  status: text("status").notNull().default('draft'), // draft, sent, delivered
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDeliveryChallanSchema = createInsertSchema(deliveryChallans).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDeliveryChallan = z.infer<typeof insertDeliveryChallanSchema>;
+export type DeliveryChallan = typeof deliveryChallans.$inferSelect;
