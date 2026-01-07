@@ -50,7 +50,9 @@ export default function Daybook() {
   const { toast } = useToast();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isSuperAdmin = user?.role === 'superadmin';
+  const isAccountant = user?.role === 'accountant';
   const canEditEntries = true; // All users can edit entries
+  const canDeleteEntries = isAdmin || isAccountant; // Admins and accountants can delete entries
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -1569,7 +1571,7 @@ export default function Daybook() {
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </Button>
-                                    {isAdmin && (
+                                    {canDeleteEntries && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
@@ -1659,7 +1661,7 @@ export default function Daybook() {
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </Button>
-                                    {isAdmin && (
+                                    {canDeleteEntries && (
                                       <Button 
                                         size="icon" 
                                         variant="ghost" 
