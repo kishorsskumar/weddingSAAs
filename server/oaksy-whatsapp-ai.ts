@@ -947,21 +947,28 @@ async function createLeadInOakSales(
 
 async function notifyWeddingPlanner(
   plannerName: string,
-  leadDetails: LeadContext
+  leadDetails: LeadContext,
+  submitterName?: string
 ): Promise<boolean> {
+  console.log('[Oaksy] Attempting to notify wedding planner:', plannerName);
   const plannerPhone = getWeddingPlannerPhone(plannerName);
   if (!plannerPhone) {
-    console.log('[Oaksy] No phone number found for planner:', plannerName);
+    console.log('[Oaksy] No phone number found for planner:', plannerName, '- Available planners:', Object.keys(WEDDING_PLANNER_PHONES).join(', '));
     return false;
   }
   
-  const message = `🌳 *New Lead Assigned*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Customer:* ${leadDetails.customerName || 'Not specified'}\n📞 *Phone:* ${leadDetails.customerPhone || 'Not provided'}\n📅 *Event Date:* ${leadDetails.eventDate || 'TBD'}\n📍 *Venue:* ${leadDetails.venue || 'TBD'}\n\n_Added via WhatsApp by Superadmin_\n\nCheck Oak Sales for more details 🌿`;
+  console.log('[Oaksy] Found phone for planner:', plannerName, '→', plannerPhone);
+  const submittedBy = submitterName || 'Superadmin';
+  
+  const message = `🌳 *New Lead Assigned*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Customer:* ${leadDetails.customerName || 'Not specified'}\n📞 *Phone:* ${leadDetails.customerPhone || 'Not provided'}\n📅 *Event Date:* ${leadDetails.eventDate || 'TBD'}\n📍 *Venue:* ${leadDetails.venue || 'TBD'}\n\n_Added via WhatsApp by ${submittedBy}_\n\nCheck Oak Sales for more details 🌿`;
   
   try {
+    console.log('[Oaksy] Sending WhatsApp notification to planner:', plannerPhone);
     await sendWhatsAppMessage(plannerPhone, message);
+    console.log('[Oaksy] Successfully notified wedding planner:', plannerName);
     return true;
   } catch (error) {
-    console.error('[Oaksy] Failed to notify planner:', error);
+    console.error('[Oaksy] Failed to notify planner:', plannerName, 'at', plannerPhone, '- Error:', error);
     return false;
   }
 }
@@ -1025,7 +1032,8 @@ async function handleSuperadminLeadMessage(
       const { dealId } = await createLeadInOakSales(leadContext, 'superadmin');
       
       // Notify the wedding planner
-      await notifyWeddingPlanner(leadContext.weddingPlanner, leadContext);
+      const submitterName = getLeadSubmitterName(fromNumber);
+      await notifyWeddingPlanner(leadContext.weddingPlanner, leadContext, submitterName);
       
       // Reset context
       await storage.updateWhatsappConversation(conversation.id, {

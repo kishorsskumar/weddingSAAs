@@ -1034,9 +1034,17 @@ function PipelineSection({
                             {formatCurrency(deal.value)}
                           </p>
                           {contact && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {contact.firstName} {contact.lastName}
-                            </p>
+                            <div className="mt-2 space-y-0.5">
+                              <p className="text-xs text-muted-foreground">
+                                {contact.firstName} {contact.lastName}
+                              </p>
+                              {contact.phone && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {contact.phone}
+                                </p>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

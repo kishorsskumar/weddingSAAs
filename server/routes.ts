@@ -5769,7 +5769,14 @@ export async function registerRoutes(
 
   // Oak Sales - Contacts
   app.get('/api/sales/contacts', async (req, res) => {
-    const contacts = await storage.getAllSalesContacts();
+    const user = req.user;
+    let contacts = await storage.getAllSalesContacts();
+    
+    // Wedding planners only see their own contacts
+    if (user && user.role === 'wedding_planner' && user.id) {
+      contacts = contacts.filter(c => c.ownerId === user.id);
+    }
+    
     res.json(contacts);
   });
 
