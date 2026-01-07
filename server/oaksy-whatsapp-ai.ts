@@ -2316,15 +2316,16 @@ export async function handleOaksyWhatsAppMessage(
       const deliverTo = dcContext.deliverTo || '';
       const existingAmount = dcContext.amount;
       
-      // Try to extract amount from message (user might include it with address)
-      const newAmount = extractAmount(messageText);
-      
-      // Check if the message is ONLY an amount (not a valid address)
-      // Messages like "Amount 45K", "45K", "₹45000", "45 thousand" are amounts, not addresses
+      // STRICT amount detection - ONLY accept if message has explicit currency markers
+      // This prevents postal codes (682001) and building numbers from being treated as amounts
+      const hasExplicitCurrencyMarker = /(?:rs\.?|₹|inr|amount)\s*\d+|^\d+[\d,]*\s*(?:k|thousand|lakh|lakhs|crore)$/i.test(messageText.trim());
       const isOnlyAmount = /^(?:amount\s*)?(?:rs\.?|₹|inr)?\s*\d+[\d,]*(?:\.\d+)?\s*(?:k|thousand|lakh|lakhs|crore)?$/i.test(messageText.trim());
       
+      // Only extract amount if message has explicit currency context
+      const newAmount = hasExplicitCurrencyMarker ? extractAmount(messageText) : null;
+      
       if (isOnlyAmount && newAmount) {
-        // User sent an amount when we expected an address - save amount, ask for address again
+        // User sent an explicit amount when we expected an address - save amount, ask for address again
         const updatedContext: IntentContext = { 
           ...dcContext, 
           amount: newAmount,
@@ -2351,15 +2352,16 @@ export async function handleOaksyWhatsAppMessage(
         deliveryAddress = deliveryAddress.replace(vehiclePattern, '').replace(/,\s*$/, '').trim();
       }
       
-      // Also remove amount-like patterns from address if they're at the end
-      deliveryAddress = deliveryAddress.replace(/,?\s*(?:amount\s*)?(?:rs\.?|₹|inr)?\s*\d+[\d,]*(?:\.\d+)?\s*(?:k|thousand|lakh|lakhs|crore)?$/i, '').trim();
+      // Remove any explicit amount patterns from address (if user included amount with address)
+      deliveryAddress = deliveryAddress.replace(/,?\s*(?:amount\s*)?(?:rs\.?|₹|inr)\s*\d+[\d,]*(?:\.\d+)?\s*(?:k|thousand|lakh|lakhs|crore)?$/i, '').trim();
       
       if (deliveryAddress.length < 5) {
         return `📍 Please provide a valid delivery address (minimum 5 characters).`;
       }
       
-      // Use existing amount or newly extracted amount
-      const finalAmount = existingAmount || newAmount;
+      // ONLY use existing amount - do NOT extract from address messages
+      // This prevents postal codes and building numbers from becoming the challan amount
+      const finalAmount = existingAmount;
       
       // Immutably merge context - preserve all existing fields and add new ones
       const updatedContext: IntentContext = { 
@@ -2367,11 +2369,6 @@ export async function handleOaksyWhatsAppMessage(
         deliveryAddress,
         vehicleNumber,
       };
-      
-      // Only add amount to context if we have one
-      if (finalAmount) {
-        updatedContext.amount = finalAmount;
-      }
       
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'pending_delivery_challan',
@@ -2385,7 +2382,7 @@ export async function handleOaksyWhatsAppMessage(
         return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm.`;
       }
       
-      return `📍 Got the address!\n\nNow, what's the total amount? 💰`;
+      return `📍 Got the address!\n\nNow, what's the total amount? 💰\n\n_Send as: "45000", "Rs 45000", or "45K"_`;
     }
     
     // Awaiting amount
@@ -2417,18 +2414,18 @@ export async function handleOaksyWhatsAppMessage(
     // Awaiting full details (generic state)
     if (conversation.currentState === 'awaiting_dc_details') {
       // Try to parse: "DC to [name], [address], [amount]"
-      const amount = extractAmount(messageText);
+      // STRICT: Only extract amounts with explicit currency markers to prevent address numbers being treated as amounts
+      const hasExplicitCurrencyMarker = /(?:rs\.?|₹|inr|amount)\s*\d+|\d+[\d,]*\s*(?:k|thousand|lakh|lakhs|crore)/i.test(messageText);
+      const amount = hasExplicitCurrencyMarker ? extractAmount(messageText) : null;
       
       // Simple parsing - look for "to" keyword
       let deliverTo = '';
-      let deliveryAddress = '';
       
       // Try comma-separated format
       const parts = messageText.split(',').map(p => p.trim());
       if (parts.length >= 2) {
         // First part is deliver to
         deliverTo = parts[0].replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
-        deliveryAddress = parts.slice(1, -1).join(', ').trim() || parts[1];
       } else {
         // Look for "to" pattern
         const toMatch = messageText.match(/(?:dc|challan|delivery)?\s*to\s+(.+)/i);
@@ -2439,10 +2436,15 @@ export async function handleOaksyWhatsAppMessage(
         }
       }
       
+      // Clean recipient name - remove amount-like patterns
+      if (amount) {
+        deliverTo = deliverTo.replace(/(?:rs\.?|₹|inr)?\s*\d+[\d,]*\s*(?:k|thousand|lakh|lakhs|crore)?/i, '').trim();
+      }
+      
       const dcContext = context as IntentContext;
       
       if (deliverTo && amount) {
-        // Have deliver to and amount, need address - merge with existing context
+        // Have deliver to and explicit amount, need address
         const updatedContext: IntentContext = { ...dcContext, deliverTo, amount };
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'pending_delivery_challan',
@@ -2452,7 +2454,7 @@ export async function handleOaksyWhatsAppMessage(
         });
         return `📋 *Delivery Challan* for *${deliverTo}*\n\nAmount: ₹${amount.toLocaleString('en-IN')}\n\nWhat's the delivery address? 📍`;
       } else if (deliverTo) {
-        // Have deliver to, need address and amount - merge with existing context
+        // Have deliver to, need address and amount - ALWAYS ask for amount explicitly
         const updatedContext: IntentContext = { ...dcContext, deliverTo };
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'pending_delivery_challan',
@@ -2844,7 +2846,9 @@ export async function handleOaksyWhatsAppMessage(
     
     const deliverTo = aiAnalysis.extractedData.deliverTo || context.deliverTo;
     const deliveryAddress = aiAnalysis.extractedData.deliveryAddress || context.deliveryAddress;
-    const amount = aiAnalysis.extractedData.amount || context.amount || extractAmount(messageText);
+    // IMPORTANT: Only use amount from AI extraction or context - DO NOT extract from raw message
+    // This prevents address numbers (like "25/103") from being mistaken as amounts
+    const amount = aiAnalysis.extractedData.amount || context.amount;
     const itemDescription = aiAnalysis.extractedData.itemDescription || context.itemDescription || 'Stage Decor Items';
     const vehicleNumber = aiAnalysis.extractedData.vehicleNumber || context.vehicleNumber;
     
