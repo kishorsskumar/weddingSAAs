@@ -2200,6 +2200,7 @@ export async function handleOaksyWhatsAppMessage(
         
         try {
           const challanNumber = await storage.generateDeliveryChallanNumber();
+          const challanDate = new Date().toISOString().split('T')[0];
           const items = [{
             description: itemDescription,
             hsnCode: '44219160',
@@ -2217,10 +2218,12 @@ export async function handleOaksyWhatsAppMessage(
           const totalBeforeRounding = subTotal + cgstAmount + sgstAmount;
           const totalAmount = Math.round(totalBeforeRounding);
           const rounding = totalAmount - totalBeforeRounding;
+          const totalInWords = `Indian Rupee ${numberToWords(totalAmount)} Only`;
+          const notes = `Created via Oaksy by ${employee.name}`;
           
           await storage.createDeliveryChallan({
             challanNumber,
-            challanDate: new Date().toISOString().split('T')[0],
+            challanDate,
             challanType: 'Job Work',
             vehicleNumber: vehicleNumber || null,
             deliverTo,
@@ -2234,8 +2237,8 @@ export async function handleOaksyWhatsAppMessage(
             sgstAmount: sgstAmount.toFixed(2),
             rounding: rounding.toFixed(2),
             totalAmount: totalAmount.toFixed(2),
-            totalInWords: `Indian Rupee ${numberToWords(totalAmount)} Only`,
-            notes: `Created via Oaksy by ${employee.name}`,
+            totalInWords,
+            notes,
             createdBy: employee.userId || null,
           });
 
@@ -2246,14 +2249,50 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
 
-          const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-            ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-            : 'http://localhost:5000';
-          
-          const createdChallan = await storage.getDeliveryChallanByNumber(challanNumber);
-          const printUrl = createdChallan ? `${baseUrl}/print/delivery-challan/${createdChallan.id}` : '';
-
-          return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n${printUrl ? `📄 View PDF: ${printUrl}` : ''}\n\n_Challan created successfully!_`;
+          // Generate PDF and send via WhatsApp
+          try {
+            const { generateDeliveryChallanPdf } = await import('./document-service');
+            const { ObjectStorageService } = await import('./objectStorage');
+            const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+            
+            const pdfBuffer = await generateDeliveryChallanPdf({
+              challanNumber,
+              challanDate,
+              challanType: 'Job Work',
+              vehicleNumber: vehicleNumber || null,
+              deliverTo,
+              deliveryAddress,
+              placeOfSupply: 'Kerala (32)',
+              items,
+              subTotal: subTotal.toFixed(2),
+              cgstRate: cgstRate.toString(),
+              cgstAmount: cgstAmount.toFixed(2),
+              sgstRate: sgstRate.toString(),
+              sgstAmount: sgstAmount.toFixed(2),
+              rounding: rounding.toFixed(2),
+              totalAmount: totalAmount.toFixed(2),
+              totalInWords,
+              notes,
+            });
+            
+            const objectStorage = new ObjectStorageService();
+            const filename = `delivery-challans/DC-${challanNumber}-${Date.now()}.pdf`;
+            const pdfUrl = await objectStorage.uploadPublicBuffer(pdfBuffer, filename, 'application/pdf');
+            
+            console.log('[Oaksy] DC PDF generated and uploaded:', pdfUrl);
+            
+            // Send PDF via WhatsApp
+            const caption = `📋 *Delivery Challan ${challanNumber}*\n\n📍 To: ${deliverTo}\n💵 Total: ₹${totalAmount.toLocaleString('en-IN')}`;
+            await sendWhatsAppMediaMessage(fromNumber, pdfUrl, caption);
+            
+            console.log('[Oaksy] DC PDF sent to:', fromNumber);
+            
+            return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n📄 _PDF sent!_`;
+          } catch (pdfError: any) {
+            console.error('[Oaksy] Error generating/sending DC PDF:', pdfError.message);
+            // Fall back to text-only confirmation if PDF fails
+            return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n_Challan created successfully! (PDF could not be generated)_`;
+          }
         } catch (error: any) {
           console.error('[Oaksy] Delivery challan creation error:', error);
           return `❌ Error creating delivery challan. Please try again or use Oak Book in the app.`;

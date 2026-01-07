@@ -489,3 +489,185 @@ export async function generateEmployeeReportPdf(): Promise<{ documentId: string;
     message: `Employee report generated with ${employees.length} employees`,
   };
 }
+
+export async function generateDeliveryChallanPdf(challan: {
+  challanNumber: string;
+  challanDate: string;
+  challanType: string;
+  vehicleNumber?: string | null;
+  deliverTo: string;
+  deliveryAddress: string;
+  placeOfSupply: string;
+  items: Array<{ description: string; hsnCode?: string; quantity: number; unit?: string; rate: number; amount: number }>;
+  subTotal: string;
+  cgstRate: string;
+  cgstAmount: string;
+  sgstRate: string;
+  sgstAmount: string;
+  rounding: string;
+  totalAmount: string;
+  totalInWords: string;
+  notes?: string | null;
+}): Promise<Buffer> {
+  const doc = new jsPDF();
+  const YEPMAN_COLOR: [number, number, number] = [157, 41, 102];
+  
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.text('Yepman International', 14, 20);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(100);
+  doc.text('Edathal P.O, Aluva, Ernakulam, Kerala - 683564', 14, 27);
+  doc.text('Ph: +91 9895810975 | GSTIN: 32AALCS5678K1Z5', 14, 32);
+  
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.text('DELIVERY CHALLAN', 196, 20, { align: 'right' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50);
+  doc.text(`Challan No: ${challan.challanNumber}`, 196, 28, { align: 'right' });
+  doc.text(`Date: ${formatDate(challan.challanDate)}`, 196, 34, { align: 'right' });
+  doc.text(`Type: ${challan.challanType}`, 196, 40, { align: 'right' });
+  if (challan.vehicleNumber) {
+    doc.text(`Vehicle: ${challan.vehicleNumber}`, 196, 46, { align: 'right' });
+  }
+  
+  doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.setLineWidth(0.5);
+  doc.line(14, 50, 196, 50);
+  
+  doc.setFillColor(248, 249, 250);
+  doc.rect(14, 55, 85, 30, 'F');
+  doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.setLineWidth(1);
+  doc.line(14, 55, 14, 85);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.text('SHIPPED FROM', 17, 61);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50);
+  doc.setFontSize(11);
+  doc.text('Yepman International', 17, 68);
+  doc.setFontSize(9);
+  doc.text('Edathal P.O, Aluva', 17, 74);
+  doc.text('Ernakulam, Kerala - 683564', 17, 79);
+  
+  doc.setFillColor(248, 249, 250);
+  doc.rect(105, 55, 91, 30, 'F');
+  doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.line(105, 55, 105, 85);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.text('DELIVER TO', 108, 61);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(50);
+  doc.setFontSize(11);
+  doc.text(challan.deliverTo, 108, 68);
+  doc.setFontSize(9);
+  const addressLines = doc.splitTextToSize(challan.deliveryAddress, 85);
+  doc.text(addressLines.slice(0, 2), 108, 74);
+  
+  const tableData = challan.items.map((item, idx) => [
+    (idx + 1).toString(),
+    item.description,
+    item.hsnCode || '-',
+    item.quantity.toString(),
+    item.unit || 'nos',
+    formatCurrency(item.rate),
+    formatCurrency(item.amount),
+  ]);
+  
+  autoTable(doc, {
+    startY: 92,
+    head: [['Sl.', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate', 'Amount']],
+    body: tableData,
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: YEPMAN_COLOR, textColor: 255, fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [250, 250, 250] },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 12 },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 22 },
+      3: { halign: 'center', cellWidth: 15 },
+      4: { halign: 'center', cellWidth: 15 },
+      5: { halign: 'right', cellWidth: 25 },
+      6: { halign: 'right', cellWidth: 28 },
+    },
+  });
+  
+  const finalY = (doc as any).lastAutoTable.finalY + 10;
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  const summaryX = 140;
+  let summaryY = finalY;
+  
+  doc.text('Sub Total:', summaryX, summaryY);
+  doc.text(`₹${challan.subTotal}`, 196, summaryY, { align: 'right' });
+  summaryY += 6;
+  
+  doc.text(`CGST @ ${challan.cgstRate}%:`, summaryX, summaryY);
+  doc.text(`₹${challan.cgstAmount}`, 196, summaryY, { align: 'right' });
+  summaryY += 6;
+  
+  doc.text(`SGST @ ${challan.sgstRate}%:`, summaryX, summaryY);
+  doc.text(`₹${challan.sgstAmount}`, 196, summaryY, { align: 'right' });
+  summaryY += 6;
+  
+  if (parseFloat(challan.rounding) !== 0) {
+    doc.text('Rounding:', summaryX, summaryY);
+    doc.text(`₹${challan.rounding}`, 196, summaryY, { align: 'right' });
+    summaryY += 6;
+  }
+  
+  doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.setLineWidth(0.5);
+  doc.line(summaryX, summaryY, 196, summaryY);
+  summaryY += 5;
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
+  doc.text('Total:', summaryX, summaryY);
+  doc.text(`₹${challan.totalAmount}`, 196, summaryY, { align: 'right' });
+  summaryY += 8;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.text(`Amount in Words: ${challan.totalInWords}`, 14, summaryY);
+  
+  if (challan.notes) {
+    summaryY += 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(50);
+    doc.text('Notes:', 14, summaryY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(challan.notes, 14, summaryY + 5);
+    summaryY += 10;
+  }
+  
+  summaryY += 25;
+  doc.setTextColor(100);
+  doc.setFontSize(10);
+  doc.line(14, summaryY, 60, summaryY);
+  doc.text('Received By', 37, summaryY + 5, { align: 'center' });
+  
+  doc.line(150, summaryY, 196, summaryY);
+  doc.text('For Yepman International', 173, summaryY + 5, { align: 'center' });
+  
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.text('This is a computer generated document and does not require a signature.', 105, 285, { align: 'center' });
+  
+  return Buffer.from(doc.output('arraybuffer'));
+}

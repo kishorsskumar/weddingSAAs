@@ -1126,28 +1126,28 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
     
     .dc-container { max-width: 800px; margin: 0 auto; padding: 15px; background: white; }
     
-    .dc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid ${BRAND_COLOR}; }
+    .dc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid ${YEPMAN_BRAND_COLOR}; }
     .dc-company-info { flex: 1; }
     .dc-company-logo { width: 150px; height: 50px; margin-bottom: 5px; }
     .dc-company-logo img { width: 100%; height: 100%; object-fit: contain; }
-    .dc-company-name { font-size: 18px; font-weight: bold; color: ${BRAND_COLOR}; }
+    .dc-company-name { font-size: 18px; font-weight: bold; color: ${YEPMAN_BRAND_COLOR}; }
     .dc-company-details { font-size: 9px; color: #666; margin-top: 3px; }
     
     .dc-title-section { text-align: right; }
-    .dc-title { font-size: 22px; font-weight: bold; color: ${BRAND_COLOR}; margin-bottom: 8px; }
+    .dc-title { font-size: 22px; font-weight: bold; color: ${YEPMAN_BRAND_COLOR}; margin-bottom: 8px; }
     .dc-info-grid { display: grid; gap: 3px; text-align: left; }
     .dc-info-row { display: flex; gap: 8px; font-size: 10px; }
     .dc-info-label { color: #666; min-width: 80px; }
     .dc-info-value { font-weight: 500; }
     
     .dc-parties { display: flex; gap: 30px; margin-bottom: 15px; }
-    .dc-party-box { flex: 1; background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 3px solid ${BRAND_COLOR}; }
-    .dc-party-title { font-size: 10px; font-weight: bold; color: ${BRAND_COLOR}; margin-bottom: 5px; text-transform: uppercase; }
+    .dc-party-box { flex: 1; background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 3px solid ${YEPMAN_BRAND_COLOR}; }
+    .dc-party-title { font-size: 10px; font-weight: bold; color: ${YEPMAN_BRAND_COLOR}; margin-bottom: 5px; text-transform: uppercase; }
     .dc-party-name { font-size: 13px; font-weight: bold; margin-bottom: 3px; }
     .dc-party-address { font-size: 10px; color: #555; white-space: pre-line; }
     
     .dc-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-    .dc-table th { background: ${BRAND_COLOR}; color: white; padding: 8px 6px; text-align: left; font-size: 10px; font-weight: 600; }
+    .dc-table th { background: ${YEPMAN_BRAND_COLOR}; color: white; padding: 8px 6px; text-align: left; font-size: 10px; font-weight: 600; }
     .dc-table th.right { text-align: right; }
     .dc-table th.center { text-align: center; }
     .dc-table td { padding: 8px 6px; border-bottom: 1px solid #eee; font-size: 10px; vertical-align: top; }
@@ -1164,7 +1164,7 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
     .dc-summary-section { display: flex; justify-content: flex-end; margin-bottom: 15px; }
     .dc-summary { width: 280px; }
     .dc-summary-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 10px; border-bottom: 1px solid #eee; }
-    .dc-summary-row.total { font-size: 13px; font-weight: bold; border-top: 2px solid ${BRAND_COLOR}; border-bottom: none; padding-top: 8px; color: ${BRAND_COLOR}; }
+    .dc-summary-row.total { font-size: 13px; font-weight: bold; border-top: 2px solid ${YEPMAN_BRAND_COLOR}; border-bottom: none; padding-top: 8px; color: ${YEPMAN_BRAND_COLOR}; }
     .dc-amount-words { font-size: 9px; color: #666; margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; }
     
     .dc-footer { margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
@@ -1187,11 +1187,11 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
         <div className="dc-header">
           <div className="dc-company-info">
             <div className="dc-company-logo">
-              <img src={logo} alt="Oakstreet Events" />
+              <img src={yepmanLogo} alt="Yepman International" />
             </div>
             <div className="dc-company-details">
               {companySettings?.address || 'Edathal P.O, Aluva, Ernakulam, Kerala - 683564'}<br />
-              Ph: {companySettings?.phone || '+91 9895810975'} | GSTIN: {companySettings?.gstNumber || '32AAHFT8765K1Z8'}
+              Ph: {companySettings?.phone || '+91 9895810975'} | GSTIN: {companySettings?.gstNumber || '32AALCS5678K1Z5'}
             </div>
           </div>
           <div className="dc-title-section">
@@ -1228,7 +1228,7 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
       <div className="dc-parties">
         <div className="dc-party-box">
           <div className="dc-party-title">Shipped From</div>
-          <div className="dc-party-name">{companySettings?.name || 'Oakstreet Events'}</div>
+          <div className="dc-party-name">Yepman International</div>
           <div className="dc-party-address">
             {companySettings?.address || 'Edathal P.O, Aluva\nErnakulam, Kerala - 683564'}
           </div>
@@ -1313,7 +1313,7 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
           <div className="dc-signature-line">Received By</div>
         </div>
         <div className="dc-signature-box">
-          <div className="dc-signature-line">For Oakstreet Events</div>
+          <div className="dc-signature-line">For Yepman International</div>
         </div>
       </div>
       
