@@ -1776,6 +1776,75 @@ export async function registerRoutes(
     }
   });
 
+  // Delivery Challans
+  app.get('/api/delivery-challans', async (req, res) => {
+    try {
+      const challans = await storage.getAllDeliveryChallans();
+      res.json(challans);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch delivery challans' });
+    }
+  });
+
+  app.get('/api/delivery-challans/next-number', async (req, res) => {
+    try {
+      const nextNumber = await storage.generateDeliveryChallanNumber();
+      res.json({ nextNumber });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to generate next challan number' });
+    }
+  });
+
+  app.get('/api/delivery-challans/:id', async (req, res) => {
+    try {
+      const challan = await storage.getDeliveryChallan(req.params.id);
+      if (!challan) {
+        return res.status(404).json({ error: 'Delivery challan not found' });
+      }
+      res.json(challan);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch delivery challan' });
+    }
+  });
+
+  app.post('/api/delivery-challans', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const challanNumber = await storage.generateDeliveryChallanNumber();
+      const data = {
+        ...req.body,
+        challanNumber,
+        createdBy: userId || null,
+      };
+      const challan = await storage.createDeliveryChallan(data);
+      res.json(challan);
+    } catch (error: any) {
+      console.error('Error creating delivery challan:', error);
+      res.status(400).json({ error: error.message || 'Failed to create delivery challan' });
+    }
+  });
+
+  app.patch('/api/delivery-challans/:id', async (req, res) => {
+    try {
+      const challan = await storage.updateDeliveryChallan(req.params.id, req.body);
+      if (!challan) {
+        return res.status(404).json({ error: 'Delivery challan not found' });
+      }
+      res.json(challan);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update delivery challan' });
+    }
+  });
+
+  app.delete('/api/delivery-challans/:id', async (req, res) => {
+    try {
+      await storage.deleteDeliveryChallan(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete delivery challan' });
+    }
+  });
+
   // Leave Requests
   app.get('/api/leave-requests', async (req, res) => {
     const requests = await storage.getAllLeaveRequests();
