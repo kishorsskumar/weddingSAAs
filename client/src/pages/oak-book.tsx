@@ -3335,7 +3335,7 @@ export default function OakBook() {
                           <Button
                             variant="ghost"
                             className={cn(
-                              "w-full text-sm font-medium",
+                              "w-full text-sm font-medium text-sidebar-foreground hover:text-sidebar-foreground",
                               leftPanelCollapsed ? "justify-center px-2" : "justify-between",
                               expandedMenus.includes(section.id) && "bg-sidebar-accent/50"
                             )}
@@ -3363,7 +3363,7 @@ export default function OakBook() {
                                       <Button
                                         variant="ghost"
                                         className={cn(
-                                          "w-full justify-between text-sm",
+                                          "w-full justify-between text-sm text-sidebar-foreground hover:text-sidebar-foreground",
                                           expandedMenus.includes(child.id) && "bg-sidebar-accent/30"
                                         )}
                                         onClick={() => toggleMenu(child.id)}
@@ -3384,7 +3384,7 @@ export default function OakBook() {
                                               variant="ghost"
                                               size="sm"
                                               className={cn(
-                                                "w-full justify-start text-xs h-7",
+                                                "w-full justify-start text-xs h-7 text-sidebar-foreground/90 hover:text-sidebar-foreground",
                                                 activeSection === subChild.id &&
                                                   "bg-sidebar-accent text-sidebar-accent-foreground"
                                               )}
@@ -3401,7 +3401,7 @@ export default function OakBook() {
                                     <Button
                                       variant="ghost"
                                       className={cn(
-                                        "w-full justify-start text-sm",
+                                        "w-full justify-start text-sm text-sidebar-foreground/90 hover:text-sidebar-foreground",
                                         activeSection === child.id &&
                                           "bg-sidebar-accent text-sidebar-accent-foreground"
                                       )}
@@ -3420,7 +3420,7 @@ export default function OakBook() {
                         <Button
                           variant="ghost"
                           className={cn(
-                            "w-full gap-2 text-sm font-medium",
+                            "w-full gap-2 text-sm font-medium text-sidebar-foreground hover:text-sidebar-foreground",
                             leftPanelCollapsed ? "justify-center px-2" : "justify-start",
                             activeSection === section.id &&
                               "bg-sidebar-accent text-sidebar-accent-foreground"
