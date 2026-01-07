@@ -34,6 +34,7 @@ interface DocumentData {
   checklist?: any;
   event?: any;
   plan?: any;
+  deliveryChallan?: any;
 }
 
 const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -161,6 +162,10 @@ export default function PrintDocument() {
             docData.checklist = checklist;
             docData.event = events.find((e: any) => e.id === plan.eventId);
           }
+        } else if (type === 'delivery-challan') {
+          const challanRes = await fetch(`/api/delivery-challans/${id}`);
+          const deliveryChallan = await challanRes.json();
+          docData.deliveryChallan = deliveryChallan;
         }
 
         setData(docData);
@@ -202,6 +207,10 @@ export default function PrintDocument() {
 
   if (params.type === 'checklist' && data?.checklist) {
     return <ChecklistPrint checklist={data.checklist} plan={data.plan} event={data.event} companySettings={companySettings} />;
+  }
+
+  if (params.type === 'delivery-challan' && data?.deliveryChallan) {
+    return <DeliveryChallanPrint challan={data.deliveryChallan} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
   return <div className="p-8 text-center">Document not found</div>;
@@ -1093,6 +1102,224 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
 
       {/* Footer */}
       <div className="footer">Oakstreet Events</div>
+    </div>
+  );
+}
+
+function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challan: any; companySettings: any; hideHeader: boolean }) {
+  const items = challan.items && Array.isArray(challan.items) ? challan.items : [];
+  const subTotal = parseFloat(challan.subTotal) || 0;
+  const cgstRate = parseFloat(challan.cgstRate) || 9;
+  const sgstRate = parseFloat(challan.sgstRate) || 9;
+  const cgstAmount = parseFloat(challan.cgstAmount) || 0;
+  const sgstAmount = parseFloat(challan.sgstAmount) || 0;
+  const totalAmount = parseFloat(challan.totalAmount) || 0;
+  const rounding = parseFloat(challan.rounding) || 0;
+
+  const challanStyles = `
+    @media print {
+      body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      @page { size: A4; margin: 10mm; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; line-height: 1.4; }
+    
+    .dc-container { max-width: 800px; margin: 0 auto; padding: 15px; background: white; }
+    
+    .dc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid ${BRAND_COLOR}; }
+    .dc-company-info { flex: 1; }
+    .dc-company-logo { width: 150px; height: 50px; margin-bottom: 5px; }
+    .dc-company-logo img { width: 100%; height: 100%; object-fit: contain; }
+    .dc-company-name { font-size: 18px; font-weight: bold; color: ${BRAND_COLOR}; }
+    .dc-company-details { font-size: 9px; color: #666; margin-top: 3px; }
+    
+    .dc-title-section { text-align: right; }
+    .dc-title { font-size: 22px; font-weight: bold; color: ${BRAND_COLOR}; margin-bottom: 8px; }
+    .dc-info-grid { display: grid; gap: 3px; text-align: left; }
+    .dc-info-row { display: flex; gap: 8px; font-size: 10px; }
+    .dc-info-label { color: #666; min-width: 80px; }
+    .dc-info-value { font-weight: 500; }
+    
+    .dc-parties { display: flex; gap: 30px; margin-bottom: 15px; }
+    .dc-party-box { flex: 1; background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 3px solid ${BRAND_COLOR}; }
+    .dc-party-title { font-size: 10px; font-weight: bold; color: ${BRAND_COLOR}; margin-bottom: 5px; text-transform: uppercase; }
+    .dc-party-name { font-size: 13px; font-weight: bold; margin-bottom: 3px; }
+    .dc-party-address { font-size: 10px; color: #555; white-space: pre-line; }
+    
+    .dc-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+    .dc-table th { background: ${BRAND_COLOR}; color: white; padding: 8px 6px; text-align: left; font-size: 10px; font-weight: 600; }
+    .dc-table th.right { text-align: right; }
+    .dc-table th.center { text-align: center; }
+    .dc-table td { padding: 8px 6px; border-bottom: 1px solid #eee; font-size: 10px; vertical-align: top; }
+    .dc-table td.right { text-align: right; }
+    .dc-table td.center { text-align: center; }
+    .dc-table tr:nth-child(even) { background: #fafafa; }
+    .dc-table .sl-col { width: 30px; }
+    .dc-table .hsn-col { width: 80px; }
+    .dc-table .qty-col { width: 50px; }
+    .dc-table .unit-col { width: 40px; }
+    .dc-table .rate-col { width: 80px; }
+    .dc-table .amount-col { width: 90px; }
+    
+    .dc-summary-section { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+    .dc-summary { width: 280px; }
+    .dc-summary-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 10px; border-bottom: 1px solid #eee; }
+    .dc-summary-row.total { font-size: 13px; font-weight: bold; border-top: 2px solid ${BRAND_COLOR}; border-bottom: none; padding-top: 8px; color: ${BRAND_COLOR}; }
+    .dc-amount-words { font-size: 9px; color: #666; margin-top: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; }
+    
+    .dc-footer { margin-top: 20px; padding-top: 15px; border-top: 1px solid #ddd; }
+    .dc-notes { font-size: 9px; color: #666; margin-bottom: 15px; }
+    .dc-notes-title { font-weight: bold; margin-bottom: 3px; }
+    
+    .dc-signature-section { display: flex; justify-content: space-between; margin-top: 30px; }
+    .dc-signature-box { text-align: center; width: 180px; }
+    .dc-signature-line { border-top: 1px solid #999; margin-top: 40px; padding-top: 5px; font-size: 10px; color: #666; }
+    
+    .dc-footer-text { text-align: center; margin-top: 20px; font-size: 9px; color: #888; }
+  `;
+
+  return (
+    <div className="dc-container">
+      <style>{challanStyles}</style>
+      
+      {/* Header */}
+      {!hideHeader && (
+        <div className="dc-header">
+          <div className="dc-company-info">
+            <div className="dc-company-logo">
+              <img src={logo} alt="Oakstreet Events" />
+            </div>
+            <div className="dc-company-details">
+              {companySettings?.address || 'Edathal P.O, Aluva, Ernakulam, Kerala - 683564'}<br />
+              Ph: {companySettings?.phone || '+91 9895810975'} | GSTIN: {companySettings?.gstNumber || '32AAHFT8765K1Z8'}
+            </div>
+          </div>
+          <div className="dc-title-section">
+            <div className="dc-title">DELIVERY CHALLAN</div>
+            <div className="dc-info-grid">
+              <div className="dc-info-row">
+                <span className="dc-info-label">Challan No:</span>
+                <span className="dc-info-value">{challan.challanNumber}</span>
+              </div>
+              <div className="dc-info-row">
+                <span className="dc-info-label">Date:</span>
+                <span className="dc-info-value">{format(new Date(challan.challanDate), 'dd/MM/yyyy')}</span>
+              </div>
+              <div className="dc-info-row">
+                <span className="dc-info-label">Type:</span>
+                <span className="dc-info-value">{challan.challanType}</span>
+              </div>
+              {challan.vehicleNumber && (
+                <div className="dc-info-row">
+                  <span className="dc-info-label">Vehicle No:</span>
+                  <span className="dc-info-value">{challan.vehicleNumber}</span>
+                </div>
+              )}
+              <div className="dc-info-row">
+                <span className="dc-info-label">Place of Supply:</span>
+                <span className="dc-info-value">{challan.placeOfSupply || 'Kerala (32)'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Parties */}
+      <div className="dc-parties">
+        <div className="dc-party-box">
+          <div className="dc-party-title">Shipped From</div>
+          <div className="dc-party-name">{companySettings?.name || 'Oakstreet Events'}</div>
+          <div className="dc-party-address">
+            {companySettings?.address || 'Edathal P.O, Aluva\nErnakulam, Kerala - 683564'}
+          </div>
+        </div>
+        <div className="dc-party-box">
+          <div className="dc-party-title">Deliver To</div>
+          <div className="dc-party-name">{challan.deliverTo}</div>
+          <div className="dc-party-address">{challan.deliveryAddress}</div>
+        </div>
+      </div>
+      
+      {/* Items Table */}
+      <table className="dc-table">
+        <thead>
+          <tr>
+            <th className="sl-col center">Sl.</th>
+            <th>Description of Goods</th>
+            <th className="hsn-col">HSN/SAC</th>
+            <th className="qty-col center">Qty</th>
+            <th className="unit-col center">Unit</th>
+            <th className="rate-col right">Rate</th>
+            <th className="amount-col right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item: any, index: number) => (
+            <tr key={index}>
+              <td className="center">{index + 1}</td>
+              <td>{item.description}</td>
+              <td>{item.hsnCode || '-'}</td>
+              <td className="center">{item.quantity}</td>
+              <td className="center">{item.unit || 'nos'}</td>
+              <td className="right">{formatIndianCurrency(item.rate || 0)}</td>
+              <td className="right">{formatIndianCurrency(item.amount || 0)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      
+      {/* Summary */}
+      <div className="dc-summary-section">
+        <div className="dc-summary">
+          <div className="dc-summary-row">
+            <span>Sub Total:</span>
+            <span>₹{formatIndianCurrency(subTotal)}</span>
+          </div>
+          <div className="dc-summary-row">
+            <span>CGST @ {cgstRate}%:</span>
+            <span>₹{formatIndianCurrency(cgstAmount)}</span>
+          </div>
+          <div className="dc-summary-row">
+            <span>SGST @ {sgstRate}%:</span>
+            <span>₹{formatIndianCurrency(sgstAmount)}</span>
+          </div>
+          {rounding !== 0 && (
+            <div className="dc-summary-row">
+              <span>Rounding:</span>
+              <span>₹{rounding.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="dc-summary-row total">
+            <span>Total:</span>
+            <span>₹{formatIndianCurrency(totalAmount)}</span>
+          </div>
+          <div className="dc-amount-words">
+            <strong>Amount in Words:</strong> {challan.totalInWords || `Indian Rupee ${numberToWords(Math.round(totalAmount))} Only`}
+          </div>
+        </div>
+      </div>
+      
+      {/* Notes */}
+      {challan.notes && (
+        <div className="dc-notes">
+          <div className="dc-notes-title">Notes:</div>
+          {challan.notes}
+        </div>
+      )}
+      
+      {/* Signature */}
+      <div className="dc-signature-section">
+        <div className="dc-signature-box">
+          <div className="dc-signature-line">Received By</div>
+        </div>
+        <div className="dc-signature-box">
+          <div className="dc-signature-line">For Oakstreet Events</div>
+        </div>
+      </div>
+      
+      <div className="dc-footer-text">
+        This is a computer generated document and does not require a signature.
+      </div>
     </div>
   );
 }
