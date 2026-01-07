@@ -279,7 +279,7 @@ export default function OakBook() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState("customers");
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales"]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales", "vendor-management"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
