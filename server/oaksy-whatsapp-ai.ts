@@ -2218,7 +2218,7 @@ export async function handleOaksyWhatsAppMessage(
             totalAmount: totalAmount.toFixed(2),
             totalInWords: `Indian Rupee ${numberToWords(totalAmount)} Only`,
             notes: `Created via Oaksy by ${employee.name}`,
-            createdBy: employee.id,
+            createdBy: employee.userId || null,
           });
 
           await storage.updateWhatsappConversation(conversation.id, {
