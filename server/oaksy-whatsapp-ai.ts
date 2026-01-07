@@ -2665,7 +2665,7 @@ export async function handleOaksyWhatsAppMessage(
     });
 
     // Role-aware greeting - check if authorized for DC creation
-    const canCreateDc = isAuthorizedDcCreator(normalizedPhone) || employee.jobTitle?.toLowerCase().includes('accountant');
+    const canCreateDc = isAuthorizedDcCreator(normalizedPhone) || employee.designation?.toLowerCase().includes('accountant');
     
     if (canCreateDc) {
       return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n📋 *Delivery Challan* - Say "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
@@ -2679,9 +2679,9 @@ export async function handleOaksyWhatsAppMessage(
   let employeeRole = 'employee';
   if (employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina')) {
     employeeRole = 'wedding_planner';
-  } else if (employee.jobTitle?.toLowerCase().includes('accountant')) {
+  } else if (employee.designation?.toLowerCase().includes('accountant')) {
     employeeRole = 'accountant';
-  } else if (employee.jobTitle?.toLowerCase().includes('manager')) {
+  } else if (employee.designation?.toLowerCase().includes('manager')) {
     employeeRole = 'manager';
   }
   
@@ -2777,8 +2777,8 @@ export async function handleOaksyWhatsAppMessage(
   if (aiAnalysis.intent === 'delivery_challan') {
     // Check if authorized by phone number or by role
     const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
-    const isAccountant = employee.jobTitle?.toLowerCase().includes('accountant');
-    const isSuperadmin = employee.jobTitle?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+    const isAccountant = employee.designation?.toLowerCase().includes('accountant');
+    const isSuperadmin = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
     const isTestEmployee = employee.name.toLowerCase().includes('test');
     
     if (!isAuthorizedByPhone && !isAccountant && !isSuperadmin && !isTestEmployee) {

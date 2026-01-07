@@ -327,6 +327,7 @@ export interface IStorage {
   getAllEmployees(): Promise<Employee[]>;
   getEmployee(id: string): Promise<Employee | undefined>;
   getEmployeeByUserId(userId: string): Promise<Employee | undefined>;
+  getEmployeeByPhone(phone: string): Promise<Employee | undefined>;
   getEmployeesWithoutUserAccount(): Promise<Employee[]>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
   updateEmployee(id: string, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
@@ -1066,6 +1067,15 @@ export class DatabaseStorage implements IStorage {
   async getEmployeeByUserId(userId: string): Promise<Employee | undefined> {
     const [employee] = await db.select().from(employees).where(eq(employees.userId, userId));
     return employee || undefined;
+  }
+
+  async getEmployeeByPhone(phone: string): Promise<Employee | undefined> {
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    const allEmployees = await this.getAllEmployees();
+    return allEmployees.find(emp => {
+      const empPhone = (emp.phone || emp.whatsappNumber || '').replace(/\D/g, '').slice(-10);
+      return empPhone === normalizedPhone;
+    });
   }
 
   async getEmployeesWithoutUserAccount(): Promise<Employee[]> {
