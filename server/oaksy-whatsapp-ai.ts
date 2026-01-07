@@ -116,11 +116,18 @@ SECURITY RULES (CRITICAL):
 - Wedding planners can see event-related data for their assigned events
 - Only superadmin can see company-wide financial data
 
+DELIVERY CHALLAN PARSING RULES:
+- "deliverTo" = Recipient NAME (person/company) - NOT the address. Examples: "ABC Decorators", "Kochi Wedding Hall", "John"
+- "deliveryAddress" = PHYSICAL LOCATION with house number, street, city. Examples: "25/103, Kottodimukku Stop, Manjummel-683501"
+- IMPORTANT: Numbers like "25/103", "12-A", "Plot 45" are ADDRESS components, NOT recipient names
+- "amount" = ONLY extract if explicitly stated with currency (45K, Rs 5000, ₹45000). DO NOT guess amounts from address numbers!
+- "vehicleNumber" = Indian vehicle format like "KL 19 C 3786", "KA 01 AB 1234"
+
 RESPONSE FORMAT - Always respond with valid JSON:
 {
   "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "greeting" | "confirmation" | "general",
   "extractedData": {
-    "amount": number or null,
+    "amount": number or null (ONLY if explicitly mentioned, never from address numbers),
     "purpose": string or null,
     "vendorName": string or null,
     "eventName": string or null,
@@ -128,8 +135,8 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "startDate": "DD/MM/YYYY" or null,
     "endDate": "DD/MM/YYYY" or null,
     "reason": string or null,
-    "deliverTo": string or null,
-    "deliveryAddress": string or null,
+    "deliverTo": string or null (recipient NAME, not address),
+    "deliveryAddress": string or null (full physical location),
     "itemDescription": string or null,
     "vehicleNumber": string or null
   },
@@ -205,11 +212,14 @@ function extractAmount(text: string): number | null {
     }
   }
   
-  // Last resort: plain numbers (but only if they look like amounts - at least 2 digits or has decimal)
-  const plainNumberMatch = text.match(/\b([0-9]{2,}(?:,[0-9]+)*(?:\.[0-9]+)?)\b/);
+  // Last resort: plain numbers (but only if they look like amounts - at least 2 digits)
+  // IMPORTANT: Exclude numbers that are part of addresses (e.g., "25/103", "12-A", "plot 45")
+  // by checking that the number is not preceded or followed by "/" or "-" 
+  const plainNumberMatch = text.match(/(?<![\/\-\d])([0-9]{3,}(?:,[0-9]+)*(?:\.[0-9]+)?)(?![\/\-\d])/);
   if (plainNumberMatch) {
     const amount = parseFloat(plainNumberMatch[1].replace(/,/g, ''));
-    if (amount > 0 && amount < 100000000) {
+    // Only accept as amount if it's a reasonable amount (at least 100)
+    if (amount >= 100 && amount < 100000000) {
       return amount;
     }
   }
