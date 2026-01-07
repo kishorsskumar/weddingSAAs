@@ -2653,13 +2653,14 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
 
-  // Handle AI-detected delivery challan intent (wedding planners and accountants only)
+  // Handle AI-detected delivery challan intent (wedding planners, accountants, superadmin, test employee)
   if (aiAnalysis.intent === 'delivery_challan') {
     const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
     const isAccountant = employee.jobTitle?.toLowerCase().includes('accountant');
     const isSuperadmin = employee.jobTitle?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+    const isTestEmployee = employee.name.toLowerCase().includes('test');
     
-    if (!isWeddingPlanner && !isAccountant && !isSuperadmin) {
+    if (!isWeddingPlanner && !isAccountant && !isSuperadmin && !isTestEmployee) {
       return `❌ Sorry ${employee.name}, delivery challans can only be created by wedding planners, accountants, or admin.\n\n_Need to create one? Please contact Fida or Femina._`;
     }
     
@@ -2704,7 +2705,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: history,
         currentState: 'awaiting_dc_details',
       });
-      return aiAnalysis.message || `📋 *Create Delivery Challan*\n\nPlease provide:\n1. Deliver to (name/company)\n2. Delivery address\n3. Amount\n\n_Example: "DC to ABC Wedding Hall, Kochi, 15000"_`;
+      return aiAnalysis.message || `📋 *Create Delivery Challan*\n\nPlease provide:\n1. Deliver to (name/company)\n2. Delivery address\n3. Amount (e.g., 45K, 45,000, 45 Thousand)\n\n_Example: "DC to ABC Wedding Hall, Kochi, 45K"_`;
     }
   }
 
