@@ -1335,8 +1335,23 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Default Kishor greeting - simplified
-    return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n\n_Send lead info or ask anything!_ 🌳`;
+    // Handle DC creation for superadmin - check if in DC flow or starting a DC
+    const isInDcFlow = conversation.activeIntent === 'pending_delivery_challan';
+    const looksLikeDc = /\bdc\b|delivery\s*challan|challan/i.test(messageText);
+    
+    if (isInDcFlow || looksLikeDc) {
+      // Get superadmin as employee for DC creation
+      const superadminEmployee = await storage.getEmployeeByPhone(normalizedPhone);
+      if (superadminEmployee) {
+        // Don't return - let execution continue to employee section below
+        // The isSuperadminByPhone block will end and employee section will handle DC
+      } else {
+        return `❌ Could not find your employee record. Please ensure your phone is registered in the system.`;
+      }
+    } else {
+      // Default Kishor greeting - only show if NOT in DC flow and NOT starting DC
+      return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n• DC to [name] [amount] → Create Delivery Challan\n\n_Send lead info or ask anything!_ 🌳`;
+    }
   }
   
   // Check if this is from an authorized lead submitter (non-superadmin like Anjana)
