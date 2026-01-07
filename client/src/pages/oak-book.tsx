@@ -680,7 +680,7 @@ export default function OakBook() {
     setMobilePreviewOpen(false);
   };
 
-  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt", id: string, hideHeader: boolean = false) => {
+  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader: boolean = false) => {
     try {
       toast({ title: "Generating PDF...", description: "Please wait" });
       
@@ -694,6 +694,9 @@ export default function OakBook() {
       } else if (type === 'receipt') {
         const payment = payments.find(p => p.id === id);
         docNumber = payment?.number || 'receipt';
+      } else if (type === 'delivery-challan') {
+        const challan = deliveryChallans.find(c => c.id === id);
+        docNumber = challan?.challanNumber || 'delivery-challan';
       }
 
       const printUrl = `/print/${type}/${id}${hideHeader ? '?noHeader=true' : ''}`;
@@ -2029,6 +2032,21 @@ export default function OakBook() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownloadPdf("delivery-challan", challan.id, false)}>
+                              Download PDF (with header)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadPdf("delivery-challan", challan.id, true)}>
+                              Download PDF (plain)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button variant="ghost" size="icon" onClick={(e) => { 
                           e.stopPropagation(); 
                           window.open(`/print/delivery-challan/${challan.id}`, '_blank');

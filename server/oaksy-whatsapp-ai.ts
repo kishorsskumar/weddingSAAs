@@ -212,15 +212,66 @@ function extractAmount(text: string): number | null {
     }
   }
   
-  // Last resort: plain numbers (but only if they look like amounts - at least 2 digits)
-  // IMPORTANT: Exclude numbers that are part of addresses (e.g., "25/103", "12-A", "plot 45")
-  // by checking that the number is not preceded or followed by "/" or "-" 
-  const plainNumberMatch = text.match(/(?<![\/\-\d])([0-9]{3,}(?:,[0-9]+)*(?:\.[0-9]+)?)(?![\/\-\d])/);
-  if (plainNumberMatch) {
-    const amount = parseFloat(plainNumberMatch[1].replace(/,/g, ''));
-    // Only accept as amount if it's a reasonable amount (at least 100)
-    if (amount >= 100 && amount < 100000000) {
-      return amount;
+  // NOTE: Removed plain number fallback to prevent postal codes/address numbers from being extracted
+  // Only amounts with explicit currency markers or multipliers (k/lakh/crore) are now matched
+  
+  return null;
+}
+
+// Stricter extraction for delivery challans - matches explicit currency/value markers
+// Also matches keyword-based amounts (amount/value/total + digits) with validation
+function extractAmountStrict(text: string): number | null {
+  // Handle shorthand notations: "5k" = 5000, "1 lakh" = 100000
+  const shorthandPatterns = [
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:la+k+h?s?|lacs?)/i, multiplier: 100000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:k|thousand|thousands)/i, multiplier: 1000 },
+    { pattern: /([0-9,]+(?:\.[0-9]+)?)\s*(?:cr|crore|crores)/i, multiplier: 10000000 },
+  ];
+  
+  for (const { pattern, multiplier } of shorthandPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const baseAmount = parseFloat(match[1].replace(/,/g, ''));
+      const amount = baseAmount * multiplier;
+      if (amount > 0 && amount < 100000000) {
+        return amount;
+      }
+    }
+  }
+  
+  // Standard patterns with currency symbols
+  const currencyPatterns = [
+    /(?:Rs\.?|₹|INR)\s*([0-9,]+(?:\.[0-9]+)?)/i,
+    /([0-9,]+(?:\.[0-9]+)?)\s*(?:Rs\.?|₹|INR|rupees?)/i,
+    /([0-9,]+(?:\.[0-9]+)?)\s*\/-/,
+  ];
+  
+  for (const pattern of currencyPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const amount = parseFloat(match[1].replace(/,/g, ''));
+      if (amount > 0 && amount < 100000000) {
+        return amount;
+      }
+    }
+  }
+  
+  // Keyword-based pattern: "amount is 45000", "total: 50,000", "value approx. 45K"
+  // Match: keyword + optional filler (up to 20 chars) + digits
+  const keywordMatch = text.match(/(?:amount|value|total|price|cost)[\s:=\-–—.,]*(?:\w+[\s:=\-–—.,]*){0,3}([0-9,]+(?:\.[0-9]+)?)/i);
+  if (keywordMatch) {
+    const amount = parseFloat(keywordMatch[1].replace(/,/g, ''));
+    // Validate: must be >= 500 to exclude house numbers, and NOT look like address/postal
+    if (amount >= 500 && amount < 100000000) {
+      // Additional validation: make sure this number isn't part of an address pattern
+      const numberStr = keywordMatch[1].replace(/,/g, '');
+      // Check if this same number appears in an address context (after dash or in fraction)
+      const isPostalCode = new RegExp(`-${numberStr}\\b`).test(text);
+      const isAddressFraction = new RegExp(`\\d+[/]${numberStr}\\b|${numberStr}[/]\\d+`).test(text);
+      
+      if (!isPostalCode && !isAddressFraction) {
+        return amount;
+      }
     }
   }
   
@@ -2290,8 +2341,9 @@ export async function handleOaksyWhatsAppMessage(
             return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n📄 _PDF sent!_`;
           } catch (pdfError: any) {
             console.error('[Oaksy] Error generating/sending DC PDF:', pdfError.message);
+            console.error('[Oaksy] DC PDF Error Stack:', pdfError.stack);
             // Fall back to text-only confirmation if PDF fails
-            return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n_Challan created successfully! (PDF could not be generated)_`;
+            return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 Deliver To: ${deliverTo}\n📦 Item: ${itemDescription}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n💵 Total (incl. GST): ₹${totalAmount.toLocaleString('en-IN')}\n\n_Challan created successfully! (PDF could not be generated: ${pdfError.message})_`;
           }
         } catch (error: any) {
           console.error('[Oaksy] Delivery challan creation error:', error);
@@ -2846,9 +2898,21 @@ export async function handleOaksyWhatsAppMessage(
     
     const deliverTo = aiAnalysis.extractedData.deliverTo || context.deliverTo;
     const deliveryAddress = aiAnalysis.extractedData.deliveryAddress || context.deliveryAddress;
-    // IMPORTANT: Only use amount from AI extraction or context - DO NOT extract from raw message
-    // This prevents address numbers (like "25/103") from being mistaken as amounts
-    const amount = aiAnalysis.extractedData.amount || context.amount;
+    
+    // STRICT amount validation - use extractAmountStrict which ONLY matches currency markers
+    // This prevents AI from incorrectly extracting "103" from "25/103" addresses
+    const ourExtractedAmount = extractAmountStrict(messageText);
+    
+    // Use our strict extraction if available (most reliable)
+    // Fall back to context.amount (already validated from previous interactions)
+    // AI extraction is NOT trusted for initial DC amounts due to address number misinterpretation
+    let amount: number | undefined = context.amount;
+    
+    if (ourExtractedAmount) {
+      // Trust our strict extraction - it only matches explicit currency markers
+      amount = ourExtractedAmount;
+    }
+    
     const itemDescription = aiAnalysis.extractedData.itemDescription || context.itemDescription || 'Stage Decor Items';
     const vehicleNumber = aiAnalysis.extractedData.vehicleNumber || context.vehicleNumber;
     
