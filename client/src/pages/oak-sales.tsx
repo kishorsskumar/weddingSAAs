@@ -140,6 +140,18 @@ export default function OakSales() {
     return pipelines;
   }, [pipelines, isSuperAdmin, isWeddingPlanner, user?.name]);
 
+  // Filter contacts based on user role - wedding planners only see their own contacts (by ownerId)
+  const filteredContacts = useMemo(() => {
+    if (isSuperAdmin) {
+      return contacts; // Superadmin/admin sees all contacts
+    }
+    if (user?.id) {
+      // Non-admin users only see contacts they own
+      return contacts.filter(c => c.ownerId === user.id);
+    }
+    return contacts;
+  }, [contacts, isSuperAdmin, user?.id]);
+
   useEffect(() => {
     // Reset selectedPipelineId if it's not in the filtered list or if no selection exists
     const isCurrentSelectionValid = selectedPipelineId && 
@@ -316,7 +328,7 @@ export default function OakSales() {
           )}
           {activeSection === 'contacts' && (
             <ContactsSection
-              contacts={contacts}
+              contacts={filteredContacts}
               companies={companies}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
@@ -1271,6 +1283,12 @@ function DealDetailPanel({
                   <div>
                     <Label className="text-muted-foreground">Contact</Label>
                     <p className="font-medium">{contact.firstName} {contact.lastName}</p>
+                    {(contact.phone || contact.mobile) && (
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Phone className="w-3 h-3" />
+                        {contact.phone || contact.mobile}
+                      </p>
+                    )}
                     {contact.email && <p className="text-sm text-muted-foreground">{contact.email}</p>}
                   </div>
                 )}
@@ -1342,6 +1360,7 @@ function ContactsSection({
   const [isAddOpen, setIsAddOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const createContactMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1374,6 +1393,7 @@ function ContactsSection({
       title: formData.get('title'),
       source: formData.get('source'),
       notes: formData.get('notes'),
+      ownerId: user?.id || null, // Assign current user as owner
     });
   };
 
