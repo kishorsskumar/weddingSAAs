@@ -114,6 +114,7 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
         ]
       },
       { id: "payments-received", label: "Payments Received" },
+      { id: "delivery-challans", label: "Delivery Challan" },
     ]
   },
   { 
@@ -240,6 +241,38 @@ type User = {
   role: string;
 };
 
+type DeliveryChallanItem = {
+  description: string;
+  hsnCode: string;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+};
+
+type DeliveryChallan = {
+  id: string;
+  challanNumber: string;
+  challanDate: string;
+  challanType: string;
+  vehicleNumber: string | null;
+  deliverTo: string;
+  deliveryAddress: string;
+  placeOfSupply: string | null;
+  items: DeliveryChallanItem[];
+  subTotal: string;
+  cgstRate: string | null;
+  cgstAmount: string | null;
+  sgstRate: string | null;
+  sgstAmount: string | null;
+  rounding: string | null;
+  totalAmount: string;
+  totalInWords: string | null;
+  status: string;
+  notes: string | null;
+  createdAt: string;
+};
+
 export default function OakBook() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -275,6 +308,8 @@ export default function OakBook() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [editingPayment, setEditingPayment] = useState<CustomerPayment | null>(null);
+  const [deliveryChallanModalOpen, setDeliveryChallanModalOpen] = useState(false);
+  const [editingDeliveryChallan, setEditingDeliveryChallan] = useState<DeliveryChallan | null>(null);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
@@ -314,6 +349,10 @@ export default function OakBook() {
 
   const { data: pendingVendorPayments = [] } = useQuery<PendingVendorPayment[]>({
     queryKey: ["/api/pending-vendor-payments"],
+  });
+
+  const { data: deliveryChallans = [] } = useQuery<DeliveryChallan[]>({
+    queryKey: ["/api/delivery-challans"],
   });
 
   const { data: companySettings } = useQuery<any>({
@@ -582,6 +621,42 @@ export default function OakBook() {
         description: error?.message || "Only superadmins can delete vendor payments",
         variant: "destructive" 
       });
+    },
+  });
+
+  const createDeliveryChallan = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/delivery-challans", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/delivery-challans"] });
+      setDeliveryChallanModalOpen(false);
+      setEditingDeliveryChallan(null);
+      toast({ title: "Delivery Challan created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create", 
+        description: error?.message || "Error creating delivery challan",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const updateDeliveryChallan = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      apiRequest("PATCH", `/api/delivery-challans/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/delivery-challans"] });
+      setDeliveryChallanModalOpen(false);
+      setEditingDeliveryChallan(null);
+      toast({ title: "Delivery Challan updated successfully" });
+    },
+  });
+
+  const deleteDeliveryChallan = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/delivery-challans/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/delivery-challans"] });
+      toast({ title: "Delivery Challan deleted" });
     },
   });
 
@@ -1901,6 +1976,99 @@ export default function OakBook() {
     </div>
   );
 
+  const renderDeliveryChallans = () => (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h1 className="text-2xl font-serif font-bold text-primary">Delivery Challans</h1>
+        <Button onClick={() => { setEditingDeliveryChallan(null); setDeliveryChallanModalOpen(true); }} data-testid="btn-add-dc">
+          <Plus className="h-4 w-4 mr-2" />
+          New Delivery Challan
+        </Button>
+      </div>
+
+      <Card>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-4 font-medium text-muted-foreground">Challan #</th>
+                <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Date</th>
+                <th className="text-left p-4 font-medium text-muted-foreground">Deliver To</th>
+                <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Type</th>
+                <th className="text-left p-4 font-medium text-muted-foreground hidden lg:table-cell">Vehicle</th>
+                <th className="text-right p-4 font-medium text-muted-foreground">Amount</th>
+                <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {deliveryChallans.map((challan) => {
+                const isSelected = selectedRecord?.type === "delivery-challan" && selectedRecord.id === challan.id;
+                return (
+                  <tr 
+                    key={challan.id} 
+                    className={cn(
+                      "border-b cursor-pointer transition-colors",
+                      isSelected ? "bg-primary/10 hover:bg-primary/15" : "hover:bg-muted/50"
+                    )}
+                    onClick={() => setSelectedRecord({ type: "delivery-challan", id: challan.id, data: challan })}
+                    data-testid={`row-dc-${challan.id}`}
+                  >
+                    <td className="p-4 font-medium text-primary">{challan.challanNumber}</td>
+                    <td className="p-4 text-muted-foreground hidden sm:table-cell">
+                      {format(new Date(challan.challanDate), "dd MMM yyyy")}
+                    </td>
+                    <td className="p-4">{challan.deliverTo}</td>
+                    <td className="p-4 hidden md:table-cell">
+                      <Badge variant="outline">{challan.challanType}</Badge>
+                    </td>
+                    <td className="p-4 hidden lg:table-cell text-muted-foreground">
+                      {challan.vehicleNumber || "-"}
+                    </td>
+                    <td className="p-4 text-right font-medium">
+                      ₹{parseFloat(challan.totalAmount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={(e) => { 
+                          e.stopPropagation(); 
+                          window.open(`/print/delivery-challan/${challan.id}`, '_blank');
+                        }} title="View PDF">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setEditingDeliveryChallan(challan); 
+                          setDeliveryChallanModalOpen(true); 
+                        }} title="Edit">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={(e) => { 
+                          e.stopPropagation(); 
+                          if (confirm('Are you sure you want to delete this delivery challan?')) {
+                            deleteDeliveryChallan.mutate(challan.id); 
+                          }
+                        }} title="Delete">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {deliveryChallans.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                    No delivery challans created yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+
   const renderExpenses = () => (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2379,6 +2547,8 @@ export default function OakBook() {
         return renderInvoices("tax");
       case "payments-received":
         return renderPaymentsReceived();
+      case "delivery-challans":
+        return renderDeliveryChallans();
       case "reports":
         return renderReports();
       case "pending-vendor-payments":
@@ -3405,6 +3575,21 @@ export default function OakBook() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Delivery Challan Modal */}
+      <DeliveryChallanModal 
+        open={deliveryChallanModalOpen}
+        onOpenChange={setDeliveryChallanModalOpen}
+        challan={editingDeliveryChallan}
+        onSubmit={(data) => {
+          if (editingDeliveryChallan) {
+            updateDeliveryChallan.mutate({ id: editingDeliveryChallan.id, data });
+          } else {
+            createDeliveryChallan.mutate(data);
+          }
+        }}
+        companySettings={companySettings}
+      />
 
       {/* Preview Modal */}
       <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
@@ -4746,5 +4931,353 @@ function SettingsSection({ companySettings, updateCompanySettings }: { companySe
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function numberToWords(num: number): string {
+  const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+    'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  
+  if (num === 0) return 'Zero';
+  if (num < 20) return ones[num];
+  if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? '-' + ones[num % 10] : '');
+  if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + numberToWords(num % 100) : '');
+  if (num < 100000) return numberToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 ? ' ' + numberToWords(num % 1000) : '');
+  if (num < 10000000) return numberToWords(Math.floor(num / 100000)) + ' Lakh' + (num % 100000 ? ' ' + numberToWords(num % 100000) : '');
+  return numberToWords(Math.floor(num / 10000000)) + ' Crore' + (num % 10000000 ? ' ' + numberToWords(num % 10000000) : '');
+}
+
+function DeliveryChallanModal({ 
+  open, 
+  onOpenChange, 
+  challan, 
+  onSubmit,
+  companySettings
+}: { 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  challan: DeliveryChallan | null;
+  onSubmit: (data: any) => void;
+  companySettings: any;
+}) {
+  const [formData, setFormData] = useState({
+    challanDate: challan?.challanDate || format(new Date(), "yyyy-MM-dd"),
+    challanType: challan?.challanType || "Job Work",
+    vehicleNumber: challan?.vehicleNumber || "",
+    deliverTo: challan?.deliverTo || "",
+    deliveryAddress: challan?.deliveryAddress || "",
+    placeOfSupply: challan?.placeOfSupply || "Kerala (32)",
+    cgstRate: challan?.cgstRate || "9",
+    sgstRate: challan?.sgstRate || "9",
+    notes: challan?.notes || "",
+  });
+  
+  const [items, setItems] = useState<{ description: string; hsnCode: string; quantity: number; unit: string; rate: number; amount: number }[]>(
+    challan?.items && Array.isArray(challan.items) ? challan.items : [{ description: "Stage Decor Items", hsnCode: "44219160", quantity: 1, unit: "nos", rate: 0, amount: 0 }]
+  );
+
+  useEffect(() => {
+    if (challan) {
+      setFormData({
+        challanDate: challan.challanDate || format(new Date(), "yyyy-MM-dd"),
+        challanType: challan.challanType || "Job Work",
+        vehicleNumber: challan.vehicleNumber || "",
+        deliverTo: challan.deliverTo || "",
+        deliveryAddress: challan.deliveryAddress || "",
+        placeOfSupply: challan.placeOfSupply || "Kerala (32)",
+        cgstRate: challan.cgstRate || "9",
+        sgstRate: challan.sgstRate || "9",
+        notes: challan.notes || "",
+      });
+      setItems(challan.items && Array.isArray(challan.items) ? challan.items : [{ description: "Stage Decor Items", hsnCode: "44219160", quantity: 1, unit: "nos", rate: 0, amount: 0 }]);
+    } else {
+      setFormData({
+        challanDate: format(new Date(), "yyyy-MM-dd"),
+        challanType: "Job Work",
+        vehicleNumber: "",
+        deliverTo: "",
+        deliveryAddress: "",
+        placeOfSupply: "Kerala (32)",
+        cgstRate: "9",
+        sgstRate: "9",
+        notes: "",
+      });
+      setItems([{ description: "Stage Decor Items", hsnCode: "44219160", quantity: 1, unit: "nos", rate: 0, amount: 0 }]);
+    }
+  }, [challan, open]);
+
+  const updateItem = (index: number, field: string, value: any) => {
+    const newItems = [...items];
+    (newItems[index] as any)[field] = value;
+    if (field === 'quantity' || field === 'rate') {
+      newItems[index].amount = newItems[index].quantity * newItems[index].rate;
+    }
+    setItems(newItems);
+  };
+
+  const addItem = () => {
+    setItems([...items, { description: "", hsnCode: "", quantity: 1, unit: "nos", rate: 0, amount: 0 }]);
+  };
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
+    }
+  };
+
+  const subTotal = items.reduce((sum, item) => sum + item.amount, 0);
+  const cgstRate = parseFloat(formData.cgstRate) || 0;
+  const sgstRate = parseFloat(formData.sgstRate) || 0;
+  const cgstAmount = subTotal * cgstRate / 100;
+  const sgstAmount = subTotal * sgstRate / 100;
+  const totalBeforeRounding = subTotal + cgstAmount + sgstAmount;
+  const roundedTotal = Math.round(totalBeforeRounding);
+  const rounding = roundedTotal - totalBeforeRounding;
+  const totalInWords = `Indian Rupee ${numberToWords(roundedTotal)} Only`;
+
+  const handleSubmit = () => {
+    if (!formData.deliverTo.trim()) {
+      alert("Please enter the recipient name");
+      return;
+    }
+    if (!formData.deliveryAddress.trim()) {
+      alert("Please enter the delivery address");
+      return;
+    }
+    
+    onSubmit({
+      ...formData,
+      items,
+      subTotal: subTotal.toFixed(2),
+      cgstAmount: cgstAmount.toFixed(2),
+      sgstAmount: sgstAmount.toFixed(2),
+      rounding: rounding.toFixed(2),
+      totalAmount: roundedTotal.toFixed(2),
+      totalInWords,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{challan ? "Edit Delivery Challan" : "New Delivery Challan"}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Challan Date *</Label>
+              <Input
+                type="date"
+                value={formData.challanDate}
+                onChange={(e) => setFormData({ ...formData, challanDate: e.target.value })}
+                data-testid="input-dc-date"
+              />
+            </div>
+            <div>
+              <Label>Challan Type</Label>
+              <Select value={formData.challanType} onValueChange={(v) => setFormData({ ...formData, challanType: v })}>
+                <SelectTrigger data-testid="select-dc-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Job Work">Job Work</SelectItem>
+                  <SelectItem value="Supply">Supply</SelectItem>
+                  <SelectItem value="Return">Return</SelectItem>
+                  <SelectItem value="Others">Others</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Vehicle Number</Label>
+              <Input
+                value={formData.vehicleNumber}
+                onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value.toUpperCase() })}
+                placeholder="e.g., KL 10 AB 1234"
+                data-testid="input-dc-vehicle"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Deliver To *</Label>
+              <Input
+                value={formData.deliverTo}
+                onChange={(e) => setFormData({ ...formData, deliverTo: e.target.value })}
+                placeholder="Recipient name/company"
+                data-testid="input-dc-deliver-to"
+              />
+            </div>
+            <div>
+              <Label>Place of Supply</Label>
+              <Input
+                value={formData.placeOfSupply}
+                onChange={(e) => setFormData({ ...formData, placeOfSupply: e.target.value })}
+                placeholder="e.g., Kerala (32)"
+                data-testid="input-dc-place-supply"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Delivery Address *</Label>
+            <Textarea
+              value={formData.deliveryAddress}
+              onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+              placeholder="Full delivery address"
+              rows={3}
+              data-testid="input-dc-address"
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-base font-medium">Items</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                <Plus className="h-4 w-4 mr-1" /> Add Item
+              </Button>
+            </div>
+            
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left p-2">#</th>
+                    <th className="text-left p-2">Description</th>
+                    <th className="text-left p-2 hidden md:table-cell">HSN/SAC</th>
+                    <th className="text-right p-2">Qty</th>
+                    <th className="text-left p-2 hidden sm:table-cell">Unit</th>
+                    <th className="text-right p-2">Rate</th>
+                    <th className="text-right p-2">Amount</th>
+                    <th className="p-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="p-2 text-muted-foreground">{index + 1}</td>
+                      <td className="p-2">
+                        <Input
+                          value={item.description}
+                          onChange={(e) => updateItem(index, 'description', e.target.value)}
+                          placeholder="Item description"
+                          className="h-8"
+                        />
+                      </td>
+                      <td className="p-2 hidden md:table-cell">
+                        <Input
+                          value={item.hsnCode}
+                          onChange={(e) => updateItem(index, 'hsnCode', e.target.value)}
+                          placeholder="HSN"
+                          className="h-8 w-24"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                          className="h-8 w-16 text-right"
+                        />
+                      </td>
+                      <td className="p-2 hidden sm:table-cell">
+                        <Input
+                          value={item.unit}
+                          onChange={(e) => updateItem(index, 'unit', e.target.value)}
+                          className="h-8 w-16"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          value={item.rate}
+                          onChange={(e) => updateItem(index, 'rate', parseFloat(e.target.value) || 0)}
+                          className="h-8 w-24 text-right"
+                        />
+                      </td>
+                      <td className="p-2 text-right font-medium">
+                        ₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => removeItem(index)}
+                          disabled={items.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <div className="w-full max-w-xs space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Sub Total:</span>
+                <span>₹{subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span>CGST</span>
+                <Input
+                  type="number"
+                  value={formData.cgstRate}
+                  onChange={(e) => setFormData({ ...formData, cgstRate: e.target.value })}
+                  className="h-7 w-14 text-right text-xs"
+                />
+                <span>%</span>
+                <span>₹{cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span>SGST</span>
+                <Input
+                  type="number"
+                  value={formData.sgstRate}
+                  onChange={(e) => setFormData({ ...formData, sgstRate: e.target.value })}
+                  className="h-7 w-14 text-right text-xs"
+                />
+                <span>%</span>
+                <span>₹{sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Rounding:</span>
+                <span>₹{rounding.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between font-bold text-lg border-t pt-2">
+                <span>Total:</span>
+                <span>₹{roundedTotal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {totalInWords}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <Textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes"
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit}>{challan ? "Update Challan" : "Create Challan"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
