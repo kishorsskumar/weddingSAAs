@@ -2224,6 +2224,27 @@ export async function handleOaksyWhatsAppMessage(
       // Try to extract amount from message (user might include it with address)
       const newAmount = extractAmount(messageText);
       
+      // Check if the message is ONLY an amount (not a valid address)
+      // Messages like "Amount 45K", "45K", "₹45000", "45 thousand" are amounts, not addresses
+      const isOnlyAmount = /^(?:amount\s*)?(?:rs\.?|₹|inr)?\s*\d+[\d,]*(?:\.\d+)?\s*(?:k|thousand|lakh|lakhs|crore)?$/i.test(messageText.trim());
+      
+      if (isOnlyAmount && newAmount) {
+        // User sent an amount when we expected an address - save amount, ask for address again
+        const updatedContext: IntentContext = { 
+          ...dcContext, 
+          amount: newAmount,
+        };
+        
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'pending_delivery_challan',
+          intentContext: updatedContext,
+          currentState: 'awaiting_dc_address',
+          conversationHistory: history,
+        });
+        
+        return `💰 Got the amount: ₹${newAmount.toLocaleString('en-IN')}\n\n📍 Now I need the *delivery address*. Please send the full address where this should be delivered.`;
+      }
+      
       // Extract vehicle number if included (e.g., "Vehicle number KL19C3786" or just "KL19C3786")
       const vehiclePattern = /(?:vehicle\s*(?:no|number)?\.?\s*)?([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,2}\s*\d{4})/i;
       const vehicleMatch = messageText.match(vehiclePattern);
@@ -2234,6 +2255,9 @@ export async function handleOaksyWhatsAppMessage(
       if (vehicleMatch) {
         deliveryAddress = deliveryAddress.replace(vehiclePattern, '').replace(/,\s*$/, '').trim();
       }
+      
+      // Also remove amount-like patterns from address if they're at the end
+      deliveryAddress = deliveryAddress.replace(/,?\s*(?:amount\s*)?(?:rs\.?|₹|inr)?\s*\d+[\d,]*(?:\.\d+)?\s*(?:k|thousand|lakh|lakhs|crore)?$/i, '').trim();
       
       if (deliveryAddress.length < 5) {
         return `📍 Please provide a valid delivery address (minimum 5 characters).`;
