@@ -218,6 +218,62 @@ function extractAmount(text: string): number | null {
   return null;
 }
 
+// Flexible amount extraction for contexts where we KNOW we're asking for an amount
+// (like QR payments, expenses after QR image is sent)
+// This accepts plain numbers like "500", "500 for taxi", "1200 lunch"
+function extractAmountFlexible(text: string): number | null {
+  // First try the strict extraction for currency-marked amounts
+  const strictAmount = extractAmount(text);
+  if (strictAmount) {
+    return strictAmount;
+  }
+  
+  // Clean the text - remove punctuation at end, normalize whitespace
+  const cleanedText = text.trim().replace(/[.,!?]+$/, '').trim();
+  
+  // Helper to validate amount (not phone number, reasonable range)
+  const isValidAmount = (num: number): boolean => {
+    return num >= 1 && num <= 10000000;
+  };
+  
+  // Helper to check if a number looks like a phone number (10+ consecutive digits)
+  const looksLikePhone = (numStr: string): boolean => {
+    const digitsOnly = numStr.replace(/[^0-9]/g, '');
+    return digitsOnly.length >= 10;
+  };
+  
+  // Priority 1: Number at the start followed by expense context word
+  const startWithContextMatch = cleanedText.match(/^([0-9,]+(?:\.[0-9]+)?)\s+(?:for|to|rupees?|rs|inr|\/-)/i);
+  if (startWithContextMatch && !looksLikePhone(startWithContextMatch[1])) {
+    const amount = parseFloat(startWithContextMatch[1].replace(/,/g, ''));
+    if (isValidAmount(amount)) return amount;
+  }
+  
+  // Priority 2: Number at the start followed by a purpose word (e.g., "500 lunch", "1200 taxi")
+  const startWithWordMatch = cleanedText.match(/^([0-9,]+(?:\.[0-9]+)?)\s+[a-zA-Z]/);
+  if (startWithWordMatch && !looksLikePhone(startWithWordMatch[1])) {
+    const amount = parseFloat(startWithWordMatch[1].replace(/,/g, ''));
+    if (isValidAmount(amount)) return amount;
+  }
+  
+  // Priority 3: Number at the very start or alone (e.g., just "500")
+  const startAloneMatch = cleanedText.match(/^([0-9,]+(?:\.[0-9]+)?)\s*$/);
+  if (startAloneMatch && !looksLikePhone(startAloneMatch[1])) {
+    const amount = parseFloat(startAloneMatch[1].replace(/,/g, ''));
+    if (isValidAmount(amount)) return amount;
+  }
+  
+  // Priority 4: Number preceded by expense cue (for/to/amount/total)
+  const expenseCueMatch = cleanedText.match(/(?:for|to|amount|total|pay|payment)\s+([0-9,]+(?:\.[0-9]+)?)/i);
+  if (expenseCueMatch && !looksLikePhone(expenseCueMatch[1])) {
+    const amount = parseFloat(expenseCueMatch[1].replace(/,/g, ''));
+    if (isValidAmount(amount)) return amount;
+  }
+  
+  // NO FALLBACK - don't just grab any number, it could be a phone/invoice number
+  return null;
+}
+
 // Stricter extraction for delivery challans - matches explicit currency/value markers
 // Also matches keyword-based amounts (amount/value/total + digits) with validation
 function extractAmountStrict(text: string): number | null {
@@ -1174,6 +1230,39 @@ export async function handleOaksyWhatsAppMessage(
     return `👍 Got it! I've cancelled the current action.\n\n_What would you like to do? Just say "help" if you need options._ 🌳`;
   }
   
+  // LOOP DETECTION - Check if we've sent the same message multiple times
+  // This helps break out of stuck states
+  let loopDetectionHistory: ConversationMessage[] = [];
+  try {
+    if (Array.isArray(conversation.conversationHistory)) {
+      loopDetectionHistory = conversation.conversationHistory as ConversationMessage[];
+    } else if (typeof conversation.conversationHistory === 'string') {
+      loopDetectionHistory = JSON.parse(conversation.conversationHistory) || [];
+    }
+  } catch {
+    loopDetectionHistory = [];
+  }
+  
+  const recentAssistantMessages = loopDetectionHistory
+    .filter(m => m.role === 'assistant')
+    .slice(-3);
+  
+  // If we have 2+ identical recent responses, something is stuck - auto-reset
+  if (recentAssistantMessages.length >= 2) {
+    const lastTwo = recentAssistantMessages.slice(-2);
+    if (lastTwo[0].content === lastTwo[1].content) {
+      // Stuck in a loop - reset to idle
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+      
+      return `I got a bit confused there! 😅\n\nLet's start fresh. What can I help you with?\n\n_Try "help" to see what I can do_ 🌳`;
+    }
+  }
+  
   // Check if this is from the superadmin FIRST (before employee check)
   const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
                               normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10)) ||
@@ -1953,7 +2042,7 @@ export async function handleOaksyWhatsAppMessage(
     
     // Waiting for both amount and purpose
     if (conversation.currentState === 'awaiting_qr_details') {
-      const amount = extractAmount(messageText);
+      const amount = extractAmountFlexible(messageText);
       if (!amount) {
         return `Please include the amount. Example: "500 for taxi" or "₹1200 for lunch"`;
       }
@@ -2013,7 +2102,7 @@ export async function handleOaksyWhatsAppMessage(
   if (conversation.activeIntent === 'income_submission') {
     // Waiting for amount after sending income screenshot
     if (conversation.currentState === 'awaiting_income_amount') {
-      const amount = extractAmount(messageText);
+      const amount = extractAmountFlexible(messageText);
       if (!amount) {
         return `Please tell me the amount received. Example: "₹50000" or "25000"`;
       }
