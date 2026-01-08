@@ -4,6 +4,7 @@ import { sendWhatsAppMessage, isWhatsAppConfigured } from './whatsapp-service';
 import type { WhatsappConversation, InsertExpenseReimbursement, InsertLeaveRequest } from '@shared/schema';
 import { objectStorageClient } from './objectStorage';
 import { randomUUID } from 'crypto';
+import { analyzeImageFromUrl } from './transaction-scanner';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -1919,25 +1920,44 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
 
-  // SMART IMAGE DETECTION - Determine if image is QR code, expense, or income
+  // SMART IMAGE DETECTION - Use AI to analyze the image
   if (mediaUrl && !conversation.activeIntent) {
     context.screenshotUrl = mediaUrl;
     
-    // Check message text for clues about what type of image this is
+    // Check message text for explicit clues
     const lowerText = messageText.toLowerCase();
     
-    // Income indicators
-    const isIncome = /\b(income|received|payment\s+from|bank\s+transfer|credited|got\s+payment|client\s+paid|advance\s+from)\b/i.test(lowerText);
+    // Explicit text indicators (user telling us what it is)
+    const explicitIncome = /\b(income|received|payment\s+from|bank\s+transfer|credited|got\s+payment|client\s+paid|advance\s+from)\b/i.test(lowerText);
+    const explicitExpense = /\b(expense|spent|paid\s+to|payment\s+for|bought|purchased|bill|invoice)\b/i.test(lowerText);
+    const explicitQr = /\b(qr|qr\s*code|scan|pay\s+here|gpay|phonepe|paytm|upi)\b/i.test(lowerText);
     
-    // Expense indicators  
-    const isExpense = /\b(expense|spent|paid\s+to|payment\s+for|bought|purchased|bill|invoice)\b/i.test(lowerText);
-    
-    // QR code indicators
-    const isQrPayment = /\b(qr|qr\s*code|scan|pay\s+here|gpay|phonepe|paytm|upi)\b/i.test(lowerText);
-    
-    // Try to extract amount from the message
-    const providedAmount = extractAmountFlexible(messageText);
+    // Try to extract amount from the message text
+    const textProvidedAmount = extractAmountFlexible(messageText);
     const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim();
+    
+    // Use AI to analyze the image if no explicit text indicators
+    let imageAnalysis: { imageType: string; amount: number | null; transactionType: string; counterparty: string | null; confidence: number; description: string } | null = null;
+    
+    if (!explicitIncome && !explicitExpense && !explicitQr) {
+      console.log('[Oaksy] Analyzing image with AI...');
+      try {
+        imageAnalysis = await analyzeImageFromUrl(mediaUrl);
+        console.log('[Oaksy] Image analysis result:', JSON.stringify(imageAnalysis));
+      } catch (error) {
+        console.error('[Oaksy] Image analysis failed:', error);
+      }
+    }
+    
+    // Determine image type and amount - prefer AI detection, fall back to text indicators
+    const isQrPayment = explicitQr || (imageAnalysis?.imageType === 'qr_code' && imageAnalysis.confidence >= 0.6);
+    const isIncome = explicitIncome || (imageAnalysis?.transactionType === 'income' && imageAnalysis.confidence >= 0.6);
+    const isExpense = explicitExpense || (imageAnalysis?.transactionType === 'expense' && imageAnalysis.confidence >= 0.6);
+    const isTransactionReceipt = imageAnalysis?.imageType === 'transaction_receipt' && imageAnalysis.confidence >= 0.6;
+    
+    // Use AI-detected amount if available, otherwise use text-provided amount
+    const providedAmount = textProvidedAmount || imageAnalysis?.amount || null;
+    const detectedCounterparty = imageAnalysis?.counterparty || null;
     
     // INCOME FLOW - User explicitly said it's income
     if (isIncome) {
@@ -2096,19 +2116,56 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // NO CLEAR INDICATOR - Ask user if Expense or Income (QR is auto-detected above)
+    // TRANSACTION RECEIPT DETECTED - AI detected a payment receipt with amount
+    if (isTransactionReceipt && providedAmount && imageAnalysis) {
+      const counterparty = detectedCounterparty || 'Unknown';
+      
+      if (imageAnalysis.transactionType === 'expense') {
+        // Expense receipt - ask for description
+        context.qrImageUrl = mediaUrl;
+        context.amount = providedAmount;
+        
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'qr_payment',
+          intentContext: context,
+          conversationHistory: history,
+          currentState: 'awaiting_qr_purpose_only',
+        });
+        
+        return `📝 *Transaction Receipt Detected!*\n\n💰 Amount: *₹${providedAmount.toLocaleString('en-IN')}*\n${counterparty !== 'Unknown' ? `👤 To: ${counterparty}\n` : ''}\n✅ What was this payment for?`;
+      } else if (imageAnalysis.transactionType === 'income') {
+        // Income receipt - ask for client name
+        context.incomeScreenshotUrl = mediaUrl;
+        context.amount = providedAmount;
+        
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'income_submission',
+          intentContext: context,
+          conversationHistory: history,
+          currentState: 'awaiting_income_client',
+        });
+        
+        return `💵 *Income Receipt Detected!*\n\n💰 Amount: *₹${providedAmount.toLocaleString('en-IN')}*\n${counterparty !== 'Unknown' ? `👤 From: ${counterparty}\n` : ''}\n✅ Who is this payment from?`;
+      }
+    }
+    
+    // NO CLEAR INDICATOR - Ask user if Expense or Income
+    const amountInfo = providedAmount ? `\n\n💰 Detected Amount: *₹${providedAmount.toLocaleString('en-IN')}*` : '';
+    const counterpartyInfo = detectedCounterparty ? `\n👤 ${detectedCounterparty}` : '';
+    
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
         qrImageUrl: mediaUrl,
         incomeScreenshotUrl: mediaUrl,
         providedAmount: providedAmount,
+        detectedCounterparty: detectedCounterparty,
       },
       conversationHistory: history,
       currentState: 'awaiting_image_type',
     });
 
-    const response = `📸 *Got your screenshot!*\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply with 1 or 2 (or say "expense" or "income")_`;
+    const response = `📸 *Got your screenshot!*${amountInfo}${counterpartyInfo}\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply 1 or 2_`;
       
     history.push({ role: 'assistant', content: response, timestamp: Date.now() });
     await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
