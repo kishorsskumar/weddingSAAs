@@ -2358,7 +2358,38 @@ export async function handleOaksyWhatsAppMessage(
         });
         return `👍 Cancelled! Let me know if you need anything else.`;
       } else {
-        return `Please reply *yes* to create the challan or *no* to cancel.`;
+        // Check if user is trying to change the amount
+        // Capture the multiplier in the regex to avoid scanning whole message
+        const amountChangeMatch = messageText.match(/^(?:amount|value|change\s*(?:to)?)\s*[:\-]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|lakh|lakhs|crore)?$/i);
+        if (amountChangeMatch) {
+          const numStr = amountChangeMatch[1].replace(/,/g, '');
+          let newAmount = parseFloat(numStr);
+          const multiplierStr = amountChangeMatch[2]?.toLowerCase();
+          
+          if (!isNaN(newAmount) && newAmount >= 0) {
+            // Apply multiplier from captured group only
+            if (multiplierStr === 'lakh' || multiplierStr === 'lakhs') {
+              newAmount *= 100000;
+            } else if (multiplierStr === 'crore') {
+              newAmount *= 10000000;
+            } else if (multiplierStr === 'k' || multiplierStr === 'thousand') {
+              newAmount *= 1000;
+            }
+            
+            const dcContext = context as IntentContext;
+            const updatedContext: IntentContext = { ...dcContext, amount: newAmount };
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'pending_delivery_challan',
+              intentContext: updatedContext,
+              currentState: 'awaiting_dc_confirmation',
+              conversationHistory: history,
+            });
+            
+            const vehicleInfo = dcContext.vehicleNumber ? `\n🚗 Vehicle: ${dcContext.vehicleNumber}` : '';
+            return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${dcContext.deliverTo}\n📍 Address: ${dcContext.deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${newAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
+          }
+        }
+        return `Please reply *yes* to create the challan or *no* to cancel.\n\n_To change amount, reply with "amount [value]" e.g., "amount 50000"_`;
       }
     }
     
@@ -2465,49 +2496,177 @@ export async function handleOaksyWhatsAppMessage(
     
     // Awaiting full details (generic state)
     if (conversation.currentState === 'awaiting_dc_details') {
-      // Try to parse: "DC to [name], [address], [amount]"
-      // STRICT: Only extract amounts with explicit currency markers to prevent address numbers being treated as amounts
-      const hasExplicitCurrencyMarker = /(?:rs\.?|₹|inr|amount)\s*\d+|\d+[\d,]*\s*(?:k|thousand|lakh|lakhs|crore)/i.test(messageText);
-      const amount = hasExplicitCurrencyMarker ? extractAmount(messageText) : null;
+      // Parse comprehensive DC message format:
+      // "Name,Address,Vehicle number XXX Value/Amount YYY"
       
-      // Simple parsing - look for "to" keyword
-      let deliverTo = '';
+      // Extract vehicle number first (pattern: "Vehicle number KL19C3786" or just "KL19C3786")
+      const vehiclePattern = /(?:vehicle\s*(?:no|number)?\.?\s*)?([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,2}\s*\d{4})/i;
+      const vehicleMatch = messageText.match(vehiclePattern);
+      const vehicleNumber = vehicleMatch ? vehicleMatch[1].replace(/\s/g, '').toUpperCase() : undefined;
       
-      // Try comma-separated format
-      const parts = messageText.split(',').map(p => p.trim());
-      if (parts.length >= 2) {
-        // First part is deliver to
-        deliverTo = parts[0].replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
-      } else {
-        // Look for "to" pattern
-        const toMatch = messageText.match(/(?:dc|challan|delivery)?\s*to\s+(.+)/i);
-        if (toMatch) {
-          deliverTo = toMatch[1].split(/[\-,]/)[0].trim();
-        } else {
-          deliverTo = messageText.replace(/^(dc|challan|delivery)\s*/i, '').trim().split(/\s+/).slice(0, 3).join(' ');
+      // Extract amount with explicit value/amount/total keyword or currency symbol
+      // Use separate patterns to avoid ambiguity with address numbers
+      let amount: number | undefined;
+      
+      // Pattern 1: Keyword followed by number (Value 450000, Amount 5000)
+      const keywordAmountMatch = messageText.match(/(?:value|amount|total|price|cost)\s*[:\-]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|lakh|lakhs|crore)?/i);
+      if (keywordAmountMatch) {
+        const baseAmount = parseFloat(keywordAmountMatch[1].replace(/,/g, ''));
+        const multiplier = keywordAmountMatch[2]?.toLowerCase();
+        if (!isNaN(baseAmount) && baseAmount > 0) {
+          if (multiplier === 'lakh' || multiplier === 'lakhs') {
+            amount = baseAmount * 100000;
+          } else if (multiplier === 'crore') {
+            amount = baseAmount * 10000000;
+          } else if (multiplier === 'k' || multiplier === 'thousand') {
+            amount = baseAmount * 1000;
+          } else {
+            amount = baseAmount;
+          }
         }
       }
       
-      // Clean recipient name - remove amount-like patterns
-      if (amount) {
-        deliverTo = deliverTo.replace(/(?:rs\.?|₹|inr)?\s*\d+[\d,]*\s*(?:k|thousand|lakh|lakhs|crore)?/i, '').trim();
+      // Pattern 2: Currency symbol (₹45000, Rs 5000)
+      if (!amount) {
+        const currencyAmountMatch = messageText.match(/(?:rs\.?|₹|inr)\s*([0-9,]+(?:\.[0-9]+)?)/i);
+        if (currencyAmountMatch) {
+          const baseAmount = parseFloat(currencyAmountMatch[1].replace(/,/g, ''));
+          if (!isNaN(baseAmount) && baseAmount > 0) {
+            amount = baseAmount;
+          }
+        }
+      }
+      
+      // Pattern 3: Number with multiplier suffix (45K, 1 lakh)
+      if (!amount) {
+        const multiplierAmountMatch = messageText.match(/([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|lakh|lakhs|crore)(?:\s|,|$)/i);
+        if (multiplierAmountMatch) {
+          const baseAmount = parseFloat(multiplierAmountMatch[1].replace(/,/g, ''));
+          const multiplier = multiplierAmountMatch[2].toLowerCase();
+          if (!isNaN(baseAmount) && baseAmount > 0) {
+            if (multiplier === 'lakh' || multiplier === 'lakhs') {
+              amount = baseAmount * 100000;
+            } else if (multiplier === 'crore') {
+              amount = baseAmount * 10000000;
+            } else if (multiplier === 'k' || multiplier === 'thousand') {
+              amount = baseAmount * 1000;
+            }
+          }
+        }
+      }
+      
+      // Remove vehicle and amount patterns from text for address parsing
+      let cleanText = messageText
+        .replace(vehiclePattern, '')
+        .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?/i, '')
+        .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?/i, '')
+        .replace(/[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)/i, '')
+        .trim();
+      
+      // Parse message for recipient name and address
+      const parts = cleanText.split(',').map(p => p.trim()).filter(p => p.length > 0);
+      
+      let deliverTo = '';
+      let deliveryAddress = '';
+      
+      // Helper: extract name from segment that might contain "Name Address" 
+      // Keeps multi-word names until first clear address token (digit, fraction, address keyword)
+      function extractNameFromSegment(segment: string): { name: string; address: string } {
+        const cleaned = segment.replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
+        const words = cleaned.split(/\s+/);
+        
+        if (words.length <= 1) {
+          return { name: cleaned, address: '' };
+        }
+        
+        // Find the first word that looks like an address token:
+        // - Contains digits (25/103, 682001)
+        // - Is an address keyword (Road, Street, Stop, etc.)
+        const addressKeywords = /^(road|street|lane|junction|stop|nagar|colony|flat|house|building|floor|main|cross|ward|sector|block|phase)$/i;
+        
+        let addressStartIdx = -1;
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          // Check if word contains digits (address numbers like 25/103, postal codes)
+          if (/\d/.test(word)) {
+            addressStartIdx = i;
+            break;
+          }
+          // Check if word is an address keyword
+          if (addressKeywords.test(word)) {
+            addressStartIdx = i;
+            break;
+          }
+        }
+        
+        if (addressStartIdx > 0) {
+          // Found address start - split there
+          const name = words.slice(0, addressStartIdx).join(' ');
+          const address = words.slice(addressStartIdx).join(' ');
+          return { name, address };
+        } else if (addressStartIdx === 0) {
+          // First word is already address-like (rare but possible)
+          return { name: '', address: cleaned };
+        }
+        
+        // No clear address token found - everything is name
+        return { name: cleaned, address: '' };
+      }
+      
+      if (parts.length >= 2) {
+        // Comma-separated format: "Name Address..., More Address..."
+        // Check if first segment contains both name and address
+        const firstSegment = parts[0];
+        const extracted = extractNameFromSegment(firstSegment);
+        
+        if (extracted.address) {
+          // First segment had "Name Address", rest are more address parts
+          deliverTo = extracted.name;
+          deliveryAddress = [extracted.address, ...parts.slice(1)].join(', ').trim().replace(/[,\s]+$/, '');
+        } else {
+          // First segment is just the name
+          deliverTo = extracted.name;
+          deliveryAddress = parts.slice(1).join(', ').trim().replace(/[,\s]+$/, '');
+        }
+      } else {
+        // Non-comma format: try "DC to Name Address" or "Name Address"
+        const toMatch = cleanText.match(/^(?:dc\s+|challan\s+|delivery\s+)?(?:to|for)\s+(\S+)\s+(.+)$/i);
+        if (toMatch) {
+          deliverTo = toMatch[1].trim();
+          deliveryAddress = toMatch[2].trim();
+        } else {
+          // No commas and no "to" keyword - try name/address split
+          const extracted = extractNameFromSegment(cleanText);
+          deliverTo = extracted.name;
+          deliveryAddress = extracted.address;
+        }
       }
       
       const dcContext = context as IntentContext;
       
-      if (deliverTo && amount) {
-        // Have deliver to and explicit amount, need address
-        const updatedContext: IntentContext = { ...dcContext, deliverTo, amount };
+      // Default amount to 0 if not provided - user must explicitly set it
+      const finalAmount = amount || 0;
+      
+      if (deliverTo && deliveryAddress) {
+        // Have name and address - go to confirmation
+        const updatedContext: IntentContext = { 
+          ...dcContext, 
+          deliverTo, 
+          deliveryAddress, 
+          amount: finalAmount,
+          vehicleNumber 
+        };
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'pending_delivery_challan',
           intentContext: updatedContext,
-          currentState: 'awaiting_dc_address',
+          currentState: 'awaiting_dc_confirmation',
           conversationHistory: history,
         });
-        return `📋 *Delivery Challan* for *${deliverTo}*\n\nAmount: ₹${amount.toLocaleString('en-IN')}\n\nWhat's the delivery address? 📍`;
+        const vehicleInfo = vehicleNumber ? `\n🚗 Vehicle: ${vehicleNumber}` : '';
+        return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.\n\n_To change amount, reply with "amount [value]" e.g., "amount 50000"_`;
       } else if (deliverTo) {
-        // Have deliver to, need address and amount - ALWAYS ask for amount explicitly
-        const updatedContext: IntentContext = { ...dcContext, deliverTo };
+        // Have recipient only, need address
+        const updatedContext: IntentContext = { ...dcContext, deliverTo, amount: finalAmount, vehicleNumber };
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'pending_delivery_challan',
           intentContext: updatedContext,
@@ -2517,7 +2676,7 @@ export async function handleOaksyWhatsAppMessage(
         return `📋 *Delivery Challan* for *${deliverTo}*\n\nWhat's the delivery address? 📍`;
       }
       
-      return `❌ I need at least a recipient name.\n\n_Example: "DC to ABC Wedding Hall"_`;
+      return `❌ I need at least a recipient name.\n\n_Example: "Aneesh, 25/103 Kottodimukku, Manjummel-683501, Vehicle number KL19C3786 Value 45000"_`;
     }
   }
 
@@ -2896,28 +3055,165 @@ export async function handleOaksyWhatsAppMessage(
       return `❌ Sorry ${employee.name}, delivery challans can only be created by authorized staff.\n\n_Need to create one? Please contact Fida, Femina, or Sabitha._`;
     }
     
-    const deliverTo = aiAnalysis.extractedData.deliverTo || context.deliverTo;
-    const deliveryAddress = aiAnalysis.extractedData.deliveryAddress || context.deliveryAddress;
+    // Parse comprehensive DC message format ourselves (more reliable than AI for this format):
+    // "Name,Address,Vehicle number XXX Value/Amount YYY"
     
-    // STRICT amount validation - use extractAmountStrict which ONLY matches currency markers
-    // This prevents AI from incorrectly extracting "103" from "25/103" addresses
-    const ourExtractedAmount = extractAmountStrict(messageText);
+    // Extract vehicle number first (pattern: "Vehicle number KL19C3786" or just "KL19C3786")
+    const vehiclePattern = /(?:vehicle\s*(?:no|number)?\.?\s*)?([A-Z]{2}\s*\d{1,2}\s*[A-Z]{1,2}\s*\d{4})/i;
+    const vehicleMatch = messageText.match(vehiclePattern);
+    const parsedVehicleNumber = vehicleMatch ? vehicleMatch[1].replace(/\s/g, '').toUpperCase() : undefined;
     
-    // Use our strict extraction if available (most reliable)
-    // Fall back to context.amount (already validated from previous interactions)
-    // AI extraction is NOT trusted for initial DC amounts due to address number misinterpretation
-    let amount: number | undefined = context.amount;
+    // Extract amount with explicit value/amount/total keyword or currency symbol
+    // Use separate patterns to avoid ambiguity with address numbers
+    let parsedAmount: number | undefined;
     
-    if (ourExtractedAmount) {
-      // Trust our strict extraction - it only matches explicit currency markers
-      amount = ourExtractedAmount;
+    // Pattern 1: Keyword followed by number (Value 450000, Amount 5000)
+    const keywordAmountMatch = messageText.match(/(?:value|amount|total|price|cost)\s*[:\-]?\s*([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|lakh|lakhs|crore)?/i);
+    if (keywordAmountMatch) {
+      const baseAmount = parseFloat(keywordAmountMatch[1].replace(/,/g, ''));
+      const multiplier = keywordAmountMatch[2]?.toLowerCase();
+      if (!isNaN(baseAmount) && baseAmount > 0) {
+        if (multiplier === 'lakh' || multiplier === 'lakhs') {
+          parsedAmount = baseAmount * 100000;
+        } else if (multiplier === 'crore') {
+          parsedAmount = baseAmount * 10000000;
+        } else if (multiplier === 'k' || multiplier === 'thousand') {
+          parsedAmount = baseAmount * 1000;
+        } else {
+          parsedAmount = baseAmount;
+        }
+      }
     }
     
-    const itemDescription = aiAnalysis.extractedData.itemDescription || context.itemDescription || 'Stage Decor Items';
-    const vehicleNumber = aiAnalysis.extractedData.vehicleNumber || context.vehicleNumber;
+    // Pattern 2: Currency symbol (₹45000, Rs 5000)
+    if (!parsedAmount) {
+      const currencyAmountMatch = messageText.match(/(?:rs\.?|₹|inr)\s*([0-9,]+(?:\.[0-9]+)?)/i);
+      if (currencyAmountMatch) {
+        const baseAmount = parseFloat(currencyAmountMatch[1].replace(/,/g, ''));
+        if (!isNaN(baseAmount) && baseAmount > 0) {
+          parsedAmount = baseAmount;
+        }
+      }
+    }
     
-    if (deliverTo && deliveryAddress && amount) {
-      // All required info collected - go to confirmation
+    // Pattern 3: Number with multiplier suffix (45K, 1 lakh)
+    if (!parsedAmount) {
+      const multiplierAmountMatch = messageText.match(/([0-9,]+(?:\.[0-9]+)?)\s*(k|thousand|lakh|lakhs|crore)(?:\s|,|$)/i);
+      if (multiplierAmountMatch) {
+        const baseAmount = parseFloat(multiplierAmountMatch[1].replace(/,/g, ''));
+        const multiplier = multiplierAmountMatch[2].toLowerCase();
+        if (!isNaN(baseAmount) && baseAmount > 0) {
+          if (multiplier === 'lakh' || multiplier === 'lakhs') {
+            parsedAmount = baseAmount * 100000;
+          } else if (multiplier === 'crore') {
+            parsedAmount = baseAmount * 10000000;
+          } else if (multiplier === 'k' || multiplier === 'thousand') {
+            parsedAmount = baseAmount * 1000;
+          }
+        }
+      }
+    }
+    
+    // Remove vehicle and amount patterns from text for address parsing
+    let cleanText = messageText
+      .replace(vehiclePattern, '')
+      .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)?/i, '')
+      .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?/i, '')
+      .replace(/[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)(?:\s|,|$)/i, '')
+      .replace(/^(dc|create\s*dc|challan|delivery\s*challan)\s*/i, '')
+      .trim();
+    
+    // Parse message for recipient name and address
+    const parts = cleanText.split(',').map(p => p.trim()).filter(p => p.length > 0);
+    
+    let parsedDeliverTo = '';
+    let parsedDeliveryAddress = '';
+    
+    // Helper: extract name from segment that might contain "Name Address"
+    // Keeps multi-word names until first clear address token (digit, fraction, address keyword)
+    function extractNameFromSegmentAI(segment: string): { name: string; address: string } {
+      const cleaned = segment.replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
+      const words = cleaned.split(/\s+/);
+      
+      if (words.length <= 1) {
+        return { name: cleaned, address: '' };
+      }
+      
+      // Find the first word that looks like an address token:
+      // - Contains digits (25/103, 682001)
+      // - Is an address keyword (Road, Street, Stop, etc.)
+      const addressKeywords = /^(road|street|lane|junction|stop|nagar|colony|flat|house|building|floor|main|cross|ward|sector|block|phase)$/i;
+      
+      let addressStartIdx = -1;
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        // Check if word contains digits (address numbers like 25/103, postal codes)
+        if (/\d/.test(word)) {
+          addressStartIdx = i;
+          break;
+        }
+        // Check if word is an address keyword
+        if (addressKeywords.test(word)) {
+          addressStartIdx = i;
+          break;
+        }
+      }
+      
+      if (addressStartIdx > 0) {
+        // Found address start - split there
+        const name = words.slice(0, addressStartIdx).join(' ');
+        const address = words.slice(addressStartIdx).join(' ');
+        return { name, address };
+      } else if (addressStartIdx === 0) {
+        // First word is already address-like (rare but possible)
+        return { name: '', address: cleaned };
+      }
+      
+      // No clear address token found - everything is name
+      return { name: cleaned, address: '' };
+    }
+    
+    if (parts.length >= 2) {
+      // Comma-separated format: "Name Address..., More Address..."
+      const firstSegment = parts[0];
+      const extracted = extractNameFromSegmentAI(firstSegment);
+      
+      if (extracted.address) {
+        // First segment had "Name Address", rest are more address parts
+        parsedDeliverTo = extracted.name;
+        parsedDeliveryAddress = [extracted.address, ...parts.slice(1)].join(', ').trim().replace(/[,\s]+$/, '');
+      } else {
+        // First segment is just the name
+        parsedDeliverTo = extracted.name;
+        parsedDeliveryAddress = parts.slice(1).join(', ').trim().replace(/[,\s]+$/, '');
+      }
+    } else {
+      // Non-comma format: try "DC to Name Address" or "Name Address"
+      const toMatch = cleanText.match(/^(?:dc\s+|challan\s+|delivery\s+)?(?:to|for)\s+(\S+)\s+(.+)$/i);
+      if (toMatch) {
+        parsedDeliverTo = toMatch[1].trim();
+        parsedDeliveryAddress = toMatch[2].trim();
+      } else {
+        // No commas and no "to" keyword - try name/address split
+        const extracted = extractNameFromSegmentAI(cleanText);
+        parsedDeliverTo = extracted.name;
+        parsedDeliveryAddress = extracted.address;
+      }
+    }
+    
+    // Use our parsed values, falling back to AI extraction, then context
+    const deliverTo = parsedDeliverTo || aiAnalysis.extractedData.deliverTo || context.deliverTo;
+    const deliveryAddress = parsedDeliveryAddress || aiAnalysis.extractedData.deliveryAddress || context.deliveryAddress;
+    const vehicleNumber = parsedVehicleNumber || aiAnalysis.extractedData.vehicleNumber || context.vehicleNumber;
+    
+    // For amount: use our parsed amount (most reliable), fall back to context (from previous interactions)
+    // Default to 0 if not provided - user can change later
+    const amount = parsedAmount ?? context.amount ?? 0;
+    
+    const itemDescription = aiAnalysis.extractedData.itemDescription || context.itemDescription || 'Stage Decor Items';
+    
+    if (deliverTo && deliveryAddress) {
+      // Have name and address - go to confirmation (amount defaults to 0)
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'pending_delivery_challan',
         intentContext: { deliverTo, deliveryAddress, amount, itemDescription, vehicleNumber },
@@ -2925,21 +3221,12 @@ export async function handleOaksyWhatsAppMessage(
         currentState: 'awaiting_dc_confirmation',
       });
       const vehicleInfo = vehicleNumber ? `\n🚗 Vehicle: ${vehicleNumber}` : '';
-      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.`;
-    } else if (deliverTo && deliveryAddress) {
-      // Have recipient and address, need amount
-      await storage.updateWhatsappConversation(conversation.id, {
-        activeIntent: 'pending_delivery_challan',
-        intentContext: { deliverTo, deliveryAddress, itemDescription },
-        conversationHistory: history,
-        currentState: 'awaiting_dc_amount',
-      });
-      return `📋 *Delivery Challan*\n\nDelivering to: *${deliverTo}*\n\nWhat's the total amount? 💰`;
+      return `📋 *Delivery Challan Summary*\n\n📍 Deliver To: ${deliverTo}\n📍 Address: ${deliveryAddress}${vehicleInfo}\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n\n*Ready to create?* Reply "yes" to confirm or "no" to cancel.\n\n_To change amount, reply with "amount [value]" e.g., "amount 50000"_`;
     } else if (deliverTo) {
       // Have recipient, need address
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: 'pending_delivery_challan',
-        intentContext: { deliverTo, amount },
+        intentContext: { deliverTo, amount, vehicleNumber },
         conversationHistory: history,
         currentState: 'awaiting_dc_address',
       });
@@ -2952,7 +3239,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: history,
         currentState: 'awaiting_dc_details',
       });
-      return aiAnalysis.message || `📋 *Create Delivery Challan*\n\nPlease provide:\n1. Deliver to (name/company)\n2. Delivery address\n3. Amount (e.g., 45K, 45,000, 45 Thousand)\n\n_Example: "DC to ABC Wedding Hall, Kochi, 45K"_`;
+      return `📋 *Create Delivery Challan*\n\nPlease provide all details in one message:\n\n_Example: "Aneesh, 25/103 Kottodimukku, Manjummel-683501, Vehicle number KL19C3786 Value 45000"_`;
     }
   }
 
