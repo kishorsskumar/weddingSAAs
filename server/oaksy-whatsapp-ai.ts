@@ -1920,44 +1920,105 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
 
-  // SMART IMAGE DETECTION - Use AI to analyze the image
+  // SMART IMAGE DETECTION - Always analyze with AI first
   if (mediaUrl && !conversation.activeIntent) {
     context.screenshotUrl = mediaUrl;
     
     // Check message text for explicit clues
     const lowerText = messageText.toLowerCase();
-    
-    // Explicit text indicators (user telling us what it is)
-    const explicitIncome = /\b(income|received|payment\s+from|bank\s+transfer|credited|got\s+payment|client\s+paid|advance\s+from)\b/i.test(lowerText);
-    const explicitExpense = /\b(expense|spent|paid\s+to|payment\s+for|bought|purchased|bill|invoice)\b/i.test(lowerText);
-    const explicitQr = /\b(qr|qr\s*code|scan|pay\s+here|gpay|phonepe|paytm|upi)\b/i.test(lowerText);
-    
-    // Try to extract amount from the message text
     const textProvidedAmount = extractAmountFlexible(messageText);
     const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim();
     
-    // Use AI to analyze the image if no explicit text indicators
+    // Explicit QR indicator - only for actual QR code images user wants to pay
+    const explicitQr = /\b(qr|qr\s*code|scan|pay\s+here)\b/i.test(lowerText);
+    
+    // ALWAYS analyze images with AI to extract amount and type
     let imageAnalysis: { imageType: string; amount: number | null; transactionType: string; counterparty: string | null; confidence: number; description: string } | null = null;
     
-    if (!explicitIncome && !explicitExpense && !explicitQr) {
-      console.log('[Oaksy] Analyzing image with AI...');
-      try {
-        imageAnalysis = await analyzeImageFromUrl(mediaUrl);
-        console.log('[Oaksy] Image analysis result:', JSON.stringify(imageAnalysis));
-      } catch (error) {
-        console.error('[Oaksy] Image analysis failed:', error);
+    console.log('[Oaksy] Analyzing image with AI for:', mediaUrl);
+    try {
+      imageAnalysis = await analyzeImageFromUrl(mediaUrl);
+      console.log('[Oaksy] Image analysis result:', JSON.stringify(imageAnalysis));
+    } catch (error) {
+      console.error('[Oaksy] Image analysis failed:', error);
+    }
+    
+    // Use AI-detected amount, fall back to text-provided amount
+    const detectedAmount = imageAnalysis?.amount || textProvidedAmount || null;
+    const detectedCounterparty = imageAnalysis?.counterparty || null;
+    const detectedType = imageAnalysis?.transactionType || 'unknown';
+    const isQrCode = explicitQr || (imageAnalysis?.imageType === 'qr_code' && imageAnalysis.confidence >= 0.6);
+    
+    // Check if user already told us it's expense or income in their message
+    const isExpenseInMessage = /\b(expense|spent|paid\s+for)\b/i.test(lowerText);
+    const isIncomeInMessage = /\b(income|received|payment\s+from|credited)\b/i.test(lowerText);
+    const descriptionInMessage = messageText
+      .replace(/₹?\s*\d+[,\d]*\.?\d*/g, '')
+      .replace(/\b(expense|spent|paid\s+for|income|received|payment\s+from|credited)\b\s*(for|from)?\s*/gi, '')
+      .replace(/rs\.?\s*/gi, '')
+      .trim();
+    
+    // If user already specified type + we have amount, complete immediately
+    if (detectedAmount && (isExpenseInMessage || isIncomeInMessage)) {
+      const description = descriptionInMessage || detectedCounterparty || (isExpenseInMessage ? 'Expense' : 'Income');
+      
+      if (isExpenseInMessage) {
+        // Create expense directly
+        const { requestCode } = await createQrPaymentRequest(
+          employee.id,
+          employee.name,
+          employee.phone || normalizedPhone,
+          'Other',
+          description,
+          detectedAmount,
+          mediaUrl
+        );
+
+        await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
+
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+
+        return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+      } else {
+        // Create income directly
+        const requestCode = await storage.generateIncomeCode();
+        await storage.createIncomeSubmission({
+          requestCode,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: employee.phone || normalizedPhone,
+          type: 'client_payment',
+          clientName: description,
+          description: `Income from ${description}`,
+          amount: detectedAmount.toString(),
+          screenshotUrl: mediaUrl,
+          status: 'pending',
+        });
+
+        await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', description, `Income from ${description}`, detectedAmount, mediaUrl);
+
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+
+        return `✅ *Thank you!*\n\nIncome recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n👤 From: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
       }
     }
     
-    // Determine image type and amount - prefer AI detection, fall back to text indicators
-    const isQrPayment = explicitQr || (imageAnalysis?.imageType === 'qr_code' && imageAnalysis.confidence >= 0.6);
-    const isIncome = explicitIncome || (imageAnalysis?.transactionType === 'income' && imageAnalysis.confidence >= 0.6);
-    const isExpense = explicitExpense || (imageAnalysis?.transactionType === 'expense' && imageAnalysis.confidence >= 0.6);
+    // Variables for backward compatibility
+    const isIncome = isIncomeInMessage || (detectedType === 'income' && imageAnalysis && imageAnalysis.confidence >= 0.7);
+    const isExpense = isExpenseInMessage || (detectedType === 'expense' && imageAnalysis && imageAnalysis.confidence >= 0.7);
+    const isQrPayment = isQrCode;
     const isTransactionReceipt = imageAnalysis?.imageType === 'transaction_receipt' && imageAnalysis.confidence >= 0.6;
-    
-    // Use AI-detected amount if available, otherwise use text-provided amount
-    const providedAmount = textProvidedAmount || imageAnalysis?.amount || null;
-    const detectedCounterparty = imageAnalysis?.counterparty || null;
+    const providedAmount = detectedAmount;
     
     // INCOME FLOW - User explicitly said it's income
     if (isIncome) {
@@ -2149,10 +2210,7 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // NO CLEAR INDICATOR - Ask user if Expense or Income
-    const amountInfo = providedAmount ? `\n\n💰 Detected Amount: *₹${providedAmount.toLocaleString('en-IN')}*` : '';
-    const counterpartyInfo = detectedCounterparty ? `\n👤 ${detectedCounterparty}` : '';
-    
+    // NO CLEAR INDICATOR - Ask user if Expense or Income with detected amount
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
@@ -2165,7 +2223,14 @@ export async function handleOaksyWhatsAppMessage(
       currentState: 'awaiting_image_type',
     });
 
-    const response = `📸 *Got your screenshot!*${amountInfo}${counterpartyInfo}\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply 1 or 2_`;
+    // Build response with detected info
+    let response: string;
+    if (providedAmount) {
+      const counterpartyInfo = detectedCounterparty ? `\n👤 ${detectedCounterparty}` : '';
+      response = `📸 *Scanned: ₹${providedAmount.toLocaleString('en-IN')}*${counterpartyInfo}\n\nIs this *Expense* or *Income*?\n\n_Just reply "expense" or "income" with what it's for_\n_Example: "expense for food" or "income from client"_`;
+    } else {
+      response = `📸 *Got your screenshot!*\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply with type, amount & description_\n_Example: "expense 500 taxi" or "income 5000 from Sharma"_`;
+    }
       
     history.push({ role: 'assistant', content: response, timestamp: Date.now() });
     await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
@@ -2179,32 +2244,65 @@ export async function handleOaksyWhatsAppMessage(
       const imgContext = context as any;
       const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
       const savedAmount = imgContext.providedAmount;
+      const savedCounterparty = imgContext.detectedCounterparty || '';
       
-      // Check user's response (only expense or income - QR is auto-detected)
-      const isExpenseResponse = /^(1|expense|spent|paid)/i.test(lowerMessage);
-      const isIncomeResponse = /^(2|income|received|got)/i.test(lowerMessage);
+      // Check user's response - they may include description in same message
+      // e.g., "Expense for Food Dr.Martin event" or "1 taxi fare" or "expense 500 lunch"
+      const isExpenseResponse = /\b(1|expense|spent|paid)\b/i.test(lowerMessage);
+      const isIncomeResponse = /\b(2|income|received|got)\b/i.test(lowerMessage);
+      
+      // Extract description from the message (everything after expense/income keywords)
+      const descriptionFromMessage = messageText
+        .replace(/^(1|2)\s*/i, '')
+        .replace(/\b(expense|spent|paid|income|received|got)\b\s*(for|from)?\s*/gi, '')
+        .trim();
+      
+      // Try to extract amount from message if not already detected
+      const messageAmount = extractAmountFlexible(messageText);
+      const finalAmount = savedAmount || messageAmount;
       
       if (isExpenseResponse) {
-        // User said expense - ask for amount and description
-        const expenseContext: IntentContext = { qrImageUrl: imageUrl };
+        // User said expense - complete the flow if we have amount
+        const description = descriptionFromMessage || savedCounterparty || 'Expense';
         
-        if (savedAmount) {
-          expenseContext.amount = savedAmount;
+        if (finalAmount) {
+          // We have amount - create expense and thank user
+          const { requestCode } = await createQrPaymentRequest(
+            employee.id,
+            employee.name,
+            employee.phone || normalizedPhone,
+            'Other',
+            description,
+            finalAmount,
+            imageUrl
+          );
+
+          await notifyKishorQrPayment(
+            requestCode,
+            employee.name,
+            description,
+            finalAmount,
+            imageUrl
+          );
+
           await storage.updateWhatsappConversation(conversation.id, {
-            activeIntent: 'qr_payment',
-            intentContext: expenseContext,
-            conversationHistory: history,
-            currentState: 'awaiting_qr_purpose_only',
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
           });
-          return `📝 *Expense* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWhat was this expense for?`;
+
+          return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
         } else {
+          // No amount - ask for it
+          const expenseContext: IntentContext = { qrImageUrl: imageUrl, qrPaymentDescription: description };
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'qr_payment',
             intentContext: expenseContext,
             conversationHistory: history,
-            currentState: 'awaiting_qr_details',
+            currentState: 'awaiting_qr_amount_only',
           });
-          return `📝 *Expense*\n\nPlease send amount and description.\n_Example: "500 for taxi" or "1200 lunch"_`;
+          return `📝 Got it: *${description}*\n\nWhat's the amount? 💰`;
         }
       }
       
