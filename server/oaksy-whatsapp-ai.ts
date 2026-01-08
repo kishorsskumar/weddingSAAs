@@ -668,7 +668,7 @@ const AUTHORIZED_DC_CREATORS: Record<string, string> = {
   'kishor': '+917902373354',           // Superadmin
   'fida fathima': '+919895810975',     // Wedding Planner
   'femina km': '+917306687284',        // Wedding Planner
-  'sabitha': '+918606687286',          // Accountant
+  'sabitha': '+917558841046',          // Accountant (Sabitha MA)
   'test employee': '+917025063335',    // Test Employee
 };
 
