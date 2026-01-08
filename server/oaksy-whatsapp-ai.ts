@@ -8,6 +8,24 @@ import { analyzeImageFromUrl } from './transaction-scanner';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Allowed employees for expense/income submission (normalized phone numbers)
+// Only these employees can submit expenses or income via WhatsApp
+const ALLOWED_EXPENSE_SUBMITTERS = [
+  '+917025063335',  // Test Employee
+  '+919895810975',  // Fida Fathima PK (Wedding Planner)
+  '+917306687284',  // Femina KM (Wedding Planner)
+  '+917558841046',  // Sabitha MA (Accountant)
+];
+
+function isAllowedExpenseSubmitter(phone: string): boolean {
+  const normalized = normalizePhoneNumber(phone);
+  return ALLOWED_EXPENSE_SUBMITTERS.some(allowed => {
+    const normalizedAllowed = normalizePhoneNumber(allowed);
+    // Match last 10 digits to handle format differences
+    return normalized.slice(-10) === normalizedAllowed.slice(-10);
+  });
+}
+
 // Helper to convert Twilio media URL to our proxy URL for public access
 function getPublicMediaUrl(twilioMediaUrl: string): string {
   if (!twilioMediaUrl || !twilioMediaUrl.includes('twilio.com')) {
@@ -1922,6 +1940,11 @@ export async function handleOaksyWhatsAppMessage(
 
   // SMART IMAGE DETECTION - Always analyze with AI first
   if (mediaUrl && !conversation.activeIntent) {
+    // Check if this employee is allowed to submit expenses/income
+    if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+      return `👋 Hi ${employee.name}!\n\n❌ Expense and income submissions are currently restricted to authorized team members only.\n\nIf you need to submit an expense, please contact your supervisor or the accountant.\n\n_For other help, just ask!_ 🌳`;
+    }
+    
     context.screenshotUrl = mediaUrl;
     
     // Check message text for explicit clues
