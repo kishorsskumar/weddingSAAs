@@ -54,6 +54,7 @@ export default function Daybook() {
   const isAccountant = user?.role === 'accountant';
   const canEditEntries = true; // All users can edit entries
   const canDeleteEntries = isAdmin || isAccountant; // Admins and accountants can delete entries
+  const canManageBanks = isAdmin || isAccountant; // Admins and accountants can manage banks
 
   const { data: entries = [] } = useQuery<DaybookEntry[]>({
     queryKey: ['/api/daybook'],
@@ -1879,7 +1880,7 @@ export default function Daybook() {
                 <Building2 className="h-5 w-5 text-primary" />
                 <CardTitle className="font-serif text-lg">Bank Accounts</CardTitle>
               </div>
-              {isAdmin && (
+              {canManageBanks && (
                 <Dialog open={isBankDialogOpen} onOpenChange={setIsBankDialogOpen}>
                   <DialogTrigger asChild>
                     <Button size="sm" className="gap-1 h-8" data-testid="button-add-bank">
@@ -1904,7 +1905,7 @@ export default function Daybook() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="font-bold font-mono text-xl">₹{Number(bank.balance).toLocaleString()}</div>
-                      {isAdmin && (
+                      {canManageBanks && (
                         <div className="flex gap-1">
                           <Dialog open={editingBank?.id === bank.id} onOpenChange={(open) => !open && setEditingBank(null)}>
                             <DialogTrigger asChild>
