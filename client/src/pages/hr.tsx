@@ -667,18 +667,99 @@ export default function HR() {
   };
 
   const EmployeeTable = ({ employeeList, isPast = false }: { employeeList: Employee[]; isPast?: boolean }) => (
-    <div className="overflow-x-auto -mx-4 sm:mx-0">
-      <div className="px-4 sm:px-0">
+    <>
+      {/* Mobile Card Layout */}
+      <div className="sm:hidden space-y-3">
+        {employeeList.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            {isPast ? "No past employees." : "No current employees."}
+          </div>
+        ) : (
+          employeeList.map((emp) => (
+            <div 
+              key={emp.id} 
+              className="bg-muted/30 rounded-lg p-3 space-y-2 border border-border/50"
+              data-testid={`card-employee-${emp.id}`}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="font-medium text-sm">{emp.name}</div>
+                  <div className="text-xs text-muted-foreground">{emp.designation}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono text-xs text-amber-400">{emp.employeeId}</div>
+                  <div className="font-mono text-sm font-semibold">₹{Number(emp.salary).toLocaleString()}</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/30">
+                <span>Joined: {formatDate(emp.joinDate)}</span>
+                {isPast && <span className="text-red-400">Left: {formatDate(emp.leaveDate)}</span>}
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    <Dialog open={editingEmployee?.id === emp.id} onOpenChange={(open) => !open && setEditingEmployee(null)}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7 text-amber-400"
+                          onClick={() => setEditingEmployee(emp)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Edit Employee</DialogTitle>
+                        </DialogHeader>
+                        <EditEmployeeForm key={emp.id} employee={emp} />
+                      </DialogContent>
+                    </Dialog>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="h-7 w-7 text-red-400"
+                      onClick={() => setEmployeeToDelete(emp)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    {user?.role === 'superadmin' && (
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className={isPast ? "h-7 w-7 text-green-400" : "h-7 w-7 text-orange-400"}
+                        onClick={() => {
+                          if (confirm(`${isPast ? 'Reactivate' : 'Deactivate'} ${emp.name}?`)) {
+                            toggleStatusMutation.mutate({
+                              id: emp.id,
+                              isActive: isPast,
+                              leaveDate: isPast ? undefined : new Date().toISOString().split('T')[0]
+                            });
+                          }
+                        }}
+                      >
+                        {isPast ? <CheckCircle className="h-3.5 w-3.5" /> : <UserMinus className="h-3.5 w-3.5" />}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table Layout */}
+      <div className="hidden sm:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-slate-800/50">
-              <TableHead className="text-xs sm:text-sm font-semibold">Emp. ID</TableHead>
-              <TableHead className="text-xs sm:text-sm font-semibold">Name</TableHead>
-              <TableHead className="text-xs sm:text-sm font-semibold">Designation</TableHead>
-              <TableHead className="text-xs sm:text-sm font-semibold">Salary</TableHead>
-              <TableHead className="text-xs sm:text-sm font-semibold">Joined</TableHead>
-              {isPast && <TableHead className="text-xs sm:text-sm font-semibold">Left</TableHead>}
-              {isAdmin && <TableHead className="text-xs sm:text-sm font-semibold text-center">Actions</TableHead>}
+              <TableHead className="text-sm font-semibold">Emp. ID</TableHead>
+              <TableHead className="text-sm font-semibold">Name</TableHead>
+              <TableHead className="text-sm font-semibold">Designation</TableHead>
+              <TableHead className="text-sm font-semibold">Salary</TableHead>
+              <TableHead className="text-sm font-semibold">Joined</TableHead>
+              {isPast && <TableHead className="text-sm font-semibold">Left</TableHead>}
+              {isAdmin && <TableHead className="text-sm font-semibold text-center">Actions</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -691,12 +772,12 @@ export default function HR() {
             ) : (
               employeeList.map((emp) => (
                 <TableRow key={emp.id} className="border-b border-slate-700/50" data-testid={`row-employee-${emp.id}`}>
-                  <TableCell className="text-xs sm:text-sm font-mono text-amber-400">{emp.employeeId}</TableCell>
-                  <TableCell className="text-xs sm:text-sm font-medium">{emp.name}</TableCell>
-                  <TableCell className="text-xs sm:text-sm">{emp.designation}</TableCell>
-                  <TableCell className="text-xs sm:text-sm font-mono">₹{Number(emp.salary).toLocaleString()}</TableCell>
-                  <TableCell className="text-xs sm:text-sm">{formatDate(emp.joinDate)}</TableCell>
-                  {isPast && <TableCell className="text-xs sm:text-sm text-red-400">{formatDate(emp.leaveDate)}</TableCell>}
+                  <TableCell className="text-sm font-mono text-amber-400">{emp.employeeId}</TableCell>
+                  <TableCell className="text-sm font-medium">{emp.name}</TableCell>
+                  <TableCell className="text-sm">{emp.designation}</TableCell>
+                  <TableCell className="text-sm font-mono">₹{Number(emp.salary).toLocaleString()}</TableCell>
+                  <TableCell className="text-sm">{formatDate(emp.joinDate)}</TableCell>
+                  {isPast && <TableCell className="text-sm text-red-400">{formatDate(emp.leaveDate)}</TableCell>}
                   {isAdmin && (
                     <TableCell>
                       <div className="flex items-center justify-center gap-1">
@@ -734,7 +815,6 @@ export default function HR() {
                             variant="ghost" 
                             className={isPast ? "h-8 w-8 text-green-400 hover:text-green-300 hover:bg-green-400/10" : "h-8 w-8 text-orange-400 hover:text-orange-300 hover:bg-orange-400/10"}
                             onClick={() => {
-                              const action = isPast ? 'reactivate' : 'deactivate';
                               if (confirm(`${isPast ? 'Reactivate' : 'Deactivate'} ${emp.name}? ${isPast ? 'They will appear in current employees.' : 'They will be moved to past employees but all data will be preserved.'}`)) {
                                 toggleStatusMutation.mutate({
                                   id: emp.id,
@@ -758,7 +838,7 @@ export default function HR() {
           </TableBody>
         </Table>
       </div>
-    </div>
+    </>
   );
 
   const totalCurrentSalary = currentEmployees.reduce((acc, emp) => acc + Number(emp.salary), 0);
@@ -863,41 +943,46 @@ export default function HR() {
       </Dialog>
 
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="w-full sm:w-auto flex flex-wrap">
-          <TabsTrigger value="current" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
-            <Users className="h-4 w-4" />
-            Current ({currentEmployees.length})
-          </TabsTrigger>
-          <TabsTrigger value="past" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
-            <UserMinus className="h-4 w-4" />
-            Past ({pastEmployees.length})
-          </TabsTrigger>
-          <TabsTrigger value="payroll" className="flex-1 sm:flex-none text-xs sm:text-sm">Payroll</TabsTrigger>
-          {isAdmin && (
-            <TabsTrigger value="salary-slips" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
-              <Receipt className="h-4 w-4" />
-              Salary Slips
+        <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-max sm:w-auto gap-1">
+            <TabsTrigger value="current" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Current</span> ({currentEmployees.length})
             </TabsTrigger>
-          )}
-          {(isAdmin || user?.role === 'manager') && (
-            <TabsTrigger value="approvals" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
-              <ClipboardCheck className="h-4 w-4" />
-              Approvals
+            <TabsTrigger value="past" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3">
+              <UserMinus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Past</span> ({pastEmployees.length})
             </TabsTrigger>
-          )}
-          {isAdmin && (
-            <TabsTrigger value="leave-tracker" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2">
-              <Calendar className="h-4 w-4" />
-              Leave Tracker
-            </TabsTrigger>
-          )}
-          {isAdmin && (
-            <TabsTrigger value="report" className="flex-1 sm:flex-none text-xs sm:text-sm gap-2" data-testid="tab-consolidated-report">
-              <FileBarChart className="h-4 w-4" />
-              Report
-            </TabsTrigger>
-          )}
-        </TabsList>
+            <TabsTrigger value="payroll" className="text-xs sm:text-sm px-2.5 sm:px-3">Payroll</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="salary-slips" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3">
+                <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Salary Slips</span>
+                <span className="sm:hidden">Slips</span>
+              </TabsTrigger>
+            )}
+            {(isAdmin || user?.role === 'manager') && (
+              <TabsTrigger value="approvals" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3">
+                <ClipboardCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Approvals</span>
+                <span className="sm:hidden">Approve</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="leave-tracker" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3">
+                <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Leave Tracker</span>
+                <span className="sm:hidden">Leaves</span>
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="report" className="text-xs sm:text-sm gap-1.5 px-2.5 sm:px-3" data-testid="tab-consolidated-report">
+                <FileBarChart className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Report
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="current" className="space-y-4">
           <Card>
