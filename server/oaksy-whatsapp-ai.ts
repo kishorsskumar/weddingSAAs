@@ -2041,9 +2041,9 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // QR CODE FLOW - User mentioned QR/UPI keywords OR no expense/income indicators (default to QR for images)
-    // If it's not clearly expense or income, assume it's a QR code for payment
-    if (isQrPayment || (!isIncome && !isExpense)) {
+    // QR CODE FLOW - ONLY if user EXPLICITLY mentioned QR/UPI keywords
+    // No longer defaults to QR - will ask user if unclear
+    if (isQrPayment) {
       context.qrImageUrl = mediaUrl;
       
       if (providedAmount && purposeText.length > 2) {
