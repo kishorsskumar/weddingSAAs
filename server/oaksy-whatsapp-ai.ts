@@ -2184,6 +2184,7 @@ export async function handleOaksyWhatsAppMessage(
   if (conversation.activeIntent === 'qr_payment') {
     // Waiting for just purpose (amount already provided)
     if (conversation.currentState === 'awaiting_qr_purpose_only') {
+      console.log(`[QR Purpose] Processing expense description: "${messageText}", amount: ${context.amount}, imageUrl: ${context.qrImageUrl}`);
       context.qrPaymentDescription = messageText;
       context.qrPaymentCategory = 'Other';
       
@@ -2196,14 +2197,20 @@ export async function handleOaksyWhatsAppMessage(
         context.amount || 0,
         context.qrImageUrl || ''
       );
+      console.log(`[QR Purpose] Created request ${requestCode}, now sending notification to Kishor...`);
 
-      await notifyKishorQrPayment(
-        requestCode,
-        employee.name,
-        messageText,
-        context.amount || 0,
-        context.qrImageUrl || ''
-      );
+      try {
+        await notifyKishorQrPayment(
+          requestCode,
+          employee.name,
+          messageText,
+          context.amount || 0,
+          context.qrImageUrl || ''
+        );
+        console.log(`[QR Purpose] Notification to Kishor completed for ${requestCode}`);
+      } catch (notifyError: any) {
+        console.error(`[QR Purpose] FAILED to notify Kishor for ${requestCode}:`, notifyError.message);
+      }
 
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: null,
@@ -3981,7 +3988,8 @@ async function notifyKishorQrPayment(
   amount: number,
   qrImageUrl: string
 ): Promise<void> {
-  console.log(`[QR Payment] Notifying Kishor about ${requestCode} from ${employeeName}`);
+  console.log(`[QR Payment] START notifyKishorQrPayment - requestCode: ${requestCode}, employee: ${employeeName}, amount: ${amount}, imageUrl: ${qrImageUrl ? 'present' : 'none'}`);
+  console.log(`[QR Payment] SUPERADMIN_WHATSAPP: ${SUPERADMIN_WHATSAPP}`);
   
   // Extract first name for the command
   const firstName = employeeName.split(' ')[0];
@@ -3994,29 +4002,36 @@ async function notifyKishorQrPayment(
         console.log('[QR Payment] Using public URL:', publicUrl);
         
         const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
-        await sendWhatsAppMediaMessage(
+        console.log('[QR Payment] Calling sendWhatsAppMediaMessage...');
+        const mediaResult = await sendWhatsAppMediaMessage(
           SUPERADMIN_WHATSAPP, 
           publicUrl,
           `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n_Reply "PAID ${firstName}" after payment_`
         );
-        console.log(`[QR Payment] Notification sent successfully for ${requestCode}`);
+        console.log(`[QR Payment] Media message result:`, mediaResult);
       } catch (mediaError: any) {
         // Fallback to text-only if media fails
         console.error('[QR Payment] Failed to send media, falling back to text:', mediaError.message);
         const message = `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n📷 QR: ${qrImageUrl}\n\n_Reply "PAID ${firstName}" after payment_`;
-        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+        console.log('[QR Payment] Sending fallback text message...');
+        const textResult = await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+        console.log('[QR Payment] Text fallback result:', textResult);
       }
     } else {
       const message = `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n_Reply "PAID ${firstName}" after payment_`;
-      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
-      console.log(`[QR Payment] Text notification sent for ${requestCode}`);
+      console.log('[QR Payment] No image, sending text-only notification...');
+      const textResult = await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+      console.log(`[QR Payment] Text notification result for ${requestCode}:`, textResult);
     }
+    console.log(`[QR Payment] END notifyKishorQrPayment - SUCCESS for ${requestCode}`);
   } catch (error: any) {
     console.error(`[QR Payment] CRITICAL: Failed to notify Kishor about ${requestCode}:`, error.message);
     // Try one more time with just text
     try {
       const fallbackMessage = `💳 ${firstName} needs ₹${amount} for ${description}. Reply PAID ${firstName} after payment.`;
+      console.log('[QR Payment] Attempting final fallback...');
       await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, fallbackMessage);
+      console.log('[QR Payment] Final fallback succeeded');
     } catch (fallbackError: any) {
       console.error('[QR Payment] Even fallback failed:', fallbackError.message);
     }
