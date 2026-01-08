@@ -1940,11 +1940,6 @@ export async function handleOaksyWhatsAppMessage(
 
   // SMART IMAGE DETECTION - Always analyze with AI first
   if (mediaUrl && !conversation.activeIntent) {
-    // Check if this employee is allowed to submit expenses/income
-    if (!isAllowedExpenseSubmitter(normalizedPhone)) {
-      return `👋 Hi ${employee.name}!\n\n❌ Expense and income submissions are currently restricted to authorized team members only.\n\nIf you need to submit an expense, please contact your supervisor or the accountant.\n\n_For other help, just ask!_ 🌳`;
-    }
-    
     context.screenshotUrl = mediaUrl;
     
     // Check message text for explicit clues
@@ -1972,43 +1967,56 @@ export async function handleOaksyWhatsAppMessage(
     const detectedType = imageAnalysis?.transactionType || 'unknown';
     const isQrCode = explicitQr || (imageAnalysis?.imageType === 'qr_code' && imageAnalysis.confidence >= 0.6);
     
-    // Check if user already told us it's expense or income in their message
-    const isExpenseInMessage = /\b(expense|spent|paid\s+for)\b/i.test(lowerText);
-    const isIncomeInMessage = /\b(income|received|payment\s+from|credited)\b/i.test(lowerText);
+    // Check if user already told us it's a PETTY expense in their message (all employees can do this)
+    const isPettyExpenseInMessage = /\b(petty|personal|reimbursement|taxi|food|lunch|dinner|travel|auto|uber|ola)\b/i.test(lowerText) && /\b(expense|spent|paid)\b/i.test(lowerText);
+    
+    // Check if user explicitly said it's an EVENT expense or income (authorized only)
+    const isEventExpenseInMessage = /\b(vendor|event|client|income|received|payment\s+from|credited)\b/i.test(lowerText);
+    
     const descriptionInMessage = messageText
       .replace(/₹?\s*\d+[,\d]*\.?\d*/g, '')
-      .replace(/\b(expense|spent|paid\s+for|income|received|payment\s+from|credited)\b\s*(for|from)?\s*/gi, '')
+      .replace(/\b(expense|spent|paid\s+for|income|received|payment\s+from|credited|petty|personal|reimbursement)\b\s*(for|from)?\s*/gi, '')
       .replace(/rs\.?\s*/gi, '')
       .trim();
     
-    // If user already specified type + we have amount, complete immediately
-    if (detectedAmount && (isExpenseInMessage || isIncomeInMessage)) {
-      const description = descriptionInMessage || detectedCounterparty || (isExpenseInMessage ? 'Expense' : 'Income');
+    // If user explicitly says "petty expense" + amount, complete immediately (open to all employees)
+    if (detectedAmount && isPettyExpenseInMessage && !isEventExpenseInMessage) {
+      const description = descriptionInMessage || detectedCounterparty || 'Petty Expense';
       
-      if (isExpenseInMessage) {
-        // Create expense directly
-        const { requestCode } = await createQrPaymentRequest(
-          employee.id,
-          employee.name,
-          employee.phone || normalizedPhone,
-          'Other',
-          description,
-          detectedAmount,
-          mediaUrl
-        );
+      const { requestCode } = await createQrPaymentRequest(
+        employee.id,
+        employee.name,
+        employee.phone || normalizedPhone,
+        'Petty',
+        description,
+        detectedAmount,
+        mediaUrl,
+        'petty'
+      );
 
-        await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
+      await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
 
-        await storage.updateWhatsappConversation(conversation.id, {
-          activeIntent: null,
-          intentContext: null,
-          currentState: 'idle',
-          conversationHistory: [],
-        });
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
 
-        return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
-      } else {
-        // Create income directly
+      return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+    }
+    
+    // If user says "event income/expense" but is not authorized, deny
+    if (isEventExpenseInMessage && !isAllowedExpenseSubmitter(normalizedPhone)) {
+      return `👋 Hi ${employee.name}!\n\n❌ Event income and vendor payments can only be submitted by authorized team members (Fida, Femina, or the Accountant).\n\n💡 For *personal expenses* (taxi, food, etc.), send the receipt and say "petty expense".\n\n🌳 Oaksy`;
+    }
+    
+    // If authorized user says event income/expense + amount, complete immediately
+    if (detectedAmount && isEventExpenseInMessage && isAllowedExpenseSubmitter(normalizedPhone)) {
+      const description = descriptionInMessage || detectedCounterparty || 'Event Payment';
+      
+      if (/\b(income|received|credited|payment\s+from)\b/i.test(lowerText)) {
+        // Event income
         const requestCode = await storage.generateIncomeCode();
         await storage.createIncomeSubmission({
           requestCode,
@@ -2032,14 +2040,38 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: [],
         });
 
-        return `✅ *Thank you!*\n\nIncome recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n👤 From: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+        return `✅ *Thank you!*\n\nEvent income recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n👤 From: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+      } else {
+        // Event vendor expense
+        const { requestCode } = await createQrPaymentRequest(
+          employee.id,
+          employee.name,
+          employee.phone || normalizedPhone,
+          'Vendor',
+          description,
+          detectedAmount,
+          mediaUrl,
+          'event'
+        );
+
+        await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
+
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+
+        return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
       }
     }
     
-    // SIMPLIFIED FLOW: Always ask "Expense or Income?" after scanning any image
+    // NEW FLOW: Ask user to choose category first
     const providedAmount = detectedAmount;
+    const isAuthorized = isAllowedExpenseSubmitter(normalizedPhone);
     
-    // Save extracted data and ask the simple question
+    // Save extracted data and ask the category question
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
@@ -2049,15 +2081,44 @@ export async function handleOaksyWhatsAppMessage(
         detectedCounterparty: detectedCounterparty,
       },
       conversationHistory: history,
-      currentState: 'awaiting_image_type',
+      currentState: 'awaiting_submission_category',
     });
     
-    // Format the question based on whether we extracted an amount
+    // Format the question based on whether user is authorized
     let imageResponse: string;
     if (providedAmount) {
-      imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\nIs this an *Expense* or *Income*?`;
+      if (isAuthorized) {
+        imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\nWhat type of submission?\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)`;
+      } else {
+        imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\n🧾 *Petty Expense*\n\nWhat is this expense for?\n_Example: "taxi to venue" or "lunch"_`;
+        // For non-authorized, go directly to petty expense flow
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'qr_payment',
+          intentContext: { 
+            qrImageUrl: mediaUrl,
+            amount: providedAmount,
+            submissionCategory: 'petty',
+          },
+          conversationHistory: history,
+          currentState: 'awaiting_qr_purpose_only',
+        });
+      }
     } else {
-      imageResponse = `📸 *Got your screenshot!*\n\nIs this an *Expense* or *Income*?\n\n_(Please also mention the amount if I couldn't read it)_`;
+      if (isAuthorized) {
+        imageResponse = `📸 *Got your screenshot!*\n\nWhat type of submission?\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)\n\n_(Also mention the amount)_`;
+      } else {
+        imageResponse = `📸 *Got your screenshot!*\n\n🧾 *Petty Expense*\n\nWhat is this expense for and how much?\n_Example: "500 taxi" or "200 lunch"_`;
+        // For non-authorized, go directly to petty expense flow
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'qr_payment',
+          intentContext: { 
+            qrImageUrl: mediaUrl,
+            submissionCategory: 'petty',
+          },
+          conversationHistory: history,
+          currentState: 'awaiting_qr_details',
+        });
+      }
     }
     
     history.push({ role: 'assistant', content: imageResponse, timestamp: Date.now() });
@@ -2066,8 +2127,214 @@ export async function handleOaksyWhatsAppMessage(
     return imageResponse;
   }
   
-  // Handle image classification flow (user responding to "expense/income?" question)
+  // Handle image classification flow
   if (conversation.activeIntent === 'image_classification') {
+    // NEW: Handle category selection (petty vs event)
+    if (conversation.currentState === 'awaiting_submission_category') {
+      const imgContext = context as any;
+      const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
+      const savedAmount = imgContext.providedAmount;
+      const savedCounterparty = imgContext.detectedCounterparty || '';
+      
+      // Check if user chose petty expense (1) or event payment (2)
+      const isPettyChoice = /\b(1|petty|personal|reimbursement|taxi|food)\b/i.test(lowerMessage);
+      const isEventChoice = /\b(2|event|vendor|client|income)\b/i.test(lowerMessage);
+      
+      // Extract any amount or description from the message
+      const messageAmount = extractAmountFlexible(messageText);
+      const finalAmount = savedAmount || messageAmount;
+      const descriptionFromMessage = messageText
+        .replace(/^(1|2)\s*/i, '')
+        .replace(/\b(petty|personal|event|vendor|client|income|expense)\b\s*/gi, '')
+        .replace(/₹?\s*\d+[,\d]*\.?\d*/g, '')
+        .replace(/rs\.?\s*/gi, '')
+        .trim();
+      
+      if (isPettyChoice && !isEventChoice) {
+        // User chose petty expense - proceed for all employees
+        if (finalAmount && descriptionFromMessage) {
+          // Complete immediately
+          const { requestCode } = await createQrPaymentRequest(
+            employee.id,
+            employee.name,
+            employee.phone || normalizedPhone,
+            'Petty',
+            descriptionFromMessage,
+            finalAmount,
+            imageUrl,
+            'petty'
+          );
+          
+          await notifyKishorQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
+          
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          
+          return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+        } else if (finalAmount) {
+          // Have amount, need description
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: { qrImageUrl: imageUrl, amount: finalAmount, submissionCategory: 'petty' },
+            conversationHistory: history,
+            currentState: 'awaiting_qr_purpose_only',
+          });
+          return `🧾 *Petty Expense - ₹${finalAmount.toLocaleString('en-IN')}*\n\nWhat is this expense for?\n_Example: "taxi" or "lunch"_`;
+        } else {
+          // Need both amount and description
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: { qrImageUrl: imageUrl, submissionCategory: 'petty' },
+            conversationHistory: history,
+            currentState: 'awaiting_qr_details',
+          });
+          return `🧾 *Petty Expense*\n\nWhat's the amount and purpose?\n_Example: "500 taxi" or "200 lunch"_`;
+        }
+      }
+      
+      if (isEventChoice) {
+        // User chose event payment - check authorization
+        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          return `❌ Event income and vendor payments can only be submitted by authorized team members (Fida, Femina, or the Accountant).\n\n💡 For *personal expenses*, send the receipt again and choose option 1.\n\n🌳 Oaksy`;
+        }
+        
+        // Authorized user - ask if it's expense or income
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'image_classification',
+          intentContext: { ...imgContext, submissionCategory: 'event' },
+          conversationHistory: history,
+          currentState: 'awaiting_event_type',
+        });
+        return `💼 *Event Payment*\n\nIs this:\n*1.* 💸 Vendor Expense (payment made)\n*2.* 💵 Client Income (payment received)`;
+      }
+      
+      // Didn't understand - ask again
+      return `Please choose:\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)`;
+    }
+    
+    // NEW: Handle event type selection (expense vs income for authorized users)
+    if (conversation.currentState === 'awaiting_event_type') {
+      const imgContext = context as any;
+      const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
+      const savedAmount = imgContext.providedAmount;
+      const savedCounterparty = imgContext.detectedCounterparty || '';
+      
+      const isExpenseChoice = /\b(1|expense|vendor|paid|spent)\b/i.test(lowerMessage);
+      const isIncomeChoice = /\b(2|income|client|received|got)\b/i.test(lowerMessage);
+      
+      const messageAmount = extractAmountFlexible(messageText);
+      const finalAmount = savedAmount || messageAmount;
+      const descriptionFromMessage = messageText
+        .replace(/^(1|2)\s*/i, '')
+        .replace(/\b(expense|income|vendor|client|paid|received)\b\s*(for|from)?\s*/gi, '')
+        .replace(/₹?\s*\d+[,\d]*\.?\d*/g, '')
+        .replace(/rs\.?\s*/gi, '')
+        .trim();
+      
+      if (isExpenseChoice && !isIncomeChoice) {
+        // Vendor expense
+        if (finalAmount && descriptionFromMessage) {
+          const { requestCode } = await createQrPaymentRequest(
+            employee.id,
+            employee.name,
+            employee.phone || normalizedPhone,
+            'Vendor',
+            descriptionFromMessage,
+            finalAmount,
+            imageUrl,
+            'event'
+          );
+          
+          await notifyKishorQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
+          
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          
+          return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+        } else if (finalAmount) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: { qrImageUrl: imageUrl, amount: finalAmount, submissionCategory: 'event' },
+            conversationHistory: history,
+            currentState: 'awaiting_qr_purpose_only',
+          });
+          return `💸 *Vendor Expense - ₹${finalAmount.toLocaleString('en-IN')}*\n\nWhich vendor is this for?`;
+        } else {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: { qrImageUrl: imageUrl, submissionCategory: 'event' },
+            conversationHistory: history,
+            currentState: 'awaiting_qr_details',
+          });
+          return `💸 *Vendor Expense*\n\nVendor name and amount?\n_Example: "Florist 5000" or "Caterer 20k"_`;
+        }
+      }
+      
+      if (isIncomeChoice) {
+        // Client income
+        if (finalAmount && descriptionFromMessage) {
+          const requestCode = await storage.generateIncomeCode();
+          await storage.createIncomeSubmission({
+            requestCode,
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeePhone: employee.phone || normalizedPhone,
+            type: 'client_payment',
+            clientName: descriptionFromMessage,
+            description: `Income from ${descriptionFromMessage}`,
+            amount: finalAmount.toString(),
+            screenshotUrl: imageUrl,
+            status: 'pending',
+          });
+          
+          await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', descriptionFromMessage, `Income from ${descriptionFromMessage}`, finalAmount, imageUrl);
+          
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          
+          return `✅ *Thank you!*\n\nClient income recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+        } else if (finalAmount) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'income_submission',
+            intentContext: { incomeScreenshotUrl: imageUrl, amount: finalAmount, incomeType: 'client_payment' },
+            conversationHistory: history,
+            currentState: 'awaiting_income_client',
+          });
+          return `💵 *Client Income - ₹${finalAmount.toLocaleString('en-IN')}*\n\nWhich client is this from?`;
+        } else {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'income_submission',
+            intentContext: { incomeScreenshotUrl: imageUrl, incomeType: 'client_payment' },
+            conversationHistory: history,
+            currentState: 'awaiting_income_details',
+          });
+          return `💵 *Client Income*\n\nClient name and amount?\n_Example: "Sharma family 50000" or "Raj 1 lakh"_`;
+        }
+      }
+      
+      // Didn't understand
+      return `Please choose:\n\n*1.* 💸 Vendor Expense (payment made)\n*2.* 💵 Client Income (payment received)`;
+    }
+    
+    // EXISTING: Handle expense/income question (legacy flow for awaiting_image_type)
     if (conversation.currentState === 'awaiting_image_type') {
       const imgContext = context as any;
       const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
@@ -3985,7 +4252,8 @@ async function createQrPaymentRequest(
   category: string,
   description: string,
   amount: number,
-  qrImageUrl: string
+  qrImageUrl: string,
+  submissionCategory?: 'petty' | 'event'
 ): Promise<{ requestCode: string }> {
   const requestCode = await storage.generateQrPaymentCode();
   
@@ -3994,7 +4262,7 @@ async function createQrPaymentRequest(
     employeeId,
     employeeName,
     employeePhone,
-    category,
+    category: submissionCategory === 'petty' ? 'Petty' : category,
     description,
     amount: amount.toString(),
     qrImageUrl,
