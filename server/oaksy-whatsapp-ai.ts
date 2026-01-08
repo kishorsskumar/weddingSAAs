@@ -63,6 +63,10 @@ interface IntentContext {
   pendingMediaUrl?: string;
   pendingAmount?: number;
   pendingPurpose?: string;
+  screenshotUrl?: string;
+  imageUrl?: string;
+  providedAmount?: number;
+  messageText?: string;
   // Income submission fields
   incomeScreenshotUrl?: string;
   incomeClientName?: string;
@@ -2109,8 +2113,8 @@ export async function handleOaksyWhatsAppMessage(
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
-        imageUrl: mediaUrl,
-        messageText: messageText,
+        qrImageUrl: mediaUrl,
+        incomeScreenshotUrl: mediaUrl,
         providedAmount: providedAmount,
       },
       conversationHistory: history,
@@ -2119,10 +2123,102 @@ export async function handleOaksyWhatsAppMessage(
 
     const response = `📸 *Got your screenshot!*\n\nWhat is this?\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n3️⃣ *QR Payment* - QR code to pay\n\n_Reply with 1, 2, or 3 (or say "expense", "income", or "qr")_`;
       
-      history.push({ role: 'assistant', content: response, timestamp: Date.now() });
-      await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
+    history.push({ role: 'assistant', content: response, timestamp: Date.now() });
+    await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
       
-      return response;
+    return response;
+  }
+  
+  // Handle image classification flow (user responding to "expense/income/qr?" question)
+  if (conversation.activeIntent === 'image_classification') {
+    if (conversation.currentState === 'awaiting_image_type') {
+      const imgContext = context as any;
+      const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
+      const savedAmount = imgContext.providedAmount;
+      
+      // Check user's response
+      const isExpenseResponse = /^(1|expense|spent|paid)/i.test(lowerMessage);
+      const isIncomeResponse = /^(2|income|received|got)/i.test(lowerMessage);
+      const isQrResponse = /^(3|qr|payment|pay)/i.test(lowerMessage);
+      
+      if (isExpenseResponse) {
+        // User said expense - ask for amount and description
+        const expenseContext: IntentContext = { qrImageUrl: imageUrl };
+        
+        if (savedAmount) {
+          expenseContext.amount = savedAmount;
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: expenseContext,
+            conversationHistory: history,
+            currentState: 'awaiting_qr_purpose_only',
+          });
+          return `📝 *Expense* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWhat was this expense for?`;
+        } else {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: expenseContext,
+            conversationHistory: history,
+            currentState: 'awaiting_qr_details',
+          });
+          return `📝 *Expense*\n\nPlease send amount and description.\n_Example: "500 for taxi" or "1200 lunch"_`;
+        }
+      }
+      
+      if (isIncomeResponse) {
+        // User said income - ask for details
+        const incomeContext: IntentContext = { 
+          incomeScreenshotUrl: imageUrl,
+          incomeClientName: 'Client',
+          incomeType: 'client_payment',
+        };
+        
+        if (savedAmount) {
+          incomeContext.amount = savedAmount;
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'income_submission',
+            intentContext: incomeContext,
+            conversationHistory: history,
+            currentState: 'awaiting_income_client',
+          });
+          return `💵 *Income* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWho is this from? (Client/Customer name)`;
+        } else {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'income_submission',
+            intentContext: incomeContext,
+            conversationHistory: history,
+            currentState: 'awaiting_income_details',
+          });
+          return `💵 *Income*\n\nPlease send amount and client name.\n_Example: "50000 from Sharma Wedding" or "25000 Rahul"_`;
+        }
+      }
+      
+      if (isQrResponse) {
+        // User said QR payment
+        const qrContext: IntentContext = { qrImageUrl: imageUrl };
+        
+        if (savedAmount) {
+          qrContext.amount = savedAmount;
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: qrContext,
+            conversationHistory: history,
+            currentState: 'awaiting_qr_purpose_only',
+          });
+          return `💳 *QR Payment* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWhat's this payment for?`;
+        } else {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: qrContext,
+            conversationHistory: history,
+            currentState: 'awaiting_qr_details',
+          });
+          return `💳 *QR Payment*\n\nPlease send amount and purpose.\n_Example: "500 for taxi" or "1200 lunch"_`;
+        }
+      }
+      
+      // User didn't give a clear answer - ask again
+      return `Please reply with:\n• *1* or *expense*\n• *2* or *income*\n• *3* or *qr*`;
     }
   }
   
@@ -2221,6 +2317,99 @@ export async function handleOaksyWhatsAppMessage(
 
   // Handle income submission flow states
   if (conversation.activeIntent === 'income_submission') {
+    // Waiting for just client name (amount already provided from image classification)
+    if (conversation.currentState === 'awaiting_income_client') {
+      const incomeContext = context as any;
+      const screenshotUrl = incomeContext.incomeScreenshotUrl || '';
+      const savedAmount = incomeContext.amount || 0;
+      const clientName = messageText.trim() || 'Client';
+      
+      const requestCode = await storage.generateIncomeCode();
+      const description = `Payment received from ${clientName}`;
+      
+      await storage.createIncomeSubmission({
+        requestCode,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeePhone: employee.phone || normalizedPhone,
+        type: 'client_payment',
+        clientName,
+        description,
+        amount: savedAmount.toString(),
+        screenshotUrl,
+        status: 'pending',
+      });
+
+      await notifyKishorIncomeSubmission(
+        requestCode,
+        employee.name,
+        'client_payment',
+        clientName,
+        description,
+        savedAmount,
+        screenshotUrl
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${savedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for approval from Kishor_ 🌳`;
+    }
+    
+    // Waiting for both amount and client name (from image classification)
+    if (conversation.currentState === 'awaiting_income_details') {
+      const incomeContext = context as any;
+      const screenshotUrl = incomeContext.incomeScreenshotUrl || '';
+      
+      // Try to extract amount and client name
+      const amount = extractAmountFlexible(messageText);
+      const clientText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').replace(/\b(from|by)\b/gi, '').trim();
+      const clientName = clientText || 'Client';
+      
+      if (!amount) {
+        return `Please include the amount. Example: "50000 from Sharma Wedding"`;
+      }
+      
+      const requestCode = await storage.generateIncomeCode();
+      const description = `Payment received from ${clientName}`;
+      
+      await storage.createIncomeSubmission({
+        requestCode,
+        employeeId: employee.id,
+        employeeName: employee.name,
+        employeePhone: employee.phone || normalizedPhone,
+        type: 'client_payment',
+        clientName,
+        description,
+        amount: amount.toString(),
+        screenshotUrl,
+        status: 'pending',
+      });
+
+      await notifyKishorIncomeSubmission(
+        requestCode,
+        employee.name,
+        'client_payment',
+        clientName,
+        description,
+        amount,
+        screenshotUrl
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for approval from Kishor_ 🌳`;
+    }
+    
     // Waiting for amount after sending income screenshot
     if (conversation.currentState === 'awaiting_income_amount') {
       const amount = extractAmountFlexible(messageText);
