@@ -24,6 +24,37 @@ export interface ImageAnalysis {
   description: string;
 }
 
+async function downloadImageAsBase64(imageUrl: string): Promise<string | null> {
+  try {
+    // For Twilio URLs, we need to use basic auth
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    const headers: Record<string, string> = {};
+    
+    if (imageUrl.includes('twilio.com') && twilioAccountSid && twilioAuthToken) {
+      const auth = Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+    
+    const response = await fetch(imageUrl, { headers });
+    
+    if (!response.ok) {
+      console.error(`Failed to download image: ${response.status} ${response.statusText}`);
+      return null;
+    }
+    
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.error('Error downloading image:', error);
+    return null;
+  }
+}
+
 export async function analyzeImageFromUrl(imageUrl: string): Promise<ImageAnalysis> {
   const prompt = `Analyze this image and determine what type it is. Respond ONLY with valid JSON:
 
@@ -50,6 +81,25 @@ For Indian payment apps (GPay, PhonePe, Paytm, bank apps), look for:
 - "Sent to" vs "Received from" to determine transaction type`;
 
   try {
+    // Download image and convert to base64 for reliable access
+    console.log('[Scanner] Downloading image from:', imageUrl);
+    const base64Image = await downloadImageAsBase64(imageUrl);
+    
+    if (!base64Image) {
+      console.error('[Scanner] Failed to download image');
+      return {
+        imageType: 'unknown',
+        amount: null,
+        status: 'unknown',
+        counterparty: null,
+        transactionType: 'unknown',
+        confidence: 0,
+        description: 'Could not download image',
+      };
+    }
+    
+    console.log('[Scanner] Image downloaded, sending to OpenAI...');
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -59,7 +109,7 @@ For Indian payment apps (GPay, PhonePe, Paytm, bank apps), look for:
             { type: "text", text: prompt },
             {
               type: "image_url",
-              image_url: { url: imageUrl }
+              image_url: { url: base64Image }
             }
           ],
         },
@@ -74,6 +124,7 @@ For Indian payment apps (GPay, PhonePe, Paytm, bank apps), look for:
     }
 
     const parsed = JSON.parse(content);
+    console.log('[Scanner] OpenAI result:', parsed);
     
     return {
       imageType: parsed.imageType || 'unknown',
@@ -85,7 +136,7 @@ For Indian payment apps (GPay, PhonePe, Paytm, bank apps), look for:
       description: parsed.description || '',
     };
   } catch (error) {
-    console.error('Image analysis error:', error);
+    console.error('[Scanner] Image analysis error:', error);
     return {
       imageType: 'unknown',
       amount: null,

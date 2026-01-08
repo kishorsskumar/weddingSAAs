@@ -2210,7 +2210,7 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // NO CLEAR INDICATOR - Ask user if Expense or Income with detected amount
+    // ASK: Is this expense or income? (simple question)
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
@@ -2223,13 +2223,12 @@ export async function handleOaksyWhatsAppMessage(
       currentState: 'awaiting_image_type',
     });
 
-    // Build response with detected info
+    // Build simple question based on whether we detected amount
     let response: string;
     if (providedAmount) {
-      const counterpartyInfo = detectedCounterparty ? `\n👤 ${detectedCounterparty}` : '';
-      response = `📸 *Scanned: ₹${providedAmount.toLocaleString('en-IN')}*${counterpartyInfo}\n\nIs this *Expense* or *Income*?\n\n_Just reply "expense" or "income" with what it's for_\n_Example: "expense for food" or "income from client"_`;
+      response = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\nIs this an *Expense* or *Income*?`;
     } else {
-      response = `📸 *Got your screenshot!*\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply with type, amount & description_\n_Example: "expense 500 taxi" or "income 5000 from Sharma"_`;
+      response = `📸 *Got your screenshot!*\n\nIs this an *Expense* or *Income*?\n\n_Also tell me the amount if I couldn't read it._`;
     }
       
     history.push({ role: 'assistant', content: response, timestamp: Date.now() });
@@ -2262,11 +2261,11 @@ export async function handleOaksyWhatsAppMessage(
       const finalAmount = savedAmount || messageAmount;
       
       if (isExpenseResponse) {
-        // User said expense - complete the flow if we have amount
-        const description = descriptionFromMessage || savedCounterparty || 'Expense';
+        // User said expense - if we have description too, complete. Otherwise ask for it.
+        const description = descriptionFromMessage || '';
         
-        if (finalAmount) {
-          // We have amount - create expense and thank user
+        if (finalAmount && description) {
+          // We have both amount and description - complete the expense
           const { requestCode } = await createQrPaymentRequest(
             employee.id,
             employee.name,
@@ -2277,13 +2276,7 @@ export async function handleOaksyWhatsAppMessage(
             imageUrl
           );
 
-          await notifyKishorQrPayment(
-            requestCode,
-            employee.name,
-            description,
-            finalAmount,
-            imageUrl
-          );
+          await notifyKishorQrPayment(requestCode, employee.name, description, finalAmount, imageUrl);
 
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -2293,44 +2286,86 @@ export async function handleOaksyWhatsAppMessage(
           });
 
           return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
-        } else {
-          // No amount - ask for it
-          const expenseContext: IntentContext = { qrImageUrl: imageUrl, qrPaymentDescription: description };
+        } else if (finalAmount) {
+          // Have amount, need description - ask what it's for
+          const expenseContext: IntentContext = { qrImageUrl: imageUrl, amount: finalAmount };
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'qr_payment',
             intentContext: expenseContext,
             conversationHistory: history,
-            currentState: 'awaiting_qr_amount_only',
+            currentState: 'awaiting_qr_purpose_only',
           });
-          return `📝 Got it: *${description}*\n\nWhat's the amount? 💰`;
+          return `📝 *Expense - ₹${finalAmount.toLocaleString('en-IN')}*\n\nWhat is this expense for?`;
+        } else {
+          // No amount - ask for amount and description
+          const expenseContext: IntentContext = { qrImageUrl: imageUrl };
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'qr_payment',
+            intentContext: expenseContext,
+            conversationHistory: history,
+            currentState: 'awaiting_qr_details',
+          });
+          return `📝 *Expense*\n\nPlease tell me the amount and what it's for.\n_Example: "500 taxi" or "1200 lunch"_`;
         }
       }
       
       if (isIncomeResponse) {
-        // User said income - ask for details
-        const incomeContext: IntentContext = { 
-          incomeScreenshotUrl: imageUrl,
-          incomeClientName: 'Client',
-          incomeType: 'client_payment',
-        };
+        // User said income - if we have description too, complete. Otherwise ask for it.
+        const clientName = descriptionFromMessage || '';
         
-        if (savedAmount) {
-          incomeContext.amount = savedAmount;
+        if (finalAmount && clientName) {
+          // We have both amount and client - complete the income
+          const requestCode = await storage.generateIncomeCode();
+          await storage.createIncomeSubmission({
+            requestCode,
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeePhone: employee.phone || normalizedPhone,
+            type: 'client_payment',
+            clientName,
+            description: `Income from ${clientName}`,
+            amount: finalAmount.toString(),
+            screenshotUrl: imageUrl,
+            status: 'pending',
+          });
+
+          await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', clientName, `Income from ${clientName}`, finalAmount, imageUrl);
+
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+
+          return `✅ *Thank you!*\n\nIncome recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Sent to Kishor for approval_ 🌳`;
+        } else if (finalAmount) {
+          // Have amount, need client name - ask who it's from
+          const incomeContext: IntentContext = { 
+            incomeScreenshotUrl: imageUrl,
+            amount: finalAmount,
+            incomeType: 'client_payment',
+          };
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'income_submission',
             intentContext: incomeContext,
             conversationHistory: history,
             currentState: 'awaiting_income_client',
           });
-          return `💵 *Income* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWho is this from? (Client/Customer name)`;
+          return `💵 *Income - ₹${finalAmount.toLocaleString('en-IN')}*\n\nWho is this income from?`;
         } else {
+          // No amount - ask for amount and client
+          const incomeContext: IntentContext = { 
+            incomeScreenshotUrl: imageUrl,
+            incomeType: 'client_payment',
+          };
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'income_submission',
             intentContext: incomeContext,
             conversationHistory: history,
             currentState: 'awaiting_income_details',
           });
-          return `💵 *Income*\n\nPlease send amount and client name.\n_Example: "50000 from Sharma Wedding" or "25000 Rahul"_`;
+          return `💵 *Income*\n\nPlease tell me the amount and who it's from.\n_Example: "50000 Sharma Wedding" or "25000 Rahul"_`;
         }
       }
       
