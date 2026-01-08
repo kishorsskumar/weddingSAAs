@@ -1159,6 +1159,21 @@ export async function handleOaksyWhatsAppMessage(
   const messageText = body.trim();
   const lowerMessage = messageText.toLowerCase();
   
+  // GLOBAL STOP/CANCEL COMMAND - Allows users to exit any ongoing flow
+  const isStopCommand = /^(stop|cancel|exit|reset|start over|nevermind|never mind|forget it|cancel transaction|abort)$/i.test(lowerMessage);
+  
+  if (isStopCommand && conversation.activeIntent) {
+    // User wants to cancel the current flow
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: null,
+      currentState: 'idle',
+      conversationHistory: [],
+    });
+    
+    return `👍 Got it! I've cancelled the current action.\n\n_What would you like to do? Just say "help" if you need options._ 🌳`;
+  }
+  
   // Check if this is from the superadmin FIRST (before employee check)
   const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
                               normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10)) ||
