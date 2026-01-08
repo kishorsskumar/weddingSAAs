@@ -1429,7 +1429,6 @@ export async function handleOaksyWhatsAppMessage(
     
     if (paidMatch) {
       const nameOrCode = paidMatch[1];
-      const eventName = paidMatch[2]?.trim() || 'General';
       
       // Find the pending QR request - either by code (QR001) or by employee first name
       let qrRequest;
@@ -1449,50 +1448,37 @@ export async function handleOaksyWhatsAppMessage(
         return `⚠️ Payment already ${qrRequest.status}.`;
       }
       
-      // Mark as paid immediately, store payment screenshot if provided
+      const qrCode = qrRequest.requestCode;
+      const amount = parseFloat(qrRequest.amount);
+      
+      // Mark as paid (pending screenshot and event assignment)
       await storage.updateQrPaymentRequest(qrRequest.id, {
         status: 'paid',
         paidAt: new Date(),
-        eventAssignment: eventName,
-        paymentScreenshotUrl: mediaUrl || null,
       });
       
-      // Record in daybook
-      const amount = parseFloat(qrRequest.amount);
-      await storage.createDaybookEntry({
-        date: new Date().toISOString().split('T')[0],
-        type: 'expense',
-        category: qrRequest.category || 'operations',
-        description: `[${qrCode}] ${qrRequest.description}`,
-        amount: amount.toString(),
-        mode: 'upi',
-        person: qrRequest.employeeName,
-        eventName: eventName === 'General' ? 'General' : eventName,
-        approvedBy: 'Kishor',
-      });
-      
-      // Notify employee with payment screenshot if available
-      const employeePhone = qrRequest.employeePhone;
-      if (employeePhone) {
-        try {
-          const confirmMessage = `✅ *${qrCode} Paid!*\n₹${amount.toLocaleString('en-IN')} for ${qrRequest.description}`;
-          
-          if (mediaUrl) {
-            // Send with payment screenshot
-            const publicUrl = getPublicMediaUrl(mediaUrl);
-            const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
-            await sendWhatsAppMediaMessage(employeePhone, publicUrl, confirmMessage);
-            console.log(`[QR] Sent payment screenshot to ${qrRequest.employeeName}`);
-          } else {
-            // Send text only
-            await sendWhatsAppMessage(employeePhone, confirmMessage);
-          }
-        } catch (e) {
-          console.error('[QR] Failed to notify employee:', e);
-        }
+      // If Kishor attached a screenshot, save it and ask for event
+      if (mediaUrl) {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'kishor_qr_payment',
+          intentContext: { 
+            qrCode: qrCode,
+            paymentScreenshotUrl: mediaUrl,
+          },
+          currentState: 'awaiting_event_assignment',
+        });
+        
+        return `📸 Got your payment screenshot for *${qrCode}*!\n\n💰 ₹${amount.toLocaleString('en-IN')}\n👤 ${qrRequest.employeeName}\n\nWhich event should this be recorded under?\n\n_Type the customer/event name, or "general" for general expenses_`;
       }
       
-      return `✅ *${qrCode}* paid → ${qrRequest.employeeName}\n₹${amount.toLocaleString('en-IN')} • ${eventName}${mediaUrl ? '\n📸 Screenshot sent to employee' : ''}`;
+      // No screenshot attached - ask for it first
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'kishor_qr_payment',
+        intentContext: { qrCode: qrCode },
+        currentState: 'awaiting_payment_screenshot',
+      });
+      
+      return `✅ *${qrCode}* marked as paid!\n\n💰 ₹${amount.toLocaleString('en-IN')}\n👤 ${qrRequest.employeeName}\n📝 ${qrRequest.description}\n\n📸 Please send the payment screenshot to forward to the employee.`;
     }
     
     if (rejectQrMatch) {
@@ -2055,8 +2041,9 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // QR CODE FLOW - User mentioned QR/UPI keywords
-    if (isQrPayment) {
+    // QR CODE FLOW - User mentioned QR/UPI keywords OR no expense/income indicators (default to QR for images)
+    // If it's not clearly expense or income, assume it's a QR code for payment
+    if (isQrPayment || (!isIncome && !isExpense)) {
       context.qrImageUrl = mediaUrl;
       
       if (providedAmount && purposeText.length > 2) {
@@ -2085,7 +2072,7 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: [],
         });
 
-        return `✅ *QR Payment Request Sent!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n📝 For: ${purposeText}\n\n_Kishor will process this soon!_ 🌳`;
+        return `✅ *QR Payment Request Sent!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n📝 For: ${purposeText}\n\n_Kishor will pay and send you confirmation!_ 🌳`;
       } else if (providedAmount) {
         context.amount = providedAmount;
         
@@ -2109,7 +2096,7 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // NO CLEAR INDICATOR - Ask user to clarify
+    // NO CLEAR INDICATOR - Ask user if Expense or Income (QR is auto-detected above)
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: 'image_classification',
       intentContext: { 
@@ -2121,7 +2108,7 @@ export async function handleOaksyWhatsAppMessage(
       currentState: 'awaiting_image_type',
     });
 
-    const response = `📸 *Got your screenshot!*\n\nWhat is this?\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n3️⃣ *QR Payment* - QR code to pay\n\n_Reply with 1, 2, or 3 (or say "expense", "income", or "qr")_`;
+    const response = `📸 *Got your screenshot!*\n\nIs this an:\n\n1️⃣ *Expense* - Money you spent\n2️⃣ *Income* - Money received\n\n_Reply with 1 or 2 (or say "expense" or "income")_`;
       
     history.push({ role: 'assistant', content: response, timestamp: Date.now() });
     await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
@@ -2129,17 +2116,16 @@ export async function handleOaksyWhatsAppMessage(
     return response;
   }
   
-  // Handle image classification flow (user responding to "expense/income/qr?" question)
+  // Handle image classification flow (user responding to "expense/income?" question)
   if (conversation.activeIntent === 'image_classification') {
     if (conversation.currentState === 'awaiting_image_type') {
       const imgContext = context as any;
       const imageUrl = imgContext.qrImageUrl || imgContext.incomeScreenshotUrl || '';
       const savedAmount = imgContext.providedAmount;
       
-      // Check user's response
+      // Check user's response (only expense or income - QR is auto-detected)
       const isExpenseResponse = /^(1|expense|spent|paid)/i.test(lowerMessage);
       const isIncomeResponse = /^(2|income|received|got)/i.test(lowerMessage);
-      const isQrResponse = /^(3|qr|payment|pay)/i.test(lowerMessage);
       
       if (isExpenseResponse) {
         // User said expense - ask for amount and description
@@ -2193,32 +2179,8 @@ export async function handleOaksyWhatsAppMessage(
         }
       }
       
-      if (isQrResponse) {
-        // User said QR payment
-        const qrContext: IntentContext = { qrImageUrl: imageUrl };
-        
-        if (savedAmount) {
-          qrContext.amount = savedAmount;
-          await storage.updateWhatsappConversation(conversation.id, {
-            activeIntent: 'qr_payment',
-            intentContext: qrContext,
-            conversationHistory: history,
-            currentState: 'awaiting_qr_purpose_only',
-          });
-          return `💳 *QR Payment* - Amount: *₹${savedAmount.toLocaleString('en-IN')}*\n\nWhat's this payment for?`;
-        } else {
-          await storage.updateWhatsappConversation(conversation.id, {
-            activeIntent: 'qr_payment',
-            intentContext: qrContext,
-            conversationHistory: history,
-            currentState: 'awaiting_qr_details',
-          });
-          return `💳 *QR Payment*\n\nPlease send amount and purpose.\n_Example: "500 for taxi" or "1200 lunch"_`;
-        }
-      }
-      
       // User didn't give a clear answer - ask again
-      return `Please reply with:\n• *1* or *expense*\n• *2* or *income*\n• *3* or *qr*`;
+      return `Please reply with:\n• *1* or *expense*\n• *2* or *income*`;
     }
   }
   
