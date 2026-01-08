@@ -2222,14 +2222,34 @@ export async function handleOaksyWhatsAppMessage(
     // Waiting for both amount and purpose
     if (conversation.currentState === 'awaiting_qr_details') {
       const amount = extractAmountFlexible(messageText);
-      if (!amount) {
-        return `Please include the amount. Example: "500 for taxi" or "₹1200 for lunch"`;
+      const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').replace(/for\s+/i, '').trim();
+      
+      if (!amount && purposeText && purposeText.length > 1) {
+        // User gave description but no amount - save description and ask just for amount
+        context.qrPaymentDescription = purposeText;
+        
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'qr_payment',
+          intentContext: context,
+          conversationHistory: history,
+          currentState: 'awaiting_qr_amount_only',
+        });
+        
+        return `📝 Got it: *${purposeText}*\n\nWhat's the amount? 💰`;
       }
       
-      const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').replace(/for\s+/i, '').trim() || 'Payment';
+      if (!amount) {
+        // Check if we already have a description saved - ask only for amount
+        if (context.qrPaymentDescription) {
+          return `What's the amount for "${context.qrPaymentDescription}"? 💰\n\n_Example: 500 or ₹1200_`;
+        }
+        return `Please send the amount and what it's for.\n\n_Example: "500 for taxi" or "1200 lunch"_`;
+      }
+      
+      const description = purposeText || context.qrPaymentDescription || 'Payment';
       
       context.amount = amount;
-      context.qrPaymentDescription = purposeText;
+      context.qrPaymentDescription = description;
       context.qrPaymentCategory = 'Other';
       
       const { requestCode } = await createQrPaymentRequest(
@@ -2237,7 +2257,7 @@ export async function handleOaksyWhatsAppMessage(
         employee.name,
         employee.phone || normalizedPhone,
         'Other',
-        purposeText,
+        description,
         amount,
         context.qrImageUrl || ''
       );
@@ -2245,7 +2265,7 @@ export async function handleOaksyWhatsAppMessage(
       await notifyKishorQrPayment(
         requestCode,
         employee.name,
-        purposeText,
+        description,
         amount,
         context.qrImageUrl || ''
       );
@@ -2257,7 +2277,44 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${purposeText}\n\n_You'll be notified once payment is done!_ 🌳`;
+      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
+    }
+    
+    // Waiting for just amount (description already provided)
+    if (conversation.currentState === 'awaiting_qr_amount_only') {
+      const amount = extractAmountFlexible(messageText);
+      if (!amount) {
+        return `Just the amount please. Example: "500" or "₹1200"`;
+      }
+      
+      const description = context.qrPaymentDescription || 'Payment';
+      
+      const { requestCode } = await createQrPaymentRequest(
+        employee.id,
+        employee.name,
+        employee.phone || normalizedPhone,
+        'Other',
+        description,
+        amount,
+        context.qrImageUrl || ''
+      );
+
+      await notifyKishorQrPayment(
+        requestCode,
+        employee.name,
+        description,
+        amount,
+        context.qrImageUrl || ''
+      );
+
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+
+      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
     // Legacy states - reset and ask to start over
