@@ -2067,31 +2067,34 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // NEW FLOW: Ask user to choose category first
+    // NEW FLOW: Different paths for authorized vs non-authorized users
     const providedAmount = detectedAmount;
     const isAuthorized = isAllowedExpenseSubmitter(normalizedPhone);
     
-    // Save extracted data and ask the category question
-    await storage.updateWhatsappConversation(conversation.id, {
-      activeIntent: 'image_classification',
-      intentContext: { 
-        qrImageUrl: mediaUrl,
-        incomeScreenshotUrl: mediaUrl,
-        providedAmount: providedAmount,
-        detectedCounterparty: detectedCounterparty,
-      },
-      conversationHistory: history,
-      currentState: 'awaiting_submission_category',
-    });
-    
-    // Format the question based on whether user is authorized
     let imageResponse: string;
-    if (providedAmount) {
-      if (isAuthorized) {
+    
+    if (isAuthorized) {
+      // Authorized users get category choice (petty vs event)
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'image_classification',
+        intentContext: { 
+          qrImageUrl: mediaUrl,
+          incomeScreenshotUrl: mediaUrl,
+          providedAmount: providedAmount,
+          detectedCounterparty: detectedCounterparty,
+        },
+        conversationHistory: history,
+        currentState: 'awaiting_submission_category',
+      });
+      
+      if (providedAmount) {
         imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\nWhat type of submission?\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)`;
       } else {
-        imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\n🧾 *Petty Expense*\n\nWhat is this expense for?\n_Example: "taxi to venue" or "lunch"_`;
-        // For non-authorized, go directly to petty expense flow
+        imageResponse = `📸 *Got your screenshot!*\n\nWhat type of submission?\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)\n\n_(Also mention the amount)_`;
+      }
+    } else {
+      // Non-authorized users go directly to petty expense flow
+      if (providedAmount) {
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'qr_payment',
           intentContext: { 
@@ -2102,13 +2105,8 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: history,
           currentState: 'awaiting_qr_purpose_only',
         });
-      }
-    } else {
-      if (isAuthorized) {
-        imageResponse = `📸 *Got your screenshot!*\n\nWhat type of submission?\n\n*1.* 🧾 Petty Expense (personal: taxi, food, etc.)\n*2.* 💼 Event Payment (vendor/client)\n\n_(Also mention the amount)_`;
+        imageResponse = `📸 *Rs.${providedAmount.toLocaleString('en-IN')}/-*\n\n🧾 *Petty Expense*\n\nWhat is this expense for?\n_Example: "taxi to venue" or "lunch"_`;
       } else {
-        imageResponse = `📸 *Got your screenshot!*\n\n🧾 *Petty Expense*\n\nWhat is this expense for and how much?\n_Example: "500 taxi" or "200 lunch"_`;
-        // For non-authorized, go directly to petty expense flow
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: 'qr_payment',
           intentContext: { 
@@ -2118,6 +2116,7 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: history,
           currentState: 'awaiting_qr_details',
         });
+        imageResponse = `📸 *Got your screenshot!*\n\n🧾 *Petty Expense*\n\nWhat is this expense for and how much?\n_Example: "500 taxi" or "200 lunch"_`;
       }
     }
     
