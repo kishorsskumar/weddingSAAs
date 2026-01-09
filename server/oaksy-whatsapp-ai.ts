@@ -3281,11 +3281,12 @@ export async function handleOaksyWhatsAppMessage(
       }
       
       // Remove vehicle and amount patterns from text for address parsing
+      // Be careful not to remove address parts that look like amounts (e.g., "103,Kottodimukku")
       let cleanText = messageText
         .replace(vehiclePattern, '')
-        .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?/i, '')
-        .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?/i, '')
-        .replace(/[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)/i, '')
+        .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?(?:\s*(?:k|thousand|lakh|lakhs|crore))?/i, '')
+        .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?(?:\s*(?:k|thousand|lakh|lakhs|crore))?/i, '')
+        .replace(/\b([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\s+(k|thousand|lakh|lakhs|crore)\b/i, '')
         .trim();
       
       // Parse message for recipient name and address
@@ -3840,11 +3841,12 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     // Remove vehicle and amount patterns from text for address parsing
+    // Be careful not to remove address parts that look like amounts (e.g., "103,Kottodimukku")
     let cleanText = messageText
       .replace(vehiclePattern, '')
-      .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)?/i, '')
-      .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?/i, '')
-      .replace(/[0-9,]+(?:\.[0-9]+)?\s*(?:k|thousand|lakh|lakhs|crore)(?:\s|,|$)/i, '')
+      .replace(/(?:value|amount|total|price|cost)\s*[:\-]?\s*[0-9,]+(?:\.[0-9]+)?(?:\s*(?:k|thousand|lakh|lakhs|crore))?/i, '')
+      .replace(/(?:rs\.?|₹|inr)\s*[0-9,]+(?:\.[0-9]+)?(?:\s*(?:k|thousand|lakh|lakhs|crore))?/i, '')
+      .replace(/\b([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\s+(k|thousand|lakh|lakhs|crore)\b/i, '')
       .replace(/^(dc|create\s*dc|challan|delivery\s*challan)\s*/i, '')
       .trim();
     
