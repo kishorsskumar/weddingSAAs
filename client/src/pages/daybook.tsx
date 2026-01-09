@@ -540,6 +540,8 @@ export default function Daybook() {
     );
     
     const onSubmit = (data: any) => {
+      if (createMutation.isPending) return;
+      
       if (!data.category) {
         toast({
           title: "Category Required",
@@ -556,22 +558,7 @@ export default function Daybook() {
       
       createMutation.mutate(submitData, {
         onSuccess: () => {
-          reset({
-            type,
-            date: data.date,
-            amount: '',
-            bankId: undefined,
-            category: '',
-            description: '',
-            eventId: undefined,
-            vendorId: undefined,
-            vendorName: '',
-            notes: '',
-          });
-          setSelectedEvent(null);
-          setSelectedVendor(null);
-          setEventSearch("");
-          setCategorySearch("");
+          onClose();
         }
       });
     };
