@@ -839,6 +839,9 @@ export async function registerRoutes(
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Debug logging for accountant permission issue
+    console.log('[Auth/me Debug]', { userId, userName: user.name, userEmail: user.email, userRole: user.role });
+
     // Admin and superadmin get all pages automatically
     let permissionsList: string[];
     if (user.role === 'admin' || user.role === 'superadmin') {
