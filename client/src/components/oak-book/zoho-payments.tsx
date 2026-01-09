@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -29,7 +31,9 @@ import {
   User,
   Receipt,
   Banknote,
-  Building2
+  Building2,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 
 type Payment = {
@@ -123,13 +127,32 @@ export function ZohoPayments() {
   );
 
   const createPayment = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/customer-payments", data),
+    mutationFn: async (data: any) => {
+      const payment = await apiRequest("POST", "/api/customer-payments", data);
+      
+      // Also create a daybook entry for this payment
+      const customer = customers.find(c => c.id === data.customerId);
+      const daybookEntry = {
+        type: "income",
+        date: data.date,
+        amount: data.amount,
+        category: "Payment Received",
+        description: `Payment from ${customer?.name || 'Customer'} - ${data.reference || payment.number}`,
+        bankId: data.bankId || null,
+      };
+      
+      await apiRequest("POST", "/api/daybook", daybookEntry);
+      
+      return payment;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
       setIsCreateModalOpen(false);
       setEditingPayment(null);
-      toast({ title: "Payment Recorded", description: "Payment has been saved successfully." });
+      toast({ title: "Payment Recorded", description: "Payment has been saved and added to daybook." });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -456,6 +479,16 @@ function PaymentFormModal({
     reference: "",
     notes: "",
   });
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearch) return customers;
+    const query = customerSearch.toLowerCase();
+    return customers.filter(c => c.name.toLowerCase().includes(query));
+  }, [customers, customerSearch]);
+
+  const selectedCustomer = customers.find(c => c.id === formData.customerId);
 
   const handleSubmit = () => {
     onSubmit(formData);
@@ -471,21 +504,54 @@ function PaymentFormModal({
         <div className="space-y-4 py-4">
           <div>
             <Label>Customer *</Label>
-            <Select
-              value={formData.customerId}
-              onValueChange={(value) => setFormData({ ...formData, customerId: value })}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={customerSearchOpen} onOpenChange={setCustomerSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={customerSearchOpen}
+                  className="w-full justify-between mt-1 font-normal"
+                  data-testid="select-customer"
+                >
+                  {selectedCustomer ? selectedCustomer.name : "Search and select customer..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[400px] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Search customers..." 
+                    value={customerSearch}
+                    onValueChange={setCustomerSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandGroup className="max-h-[200px] overflow-y-auto">
+                      {filteredCustomers.map((customer) => (
+                        <CommandItem
+                          key={customer.id}
+                          value={customer.id}
+                          onSelect={() => {
+                            setFormData({ ...formData, customerId: customer.id });
+                            setCustomerSearchOpen(false);
+                            setCustomerSearch("");
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.customerId === customer.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {customer.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
