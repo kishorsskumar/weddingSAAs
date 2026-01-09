@@ -177,14 +177,31 @@ export default function Daybook() {
 
   const createMutation = useMutation({
     mutationFn: async (data: Partial<DaybookEntry>) => {
-      const res = await fetch('/api/daybook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Failed to create entry');
-      return res.json();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        const res = await fetch('/api/daybook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || 'Failed to create entry');
+        }
+        return res.json();
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error('Request timed out. Please check your connection and try again.');
+        }
+        throw error;
+      }
     },
+    retry: 0, // Don't auto-retry to prevent stuck states
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
@@ -193,10 +210,11 @@ export default function Daybook() {
         description: `Your ${data.type} entry has been saved successfully.`,
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
+      console.error('Daybook entry creation error:', error);
       toast({
         title: "Error",
-        description: "Failed to create entry. Please try again.",
+        description: error.message || "Failed to create entry. Please try again.",
         variant: "destructive",
       });
     },
@@ -561,7 +579,10 @@ export default function Daybook() {
     );
     
     const onSubmit = (data: any) => {
-      if (createMutation.isPending) return;
+      if (createMutation.isPending) {
+        console.log('Mutation already pending, skipping duplicate submit');
+        return;
+      }
       
       if (!data.category) {
         toast({
@@ -577,9 +598,29 @@ export default function Daybook() {
         date: data.date || formattedDate,
       };
       
+      console.log('Submitting daybook entry:', submitData);
+      
       createMutation.mutate(submitData, {
         onSuccess: () => {
-          onClose();
+          // Reset form for next entry while keeping the dialog open
+          reset({
+            type,
+            date: formattedDate,
+            amount: '',
+            category: '',
+            description: '',
+            bankId: '',
+            eventId: '',
+            vendorId: '',
+            vendorName: '',
+          });
+          setSelectedEvent(null);
+          setSelectedVendor(null);
+          setEventSearch("");
+          setCategorySearch("");
+        },
+        onError: (error) => {
+          console.error('Daybook submission failed:', error);
         }
       });
     };
