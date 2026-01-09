@@ -11,6 +11,7 @@ import { ZohoPayments } from "@/components/oak-book/zoho-payments";
 import { ZohoExpenses } from "@/components/oak-book/zoho-expenses";
 import { ZohoBills } from "@/components/oak-book/zoho-bills";
 import { ZohoDeliveryChallans } from "@/components/oak-book/zoho-delivery-challans";
+import { ZohoBanks } from "@/components/oak-book/zoho-banks";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import html2canvas from "html2canvas";
@@ -125,14 +126,17 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "delivery-challans", label: "Delivery Challan" },
     ]
   },
+  { id: "vendors", label: "Vendors", icon: Building2 },
   { 
-    id: "vendor-management", 
-    label: "Vendor Management", 
-    icon: Building2,
+    id: "purchases", 
+    label: "Purchases", 
+    icon: Wallet,
     children: [
-      { id: "pending-vendor-payments", label: "Pending Vendor Payments" },
+      { id: "expenses", label: "Expenses" },
+      { id: "bills", label: "Bills" },
     ]
   },
+  { id: "banks", label: "Banking", icon: Landmark },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -2601,6 +2605,8 @@ export default function OakBook() {
         return <ZohoBills />;
       case "delivery-challans":
         return <ZohoDeliveryChallans />;
+      case "banks":
+        return <ZohoBanks />;
       case "reports":
         return renderReports();
       case "pending-vendor-payments":
