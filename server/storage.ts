@@ -367,6 +367,7 @@ export interface IStorage {
   getBankTransfersByDate(date: string): Promise<BankTransfer[]>;
   getBankTransfersByDateRange(startDate: string, endDate: string): Promise<BankTransfer[]>;
   createBankTransfer(transfer: InsertBankTransfer): Promise<BankTransfer>;
+  updateBankTransfer(id: string, transfer: Partial<InsertBankTransfer>): Promise<BankTransfer | undefined>;
   deleteBankTransfer(id: string): Promise<void>;
   
   // Leave Requests
@@ -1385,6 +1386,11 @@ export class DatabaseStorage implements IStorage {
   async createBankTransfer(insertTransfer: InsertBankTransfer): Promise<BankTransfer> {
     const [transfer] = await db.insert(bankTransfers).values(insertTransfer).returning();
     return transfer;
+  }
+
+  async updateBankTransfer(id: string, updateData: Partial<InsertBankTransfer>): Promise<BankTransfer | undefined> {
+    const [transfer] = await db.update(bankTransfers).set(updateData).where(eq(bankTransfers.id, id)).returning();
+    return transfer || undefined;
   }
 
   async deleteBankTransfer(id: string): Promise<void> {

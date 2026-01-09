@@ -29,6 +29,8 @@ export default function Daybook() {
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [editingCategory, setEditingCategory] = useState<DaybookCategory | null>(null);
   const [editingEntry, setEditingEntry] = useState<DaybookEntry | null>(null);
+  const [editingTransfer, setEditingTransfer] = useState<BankTransfer | null>(null);
+  const [isEditTransferDialogOpen, setIsEditTransferDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
   const [scanningImage, setScanningImage] = useState<string | null>(null);
@@ -322,6 +324,25 @@ export default function Daybook() {
       queryClient.invalidateQueries({ queryKey: ['/api/bank-transfers'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
       setIsTransferDialogOpen(false);
+    },
+  });
+
+  const updateTransferMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { amount: string; description?: string } }) => {
+      const res = await fetch(`/api/bank-transfers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update transfer');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/bank-transfers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
+      setEditingTransfer(null);
+      setIsEditTransferDialogOpen(false);
+      toast({ title: "Transfer updated successfully" });
     },
   });
 
@@ -1718,17 +1739,31 @@ export default function Daybook() {
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold">₹{Number(transfer.amount).toLocaleString()}</span>
                         {(isAdmin || isAccountant) && (
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (confirm(`Delete this transfer?`)) deleteTransferMutation.mutate(transfer.id);
-                            }}
-                            data-testid={`button-delete-transfer-${transfer.id}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
+                          <>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7"
+                              onClick={() => {
+                                setEditingTransfer(transfer);
+                                setIsEditTransferDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-transfer-${transfer.id}`}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm(`Delete this transfer?`)) deleteTransferMutation.mutate(transfer.id);
+                              }}
+                              data-testid={`button-delete-transfer-${transfer.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -2446,6 +2481,72 @@ export default function Daybook() {
               Print
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Transfer Dialog */}
+      <Dialog open={isEditTransferDialogOpen} onOpenChange={(open) => {
+        setIsEditTransferDialogOpen(open);
+        if (!open) setEditingTransfer(null);
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Bank Transfer</DialogTitle>
+          </DialogHeader>
+          {editingTransfer && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="font-medium">{getBankName(editingTransfer.fromBankId)}</span>
+                  <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{getBankName(editingTransfer.toBankId)}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Amount (₹)</Label>
+                <Input
+                  type="number"
+                  defaultValue={editingTransfer.amount}
+                  onChange={(e) => setEditingTransfer({ ...editingTransfer, amount: e.target.value })}
+                  data-testid="input-edit-transfer-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Input
+                  defaultValue={editingTransfer.description || ""}
+                  onChange={(e) => setEditingTransfer({ ...editingTransfer, description: e.target.value })}
+                  placeholder="Optional description"
+                  data-testid="input-edit-transfer-description"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => {
+                  setIsEditTransferDialogOpen(false);
+                  setEditingTransfer(null);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (editingTransfer) {
+                      updateTransferMutation.mutate({
+                        id: editingTransfer.id,
+                        data: {
+                          amount: editingTransfer.amount,
+                          description: editingTransfer.description || undefined,
+                        },
+                      });
+                    }
+                  }}
+                  disabled={updateTransferMutation.isPending}
+                  data-testid="button-save-transfer"
+                >
+                  {updateTransferMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

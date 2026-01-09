@@ -1719,6 +1719,37 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/bank-transfers/:id', async (req, res) => {
+    try {
+      const transfer = await storage.getBankTransfer(req.params.id);
+      if (!transfer) {
+        return res.status(404).json({ error: 'Transfer not found' });
+      }
+      
+      const { amount, description } = req.body;
+      const amountDiff = parseFloat(amount) - parseFloat(transfer.amount);
+      
+      if (amountDiff !== 0) {
+        const fromBank = await storage.getBank(transfer.fromBankId);
+        const toBank = await storage.getBank(transfer.toBankId);
+        if (fromBank) {
+          const newFromBalance = (parseFloat(fromBank.balance) - amountDiff).toString();
+          await storage.updateBank(fromBank.id, { balance: newFromBalance });
+        }
+        if (toBank) {
+          const newToBalance = (parseFloat(toBank.balance) + amountDiff).toString();
+          await storage.updateBank(toBank.id, { balance: newToBalance });
+        }
+      }
+      
+      const updated = await storage.updateBankTransfer(req.params.id, { amount, description });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating bank transfer:', error);
+      res.status(500).json({ error: 'Failed to update transfer' });
+    }
+  });
+
   app.delete('/api/bank-transfers/:id', async (req, res) => {
     const transfer = await storage.getBankTransfer(req.params.id);
     if (transfer) {
