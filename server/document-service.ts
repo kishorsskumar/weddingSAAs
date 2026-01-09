@@ -520,7 +520,7 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
-  doc.text('Edathal P.O, Aluva, Ernakulam, Kerala - 683564', 14, 27);
+  doc.text('2nd floor, above Devas Studio, Deshabhimani Road, Kaloor, Kochi-682017', 14, 27);
   doc.text('Ph: +91 9895810975 | GSTIN: 32AALCS5678K1Z5', 14, 32);
   
   doc.setFontSize(18);
@@ -557,8 +557,8 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(11);
   doc.text('Yepman International', 17, 68);
   doc.setFontSize(9);
-  doc.text('Edathal P.O, Aluva', 17, 74);
-  doc.text('Ernakulam, Kerala - 683564', 17, 79);
+  doc.text('2nd floor, above Devas Studio,', 17, 74);
+  doc.text('Deshabhimani Road, Kaloor, Kochi-682017', 17, 79);
   
   doc.setFillColor(248, 249, 250);
   doc.rect(105, 55, 91, 30, 'F');
@@ -571,11 +571,11 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.text('DELIVER TO', 108, 61);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50);
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.text(challan.deliverTo, 108, 68);
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   const addressLines = doc.splitTextToSize(challan.deliveryAddress, 85);
-  doc.text(addressLines.slice(0, 2), 108, 74);
+  doc.text(addressLines.slice(0, 4), 108, 74);
   
   const tableData = challan.items.map((item, idx) => [
     (idx + 1).toString(),
