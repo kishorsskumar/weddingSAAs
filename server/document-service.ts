@@ -543,10 +543,10 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.line(14, 50, 196, 50);
   
   doc.setFillColor(248, 249, 250);
-  doc.rect(14, 55, 85, 30, 'F');
+  doc.rect(14, 55, 85, 40, 'F');
   doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
   doc.setLineWidth(1);
-  doc.line(14, 55, 14, 85);
+  doc.line(14, 55, 14, 95);
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
@@ -561,9 +561,9 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.text('Deshabhimani Road, Kaloor, Kochi-682017', 17, 79);
   
   doc.setFillColor(248, 249, 250);
-  doc.rect(105, 55, 91, 30, 'F');
+  doc.rect(105, 55, 91, 40, 'F');
   doc.setDrawColor(YEPMAN_COLOR[0], YEPMAN_COLOR[1], YEPMAN_COLOR[2]);
-  doc.line(105, 55, 105, 85);
+  doc.line(105, 55, 105, 95);
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
@@ -571,11 +571,11 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.text('DELIVER TO', 108, 61);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(50);
-  doc.setFontSize(10);
-  doc.text(challan.deliverTo, 108, 68);
-  doc.setFontSize(8);
+  doc.setFontSize(9);
+  doc.text(challan.deliverTo, 108, 67);
+  doc.setFontSize(7);
   const addressLines = doc.splitTextToSize(challan.deliveryAddress, 85);
-  doc.text(addressLines.slice(0, 4), 108, 74);
+  doc.text(addressLines, 108, 73);
   
   const tableData = challan.items.map((item, idx) => [
     (idx + 1).toString(),
@@ -588,7 +588,7 @@ export async function generateDeliveryChallanPdf(challan: {
   ]);
   
   autoTable(doc, {
-    startY: 92,
+    startY: 100,
     head: [['Sl.', 'Description of Goods', 'HSN/SAC', 'Qty', 'Unit', 'Rate', 'Amount']],
     body: tableData,
     styles: { fontSize: 9, cellPadding: 3 },
