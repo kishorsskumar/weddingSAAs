@@ -1717,7 +1717,7 @@ export default function Daybook() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold">₹{Number(transfer.amount).toLocaleString()}</span>
-                        {isAdmin && (
+                        {(isAdmin || isAccountant) && (
                           <Button 
                             size="icon" 
                             variant="ghost" 
