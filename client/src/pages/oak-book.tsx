@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/context/auth-context";
+import { ZohoQuotes } from "@/components/oak-book/zoho-quotes";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import html2canvas from "html2canvas";
@@ -2555,9 +2556,19 @@ export default function OakBook() {
         return renderCustomers();
       case "estimates":
       case "standard-estimates":
-        return renderEstimates("standard");
+        return (
+          <ZohoQuotes 
+            filterType="standard" 
+            onDownloadPdf={handleDownloadPdf}
+          />
+        );
       case "tax-estimates":
-        return renderEstimates("tax");
+        return (
+          <ZohoQuotes 
+            filterType="tax" 
+            onDownloadPdf={handleDownloadPdf}
+          />
+        );
       case "invoices":
       case "standard-invoices":
         return renderInvoices("standard");
