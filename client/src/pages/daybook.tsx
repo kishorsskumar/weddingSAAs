@@ -183,37 +183,19 @@ export default function Daybook() {
       if (!res.ok) throw new Error('Failed to create entry');
       return res.json();
     },
-    onMutate: async (newEntry) => {
-      // Cancel outgoing refetches to avoid race conditions
-      await queryClient.cancelQueries({ queryKey: ['/api/daybook'] });
-      // Snapshot previous value
-      const previousEntries = queryClient.getQueryData<DaybookEntry[]>(['/api/daybook']);
-      // Optimistically add new entry with temp ID
-      if (previousEntries) {
-        queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], [
-          ...previousEntries,
-          { ...newEntry, id: `temp-${Date.now()}`, createdAt: new Date().toISOString() } as DaybookEntry
-        ]);
-      }
-      return { previousEntries };
-    },
-    onError: (_err, _newEntry, context) => {
-      // Rollback on error
-      if (context?.previousEntries) {
-        queryClient.setQueryData(['/api/daybook'], context.previousEntries);
-      }
-    },
     onSuccess: (data) => {
-      // Replace temp entry with real one from server
-      queryClient.setQueryData<DaybookEntry[]>(['/api/daybook'], (old) => {
-        if (!old) return [data];
-        return old.map(entry => (typeof entry.id === 'string' && entry.id.startsWith('temp-')) ? data : entry);
-      });
-      // Only invalidate banks since balance changed
+      queryClient.invalidateQueries({ queryKey: ['/api/daybook'] });
       queryClient.invalidateQueries({ queryKey: ['/api/banks'] });
       toast({
         title: "Entry Added",
         description: `Your ${data.type} entry has been saved successfully.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create entry. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -581,10 +563,15 @@ export default function Daybook() {
             bankId: undefined,
             category: '',
             description: '',
+            eventId: undefined,
+            vendorId: undefined,
+            vendorName: '',
+            notes: '',
           });
           setSelectedEvent(null);
           setSelectedVendor(null);
-          queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+          setEventSearch("");
+          setCategorySearch("");
         }
       });
     };
