@@ -4,6 +4,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/context/auth-context";
 import { ZohoQuotes } from "@/components/oak-book/zoho-quotes";
+import { ZohoInvoices } from "@/components/oak-book/zoho-invoices";
+import { ZohoCustomers } from "@/components/oak-book/zoho-customers";
+import { ZohoVendors } from "@/components/oak-book/zoho-vendors";
+import { ZohoPayments } from "@/components/oak-book/zoho-payments";
+import { ZohoExpenses } from "@/components/oak-book/zoho-expenses";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import html2canvas from "html2canvas";
@@ -2553,7 +2558,9 @@ export default function OakBook() {
   const renderContent = () => {
     switch (activeSection) {
       case "customers":
-        return renderCustomers();
+        return <ZohoCustomers />;
+      case "vendors":
+        return <ZohoVendors />;
       case "estimates":
       case "standard-estimates":
         return (
@@ -2571,11 +2578,23 @@ export default function OakBook() {
         );
       case "invoices":
       case "standard-invoices":
-        return renderInvoices("standard");
+        return (
+          <ZohoInvoices 
+            filterType="standard" 
+            onDownloadPdf={handleDownloadPdf}
+          />
+        );
       case "tax-invoices":
-        return renderInvoices("tax");
+        return (
+          <ZohoInvoices 
+            filterType="tax" 
+            onDownloadPdf={handleDownloadPdf}
+          />
+        );
       case "payments-received":
-        return renderPaymentsReceived();
+        return <ZohoPayments />;
+      case "expenses":
+        return <ZohoExpenses />;
       case "delivery-challans":
         return renderDeliveryChallans();
       case "reports":
