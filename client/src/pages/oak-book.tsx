@@ -9,6 +9,8 @@ import { ZohoCustomers } from "@/components/oak-book/zoho-customers";
 import { ZohoVendors } from "@/components/oak-book/zoho-vendors";
 import { ZohoPayments } from "@/components/oak-book/zoho-payments";
 import { ZohoExpenses } from "@/components/oak-book/zoho-expenses";
+import { ZohoBills } from "@/components/oak-book/zoho-bills";
+import { ZohoDeliveryChallans } from "@/components/oak-book/zoho-delivery-challans";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import html2canvas from "html2canvas";
@@ -2595,8 +2597,10 @@ export default function OakBook() {
         return <ZohoPayments />;
       case "expenses":
         return <ZohoExpenses />;
+      case "bills":
+        return <ZohoBills />;
       case "delivery-challans":
-        return renderDeliveryChallans();
+        return <ZohoDeliveryChallans />;
       case "reports":
         return renderReports();
       case "pending-vendor-payments":
