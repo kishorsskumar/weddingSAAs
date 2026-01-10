@@ -122,9 +122,14 @@ CAPABILITIES:
 1. EXPENSES & PAYMENTS: Help submit expenses, track vendor payments, record income
 2. LEAVE MANAGEMENT: Process leave requests, check balances, track approvals
 3. EVENT COORDINATION: Help with event details, production schedules, team assignments
-4. FINANCIAL QUERIES: Daybook entries, payment status, vendor management
+4. FINANCIAL QUERIES: Daybook entries, payment status, vendor management, bank balances
 5. STATUS CHECKS: Any pending requests, approvals, or action items
 6. DELIVERY CHALLANS: Create delivery challans for goods/materials (wedding planners and accountants only)
+7. EVENT QUERIES: Check upcoming events, event details, countdown to events
+8. BANK & FINANCIAL: Check bank balances, daily summaries, pending payments
+9. TEAM QUERIES: Team availability, who's on leave, staff assignments
+10. VENDOR LOOKUPS: Vendor contact info, past payment rates, payment history
+11. QUICK REPORTS: Event profitability, client payment status, monthly summaries (superadmin only)
 
 FLEXIBILITY GUIDELINES:
 - Understand natural language - don't require specific formats
@@ -137,7 +142,7 @@ SECURITY RULES (CRITICAL):
 - NEVER share salary details, profit margins, or financial summaries with non-superadmins
 - Employees can only see their own requests and data
 - Wedding planners can see event-related data for their assigned events
-- Only superadmin can see company-wide financial data
+- Only superadmin can see company-wide financial data and bank balances
 
 DELIVERY CHALLAN PARSING RULES:
 - "deliverTo" = Recipient NAME (person/company) - NOT the address. Examples: "ABC Decorators", "Kochi Wedding Hall", "John"
@@ -146,14 +151,30 @@ DELIVERY CHALLAN PARSING RULES:
 - "amount" = ONLY extract if explicitly stated with currency (45K, Rs 5000, ₹45000). DO NOT guess amounts from address numbers!
 - "vehicleNumber" = Indian vehicle format like "KL 19 C 3786", "KA 01 AB 1234"
 
+QUERY TYPE DETECTION:
+- "events this week", "upcoming events", "what events", "weddings this month" = event_query with queryType: "upcoming"
+- "how many days till X wedding", "countdown to X", "when is X event" = event_query with queryType: "countdown"
+- "bank balance", "account balance", "how much in X account" = bank_query
+- "who's available", "team availability", "who can work on X" = team_query with queryType: "availability"
+- "who's on leave", "leave status today" = team_query with queryType: "on_leave"
+- "what did we pay X vendor", "X vendor rate", "vendor history" = vendor_query
+- "pending payments", "overdue invoices", "client owes" = financial_query with queryType: "pending"
+- "daily summary", "today's transactions" = financial_query with queryType: "daily_summary"
+- "profit on X event", "X wedding profitability" = report_query with queryType: "event_profit" (superadmin only)
+- "monthly summary", "this month performance" = report_query with queryType: "monthly" (superadmin only)
+- "how much X client owes", "X payment status" = financial_query with queryType: "client_dues"
+
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null (ONLY if explicitly mentioned, never from address numbers),
     "purpose": string or null,
     "vendorName": string or null,
     "eventName": string or null,
+    "customerName": string or null,
+    "queryType": string or null (for queries: "upcoming", "countdown", "availability", "on_leave", "pending", "daily_summary", "event_profit", "monthly", "client_dues"),
+    "timeframe": string or null (for queries: "today", "this_week", "this_month", "next_week"),
     "leaveType": "sick" | "casual" | "vacation" | "personal" | null,
     "startDate": "DD/MM/YYYY" or null,
     "endDate": "DD/MM/YYYY" or null,
@@ -161,7 +182,8 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "deliverTo": string or null (recipient NAME, not address),
     "deliveryAddress": string or null (full physical location),
     "itemDescription": string or null,
-    "vehicleNumber": string or null
+    "vehicleNumber": string or null,
+    "bankName": string or null
   },
   "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation"] or [],
   "isComplete": boolean,
@@ -563,6 +585,362 @@ function parseDate(text: string): string | null {
   }
   return null;
 }
+
+// ============== QUERY HANDLER FUNCTIONS ==============
+
+// Get upcoming events based on timeframe
+async function getUpcomingEvents(timeframe: string = 'this_week', plannerName?: string): Promise<string> {
+  const events = await storage.getAllEvents();
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  let endDate: Date;
+  let periodLabel: string;
+  
+  let startDate = new Date(today);
+  
+  switch (timeframe) {
+    case 'today':
+      endDate = new Date(today);
+      endDate.setHours(23, 59, 59);
+      periodLabel = 'today';
+      break;
+    case 'this_week':
+      endDate = new Date(today);
+      endDate.setDate(today.getDate() + 7);
+      periodLabel = 'this week';
+      break;
+    case 'next_week':
+      startDate = new Date(today);
+      startDate.setDate(today.getDate() + 7);
+      endDate = new Date(today);
+      endDate.setDate(today.getDate() + 14);
+      periodLabel = 'next week';
+      break;
+    case 'this_month':
+    default:
+      endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      periodLabel = 'this month';
+      break;
+  }
+  
+  let filteredEvents = events.filter(e => {
+    const eventDate = new Date(e.date);
+    return eventDate >= startDate && eventDate <= endDate;
+  });
+  
+  // Filter by planner if specified
+  if (plannerName) {
+    filteredEvents = filteredEvents.filter(e => 
+      e.planner?.toLowerCase().includes(plannerName.toLowerCase())
+    );
+  }
+  
+  // Sort by date
+  filteredEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  if (filteredEvents.length === 0) {
+    return `📅 No events scheduled ${periodLabel}${plannerName ? ` for ${plannerName}` : ''}.`;
+  }
+  
+  const eventList = filteredEvents.slice(0, 5).map(e => {
+    const eventDate = new Date(e.date);
+    const dateStr = eventDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    return `• *${e.customer || e.title}* - ${dateStr}\n  📍 ${e.venue || 'TBD'}`;
+  }).join('\n\n');
+  
+  const moreText = filteredEvents.length > 5 ? `\n\n_...and ${filteredEvents.length - 5} more events_` : '';
+  
+  return `📅 *Events ${periodLabel}${plannerName ? ` (${plannerName})` : ''}:*\n\n${eventList}${moreText}`;
+}
+
+// Get countdown to a specific event
+async function getEventCountdown(eventName: string): Promise<string> {
+  const events = await storage.getAllEvents();
+  const now = new Date();
+  
+  // Find matching event
+  const matchingEvent = events.find(e => 
+    e.customer?.toLowerCase().includes(eventName.toLowerCase()) ||
+    e.title?.toLowerCase().includes(eventName.toLowerCase()) ||
+    e.venue?.toLowerCase().includes(eventName.toLowerCase())
+  );
+  
+  if (!matchingEvent) {
+    return `❌ Couldn't find an event matching "${eventName}". Try the customer name or venue.`;
+  }
+  
+  const eventDate = new Date(matchingEvent.date);
+  const diffTime = eventDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return `📅 *${matchingEvent.customer || matchingEvent.title}*\n\nThis event was ${Math.abs(diffDays)} days ago (${eventDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}).`;
+  } else if (diffDays === 0) {
+    return `🎉 *${matchingEvent.customer || matchingEvent.title}*\n\n*TODAY IS THE DAY!* 🌟\n📍 ${matchingEvent.venue || 'Venue TBD'}`;
+  } else if (diffDays === 1) {
+    return `⏰ *${matchingEvent.customer || matchingEvent.title}*\n\n*TOMORROW!* Just 1 day to go!\n📍 ${matchingEvent.venue || 'Venue TBD'}`;
+  } else {
+    return `📅 *${matchingEvent.customer || matchingEvent.title}*\n\n⏳ *${diffDays} days* until the event\n📆 ${eventDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n📍 ${matchingEvent.venue || 'Venue TBD'}`;
+  }
+}
+
+// Get bank balances (superadmin only)
+async function getBankBalances(bankName?: string): Promise<string> {
+  const banks = await storage.getBanks();
+  
+  if (bankName) {
+    const matchingBank = banks.find(b => 
+      b.name.toLowerCase().includes(bankName.toLowerCase()) ||
+      b.accountNumber?.includes(bankName)
+    );
+    
+    if (!matchingBank) {
+      return `❌ Bank "${bankName}" not found.`;
+    }
+    
+    return `🏦 *${matchingBank.name}*\n\n💰 Balance: *₹${parseFloat(matchingBank.balance).toLocaleString('en-IN')}*`;
+  }
+  
+  // Return all banks
+  let totalBalance = 0;
+  const bankList = banks.map(b => {
+    const balance = parseFloat(b.balance);
+    totalBalance += balance;
+    return `• *${b.name}*: ₹${balance.toLocaleString('en-IN')}`;
+  }).join('\n');
+  
+  return `🏦 *Bank Balances:*\n\n${bankList}\n\n━━━━━━━━━━━━━━\n💰 *Total:* ₹${totalBalance.toLocaleString('en-IN')}`;
+}
+
+// Get daily financial summary
+async function getDailySummary(date?: string): Promise<string> {
+  const targetDate = date || new Date().toISOString().split('T')[0];
+  const entries = await storage.getDaybookEntries();
+  
+  const dailyEntries = entries.filter(e => e.date === targetDate);
+  
+  let totalIncome = 0;
+  let totalExpense = 0;
+  
+  dailyEntries.forEach(e => {
+    const amount = parseFloat(e.amount);
+    if (e.type === 'income') {
+      totalIncome += amount;
+    } else {
+      totalExpense += amount;
+    }
+  });
+  
+  const dateLabel = targetDate === new Date().toISOString().split('T')[0] ? 'Today' : targetDate;
+  
+  if (dailyEntries.length === 0) {
+    return `📊 *${dateLabel}'s Summary:*\n\nNo transactions recorded.`;
+  }
+  
+  // Show last 5 entries
+  const recentEntries = dailyEntries.slice(-5).map(e => {
+    const emoji = e.type === 'income' ? '📥' : '📤';
+    return `${emoji} ₹${parseFloat(e.amount).toLocaleString('en-IN')} - ${e.description?.substring(0, 25) || e.category}`;
+  }).join('\n');
+  
+  return `📊 *${dateLabel}'s Summary:*\n\n📥 Income: ₹${totalIncome.toLocaleString('en-IN')}\n📤 Expense: ₹${totalExpense.toLocaleString('en-IN')}\n💰 Net: ₹${(totalIncome - totalExpense).toLocaleString('en-IN')}\n\n*Recent:*\n${recentEntries}`;
+}
+
+// Get pending payments (client dues)
+async function getPendingPayments(customerName?: string): Promise<string> {
+  const events = await storage.getAllEvents();
+  
+  let pendingEvents = events.filter(e => {
+    const salesValue = parseFloat(e.salesValue || '0');
+    const advanceReceived = parseFloat(e.advanceReceived || '0');
+    return salesValue > advanceReceived && salesValue > 0;
+  });
+  
+  if (customerName) {
+    pendingEvents = pendingEvents.filter(e => 
+      e.customer?.toLowerCase().includes(customerName.toLowerCase())
+    );
+  }
+  
+  if (pendingEvents.length === 0) {
+    return `✅ No pending payments${customerName ? ` from ${customerName}` : ''}.`;
+  }
+  
+  // Sort by pending amount (highest first)
+  pendingEvents.sort((a, b) => {
+    const pendingA = parseFloat(a.salesValue || '0') - parseFloat(a.advanceReceived || '0');
+    const pendingB = parseFloat(b.salesValue || '0') - parseFloat(b.advanceReceived || '0');
+    return pendingB - pendingA;
+  });
+  
+  let totalPending = 0;
+  const pendingList = pendingEvents.slice(0, 5).map(e => {
+    const salesValue = parseFloat(e.salesValue || '0');
+    const advanceReceived = parseFloat(e.advanceReceived || '0');
+    const pending = salesValue - advanceReceived;
+    totalPending += pending;
+    return `• *${e.customer}*: ₹${pending.toLocaleString('en-IN')} pending\n  (Paid: ₹${advanceReceived.toLocaleString('en-IN')} of ₹${salesValue.toLocaleString('en-IN')})`;
+  }).join('\n\n');
+  
+  const moreText = pendingEvents.length > 5 ? `\n\n_...and ${pendingEvents.length - 5} more clients_` : '';
+  
+  return `💳 *Pending Payments:*\n\n${pendingList}${moreText}\n\n━━━━━━━━━━━━━━\n💰 *Total Pending:* ₹${totalPending.toLocaleString('en-IN')}`;
+}
+
+// Get team availability / who's on leave
+async function getTeamStatus(queryType: string, targetDate?: string): Promise<string> {
+  const employees = await storage.getAllEmployees();
+  const leaveRequests = await storage.getLeaveRequests();
+  
+  const today = targetDate || new Date().toISOString().split('T')[0];
+  
+  // Get approved leaves for today
+  const onLeave = leaveRequests.filter(lr => {
+    if (lr.status !== 'approved') return false;
+    const start = new Date(lr.startDate);
+    const end = new Date(lr.endDate);
+    const checkDate = new Date(today);
+    return checkDate >= start && checkDate <= end;
+  });
+  
+  const onLeaveNames = onLeave.map(lr => lr.employeeName);
+  
+  if (queryType === 'on_leave') {
+    if (onLeaveNames.length === 0) {
+      return `✅ *Team Attendance Today:*\n\nNo one is on leave today. Full team available!`;
+    }
+    
+    return `📋 *On Leave Today:*\n\n${onLeaveNames.map(n => `• ${n}`).join('\n')}\n\n_${employees.length - onLeaveNames.length} team members available._`;
+  } else {
+    // availability query
+    const available = employees.filter(e => !onLeaveNames.includes(e.name));
+    
+    if (available.length === 0) {
+      return `⚠️ No team members available today!`;
+    }
+    
+    const availableList = available.slice(0, 8).map(e => {
+      const role = e.designation || e.jobRole || '';
+      return `• *${e.name}*${role ? ` (${role})` : ''}`;
+    }).join('\n');
+    
+    return `👥 *Available Today:*\n\n${availableList}${available.length > 8 ? `\n\n_...and ${available.length - 8} more_` : ''}`;
+  }
+}
+
+// Get vendor payment history
+async function getVendorHistory(vendorName: string): Promise<string> {
+  const entries = await storage.getDaybookEntries();
+  
+  // Filter vendor payments
+  const vendorPayments = entries.filter(e => 
+    e.type === 'expense' && 
+    (e.vendorName?.toLowerCase().includes(vendorName.toLowerCase()) ||
+     e.description?.toLowerCase().includes(vendorName.toLowerCase()))
+  );
+  
+  if (vendorPayments.length === 0) {
+    return `❌ No payment history found for "${vendorName}".`;
+  }
+  
+  // Calculate total and find recent payments
+  let totalPaid = 0;
+  vendorPayments.forEach(p => {
+    totalPaid += parseFloat(p.amount);
+  });
+  
+  // Sort by date (recent first) and get last 5
+  const recentPayments = vendorPayments
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 5);
+  
+  const paymentList = recentPayments.map(p => {
+    const date = new Date(p.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    return `• ${date}: ₹${parseFloat(p.amount).toLocaleString('en-IN')}${p.eventName ? ` (${p.eventName})` : ''}`;
+  }).join('\n');
+  
+  return `🏪 *${vendorName} - Payment History:*\n\n${paymentList}\n\n━━━━━━━━━━━━━━\n💰 *Total Paid:* ₹${totalPaid.toLocaleString('en-IN')} (${vendorPayments.length} payments)`;
+}
+
+// Get event profitability (superadmin only)
+async function getEventProfitability(eventName: string): Promise<string> {
+  const events = await storage.getAllEvents();
+  const entries = await storage.getDaybookEntries();
+  
+  // Find the event
+  const event = events.find(e => 
+    e.customer?.toLowerCase().includes(eventName.toLowerCase()) ||
+    e.title?.toLowerCase().includes(eventName.toLowerCase())
+  );
+  
+  if (!event) {
+    return `❌ Event "${eventName}" not found.`;
+  }
+  
+  // Get event income and expenses
+  const eventEntries = entries.filter(e => e.eventId === event.id || e.eventName === event.title);
+  
+  let totalIncome = parseFloat(event.advanceReceived || '0');
+  let totalExpense = 0;
+  
+  eventEntries.forEach(e => {
+    const amount = parseFloat(e.amount);
+    if (e.type === 'income') {
+      totalIncome += amount;
+    } else {
+      totalExpense += amount;
+    }
+  });
+  
+  const salesValue = parseFloat(event.salesValue || '0');
+  const profit = totalIncome - totalExpense;
+  const pending = salesValue - totalIncome;
+  
+  return `📊 *${event.customer || event.title}*\n\n💵 Sales Value: ₹${salesValue.toLocaleString('en-IN')}\n📥 Received: ₹${totalIncome.toLocaleString('en-IN')}\n📤 Expenses: ₹${totalExpense.toLocaleString('en-IN')}\n💳 Pending: ₹${pending.toLocaleString('en-IN')}\n\n━━━━━━━━━━━━━━\n${profit >= 0 ? '✅' : '❌'} *Profit:* ₹${profit.toLocaleString('en-IN')}`;
+}
+
+// Get monthly summary (superadmin only)
+async function getMonthlySummary(year?: number, month?: number): Promise<string> {
+  const now = new Date();
+  const targetYear = year || now.getFullYear();
+  const targetMonth = month || now.getMonth() + 1;
+  
+  const entries = await storage.getDaybookEntries();
+  const events = await storage.getAllEvents();
+  
+  // Filter entries for the month
+  const monthStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
+  const monthEntries = entries.filter(e => e.date.startsWith(monthStr));
+  
+  let totalIncome = 0;
+  let totalExpense = 0;
+  
+  monthEntries.forEach(e => {
+    const amount = parseFloat(e.amount);
+    if (e.type === 'income') {
+      totalIncome += amount;
+    } else {
+      totalExpense += amount;
+    }
+  });
+  
+  // Count events this month
+  const monthEvents = events.filter(e => e.date.startsWith(monthStr));
+  
+  const monthName = new Date(targetYear, targetMonth - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  
+  return `📊 *${monthName} Summary:*\n\n📅 Events: ${monthEvents.length}\n📥 Income: ₹${totalIncome.toLocaleString('en-IN')}\n📤 Expenses: ₹${totalExpense.toLocaleString('en-IN')}\n\n━━━━━━━━━━━━━━\n💰 *Net:* ₹${(totalIncome - totalExpense).toLocaleString('en-IN')}`;
+}
+
+// Check if user is superadmin (by phone)
+function isSuperadminPhone(phone: string): boolean {
+  const normalized = normalizePhoneNumber(phone);
+  // Kishor's number
+  return normalized.slice(-10) === '7902373354';
+}
+
+// ============== END QUERY HANDLER FUNCTIONS ==============
 
 async function analyzeWithAI(
   message: string,
@@ -3662,12 +4040,17 @@ export async function handleOaksyWhatsAppMessage(
 
     // Role-aware greeting - check if authorized for DC creation
     const canCreateDc = isAuthorizedDcCreator(normalizedPhone) || employee.designation?.toLowerCase().includes('accountant');
+    const isSuperadmin = isSuperadminPhone(normalizedPhone);
+    
+    if (isSuperadmin) {
+      return `👋 Hi Kishor! I'm *Oaksy AI*, your business assistant 🌳\n\n*Quick commands:*\n\n📅 "events this week" - See upcoming events\n🏦 "bank balance" - Check all balances\n📊 "monthly summary" - Business overview\n💳 "pending payments" - Client dues\n👥 "who's on leave" - Team status\n🏪 "vendor history [name]" - Payment records\n📈 "profit on [event]" - Event profitability\n\n_What would you like to know?_`;
+    }
     
     if (canCreateDc) {
-      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n🏪 *Vendor Payments* - Just say "vendor payment [name] [amount]"\n📋 *Delivery Challan* - Say "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send the amount or receipt\n💳 *QR Payment* - Send QR code for direct payment\n📅 *Leave Requests* - Say "leave" or "vacation"\n\n_Tell me what you need!_`;
+      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n📅 *Events* - "events this week" or "countdown to [event]"\n🏪 *Vendor Payments* - "vendor payment [name] [amount]"\n📋 *Delivery Challan* - "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send amount or receipt\n💳 *QR Payment* - Send QR code for payment\n📅 *Leave Requests* - Say "leave"\n💳 *Pending Payments* - "how much does [client] owe"\n\n_Tell me what you need!_`;
     }
 
-    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n\n_Just tell me what you need!_`;
+    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n📅 *Events* - Ask "events this week"\n👥 *Team* - Ask "who's on leave today"\n\n_Just tell me what you need!_`;
   }
 
   // Use AI to understand the message when no pattern matches
@@ -3968,6 +4351,92 @@ export async function handleOaksyWhatsAppMessage(
       });
       return `📋 *Create Delivery Challan*\n\nPlease provide all details in one message:\n\n_Example: "Aneesh, 25/103 Kottodimukku, Manjummel-683501, Vehicle number KL19C3786 Value 45000"_`;
     }
+  }
+
+  // Handle AI-detected event query intent
+  if (aiAnalysis.intent === 'event_query') {
+    const queryType = aiAnalysis.extractedData.queryType || 'upcoming';
+    const timeframe = aiAnalysis.extractedData.timeframe || 'this_week';
+    const eventName = aiAnalysis.extractedData.eventName;
+    
+    if (queryType === 'countdown' && eventName) {
+      const result = await getEventCountdown(eventName);
+      return result;
+    } else {
+      // Get planner name for wedding planners
+      const plannerName = (employeeRole === 'wedding_planner') ? employee.name.split(' ')[0] : undefined;
+      const result = await getUpcomingEvents(timeframe, plannerName);
+      return result;
+    }
+  }
+
+  // Handle AI-detected bank query intent (superadmin only)
+  if (aiAnalysis.intent === 'bank_query') {
+    if (!isSuperadminPhone(normalizedPhone)) {
+      return `🔒 Bank balances are only available to management.\n\n_Please contact Kishor for financial information._`;
+    }
+    const bankName = aiAnalysis.extractedData.bankName;
+    const result = await getBankBalances(bankName);
+    return result;
+  }
+
+  // Handle AI-detected team query intent
+  if (aiAnalysis.intent === 'team_query') {
+    const queryType = aiAnalysis.extractedData.queryType || 'availability';
+    const result = await getTeamStatus(queryType);
+    return result;
+  }
+
+  // Handle AI-detected vendor query intent
+  if (aiAnalysis.intent === 'vendor_query') {
+    const vendorName = aiAnalysis.extractedData.vendorName;
+    if (!vendorName) {
+      return `🏪 Which vendor would you like to know about?\n\n_Example: "vendor history Plan B Cinema"_`;
+    }
+    const result = await getVendorHistory(vendorName);
+    return result;
+  }
+
+  // Handle AI-detected financial query intent
+  if (aiAnalysis.intent === 'financial_query') {
+    const queryType = aiAnalysis.extractedData.queryType || 'pending';
+    const customerName = aiAnalysis.extractedData.customerName;
+    
+    if (queryType === 'daily_summary') {
+      if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant') {
+        return `🔒 Daily summaries are only available to management and accounts.\n\n_Please contact Kishor or Sabitha._`;
+      }
+      const result = await getDailySummary();
+      return result;
+    } else if (queryType === 'pending' || queryType === 'client_dues') {
+      if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant' && employeeRole !== 'wedding_planner') {
+        return `🔒 Payment information is only available to authorized staff.`;
+      }
+      const result = await getPendingPayments(customerName);
+      return result;
+    }
+    
+    return aiAnalysis.message || `💰 I can help with financial queries! Try:\n\n• "daily summary"\n• "pending payments"\n• "how much does [client] owe?"`;
+  }
+
+  // Handle AI-detected report query intent (superadmin only)
+  if (aiAnalysis.intent === 'report_query') {
+    if (!isSuperadminPhone(normalizedPhone)) {
+      return `🔒 Reports are only available to management.\n\n_Please contact Kishor for business reports._`;
+    }
+    
+    const queryType = aiAnalysis.extractedData.queryType || 'monthly';
+    const eventName = aiAnalysis.extractedData.eventName;
+    
+    if (queryType === 'event_profit' && eventName) {
+      const result = await getEventProfitability(eventName);
+      return result;
+    } else if (queryType === 'monthly') {
+      const result = await getMonthlySummary();
+      return result;
+    }
+    
+    return aiAnalysis.message || `📊 Available reports:\n\n• "monthly summary"\n• "profit on [event name]"`;
   }
 
   // Return AI's response for other intents

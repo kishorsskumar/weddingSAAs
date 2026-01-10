@@ -58,10 +58,17 @@ Preferred communication style: Simple, everyday language.
   - **Flexible Amount Parsing:** Accepts "5k", "5 thousand", "1 lakh", "Rs 5000", "₹5000" etc.
   - **Security:** Never shares sensitive data (salaries, profits) with non-superadmins
   - **Capabilities by Role:**
-    - Employees: Expenses, leave requests, QR payments, status checks
-    - Wedding Planners (Fida/Femina): Vendor payments, event coordination, production planning
-    - Accountant: Financial queries, daybook entries, payment tracking
-    - Superadmin: Full business assistant with complete access
+    - Employees: Expenses, leave requests, QR payments, status checks, event queries, team availability
+    - Wedding Planners (Fida/Femina): Vendor payments, event coordination, production planning, pending payments, event countdown
+    - Accountant: Financial queries, daybook entries, payment tracking, daily summaries
+    - Superadmin: Full business assistant with complete access to all queries and reports
+  - **New Query Features (via WhatsApp):**
+    - **Event Queries:** "events this week", "countdown to [event]", "what events today"
+    - **Bank Queries (Superadmin):** "bank balance", "how much in [bank name]"
+    - **Team Queries:** "who's on leave", "team availability today"
+    - **Vendor Queries:** "vendor history [name]", "what did we pay [vendor]"
+    - **Financial Queries:** "pending payments", "daily summary", "how much does [client] owe"
+    - **Report Queries (Superadmin):** "monthly summary", "profit on [event name]"
 - **Two-Way WhatsApp Communication:** Employee expense/leave requests, Superadmin approval workflow, dashboard inbox for management, Superadmin lead submission with AI extraction.
 - **QR Payment Request System:** Employee QR code submission for payments, Kishor approval/payment flow with screenshot collection, event assignment, automatic daybook recording.
 - **Income Submission System:** Employee submits payment received screenshots with text like "Income from [client]" or "Bank transfer from [client]", Kishor approves with event assignment, automatic daybook recording as income.
