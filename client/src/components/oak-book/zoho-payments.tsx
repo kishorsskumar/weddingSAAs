@@ -54,6 +54,12 @@ type Payment = {
 type Customer = {
   id: string;
   name: string;
+  source?: 'oakbook' | 'event';
+};
+
+type Event = {
+  id: string;
+  customer: string;
 };
 
 type Invoice = {
@@ -90,8 +96,12 @@ export function ZohoPayments() {
     queryKey: ["/api/customer-payments"],
   });
 
-  const { data: customers = [] } = useQuery<Customer[]>({
+  const { data: oakBookCustomers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
+  });
+
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ["/api/events"],
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
@@ -101,6 +111,28 @@ export function ZohoPayments() {
   const { data: banks = [] } = useQuery<Bank[]>({
     queryKey: ["/api/banks"],
   });
+
+  // Merge Oak Book customers with unique event customers
+  const customers = useMemo(() => {
+    const oakBookList: Customer[] = oakBookCustomers.map(c => ({ ...c, source: 'oakbook' as const }));
+    
+    // Get unique customer names from events that aren't already in Oak Book
+    const eventCustomerNames = new Set(events.map(e => e.customer?.trim()).filter(Boolean));
+    const oakBookNames = new Set(oakBookCustomers.map(c => c.name.toLowerCase()));
+    
+    const eventOnlyCustomers: Customer[] = [];
+    eventCustomerNames.forEach(name => {
+      if (name && !oakBookNames.has(name.toLowerCase())) {
+        eventOnlyCustomers.push({
+          id: `event-${name}`,
+          name: name,
+          source: 'event' as const
+        });
+      }
+    });
+    
+    return [...oakBookList, ...eventOnlyCustomers].sort((a, b) => a.name.localeCompare(b.name));
+  }, [oakBookCustomers, events]);
 
   const filteredPayments = useMemo(() => {
     let filtered = payments;
@@ -454,6 +486,7 @@ function PaymentFormModal({
 }) {
   const [formData, setFormData] = useState({
     customerId: "",
+    customerName: "",
     invoiceId: "",
     amount: "",
     date: format(new Date(), "yyyy-MM-dd"),
@@ -515,7 +548,7 @@ function PaymentFormModal({
                           key={customer.id}
                           value={customer.id}
                           onSelect={() => {
-                            setFormData({ ...formData, customerId: customer.id });
+                            setFormData({ ...formData, customerId: customer.id, customerName: customer.name });
                             setCustomerSearchOpen(false);
                             setCustomerSearch("");
                           }}
@@ -527,7 +560,13 @@ function PaymentFormModal({
                             )}
                           />
                           <User className="mr-2 h-4 w-4 text-muted-foreground" />
-                          {customer.name}
+                          <span className="flex-1">{customer.name}</span>
+                          {customer.source === 'event' && (
+                            <span className="text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">Event</span>
+                          )}
+                          {customer.source === 'oakbook' && (
+                            <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Oak Book</span>
+                          )}
                         </CommandItem>
                       ))}
                     </CommandGroup>
