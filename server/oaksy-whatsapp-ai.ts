@@ -95,6 +95,11 @@ interface IntentContext {
   deliveryAddress?: string;
   itemDescription?: string;
   vehicleNumber?: string;
+  // Query fields for new AI intents
+  queryType?: string;
+  timeframe?: string;
+  bankName?: string;
+  customerName?: string;
 }
 
 interface ConversationMessage {
@@ -687,10 +692,10 @@ async function getEventCountdown(eventName: string): Promise<string> {
 
 // Get bank balances (superadmin only)
 async function getBankBalances(bankName?: string): Promise<string> {
-  const banks = await storage.getBanks();
+  const banks = await storage.getAllBanks();
   
   if (bankName) {
-    const matchingBank = banks.find(b => 
+    const matchingBank = banks.find((b: any) => 
       b.name.toLowerCase().includes(bankName.toLowerCase()) ||
       b.accountNumber?.includes(bankName)
     );
@@ -704,7 +709,7 @@ async function getBankBalances(bankName?: string): Promise<string> {
   
   // Return all banks
   let totalBalance = 0;
-  const bankList = banks.map(b => {
+  const bankList = banks.map((b: any) => {
     const balance = parseFloat(b.balance);
     totalBalance += balance;
     return `• *${b.name}*: ₹${balance.toLocaleString('en-IN')}`;
@@ -716,14 +721,14 @@ async function getBankBalances(bankName?: string): Promise<string> {
 // Get daily financial summary
 async function getDailySummary(date?: string): Promise<string> {
   const targetDate = date || new Date().toISOString().split('T')[0];
-  const entries = await storage.getDaybookEntries();
+  const entries = await storage.getAllDaybookEntries();
   
-  const dailyEntries = entries.filter(e => e.date === targetDate);
+  const dailyEntries = entries.filter((e: any) => e.date === targetDate);
   
   let totalIncome = 0;
   let totalExpense = 0;
   
-  dailyEntries.forEach(e => {
+  dailyEntries.forEach((e: any) => {
     const amount = parseFloat(e.amount);
     if (e.type === 'income') {
       totalIncome += amount;
@@ -739,7 +744,7 @@ async function getDailySummary(date?: string): Promise<string> {
   }
   
   // Show last 5 entries
-  const recentEntries = dailyEntries.slice(-5).map(e => {
+  const recentEntries = dailyEntries.slice(-5).map((e: any) => {
     const emoji = e.type === 'income' ? '📥' : '📤';
     return `${emoji} ₹${parseFloat(e.amount).toLocaleString('en-IN')} - ${e.description?.substring(0, 25) || e.category}`;
   }).join('\n');
@@ -751,14 +756,14 @@ async function getDailySummary(date?: string): Promise<string> {
 async function getPendingPayments(customerName?: string): Promise<string> {
   const events = await storage.getAllEvents();
   
-  let pendingEvents = events.filter(e => {
+  let pendingEvents = events.filter((e: any) => {
     const salesValue = parseFloat(e.salesValue || '0');
-    const advanceReceived = parseFloat(e.advanceReceived || '0');
-    return salesValue > advanceReceived && salesValue > 0;
+    const paid = parseFloat(e.paymentReceived || '0');
+    return salesValue > paid && salesValue > 0;
   });
   
   if (customerName) {
-    pendingEvents = pendingEvents.filter(e => 
+    pendingEvents = pendingEvents.filter((e: any) => 
       e.customer?.toLowerCase().includes(customerName.toLowerCase())
     );
   }
@@ -768,19 +773,19 @@ async function getPendingPayments(customerName?: string): Promise<string> {
   }
   
   // Sort by pending amount (highest first)
-  pendingEvents.sort((a, b) => {
-    const pendingA = parseFloat(a.salesValue || '0') - parseFloat(a.advanceReceived || '0');
-    const pendingB = parseFloat(b.salesValue || '0') - parseFloat(b.advanceReceived || '0');
+  pendingEvents.sort((a: any, b: any) => {
+    const pendingA = parseFloat(a.salesValue || '0') - parseFloat(a.paymentReceived || '0');
+    const pendingB = parseFloat(b.salesValue || '0') - parseFloat(b.paymentReceived || '0');
     return pendingB - pendingA;
   });
   
   let totalPending = 0;
-  const pendingList = pendingEvents.slice(0, 5).map(e => {
+  const pendingList = pendingEvents.slice(0, 5).map((e: any) => {
     const salesValue = parseFloat(e.salesValue || '0');
-    const advanceReceived = parseFloat(e.advanceReceived || '0');
-    const pending = salesValue - advanceReceived;
+    const paid = parseFloat(e.paymentReceived || '0');
+    const pending = salesValue - paid;
     totalPending += pending;
-    return `• *${e.customer}*: ₹${pending.toLocaleString('en-IN')} pending\n  (Paid: ₹${advanceReceived.toLocaleString('en-IN')} of ₹${salesValue.toLocaleString('en-IN')})`;
+    return `• *${e.customer}*: ₹${pending.toLocaleString('en-IN')} pending\n  (Paid: ₹${paid.toLocaleString('en-IN')} of ₹${salesValue.toLocaleString('en-IN')})`;
   }).join('\n\n');
   
   const moreText = pendingEvents.length > 5 ? `\n\n_...and ${pendingEvents.length - 5} more clients_` : '';
@@ -791,12 +796,12 @@ async function getPendingPayments(customerName?: string): Promise<string> {
 // Get team availability / who's on leave
 async function getTeamStatus(queryType: string, targetDate?: string): Promise<string> {
   const employees = await storage.getAllEmployees();
-  const leaveRequests = await storage.getLeaveRequests();
+  const leaveRequests = await storage.getAllLeaveRequests();
   
   const today = targetDate || new Date().toISOString().split('T')[0];
   
   // Get approved leaves for today
-  const onLeave = leaveRequests.filter(lr => {
+  const onLeave = leaveRequests.filter((lr: any) => {
     if (lr.status !== 'approved') return false;
     const start = new Date(lr.startDate);
     const end = new Date(lr.endDate);
@@ -804,24 +809,24 @@ async function getTeamStatus(queryType: string, targetDate?: string): Promise<st
     return checkDate >= start && checkDate <= end;
   });
   
-  const onLeaveNames = onLeave.map(lr => lr.employeeName);
+  const onLeaveNames = onLeave.map((lr: any) => lr.employeeName);
   
   if (queryType === 'on_leave') {
     if (onLeaveNames.length === 0) {
       return `✅ *Team Attendance Today:*\n\nNo one is on leave today. Full team available!`;
     }
     
-    return `📋 *On Leave Today:*\n\n${onLeaveNames.map(n => `• ${n}`).join('\n')}\n\n_${employees.length - onLeaveNames.length} team members available._`;
+    return `📋 *On Leave Today:*\n\n${onLeaveNames.map((n: string) => `• ${n}`).join('\n')}\n\n_${employees.length - onLeaveNames.length} team members available._`;
   } else {
     // availability query
-    const available = employees.filter(e => !onLeaveNames.includes(e.name));
+    const available = employees.filter((e: any) => !onLeaveNames.includes(e.name));
     
     if (available.length === 0) {
       return `⚠️ No team members available today!`;
     }
     
-    const availableList = available.slice(0, 8).map(e => {
-      const role = e.designation || e.jobRole || '';
+    const availableList = available.slice(0, 8).map((e: any) => {
+      const role = e.designation || '';
       return `• *${e.name}*${role ? ` (${role})` : ''}`;
     }).join('\n');
     
@@ -831,10 +836,10 @@ async function getTeamStatus(queryType: string, targetDate?: string): Promise<st
 
 // Get vendor payment history
 async function getVendorHistory(vendorName: string): Promise<string> {
-  const entries = await storage.getDaybookEntries();
+  const entries = await storage.getAllDaybookEntries();
   
   // Filter vendor payments
-  const vendorPayments = entries.filter(e => 
+  const vendorPayments = entries.filter((e: any) => 
     e.type === 'expense' && 
     (e.vendorName?.toLowerCase().includes(vendorName.toLowerCase()) ||
      e.description?.toLowerCase().includes(vendorName.toLowerCase()))
@@ -846,16 +851,16 @@ async function getVendorHistory(vendorName: string): Promise<string> {
   
   // Calculate total and find recent payments
   let totalPaid = 0;
-  vendorPayments.forEach(p => {
+  vendorPayments.forEach((p: any) => {
     totalPaid += parseFloat(p.amount);
   });
   
   // Sort by date (recent first) and get last 5
   const recentPayments = vendorPayments
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
   
-  const paymentList = recentPayments.map(p => {
+  const paymentList = recentPayments.map((p: any) => {
     const date = new Date(p.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
     return `• ${date}: ₹${parseFloat(p.amount).toLocaleString('en-IN')}${p.eventName ? ` (${p.eventName})` : ''}`;
   }).join('\n');
@@ -866,7 +871,7 @@ async function getVendorHistory(vendorName: string): Promise<string> {
 // Get event profitability (superadmin only)
 async function getEventProfitability(eventName: string): Promise<string> {
   const events = await storage.getAllEvents();
-  const entries = await storage.getDaybookEntries();
+  const entries = await storage.getAllDaybookEntries();
   
   // Find the event
   const event = events.find(e => 
@@ -879,12 +884,12 @@ async function getEventProfitability(eventName: string): Promise<string> {
   }
   
   // Get event income and expenses
-  const eventEntries = entries.filter(e => e.eventId === event.id || e.eventName === event.title);
+  const eventEntries = entries.filter((e: any) => e.eventId === event.id || e.eventName === event.title);
   
-  let totalIncome = parseFloat(event.advanceReceived || '0');
+  let totalIncome = parseFloat(event.paymentReceived || '0');
   let totalExpense = 0;
   
-  eventEntries.forEach(e => {
+  eventEntries.forEach((e: any) => {
     const amount = parseFloat(e.amount);
     if (e.type === 'income') {
       totalIncome += amount;
@@ -906,17 +911,17 @@ async function getMonthlySummary(year?: number, month?: number): Promise<string>
   const targetYear = year || now.getFullYear();
   const targetMonth = month || now.getMonth() + 1;
   
-  const entries = await storage.getDaybookEntries();
+  const entries = await storage.getAllDaybookEntries();
   const events = await storage.getAllEvents();
   
   // Filter entries for the month
   const monthStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}`;
-  const monthEntries = entries.filter(e => e.date.startsWith(monthStr));
+  const monthEntries = entries.filter((e: any) => e.date.startsWith(monthStr));
   
   let totalIncome = 0;
   let totalExpense = 0;
   
-  monthEntries.forEach(e => {
+  monthEntries.forEach((e: any) => {
     const amount = parseFloat(e.amount);
     if (e.type === 'income') {
       totalIncome += amount;
