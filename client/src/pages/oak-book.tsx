@@ -850,6 +850,27 @@ export default function OakBook() {
     setSelectedRecord(null);
   };
 
+  // Filter sidebar sections based on user role
+  // Payments Received is only visible to superadmin and accountant
+  const canViewPaymentsReceived = user?.role === 'superadmin' || user?.role === 'accountant';
+  
+  const filteredSidebarSections = useMemo(() => {
+    return SIDEBAR_SECTIONS.map(section => {
+      if (section.id === 'sales' && section.children) {
+        return {
+          ...section,
+          children: section.children.filter(child => {
+            if (child.id === 'payments-received') {
+              return canViewPaymentsReceived;
+            }
+            return true;
+          })
+        };
+      }
+      return section;
+    });
+  }, [canViewPaymentsReceived]);
+
   const totalIncome = useMemo(() => {
     return payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
   }, [payments]);
@@ -913,7 +934,7 @@ export default function OakBook() {
       </div>
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">
-          {SIDEBAR_SECTIONS.map((section) => (
+          {filteredSidebarSections.map((section) => (
             <div key={section.id}>
               {section.children ? (
                 <>
@@ -3386,7 +3407,7 @@ export default function OakBook() {
                       {!leftPanelCollapsed && <span>Dashboard</span>}
                     </Button>
                   </Link>
-                  {SIDEBAR_SECTIONS.map((section) => (
+                  {filteredSidebarSections.map((section) => (
                     <div key={section.id}>
                       {section.children ? (
                         <>
