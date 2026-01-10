@@ -127,24 +127,7 @@ export function ZohoPayments() {
   );
 
   const createPayment = useMutation({
-    mutationFn: async (data: any) => {
-      const payment = await apiRequest("POST", "/api/customer-payments", data);
-      
-      // Also create a daybook entry for this payment
-      const customer = customers.find(c => c.id === data.customerId);
-      const daybookEntry = {
-        type: "income",
-        date: data.date,
-        amount: data.amount,
-        category: "Payment Received",
-        description: `Payment from ${customer?.name || 'Customer'} - ${data.reference || payment.number}`,
-        bankId: data.bankId || null,
-      };
-      
-      await apiRequest("POST", "/api/daybook", daybookEntry);
-      
-      return payment;
-    },
+    mutationFn: (data: any) => apiRequest("POST", "/api/customer-payments", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
