@@ -129,6 +129,7 @@ function OutreachTab({ eventId, guests, responses }: {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [outreachSubTab, setOutreachSubTab] = useState<"send" | "templates" | "history">("send");
+  const [guestStatusFilter, setGuestStatusFilter] = useState<"all" | "pending" | "yes" | "no" | "maybe">("pending");
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -273,9 +274,14 @@ function OutreachTab({ eventId, guests, responses }: {
     }
   };
 
-  const pendingGuests = guests.filter(g => {
-    const response = responses.find(r => r.guestId === g.id);
-    return !response || response.attendanceStatus === 'pending';
+  const getGuestStatus = (guestId: string) => {
+    const response = responses.find(r => r.guestId === guestId);
+    return response?.attendanceStatus || 'pending';
+  };
+
+  const filteredGuests = guests.filter(g => {
+    if (guestStatusFilter === "all") return true;
+    return getGuestStatus(g.id) === guestStatusFilter;
   });
 
   const toggleGuestSelection = (guestId: string) => {
@@ -286,12 +292,20 @@ function OutreachTab({ eventId, guests, responses }: {
     );
   };
 
-  const selectAllPending = () => {
-    setSelectedGuestIds(pendingGuests.map(g => g.id));
+  const selectAllFiltered = () => {
+    setSelectedGuestIds(filteredGuests.map(g => g.id));
   };
 
   const clearSelection = () => {
     setSelectedGuestIds([]);
+  };
+
+  const statusCounts = {
+    all: guests.length,
+    pending: guests.filter(g => getGuestStatus(g.id) === 'pending').length,
+    yes: guests.filter(g => getGuestStatus(g.id) === 'yes').length,
+    no: guests.filter(g => getGuestStatus(g.id) === 'no').length,
+    maybe: guests.filter(g => getGuestStatus(g.id) === 'maybe').length,
   };
 
   if (!eventId) {
@@ -435,41 +449,91 @@ function OutreachTab({ eventId, guests, responses }: {
               <div className="flex items-center justify-between">
                 <Label>Select Guests ({selectedGuestIds.length} selected)</Label>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={selectAllPending}>
-                    Select All Pending ({pendingGuests.length})
+                  <Button variant="outline" size="sm" onClick={selectAllFiltered}>
+                    Select All ({filteredGuests.length})
                   </Button>
                   <Button variant="outline" size="sm" onClick={clearSelection}>
                     Clear
                   </Button>
                 </div>
               </div>
+              
+              <div className="flex gap-2 flex-wrap">
+                <Button 
+                  variant={guestStatusFilter === "all" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setGuestStatusFilter("all")}
+                  className={guestStatusFilter === "all" ? "bg-[#6b8e6b]" : ""}
+                >
+                  All ({statusCounts.all})
+                </Button>
+                <Button 
+                  variant={guestStatusFilter === "pending" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setGuestStatusFilter("pending")}
+                  className={guestStatusFilter === "pending" ? "bg-yellow-600" : ""}
+                >
+                  Pending ({statusCounts.pending})
+                </Button>
+                <Button 
+                  variant={guestStatusFilter === "yes" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setGuestStatusFilter("yes")}
+                  className={guestStatusFilter === "yes" ? "bg-green-600" : ""}
+                >
+                  Confirmed ({statusCounts.yes})
+                </Button>
+                <Button 
+                  variant={guestStatusFilter === "maybe" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setGuestStatusFilter("maybe")}
+                  className={guestStatusFilter === "maybe" ? "bg-amber-500" : ""}
+                >
+                  Maybe ({statusCounts.maybe})
+                </Button>
+                <Button 
+                  variant={guestStatusFilter === "no" ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setGuestStatusFilter("no")}
+                  className={guestStatusFilter === "no" ? "bg-red-600" : ""}
+                >
+                  Declined ({statusCounts.no})
+                </Button>
+              </div>
+
               <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-1">
-                {guests.map(guest => {
-                  const response = responses.find(r => r.guestId === guest.id);
-                  const status = response?.attendanceStatus || 'pending';
-                  return (
-                    <div 
-                      key={guest.id} 
-                      className={cn(
-                        "flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer",
-                        selectedGuestIds.includes(guest.id) && "bg-[#6b8e6b]/10"
-                      )}
-                      onClick={() => toggleGuestSelection(guest.id)}
-                    >
-                      <Checkbox 
-                        checked={selectedGuestIds.includes(guest.id)}
-                        onCheckedChange={() => toggleGuestSelection(guest.id)}
-                      />
-                      <div className="flex-1">
-                        <span className="font-medium">{guest.name}</span>
-                        <span className="text-sm text-[#8b7355] ml-2">{guest.phone}</span>
+                {filteredGuests.length === 0 ? (
+                  <div className="text-center py-4 text-[#8b7355]">
+                    No guests with this status
+                  </div>
+                ) : (
+                  filteredGuests.map(guest => {
+                    const status = getGuestStatus(guest.id);
+                    return (
+                      <div 
+                        key={guest.id} 
+                        className={cn(
+                          "flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer",
+                          selectedGuestIds.includes(guest.id) && "bg-[#6b8e6b]/10"
+                        )}
+                        onClick={() => toggleGuestSelection(guest.id)}
+                      >
+                        <Checkbox 
+                          checked={selectedGuestIds.includes(guest.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => toggleGuestSelection(guest.id)}
+                        />
+                        <div className="flex-1">
+                          <span className="font-medium">{guest.name}</span>
+                          <span className="text-sm text-[#8b7355] ml-2">{guest.phone}</span>
+                        </div>
+                        <Badge variant={status === 'yes' ? 'default' : status === 'no' ? 'destructive' : 'secondary'}>
+                          {status}
+                        </Badge>
                       </div>
-                      <Badge variant={status === 'yes' ? 'default' : status === 'no' ? 'destructive' : 'secondary'}>
-                        {status}
-                      </Badge>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
 

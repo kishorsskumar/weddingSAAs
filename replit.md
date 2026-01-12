@@ -84,6 +84,12 @@ Preferred communication style: Simple, everyday language.
   - **Follow-up Management:** Track guests needing human follow-up with escalation notes
   - **Bulk Import:** Add multiple guests at once
   - **WhatsApp Integration:** Query RSVP status via Oaksy AI ("rsvp status", "pending rsvps", "meal count")
+  - **Outreach System (Superadmin & Wedding Planners only):**
+    - **Message Templates:** Customizable greeting and reminder templates with variables ({{guestName}}, {{eventName}}, {{eventDate}}, {{venue}})
+    - **Send Messages:** Select guests by RSVP status (pending/confirmed/declined/maybe) and send WhatsApp messages via Twilio
+    - **Status Filtering:** Filter guests by their RSVP status before sending messages
+    - **Message History:** Track all sent messages with delivery status (sent/delivered/read/failed)
+    - **Outreach Analytics:** Dashboard showing total sent, delivered, read, failed, and pending message counts
 
 ## External Dependencies
 
