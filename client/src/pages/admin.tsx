@@ -38,20 +38,23 @@ type LeaveCategory = {
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard" },
-  { id: "event-calendar", label: "Event Calendar" },
-  { id: "team-calendar", label: "Team Calendar" },
-  { id: "event-database", label: "Event Database" },
-  { id: "event-milestones", label: "Event Milestones" },
-  { id: "daybook", label: "Daybook" },
+  { id: "event-calendar", label: "Oak Event Calendar" },
+  { id: "monthly-plan", label: "Monthly Plan" },
+  { id: "team-calendar", label: "Oak Team Calendar" },
+  { id: "event-database", label: "Oak Event Database" },
+  { id: "event-milestones", label: "Oak Event Milestones" },
+  { id: "daybook", label: "Oak Daybook" },
   { id: "oak-book", label: "Oak Book" },
   { id: "oak-sales", label: "Oak Sales" },
   { id: "oak-inventory", label: "Oak Inventory" },
   { id: "execution-plan", label: "Execution Plan" },
-  { id: "hr", label: "HR" },
+  { id: "hr", label: "Oak HR" },
   { id: "employee-portal", label: "Employee Portal" },
   { id: "oaksy", label: "Oaksy AI" },
   { id: "oak-creative", label: "Oak Creative" },
-  { id: "admin", label: "Admin" },
+  { id: "whatsapp-inbox", label: "WhatsApp Inbox" },
+  { id: "oak-rsvp", label: "Oak RSVP" },
+  { id: "admin", label: "Admin Panel" },
 ];
 
 type Role = {
