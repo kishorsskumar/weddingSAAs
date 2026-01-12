@@ -287,6 +287,15 @@ import {
   rsvpResponses,
   type RsvpResponse,
   type InsertRsvpResponse,
+  rsvpMessageTemplates,
+  type RsvpMessageTemplate,
+  type InsertRsvpMessageTemplate,
+  rsvpMessageJobs,
+  type RsvpMessageJob,
+  type InsertRsvpMessageJob,
+  rsvpMessageLogs,
+  type RsvpMessageLog,
+  type InsertRsvpMessageLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4513,6 +4522,121 @@ export class DatabaseStorage implements IStorage {
       vegetarian: responses.filter(r => r.mealPreference === 'vegetarian').length,
       nonVegetarian: responses.filter(r => r.mealPreference === 'non_vegetarian').length,
       needsFollowUp: responses.filter(r => r.needsHumanFollowUp).length,
+    };
+  }
+
+  // RSVP Message Templates
+  async createRsvpMessageTemplate(data: InsertRsvpMessageTemplate): Promise<RsvpMessageTemplate> {
+    const [created] = await db.insert(rsvpMessageTemplates).values(data).returning();
+    return created;
+  }
+
+  async getRsvpMessageTemplate(id: string): Promise<RsvpMessageTemplate | undefined> {
+    const [template] = await db.select().from(rsvpMessageTemplates).where(eq(rsvpMessageTemplates.id, id));
+    return template;
+  }
+
+  async getRsvpMessageTemplatesByEvent(eventId: string): Promise<RsvpMessageTemplate[]> {
+    return await db.select().from(rsvpMessageTemplates)
+      .where(eq(rsvpMessageTemplates.eventId, eventId))
+      .orderBy(rsvpMessageTemplates.templateType);
+  }
+
+  async updateRsvpMessageTemplate(id: string, data: Partial<RsvpMessageTemplate>): Promise<RsvpMessageTemplate | undefined> {
+    const [updated] = await db.update(rsvpMessageTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(rsvpMessageTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpMessageTemplate(id: string): Promise<void> {
+    await db.delete(rsvpMessageTemplates).where(eq(rsvpMessageTemplates.id, id));
+  }
+
+  // RSVP Message Jobs
+  async createRsvpMessageJob(data: InsertRsvpMessageJob): Promise<RsvpMessageJob> {
+    const [created] = await db.insert(rsvpMessageJobs).values(data).returning();
+    return created;
+  }
+
+  async getRsvpMessageJob(id: string): Promise<RsvpMessageJob | undefined> {
+    const [job] = await db.select().from(rsvpMessageJobs).where(eq(rsvpMessageJobs.id, id));
+    return job;
+  }
+
+  async getRsvpMessageJobsByEvent(eventId: string): Promise<RsvpMessageJob[]> {
+    return await db.select().from(rsvpMessageJobs)
+      .where(eq(rsvpMessageJobs.eventId, eventId))
+      .orderBy(desc(rsvpMessageJobs.createdAt));
+  }
+
+  async getPendingRsvpMessageJobs(): Promise<RsvpMessageJob[]> {
+    return await db.select().from(rsvpMessageJobs)
+      .where(eq(rsvpMessageJobs.status, 'pending'));
+  }
+
+  async updateRsvpMessageJob(id: string, data: Partial<RsvpMessageJob>): Promise<RsvpMessageJob | undefined> {
+    const [updated] = await db.update(rsvpMessageJobs)
+      .set(data)
+      .where(eq(rsvpMessageJobs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpMessageJob(id: string): Promise<void> {
+    await db.delete(rsvpMessageJobs).where(eq(rsvpMessageJobs.id, id));
+  }
+
+  // RSVP Message Logs
+  async createRsvpMessageLog(data: InsertRsvpMessageLog): Promise<RsvpMessageLog> {
+    const [created] = await db.insert(rsvpMessageLogs).values(data).returning();
+    return created;
+  }
+
+  async getRsvpMessageLog(id: string): Promise<RsvpMessageLog | undefined> {
+    const [log] = await db.select().from(rsvpMessageLogs).where(eq(rsvpMessageLogs.id, id));
+    return log;
+  }
+
+  async getRsvpMessageLogsByEvent(eventId: string): Promise<RsvpMessageLog[]> {
+    return await db.select().from(rsvpMessageLogs)
+      .where(eq(rsvpMessageLogs.eventId, eventId))
+      .orderBy(desc(rsvpMessageLogs.createdAt));
+  }
+
+  async getRsvpMessageLogsByGuest(guestId: string): Promise<RsvpMessageLog[]> {
+    return await db.select().from(rsvpMessageLogs)
+      .where(eq(rsvpMessageLogs.guestId, guestId))
+      .orderBy(desc(rsvpMessageLogs.createdAt));
+  }
+
+  async updateRsvpMessageLog(id: string, data: Partial<RsvpMessageLog>): Promise<RsvpMessageLog | undefined> {
+    const [updated] = await db.update(rsvpMessageLogs)
+      .set(data)
+      .where(eq(rsvpMessageLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getOutreachStatsByEvent(eventId: string): Promise<{
+    totalSent: number;
+    delivered: number;
+    read: number;
+    failed: number;
+    pending: number;
+    greetingsSent: number;
+    remindersSent: number;
+  }> {
+    const logs = await this.getRsvpMessageLogsByEvent(eventId);
+    return {
+      totalSent: logs.length,
+      delivered: logs.filter(l => l.deliveryStatus === 'delivered' || l.deliveryStatus === 'read').length,
+      read: logs.filter(l => l.deliveryStatus === 'read').length,
+      failed: logs.filter(l => l.deliveryStatus === 'failed').length,
+      pending: logs.filter(l => l.deliveryStatus === 'pending' || l.deliveryStatus === 'sent').length,
+      greetingsSent: logs.filter(l => l.messageType === 'greeting').length,
+      remindersSent: logs.filter(l => l.messageType === 'reminder').length,
     };
   }
 }
