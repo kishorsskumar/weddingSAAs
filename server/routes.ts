@@ -775,6 +775,7 @@ export async function registerRoutes(
     'oaksy',
     'oak-creative',
     'whatsapp-inbox',
+    'oak-rsvp',
     'admin',
   ];
 
@@ -1873,6 +1874,150 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to delete delivery challan' });
+    }
+  });
+
+  // Oak RSVP - Event Guests
+  app.get('/api/event-guests', async (req, res) => {
+    try {
+      const { eventId } = req.query;
+      if (eventId) {
+        const guests = await storage.getEventGuestsByEvent(eventId as string);
+        res.json(guests);
+      } else {
+        const guests = await storage.getAllEventGuests();
+        res.json(guests);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get event guests' });
+    }
+  });
+
+  app.get('/api/event-guests/:id', async (req, res) => {
+    try {
+      const guest = await storage.getEventGuest(req.params.id);
+      if (!guest) {
+        return res.status(404).json({ error: 'Guest not found' });
+      }
+      res.json(guest);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get guest' });
+    }
+  });
+
+  app.post('/api/event-guests', async (req, res) => {
+    try {
+      const guest = await storage.createEventGuest(req.body);
+      res.json(guest);
+    } catch (error: any) {
+      console.error('Error creating event guest:', error);
+      res.status(400).json({ error: error.message || 'Failed to create guest' });
+    }
+  });
+
+  app.post('/api/event-guests/bulk', async (req, res) => {
+    try {
+      const { guests } = req.body;
+      if (!Array.isArray(guests)) {
+        return res.status(400).json({ error: 'Guests must be an array' });
+      }
+      const created = await storage.bulkCreateEventGuests(guests);
+      res.json(created);
+    } catch (error: any) {
+      console.error('Error bulk creating guests:', error);
+      res.status(400).json({ error: error.message || 'Failed to create guests' });
+    }
+  });
+
+  app.patch('/api/event-guests/:id', async (req, res) => {
+    try {
+      const guest = await storage.updateEventGuest(req.params.id, req.body);
+      if (!guest) {
+        return res.status(404).json({ error: 'Guest not found' });
+      }
+      res.json(guest);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update guest' });
+    }
+  });
+
+  app.delete('/api/event-guests/:id', async (req, res) => {
+    try {
+      await storage.deleteEventGuest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete guest' });
+    }
+  });
+
+  // Oak RSVP - RSVP Responses
+  app.get('/api/rsvp-responses', async (req, res) => {
+    try {
+      const { eventId, guestId } = req.query;
+      if (eventId) {
+        const responses = await storage.getRsvpResponsesByEvent(eventId as string);
+        res.json(responses);
+      } else if (guestId) {
+        const response = await storage.getRsvpResponseByGuest(guestId as string);
+        res.json(response ? [response] : []);
+      } else {
+        const responses = await storage.getAllRsvpResponses();
+        res.json(responses);
+      }
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get RSVP responses' });
+    }
+  });
+
+  app.get('/api/rsvp-responses/:id', async (req, res) => {
+    try {
+      const response = await storage.getRsvpResponse(req.params.id);
+      if (!response) {
+        return res.status(404).json({ error: 'RSVP response not found' });
+      }
+      res.json(response);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get RSVP response' });
+    }
+  });
+
+  app.get('/api/rsvp-stats/:eventId', async (req, res) => {
+    try {
+      const stats = await storage.getRsvpStatsByEvent(req.params.eventId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get RSVP stats' });
+    }
+  });
+
+  app.post('/api/rsvp-responses', async (req, res) => {
+    try {
+      const response = await storage.createRsvpResponse(req.body);
+      res.json(response);
+    } catch (error: any) {
+      console.error('Error creating RSVP response:', error);
+      res.status(400).json({ error: error.message || 'Failed to create RSVP response' });
+    }
+  });
+
+  app.patch('/api/rsvp-responses/:id', async (req, res) => {
+    try {
+      const response = await storage.updateRsvpResponse(req.params.id, req.body);
+      if (!response) {
+        return res.status(404).json({ error: 'RSVP response not found' });
+      }
+      res.json(response);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update RSVP response' });
+    }
+  });
+
+  app.delete('/api/rsvp-responses/:id', async (req, res) => {
+    try {
+      await storage.deleteRsvpResponse(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete RSVP response' });
     }
   });
 

@@ -135,6 +135,7 @@ CAPABILITIES:
 9. TEAM QUERIES: Team availability, who's on leave, staff assignments
 10. VENDOR LOOKUPS: Vendor contact info, past payment rates, payment history
 11. QUICK REPORTS: Event profitability, client payment status, monthly summaries (superadmin only)
+12. RSVP TRACKING: Check guest RSVP status, attendance counts, meal preferences, follow-up with pending guests (wedding planners and superadmin)
 
 FLEXIBILITY GUIDELINES:
 - Understand natural language - don't require specific formats
@@ -168,10 +169,13 @@ QUERY TYPE DETECTION:
 - "profit on X event", "X wedding profitability" = report_query with queryType: "event_profit" (superadmin only)
 - "monthly summary", "this month performance" = report_query with queryType: "monthly" (superadmin only)
 - "how much X client owes", "X payment status" = financial_query with queryType: "client_dues"
+- "rsvp status", "guest list", "who confirmed for X event", "how many confirmed" = rsvp_query with queryType: "status"
+- "pending rsvps", "who hasn't responded", "rsvp follow-up" = rsvp_query with queryType: "pending"
+- "meal count", "food preferences", "veg non-veg count" = rsvp_query with queryType: "meals"
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "rsvp_query" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null (ONLY if explicitly mentioned, never from address numbers),
     "purpose": string or null,
@@ -943,6 +947,73 @@ function isSuperadminPhone(phone: string): boolean {
   const normalized = normalizePhoneNumber(phone);
   // Kishor's number
   return normalized.slice(-10) === '7902373354';
+}
+
+// Get RSVP status for an event
+async function getRsvpStatus(eventName?: string, queryType: string = 'status'): Promise<string> {
+  const events = await storage.getAllEvents();
+  
+  // If event name provided, find that specific event
+  let targetEvent = null;
+  if (eventName) {
+    const searchTerm = eventName.toLowerCase();
+    targetEvent = events.find(e => 
+      e.title?.toLowerCase().includes(searchTerm) || 
+      e.customer?.toLowerCase().includes(searchTerm) ||
+      e.name?.toLowerCase().includes(searchTerm)
+    );
+    
+    if (!targetEvent) {
+      return `❌ Event "${eventName}" not found.\n\n_Try: "RSVP status for [event name]"_`;
+    }
+  } else {
+    // Get next upcoming event
+    const now = new Date();
+    const upcomingEvents = events
+      .filter(e => new Date(e.date) >= now)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (upcomingEvents.length === 0) {
+      return `📋 No upcoming events found for RSVP tracking.`;
+    }
+    
+    targetEvent = upcomingEvents[0];
+  }
+  
+  try {
+    const stats = await storage.getRsvpStatsByEvent(targetEvent.id);
+    const guests = await storage.getEventGuestsByEvent(targetEvent.id);
+    
+    const eventTitle = targetEvent.customer || targetEvent.title || 'Event';
+    const eventDate = new Date(targetEvent.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    
+    if (queryType === 'pending') {
+      const responses = await storage.getRsvpResponsesByEvent(targetEvent.id);
+      const respondedGuestIds = responses.map(r => r.guestId);
+      const pendingGuests = guests.filter(g => !respondedGuestIds.includes(g.id));
+      
+      if (pendingGuests.length === 0) {
+        return `✅ All guests have responded for *${eventTitle}*! 🎉`;
+      }
+      
+      const guestList = pendingGuests.slice(0, 10).map(g => `• ${g.name} (${g.phone})`).join('\n');
+      const moreText = pendingGuests.length > 10 ? `\n_...and ${pendingGuests.length - 10} more_` : '';
+      
+      return `📋 *Pending RSVPs for ${eventTitle}*\n📅 ${eventDate}\n\n⏳ *${pendingGuests.length} guests haven't responded:*\n${guestList}${moreText}\n\n_Need help following up?_`;
+    }
+    
+    if (queryType === 'meals') {
+      return `🍽️ *Meal Preferences for ${eventTitle}*\n📅 ${eventDate}\n\n🥬 Vegetarian: ${stats.vegetarian}\n🍗 Non-Vegetarian: ${stats.nonVegetarian}\n\n👥 Total Confirmed Attendees: ${stats.totalAttendees}`;
+    }
+    
+    // Default: full status
+    const responseRate = stats.total > 0 ? Math.round(((stats.confirmed + stats.declined + stats.maybe) / stats.total) * 100) : 0;
+    
+    return `📋 *RSVP Status for ${eventTitle}*\n📅 ${eventDate}\n\n📊 Response Rate: ${responseRate}%\n\n✅ Confirmed: ${stats.confirmed}\n❌ Declined: ${stats.declined}\n🤔 Maybe: ${stats.maybe}\n⏳ Pending: ${stats.pending}\n\n👥 Total Attendees: ${stats.totalAttendees}\n🏨 Need Accommodation: ${stats.needsAccommodation}\n🚗 Need Transport: ${stats.needsTransportation}`;
+  } catch (error: any) {
+    console.error('[RSVP Query] Error:', error.message);
+    return `❌ Could not fetch RSVP status. Please try again.`;
+  }
 }
 
 // ============== END QUERY HANDLER FUNCTIONS ==============
@@ -4442,6 +4513,18 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     return aiAnalysis.message || `📊 Available reports:\n\n• "monthly summary"\n• "profit on [event name]"`;
+  }
+
+  // Handle AI-detected RSVP query intent
+  if (aiAnalysis.intent === 'rsvp_query') {
+    if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'wedding_planner') {
+      return `🔒 RSVP tracking is only available to wedding planners and management.\n\n_Contact Fida or Femina for guest list details._`;
+    }
+    
+    const queryType = aiAnalysis.extractedData.queryType || 'status';
+    const eventName = aiAnalysis.extractedData.eventName;
+    const result = await getRsvpStatus(eventName, queryType);
+    return result;
   }
 
   // Return AI's response for other intents

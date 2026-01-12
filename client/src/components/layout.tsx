@@ -56,6 +56,7 @@ const ALL_PAGES = [
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
   { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
+  { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -76,6 +77,7 @@ const ICONS: Record<string, any> = {
   oaksy: Sparkles,
   "oak-creative": Palette,
   "whatsapp-inbox": MessageSquare,
+  "oak-rsvp": Users,
   admin: Shield,
 };
 

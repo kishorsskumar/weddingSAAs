@@ -281,6 +281,12 @@ import {
   deliveryChallans,
   type DeliveryChallan,
   type InsertDeliveryChallan,
+  eventGuests,
+  type EventGuest,
+  type InsertEventGuest,
+  rsvpResponses,
+  type RsvpResponse,
+  type InsertRsvpResponse,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
@@ -4385,6 +4391,129 @@ export class DatabaseStorage implements IStorage {
       if (!isNaN(num) && num > maxNum) maxNum = num;
     }
     return `DC-${String(maxNum + 1).padStart(5, '0')}`;
+  }
+
+  // Event Guests CRUD
+  async createEventGuest(data: InsertEventGuest): Promise<EventGuest> {
+    const [created] = await db.insert(eventGuests).values(data).returning();
+    return created;
+  }
+
+  async getEventGuest(id: string): Promise<EventGuest | undefined> {
+    const [guest] = await db.select().from(eventGuests).where(eq(eventGuests.id, id));
+    return guest;
+  }
+
+  async getEventGuestByPhone(eventId: string, phone: string): Promise<EventGuest | undefined> {
+    const [guest] = await db.select().from(eventGuests)
+      .where(and(eq(eventGuests.eventId, eventId), eq(eventGuests.phone, phone)));
+    return guest;
+  }
+
+  async getEventGuestsByEvent(eventId: string): Promise<EventGuest[]> {
+    return await db.select().from(eventGuests)
+      .where(eq(eventGuests.eventId, eventId))
+      .orderBy(eventGuests.name);
+  }
+
+  async getAllEventGuests(): Promise<EventGuest[]> {
+    return await db.select().from(eventGuests)
+      .orderBy(desc(eventGuests.createdAt));
+  }
+
+  async updateEventGuest(id: string, data: Partial<EventGuest>): Promise<EventGuest | undefined> {
+    const [updated] = await db.update(eventGuests)
+      .set(data)
+      .where(eq(eventGuests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEventGuest(id: string): Promise<void> {
+    await db.delete(eventGuests).where(eq(eventGuests.id, id));
+  }
+
+  async bulkCreateEventGuests(guests: InsertEventGuest[]): Promise<EventGuest[]> {
+    if (guests.length === 0) return [];
+    return await db.insert(eventGuests).values(guests).returning();
+  }
+
+  // RSVP Responses CRUD
+  async createRsvpResponse(data: InsertRsvpResponse): Promise<RsvpResponse> {
+    const [created] = await db.insert(rsvpResponses).values(data).returning();
+    return created;
+  }
+
+  async getRsvpResponse(id: string): Promise<RsvpResponse | undefined> {
+    const [response] = await db.select().from(rsvpResponses).where(eq(rsvpResponses.id, id));
+    return response;
+  }
+
+  async getRsvpResponseByGuest(guestId: string): Promise<RsvpResponse | undefined> {
+    const [response] = await db.select().from(rsvpResponses)
+      .where(eq(rsvpResponses.guestId, guestId));
+    return response;
+  }
+
+  async getRsvpResponsesByEvent(eventId: string): Promise<RsvpResponse[]> {
+    return await db.select().from(rsvpResponses)
+      .where(eq(rsvpResponses.eventId, eventId))
+      .orderBy(desc(rsvpResponses.updatedAt));
+  }
+
+  async getAllRsvpResponses(): Promise<RsvpResponse[]> {
+    return await db.select().from(rsvpResponses)
+      .orderBy(desc(rsvpResponses.createdAt));
+  }
+
+  async updateRsvpResponse(id: string, data: Partial<RsvpResponse>): Promise<RsvpResponse | undefined> {
+    const [updated] = await db.update(rsvpResponses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(rsvpResponses.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpResponse(id: string): Promise<void> {
+    await db.delete(rsvpResponses).where(eq(rsvpResponses.id, id));
+  }
+
+  async getOrCreateRsvpResponse(guestId: string, eventId: string): Promise<RsvpResponse> {
+    const existing = await this.getRsvpResponseByGuest(guestId);
+    if (existing) return existing;
+    return await this.createRsvpResponse({ guestId, eventId });
+  }
+
+  async getRsvpStatsByEvent(eventId: string): Promise<{
+    total: number;
+    confirmed: number;
+    declined: number;
+    maybe: number;
+    pending: number;
+    totalAttendees: number;
+    needsAccommodation: number;
+    needsTransportation: number;
+    vegetarian: number;
+    nonVegetarian: number;
+    needsFollowUp: number;
+  }> {
+    const responses = await this.getRsvpResponsesByEvent(eventId);
+    const guests = await this.getEventGuestsByEvent(eventId);
+    
+    return {
+      total: guests.length,
+      confirmed: responses.filter(r => r.attendanceStatus === 'yes').length,
+      declined: responses.filter(r => r.attendanceStatus === 'no').length,
+      maybe: responses.filter(r => r.attendanceStatus === 'maybe').length,
+      pending: guests.length - responses.filter(r => r.attendanceStatus !== 'pending').length,
+      totalAttendees: responses.filter(r => r.attendanceStatus === 'yes')
+        .reduce((sum, r) => sum + (r.numberOfAttendees || 1), 0),
+      needsAccommodation: responses.filter(r => r.needsAccommodation).length,
+      needsTransportation: responses.filter(r => r.needsTransportation).length,
+      vegetarian: responses.filter(r => r.mealPreference === 'vegetarian').length,
+      nonVegetarian: responses.filter(r => r.mealPreference === 'non_vegetarian').length,
+      needsFollowUp: responses.filter(r => r.needsHumanFollowUp).length,
+    };
   }
 }
 

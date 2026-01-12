@@ -47,7 +47,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database:** PostgreSQL with Drizzle ORM for type-safe queries.
-- **Schema:** Users (roles, permissions), Events (financial tracking), Meetings, Employees, Daybook, Banks, Leave Requests, Sessions, Oaksy conversations/messages, WhatsApp conversations/approvals/inbound messages, QR payment requests, Monthly Production Plan.
+- **Schema:** Users (roles, permissions), Events (financial tracking), Meetings, Employees, Daybook, Banks, Leave Requests, Sessions, Oaksy conversations/messages, WhatsApp conversations/approvals/inbound messages, QR payment requests, Monthly Production Plan, Event Guests, RSVP Responses.
 - **Validation:** Drizzle-zod integration for schema validation on API endpoints.
 
 ### Key Features
@@ -69,12 +69,21 @@ Preferred communication style: Simple, everyday language.
     - **Vendor Queries:** "vendor history [name]", "what did we pay [vendor]"
     - **Financial Queries:** "pending payments", "daily summary", "how much does [client] owe"
     - **Report Queries (Superadmin):** "monthly summary", "profit on [event name]"
+    - **RSVP Queries (Wedding Planners/Superadmin):** "rsvp status", "pending rsvps", "meal count for [event]"
 - **Two-Way WhatsApp Communication:** Employee expense/leave requests, Superadmin approval workflow, dashboard inbox for management, Superadmin lead submission with AI extraction.
 - **QR Payment Request System:** Employee QR code submission for payments, Kishor approval/payment flow with screenshot collection, event assignment, automatic daybook recording.
 - **Income Submission System:** Employee submits payment received screenshots with text like "Income from [client]" or "Bank transfer from [client]", Kishor approves with event assignment, automatic daybook recording as income.
 - **Monthly Production Plan:** Macro-level scheduling with inline editing, auto-sync from events, PDF export.
   - **PDF Settings (for single-page fit):** A4 landscape, fontSize: 7pt, cellPadding: 2.5, minCellHeight: 8mm, 13 columns with optimized widths (16+30+26+18+18+20+12+18+24+24+24+24+20 = 274mm), margins: 8mm
 - **Leave Tracker (Oak HR):** Comprehensive leave monitoring, statistics, manual entry, status management.
+- **Oak RSVP:** Guest management and RSVP tracking for events:
+  - **Guest List Management:** Add, edit, delete guests with phone, email, relationship, and group tags
+  - **RSVP Response Tracking:** Attendance status (confirmed/declined/maybe/pending), meal preferences, dietary restrictions
+  - **Logistics Tracking:** Accommodation needs (nights, check-in/out dates), transportation requirements
+  - **Dashboard Analytics:** Response rates, total attendees, meal counts, accommodation/transport needs
+  - **Follow-up Management:** Track guests needing human follow-up with escalation notes
+  - **Bulk Import:** Add multiple guests at once
+  - **WhatsApp Integration:** Query RSVP status via Oaksy AI ("rsvp status", "pending rsvps", "meal count")
 
 ## External Dependencies
 

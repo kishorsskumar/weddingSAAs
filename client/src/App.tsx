@@ -23,6 +23,7 @@ import PrintDocument from "@/pages/print-document";
 import EmployeePortal from "@/pages/employee-portal";
 import Oaksy from "@/pages/oaksy";
 import OakCreative from "@/pages/oak-creative";
+import OakRSVP from "@/pages/oak-rsvp";
 import MonthlyPlan from "@/pages/monthly-plan";
 import WhatsappInbox from "@/pages/whatsapp-inbox";
 import NotFound from "@/pages/not-found";
@@ -98,6 +99,9 @@ function AppRoutes() {
         </Route>
         <Route path="/whatsapp-inbox">
            <PrivateRoute component={WhatsappInbox} path="/whatsapp-inbox" />
+        </Route>
+        <Route path="/oak-rsvp">
+           <PrivateRoute component={OakRSVP} path="/oak-rsvp" />
         </Route>
         <Route component={NotFound} />
       </Switch>

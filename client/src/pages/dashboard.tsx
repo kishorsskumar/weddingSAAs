@@ -68,6 +68,7 @@ const ALL_PAGES = [
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
   { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox", icon: MessageSquare, description: "Employee requests via WhatsApp" },
+  { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp", icon: Users, description: "Event guest management" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];
 
