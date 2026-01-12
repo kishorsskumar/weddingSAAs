@@ -2044,3 +2044,64 @@ export const rsvpResponses = pgTable("rsvp_responses", {
 export const insertRsvpResponseSchema = createInsertSchema(rsvpResponses).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertRsvpResponse = z.infer<typeof insertRsvpResponseSchema>;
 export type RsvpResponse = typeof rsvpResponses.$inferSelect;
+
+// RSVP Message Templates - for greeting and reminder messages
+export const rsvpMessageTemplates = pgTable("rsvp_message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  templateType: text("template_type").notNull(), // 'greeting', 'reminder_1', 'reminder_2', 'reminder_final'
+  templateName: text("template_name").notNull(),
+  messageContent: text("message_content").notNull(), // Supports {{guestName}}, {{eventName}}, {{eventDate}}, {{rsvpLink}}
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRsvpMessageTemplateSchema = createInsertSchema(rsvpMessageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRsvpMessageTemplate = z.infer<typeof insertRsvpMessageTemplateSchema>;
+export type RsvpMessageTemplate = typeof rsvpMessageTemplates.$inferSelect;
+
+// RSVP Message Jobs - scheduled reminders
+export const rsvpMessageJobs = pgTable("rsvp_message_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  templateId: varchar("template_id").notNull().references(() => rsvpMessageTemplates.id, { onDelete: 'cascade' }),
+  jobType: text("job_type").notNull(), // 'immediate', 'scheduled', 'recurring'
+  scheduledAt: timestamp("scheduled_at"), // When to send (null for immediate)
+  recurringPattern: text("recurring_pattern"), // 'daily', 'every_3_days', 'weekly'
+  targetAudience: text("target_audience").notNull().default('pending'), // 'all', 'pending', 'maybe'
+  status: text("status").notNull().default('pending'), // 'pending', 'running', 'completed', 'cancelled'
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRsvpMessageJobSchema = createInsertSchema(rsvpMessageJobs).omit({ id: true, createdAt: true });
+export type InsertRsvpMessageJob = z.infer<typeof insertRsvpMessageJobSchema>;
+export type RsvpMessageJob = typeof rsvpMessageJobs.$inferSelect;
+
+// RSVP Message Logs - tracking sent messages
+export const rsvpMessageLogs = pgTable("rsvp_message_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  guestId: varchar("guest_id").notNull().references(() => eventGuests.id, { onDelete: 'cascade' }),
+  templateId: varchar("template_id").references(() => rsvpMessageTemplates.id),
+  jobId: varchar("job_id").references(() => rsvpMessageJobs.id),
+  messageType: text("message_type").notNull(), // 'greeting', 'reminder', 'custom'
+  messageContent: text("message_content").notNull(), // Actual sent message with variables replaced
+  recipientPhone: text("recipient_phone").notNull(),
+  deliveryStatus: text("delivery_status").notNull().default('pending'), // 'pending', 'sent', 'delivered', 'read', 'failed'
+  twilioMessageSid: text("twilio_message_sid"), // Twilio message ID for tracking
+  errorMessage: text("error_message"), // If failed
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  sentBy: varchar("sent_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRsvpMessageLogSchema = createInsertSchema(rsvpMessageLogs).omit({ id: true, createdAt: true });
+export type InsertRsvpMessageLog = z.infer<typeof insertRsvpMessageLogSchema>;
+export type RsvpMessageLog = typeof rsvpMessageLogs.$inferSelect;
