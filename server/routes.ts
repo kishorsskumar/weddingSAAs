@@ -2319,20 +2319,29 @@ export async function registerRoutes(
         return res.status(403).json({ error: 'Only superadmin and wedding planners can send RSVP messages' });
       }
 
-      const { eventId, templateId, guestIds, messageType } = req.body;
+      const { eventId, templateId, guestIds, messageType, messageContent: directMessage } = req.body;
       
-      if (!eventId || !templateId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
-        return res.status(400).json({ error: 'eventId, templateId, and guestIds are required' });
+      // Support both template-based and direct message modes
+      if (!guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
+        return res.status(400).json({ error: 'guestIds is required' });
+      }
+      
+      if (!templateId && !directMessage) {
+        return res.status(400).json({ error: 'Either templateId or messageContent is required' });
       }
 
-      const template = await storage.getRsvpMessageTemplate(templateId);
-      if (!template) {
-        return res.status(404).json({ error: 'Template not found' });
+      let templateContent: string | null = null;
+      if (templateId) {
+        const template = await storage.getRsvpMessageTemplate(templateId);
+        if (!template) {
+          return res.status(404).json({ error: 'Template not found' });
+        }
+        templateContent = template.messageContent;
       }
 
-      const event = await storage.getEvent(eventId);
-      if (!event) {
-        return res.status(404).json({ error: 'Event not found' });
+      let event = null;
+      if (eventId) {
+        event = await storage.getEvent(eventId);
       }
 
       const results: { guestId: string; success: boolean; error?: string }[] = [];
@@ -2344,29 +2353,37 @@ export async function registerRoutes(
           continue;
         }
 
-        // Personalize message
-        const personalizedMessage = template.messageContent
-          .replace(/\{\{guestName\}\}/g, guest.name)
-          .replace(/\{\{eventName\}\}/g, event.customer || event.title)
-          .replace(/\{\{eventDate\}\}/g, event.date)
-          .replace(/\{\{venue\}\}/g, event.venue || 'Venue TBD');
+        // Use direct message or personalize template
+        let finalMessage: string;
+        if (directMessage) {
+          finalMessage = directMessage;
+        } else if (templateContent) {
+          finalMessage = templateContent
+            .replace(/\{\{guestName\}\}/g, guest.name)
+            .replace(/\{\{eventName\}\}/g, event?.customer || event?.title || 'Event')
+            .replace(/\{\{eventDate\}\}/g, event?.date || 'TBD')
+            .replace(/\{\{venue\}\}/g, event?.venue || 'Venue TBD');
+        } else {
+          results.push({ guestId, success: false, error: 'No message content' });
+          continue;
+        }
 
         try {
           // Send via Twilio WhatsApp
           const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
           const twilioMessage = await twilioClient.messages.create({
-            body: personalizedMessage,
+            body: finalMessage,
             from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
             to: `whatsapp:${guest.phone.startsWith('+') ? guest.phone : '+91' + guest.phone}`,
           });
 
           // Log the message
           await storage.createRsvpMessageLog({
-            eventId,
+            eventId: eventId || guest.eventId,
             guestId,
-            templateId,
-            messageType: messageType || 'greeting',
-            messageContent: personalizedMessage,
+            templateId: templateId || null,
+            messageType: messageType || 'individual',
+            messageContent: finalMessage,
             recipientPhone: guest.phone,
             deliveryStatus: 'sent',
             twilioMessageSid: twilioMessage.sid,
@@ -2379,11 +2396,11 @@ export async function registerRoutes(
           console.error(`Failed to send message to guest ${guestId}:`, sendError);
           
           await storage.createRsvpMessageLog({
-            eventId,
+            eventId: eventId || guest.eventId,
             guestId,
-            templateId,
-            messageType: messageType || 'greeting',
-            messageContent: personalizedMessage,
+            templateId: templateId || null,
+            messageType: messageType || 'individual',
+            messageContent: finalMessage,
             recipientPhone: guest.phone,
             deliveryStatus: 'failed',
             errorMessage: sendError.message,
