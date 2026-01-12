@@ -992,6 +992,30 @@ export default function OakRSVP() {
             <p className="text-[#8b7355] mt-1">Manage event guest lists and track RSVP responses</p>
           </div>
           <div className="flex items-center gap-3">
+            {isSuperAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/seed-demo-rsvp', { method: 'POST' });
+                    const data = await res.json();
+                    if (res.ok) {
+                      toast({ title: data.message || "Demo event created!", description: "Vandana Wedding with 49 guests" });
+                      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+                    } else {
+                      toast({ title: data.error || "Failed to create demo", variant: "destructive" });
+                    }
+                  } catch (error) {
+                    toast({ title: "Failed to create demo event", variant: "destructive" });
+                  }
+                }}
+                data-testid="create-demo-event"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create Demo Event
+              </Button>
+            )}
             <Popover open={eventComboOpen} onOpenChange={setEventComboOpen}>
               <PopoverTrigger asChild>
                 <Button
