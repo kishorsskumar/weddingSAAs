@@ -760,6 +760,9 @@ export default function OakRSVP() {
   const [guestToDelete, setGuestToDelete] = useState<EventGuest | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [individualMsgGuest, setIndividualMsgGuest] = useState<EventGuest | null>(null);
+  const [individualMessage, setIndividualMessage] = useState("");
+  const [isSendingIndividual, setIsSendingIndividual] = useState(false);
   
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -1002,10 +1005,10 @@ export default function OakRSVP() {
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[280px] p-0">
+              <PopoverContent className="w-[350px] p-0">
                 <Command>
-                  <CommandInput placeholder="Search events..." />
-                  <CommandList>
+                  <CommandInput placeholder="Search by name, customer, or venue..." />
+                  <CommandList className="max-h-[300px] overflow-y-auto">
                     <CommandEmpty>No events found.</CommandEmpty>
                     <CommandGroup>
                       <CommandItem
@@ -1021,14 +1024,17 @@ export default function OakRSVP() {
                       {events.map((event) => (
                         <CommandItem
                           key={event.id}
-                          value={event.customer || event.title}
+                          value={`${event.customer || ''} ${event.title} ${event.venue || ''}`}
                           onSelect={() => {
                             setSelectedEventId(event.id);
                             setEventComboOpen(false);
                           }}
                         >
                           <Check className={cn("mr-2 h-4 w-4", selectedEventId === event.id ? "opacity-100" : "opacity-0")} />
-                          {event.customer || event.title}
+                          <div className="flex flex-col">
+                            <span className="font-medium">{event.customer || event.title}</span>
+                            {event.venue && <span className="text-xs text-[#8b7355]">{event.venue}</span>}
+                          </div>
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -1319,6 +1325,24 @@ export default function OakRSVP() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            {(user?.role === 'superadmin' || user?.role === 'wedding_planner') && guest.phone && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  const event = selectedEvent;
+                                  const defaultMsg = event 
+                                    ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
+                                    : `Hello ${guest.name}! Please confirm your attendance.`;
+                                  setIndividualMessage(defaultMsg);
+                                  setIndividualMsgGuest(guest);
+                                }}
+                                title="Send WhatsApp message"
+                                data-testid={`whatsapp-guest-${guest.id}`}
+                              >
+                                <MessageSquare className="h-4 w-4 text-green-600" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -1770,6 +1794,79 @@ export default function OakRSVP() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!individualMsgGuest} onOpenChange={(open) => !open && setIndividualMsgGuest(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-green-600" />
+              Send WhatsApp Message
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-[#f5f2ed] rounded-lg">
+              <div className="font-medium text-[#3d3024]">{individualMsgGuest?.name}</div>
+              <div className="text-sm text-[#8b7355]">{individualMsgGuest?.phone}</div>
+            </div>
+            <div className="space-y-2">
+              <Label>Message</Label>
+              <Textarea
+                value={individualMessage}
+                onChange={(e) => setIndividualMessage(e.target.value)}
+                rows={5}
+                placeholder="Type your message..."
+                data-testid="individual-message-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIndividualMsgGuest(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={async () => {
+                if (!individualMsgGuest || !individualMessage.trim()) return;
+                setIsSendingIndividual(true);
+                try {
+                  const res = await fetch('/api/rsvp-send-messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      eventId: selectedEventId,
+                      guestIds: [individualMsgGuest.id],
+                      messageContent: individualMessage,
+                      messageType: 'individual'
+                    })
+                  });
+                  if (!res.ok) throw new Error('Failed to send');
+                  toast({ title: "Message sent!", description: `Message sent to ${individualMsgGuest.name}` });
+                  setIndividualMsgGuest(null);
+                  setIndividualMessage("");
+                } catch (error) {
+                  toast({ title: "Failed to send message", variant: "destructive" });
+                } finally {
+                  setIsSendingIndividual(false);
+                }
+              }}
+              disabled={isSendingIndividual || !individualMessage.trim()}
+              data-testid="send-individual-msg-btn"
+            >
+              {isSendingIndividual ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Message
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

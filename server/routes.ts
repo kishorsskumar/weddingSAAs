@@ -2021,6 +2021,154 @@ export async function registerRoutes(
     }
   });
 
+  // Seed demo RSVP event
+  app.post('/api/seed-demo-rsvp', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      if (!userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(userId);
+      if (user?.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Only superadmin can create demo data' });
+      }
+
+      // Check if demo event already exists
+      const existingEvents = await storage.getEvents();
+      const demoEvent = existingEvents.find(e => 
+        e.title === 'Vandana Wedding' && e.venue === 'Kumarakom'
+      );
+      if (demoEvent) {
+        return res.json({ message: 'Demo event already exists', eventId: demoEvent.id });
+      }
+
+      // Create the event
+      const event = await storage.createEvent({
+        title: 'Vandana Wedding',
+        customer: 'Vandana & Arjun',
+        date: '2026-03-15',
+        time: '18:00',
+        venue: 'Kumarakom',
+        venueAddress: 'Kumarakom Lake Resort, Kumarakom, Kerala',
+        description: 'Grand wedding celebration',
+        status: 'confirmed',
+        category: 'wedding',
+      });
+
+      // 49 realistic Indian guest names with varied details
+      const guestData = [
+        { name: 'Priya Nair', phone: '+919876543201', relationship: 'Bride Family', group: "Bride's Side" },
+        { name: 'Rajesh Menon', phone: '+919876543202', relationship: 'Groom Family', group: "Groom's Side" },
+        { name: 'Lakshmi Iyer', phone: '+919876543203', relationship: 'Aunt', group: "Bride's Side" },
+        { name: 'Suresh Kumar', phone: '+919876543204', relationship: 'Uncle', group: "Groom's Side" },
+        { name: 'Anjali Varma', phone: '+919876543205', relationship: 'Cousin', group: "Bride's Side" },
+        { name: 'Vikram Pillai', phone: '+919876543206', relationship: 'Friend', group: 'Friends' },
+        { name: 'Deepa Krishnan', phone: '+919876543207', relationship: 'Colleague', group: 'Colleagues' },
+        { name: 'Arun Nambiar', phone: '+919876543208', relationship: 'Brother', group: "Groom's Side" },
+        { name: 'Meera Shenoy', phone: '+919876543209', relationship: 'Sister', group: "Bride's Side" },
+        { name: 'Karthik Rajan', phone: '+919876543210', relationship: 'Best Friend', group: 'Friends' },
+        { name: 'Divya Panicker', phone: '+919876543211', relationship: 'College Friend', group: 'Friends' },
+        { name: 'Ramesh Warrier', phone: '+919876543212', relationship: 'Father Friend', group: 'Family Friends' },
+        { name: 'Sunita Balakrishnan', phone: '+919876543213', relationship: 'Mother Friend', group: 'Family Friends' },
+        { name: 'Gopal Krishnan', phone: '+919876543214', relationship: 'Grandfather', group: "Bride's Side" },
+        { name: 'Kamala Devi', phone: '+919876543215', relationship: 'Grandmother', group: "Groom's Side" },
+        { name: 'Nikhil Thomas', phone: '+919876543216', relationship: 'Neighbor', group: 'Neighbors' },
+        { name: 'Shalini Mathew', phone: '+919876543217', relationship: 'Colleague', group: 'Colleagues' },
+        { name: 'Ajay Menon', phone: '+919876543218', relationship: 'Cousin', group: "Groom's Side" },
+        { name: 'Rekha Nair', phone: '+919876543219', relationship: 'Aunt', group: "Bride's Side" },
+        { name: 'Prasad Kurup', phone: '+919876543220', relationship: 'Uncle', group: "Groom's Side" },
+        { name: 'Smitha Raj', phone: '+919876543221', relationship: 'School Friend', group: 'Friends' },
+        { name: 'Biju Varghese', phone: '+919876543222', relationship: 'Family Friend', group: 'Family Friends' },
+        { name: 'Leela Menon', phone: '+919876543223', relationship: 'Great Aunt', group: "Bride's Side" },
+        { name: 'Mohan Das', phone: '+919876543224', relationship: 'Great Uncle', group: "Groom's Side" },
+        { name: 'Anitha Pillai', phone: '+919876543225', relationship: 'Sister-in-law', group: "Groom's Side" },
+        { name: 'Sanjay Namboodiri', phone: '+919876543226', relationship: 'Brother-in-law', group: "Bride's Side" },
+        { name: 'Renu Kaimal', phone: '+919876543227', relationship: 'Cousin', group: "Bride's Side" },
+        { name: 'Vinod Achari', phone: '+919876543228', relationship: 'Vendor Friend', group: 'Business' },
+        { name: 'Geetha Raman', phone: '+919876543229', relationship: 'Family Doctor', group: 'Family Friends' },
+        { name: 'Murali Krishnan', phone: '+919876543230', relationship: 'Childhood Friend', group: 'Friends' },
+        { name: 'Padma Suresh', phone: '+919876543231', relationship: 'Mother Friend', group: 'Family Friends' },
+        { name: 'Harish Nair', phone: '+919876543232', relationship: 'Cousin', group: "Groom's Side" },
+        { name: 'Jyothi Warrier', phone: '+919876543233', relationship: 'Aunt', group: "Bride's Side" },
+        { name: 'Satheesh Kumar', phone: '+919876543234', relationship: 'Uncle', group: "Groom's Side" },
+        { name: 'Rani Menon', phone: '+919876543235', relationship: 'Neighbor', group: 'Neighbors' },
+        { name: 'Praveen Nambiar', phone: '+919876543236', relationship: 'Work Colleague', group: 'Colleagues' },
+        { name: 'Maya Pillai', phone: '+919876543237', relationship: 'College Friend', group: 'Friends' },
+        { name: 'Sunil Varma', phone: '+919876543238', relationship: 'Family Friend', group: 'Family Friends' },
+        { name: 'Radha Krishnan', phone: '+919876543239', relationship: 'Cousin', group: "Bride's Side" },
+        { name: 'Shaji Thomas', phone: '+919876543240', relationship: 'Business Partner', group: 'Business' },
+        { name: 'Usha Nair', phone: '+919876543241', relationship: 'Teacher', group: 'Family Friends' },
+        { name: 'Jayakumar Menon', phone: '+919876543242', relationship: 'Father Colleague', group: 'Family Friends' },
+        { name: 'Beena Rajan', phone: '+919876543243', relationship: 'Mother Colleague', group: 'Family Friends' },
+        { name: 'Raghunath Pillai', phone: '+919876543244', relationship: 'Uncle', group: "Groom's Side" },
+        { name: 'Saritha Das', phone: '+919876543245', relationship: 'Aunt', group: "Bride's Side" },
+        { name: 'Manoj Kumar', phone: '+919876543246', relationship: 'Cousin', group: "Groom's Side" },
+        { name: 'Latha Namboodiri', phone: '+919876543247', relationship: 'Family Priest', group: 'VIP' },
+        { name: 'Venu Gopal', phone: '+919876543248', relationship: 'Photographer', group: 'Vendors' },
+        { name: 'Bindu Menon', phone: '+919876543249', relationship: 'Event Planner', group: 'Vendors' },
+      ];
+
+      // Response configurations - varied statuses
+      const statusDistribution = [
+        { status: 'yes', count: 28 },   // 28 confirmed
+        { status: 'pending', count: 12 }, // 12 pending
+        { status: 'maybe', count: 5 },    // 5 maybe
+        { status: 'no', count: 4 },       // 4 declined
+      ];
+
+      const mealOptions = ['vegetarian', 'non-vegetarian', 'vegan'];
+
+      let guestIndex = 0;
+      for (const guest of guestData) {
+        const createdGuest = await storage.createEventGuest({
+          eventId: event.id,
+          name: guest.name,
+          phone: guest.phone,
+          email: guest.name.toLowerCase().replace(' ', '.') + '@example.com',
+          relationship: guest.relationship,
+          guestGroup: guest.group,
+          maxAttendees: Math.floor(Math.random() * 3) + 1,
+          reminderCount: 0,
+        });
+
+        // Determine status based on distribution
+        let status = 'pending';
+        if (guestIndex < 28) status = 'yes';
+        else if (guestIndex < 40) status = 'pending';
+        else if (guestIndex < 45) status = 'maybe';
+        else status = 'no';
+
+        if (status !== 'pending') {
+          const numberOfAttendees = status === 'yes' ? Math.floor(Math.random() * 3) + 1 : 1;
+          await storage.createRsvpResponse({
+            guestId: createdGuest.id,
+            eventId: event.id,
+            attendanceStatus: status,
+            numberOfAttendees,
+            mealPreference: mealOptions[Math.floor(Math.random() * mealOptions.length)],
+            needsAccommodation: status === 'yes' && Math.random() > 0.6,
+            accommodationNights: status === 'yes' ? Math.floor(Math.random() * 3) + 1 : undefined,
+            needsTransportation: status === 'yes' && Math.random() > 0.7,
+            responseSource: 'web',
+            needsHumanFollowUp: false,
+          });
+        }
+
+        guestIndex++;
+      }
+
+      res.json({ 
+        success: true, 
+        message: 'Demo event created successfully', 
+        eventId: event.id,
+        guestCount: guestData.length 
+      });
+    } catch (error: any) {
+      console.error('Error creating demo event:', error);
+      res.status(500).json({ error: error.message || 'Failed to create demo event' });
+    }
+  });
+
   // RSVP Message Templates
   app.get('/api/rsvp-message-templates', async (req, res) => {
     try {
