@@ -2021,6 +2021,244 @@ export async function registerRoutes(
     }
   });
 
+  // RSVP Message Templates
+  app.get('/api/rsvp-message-templates', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string;
+      if (!eventId) {
+        return res.status(400).json({ error: 'eventId is required' });
+      }
+      const templates = await storage.getRsvpMessageTemplatesByEvent(eventId);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get message templates' });
+    }
+  });
+
+  app.get('/api/rsvp-message-templates/:id', async (req, res) => {
+    try {
+      const template = await storage.getRsvpMessageTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get template' });
+    }
+  });
+
+  app.post('/api/rsvp-message-templates', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const template = await storage.createRsvpMessageTemplate({
+        ...req.body,
+        createdBy: userId,
+      });
+      res.json(template);
+    } catch (error: any) {
+      console.error('Error creating template:', error);
+      res.status(400).json({ error: error.message || 'Failed to create template' });
+    }
+  });
+
+  app.patch('/api/rsvp-message-templates/:id', async (req, res) => {
+    try {
+      const template = await storage.updateRsvpMessageTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update template' });
+    }
+  });
+
+  app.delete('/api/rsvp-message-templates/:id', async (req, res) => {
+    try {
+      await storage.deleteRsvpMessageTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete template' });
+    }
+  });
+
+  // RSVP Message Jobs (Scheduled reminders)
+  app.get('/api/rsvp-message-jobs', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string;
+      if (!eventId) {
+        return res.status(400).json({ error: 'eventId is required' });
+      }
+      const jobs = await storage.getRsvpMessageJobsByEvent(eventId);
+      res.json(jobs);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get message jobs' });
+    }
+  });
+
+  app.post('/api/rsvp-message-jobs', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const job = await storage.createRsvpMessageJob({
+        ...req.body,
+        createdBy: userId,
+      });
+      res.json(job);
+    } catch (error: any) {
+      console.error('Error creating job:', error);
+      res.status(400).json({ error: error.message || 'Failed to create job' });
+    }
+  });
+
+  app.patch('/api/rsvp-message-jobs/:id', async (req, res) => {
+    try {
+      const job = await storage.updateRsvpMessageJob(req.params.id, req.body);
+      if (!job) {
+        return res.status(404).json({ error: 'Job not found' });
+      }
+      res.json(job);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update job' });
+    }
+  });
+
+  app.delete('/api/rsvp-message-jobs/:id', async (req, res) => {
+    try {
+      await storage.deleteRsvpMessageJob(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete job' });
+    }
+  });
+
+  // RSVP Message Logs (Sent messages)
+  app.get('/api/rsvp-message-logs', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string;
+      const guestId = req.query.guestId as string;
+      
+      if (guestId) {
+        const logs = await storage.getRsvpMessageLogsByGuest(guestId);
+        return res.json(logs);
+      }
+      if (eventId) {
+        const logs = await storage.getRsvpMessageLogsByEvent(eventId);
+        return res.json(logs);
+      }
+      res.status(400).json({ error: 'eventId or guestId is required' });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get message logs' });
+    }
+  });
+
+  // Outreach stats for dashboard
+  app.get('/api/rsvp-outreach-stats/:eventId', async (req, res) => {
+    try {
+      const stats = await storage.getOutreachStatsByEvent(req.params.eventId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get outreach stats' });
+    }
+  });
+
+  // Send greeting/reminder to guests via WhatsApp
+  app.post('/api/rsvp-send-messages', async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !['superadmin', 'wedding_planner'].includes(user.role)) {
+        return res.status(403).json({ error: 'Only superadmin and wedding planners can send RSVP messages' });
+      }
+
+      const { eventId, templateId, guestIds, messageType } = req.body;
+      
+      if (!eventId || !templateId || !guestIds || !Array.isArray(guestIds) || guestIds.length === 0) {
+        return res.status(400).json({ error: 'eventId, templateId, and guestIds are required' });
+      }
+
+      const template = await storage.getRsvpMessageTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
+      const results: { guestId: string; success: boolean; error?: string }[] = [];
+      
+      for (const guestId of guestIds) {
+        const guest = await storage.getEventGuest(guestId);
+        if (!guest || !guest.phone) {
+          results.push({ guestId, success: false, error: 'Guest not found or no phone number' });
+          continue;
+        }
+
+        // Personalize message
+        const personalizedMessage = template.messageContent
+          .replace(/\{\{guestName\}\}/g, guest.name)
+          .replace(/\{\{eventName\}\}/g, event.customer || event.title)
+          .replace(/\{\{eventDate\}\}/g, event.date)
+          .replace(/\{\{venue\}\}/g, event.venue || 'Venue TBD');
+
+        try {
+          // Send via Twilio WhatsApp
+          const twilioClient = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+          const twilioMessage = await twilioClient.messages.create({
+            body: personalizedMessage,
+            from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
+            to: `whatsapp:${guest.phone.startsWith('+') ? guest.phone : '+91' + guest.phone}`,
+          });
+
+          // Log the message
+          await storage.createRsvpMessageLog({
+            eventId,
+            guestId,
+            templateId,
+            messageType: messageType || 'greeting',
+            messageContent: personalizedMessage,
+            recipientPhone: guest.phone,
+            deliveryStatus: 'sent',
+            twilioMessageSid: twilioMessage.sid,
+            sentAt: new Date(),
+            sentBy: userId,
+          });
+
+          results.push({ guestId, success: true });
+        } catch (sendError: any) {
+          console.error(`Failed to send message to guest ${guestId}:`, sendError);
+          
+          await storage.createRsvpMessageLog({
+            eventId,
+            guestId,
+            templateId,
+            messageType: messageType || 'greeting',
+            messageContent: personalizedMessage,
+            recipientPhone: guest.phone,
+            deliveryStatus: 'failed',
+            errorMessage: sendError.message,
+            sentBy: userId,
+          });
+
+          results.push({ guestId, success: false, error: sendError.message });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      res.json({ 
+        success: true, 
+        sent: successCount, 
+        failed: results.length - successCount,
+        results 
+      });
+    } catch (error: any) {
+      console.error('Error sending RSVP messages:', error);
+      res.status(500).json({ error: error.message || 'Failed to send messages' });
+    }
+  });
+
   // Leave Requests
   app.get('/api/leave-requests', async (req, res) => {
     const requests = await storage.getAllLeaveRequests();
