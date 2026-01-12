@@ -86,6 +86,605 @@ interface Event {
   status?: string;
 }
 
+interface RsvpMessageTemplate {
+  id: string;
+  eventId: string;
+  templateType: string;
+  templateName: string;
+  messageContent: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface RsvpMessageLog {
+  id: string;
+  eventId: string;
+  guestId: string;
+  messageType: string;
+  messageContent: string;
+  recipientPhone: string;
+  deliveryStatus: string;
+  sentAt?: string;
+  createdAt: string;
+}
+
+interface OutreachStats {
+  totalSent: number;
+  delivered: number;
+  read: number;
+  failed: number;
+  pending: number;
+  greetingsSent: number;
+  remindersSent: number;
+}
+
+function OutreachTab({ eventId, guests, responses }: { 
+  eventId: string | null; 
+  guests: EventGuest[];
+  responses: RsvpResponse[];
+}) {
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<RsvpMessageTemplate | null>(null);
+  const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [isSending, setIsSending] = useState(false);
+  const [outreachSubTab, setOutreachSubTab] = useState<"send" | "templates" | "history">("send");
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  const canSendMessages = user?.role === 'superadmin' || user?.role === 'wedding_planner';
+
+  const { data: templates = [] } = useQuery<RsvpMessageTemplate[]>({
+    queryKey: ['/api/rsvp-message-templates', eventId],
+    queryFn: async () => {
+      if (!eventId) return [];
+      const res = await fetch(`/api/rsvp-message-templates?eventId=${eventId}`);
+      if (!res.ok) throw new Error('Failed to fetch templates');
+      return res.json();
+    },
+    enabled: !!eventId,
+  });
+
+  const { data: messageLogs = [] } = useQuery<RsvpMessageLog[]>({
+    queryKey: ['/api/rsvp-message-logs', eventId],
+    queryFn: async () => {
+      if (!eventId) return [];
+      const res = await fetch(`/api/rsvp-message-logs?eventId=${eventId}`);
+      if (!res.ok) throw new Error('Failed to fetch message logs');
+      return res.json();
+    },
+    enabled: !!eventId,
+  });
+
+  const { data: outreachStats } = useQuery<OutreachStats>({
+    queryKey: ['/api/rsvp-outreach-stats', eventId],
+    queryFn: async () => {
+      if (!eventId) return null;
+      const res = await fetch(`/api/rsvp-outreach-stats/${eventId}`);
+      if (!res.ok) throw new Error('Failed to fetch outreach stats');
+      return res.json();
+    },
+    enabled: !!eventId,
+  });
+
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: Partial<RsvpMessageTemplate>) => {
+      const res = await fetch('/api/rsvp-message-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-message-templates'] });
+      setIsTemplateDialogOpen(false);
+      setEditingTemplate(null);
+      toast({ title: "Template created successfully" });
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<RsvpMessageTemplate> }) => {
+      const res = await fetch(`/api/rsvp-message-templates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-message-templates'] });
+      setIsTemplateDialogOpen(false);
+      setEditingTemplate(null);
+      toast({ title: "Template updated successfully" });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/rsvp-message-templates/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete template');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-message-templates'] });
+      toast({ title: "Template deleted" });
+    },
+  });
+
+  const handleSendMessages = async () => {
+    if (!eventId || !selectedTemplateId || selectedGuestIds.length === 0) {
+      toast({ title: "Please select a template and at least one guest", variant: "destructive" });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const res = await fetch('/api/rsvp-send-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId,
+          templateId: selectedTemplateId,
+          guestIds: selectedGuestIds,
+          messageType: templates.find(t => t.id === selectedTemplateId)?.templateType || 'greeting',
+        }),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to send messages');
+
+      toast({ 
+        title: "Messages sent", 
+        description: `Sent: ${result.sent}, Failed: ${result.failed}` 
+      });
+      setSelectedGuestIds([]);
+      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-message-logs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-outreach-stats'] });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleTemplateSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      eventId: eventId!,
+      templateType: formData.get('templateType') as string,
+      templateName: formData.get('templateName') as string,
+      messageContent: formData.get('messageContent') as string,
+      isActive: true,
+    };
+
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({ id: editingTemplate.id, data });
+    } else {
+      createTemplateMutation.mutate(data);
+    }
+  };
+
+  const pendingGuests = guests.filter(g => {
+    const response = responses.find(r => r.guestId === g.id);
+    return !response || response.attendanceStatus === 'pending';
+  });
+
+  const toggleGuestSelection = (guestId: string) => {
+    setSelectedGuestIds(prev => 
+      prev.includes(guestId) 
+        ? prev.filter(id => id !== guestId)
+        : [...prev, guestId]
+    );
+  };
+
+  const selectAllPending = () => {
+    setSelectedGuestIds(pendingGuests.map(g => g.id));
+  };
+
+  const clearSelection = () => {
+    setSelectedGuestIds([]);
+  };
+
+  if (!eventId) {
+    return (
+      <Card className="bg-white">
+        <CardContent className="py-12 text-center text-[#8b7355]">
+          <Send className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>Select an event to manage outreach messages</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!canSendMessages) {
+    return (
+      <Card className="bg-white">
+        <CardContent className="py-12 text-center text-[#8b7355]">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+          <p>Only Superadmin and Wedding Planners can send RSVP messages</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {outreachStats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Total Sent</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-[#3d3024]">{outreachStats.totalSent}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Delivered</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-green-600">{outreachStats.delivered}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Read</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-blue-600">{outreachStats.read}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Failed</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-red-600">{outreachStats.failed}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Pending</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-yellow-600">{outreachStats.pending}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Greetings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-[#6b8e6b]">{outreachStats.greetingsSent}</span>
+            </CardContent>
+          </Card>
+          <Card className="bg-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-[#8b7355]">Reminders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <span className="text-2xl font-bold text-[#8b7355]">{outreachStats.remindersSent}</span>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="flex gap-2 border-b pb-2">
+        <Button 
+          variant={outreachSubTab === "send" ? "default" : "ghost"}
+          onClick={() => setOutreachSubTab("send")}
+          className={outreachSubTab === "send" ? "bg-[#6b8e6b]" : ""}
+        >
+          <Send className="h-4 w-4 mr-2" />
+          Send Messages
+        </Button>
+        <Button 
+          variant={outreachSubTab === "templates" ? "default" : "ghost"}
+          onClick={() => setOutreachSubTab("templates")}
+          className={outreachSubTab === "templates" ? "bg-[#6b8e6b]" : ""}
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Templates
+        </Button>
+        <Button 
+          variant={outreachSubTab === "history" ? "default" : "ghost"}
+          onClick={() => setOutreachSubTab("history")}
+          className={outreachSubTab === "history" ? "bg-[#6b8e6b]" : ""}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Message History
+        </Button>
+      </div>
+
+      {outreachSubTab === "send" && (
+        <Card className="bg-white">
+          <CardHeader>
+            <CardTitle className="text-lg text-[#3d3024]">Send WhatsApp Messages</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Message Template</Label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger data-testid="select-template">
+                  <SelectValue placeholder="Choose a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.templateName} ({t.templateType})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {templates.length === 0 && (
+                <p className="text-sm text-amber-600">No templates yet. Create one in the Templates tab.</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Select Guests ({selectedGuestIds.length} selected)</Label>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAllPending}>
+                    Select All Pending ({pendingGuests.length})
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                    Clear
+                  </Button>
+                </div>
+              </div>
+              <div className="max-h-60 overflow-y-auto border rounded-md p-2 space-y-1">
+                {guests.map(guest => {
+                  const response = responses.find(r => r.guestId === guest.id);
+                  const status = response?.attendanceStatus || 'pending';
+                  return (
+                    <div 
+                      key={guest.id} 
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer",
+                        selectedGuestIds.includes(guest.id) && "bg-[#6b8e6b]/10"
+                      )}
+                      onClick={() => toggleGuestSelection(guest.id)}
+                    >
+                      <Checkbox 
+                        checked={selectedGuestIds.includes(guest.id)}
+                        onCheckedChange={() => toggleGuestSelection(guest.id)}
+                      />
+                      <div className="flex-1">
+                        <span className="font-medium">{guest.name}</span>
+                        <span className="text-sm text-[#8b7355] ml-2">{guest.phone}</span>
+                      </div>
+                      <Badge variant={status === 'yes' ? 'default' : status === 'no' ? 'destructive' : 'secondary'}>
+                        {status}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Button 
+              className="w-full bg-[#6b8e6b] hover:bg-[#5a7a5a]"
+              onClick={handleSendMessages}
+              disabled={isSending || !selectedTemplateId || selectedGuestIds.length === 0}
+              data-testid="send-messages-btn"
+            >
+              {isSending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send to {selectedGuestIds.length} Guest{selectedGuestIds.length !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {outreachSubTab === "templates" && (
+        <Card className="bg-white">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg text-[#3d3024]">Message Templates</CardTitle>
+            <Button 
+              onClick={() => {
+                setEditingTemplate(null);
+                setIsTemplateDialogOpen(true);
+              }}
+              className="bg-[#6b8e6b] hover:bg-[#5a7a5a]"
+              data-testid="add-template-btn"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Template
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {templates.length === 0 ? (
+              <div className="text-center py-8 text-[#8b7355]">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No templates yet. Create your first greeting template!</p>
+                <p className="text-sm mt-2">Use variables: {"{{guestName}}"}, {"{{eventName}}"}, {"{{eventDate}}"}, {"{{venue}}"}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {templates.map(template => (
+                  <div key={template.id} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-medium text-[#3d3024]">{template.templateName}</div>
+                        <Badge className="mt-1">{template.templateType}</Badge>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => {
+                            setEditingTemplate(template);
+                            setIsTemplateDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => deleteTemplateMutation.mutate(template.id)}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm text-[#8b7355] whitespace-pre-wrap bg-gray-50 p-2 rounded">
+                      {template.messageContent}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {outreachSubTab === "history" && (
+        <Card className="bg-white">
+          <CardHeader>
+            <CardTitle className="text-lg text-[#3d3024]">Message History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {messageLogs.length === 0 ? (
+              <div className="text-center py-8 text-[#8b7355]">
+                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No messages sent yet</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Guest</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Sent At</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {messageLogs.map(log => {
+                    const guest = guests.find(g => g.id === log.guestId);
+                    return (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          <div>{guest?.name || 'Unknown'}</div>
+                          <div className="text-sm text-[#8b7355]">{log.recipientPhone}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{log.messageType}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              log.deliveryStatus === 'delivered' || log.deliveryStatus === 'read' 
+                                ? 'default' 
+                                : log.deliveryStatus === 'failed' 
+                                  ? 'destructive' 
+                                  : 'secondary'
+                            }
+                          >
+                            {log.deliveryStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-[#8b7355]">
+                          {log.sentAt ? format(parseISO(log.sentAt), 'MMM d, h:mm a') : '-'}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? 'Edit Template' : 'Create Template'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleTemplateSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="templateName">Template Name</Label>
+              <Input
+                id="templateName"
+                name="templateName"
+                defaultValue={editingTemplate?.templateName || ''}
+                required
+                placeholder="e.g., Welcome Greeting"
+                data-testid="input-template-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="templateType">Type</Label>
+              <Select name="templateType" defaultValue={editingTemplate?.templateType || 'greeting'}>
+                <SelectTrigger data-testid="select-template-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="greeting">Greeting (Initial Introduction)</SelectItem>
+                  <SelectItem value="reminder_1">First Reminder</SelectItem>
+                  <SelectItem value="reminder_2">Second Reminder</SelectItem>
+                  <SelectItem value="reminder_final">Final Reminder</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="messageContent">Message Content</Label>
+              <Textarea
+                id="messageContent"
+                name="messageContent"
+                defaultValue={editingTemplate?.messageContent || `Namaste {{guestName}},
+
+Welcome to the celebration! We are Oakstreet Events, and we're delighted to assist with your RSVP for {{eventName}} on {{eventDate}} at {{venue}}.
+
+Please let us know if you'll be joining us. We look forward to seeing you!
+
+Warm regards,
+Oakstreet Events Team`}
+                required
+                rows={8}
+                placeholder="Use {{guestName}}, {{eventName}}, {{eventDate}}, {{venue}} for personalization"
+                data-testid="input-template-content"
+              />
+              <p className="text-xs text-[#8b7355]">
+                Available variables: {"{{guestName}}"}, {"{{eventName}}"}, {"{{eventDate}}"}, {"{{venue}}"}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-[#6b8e6b] hover:bg-[#5a7a5a]" data-testid="save-template-btn">
+                {editingTemplate ? 'Update' : 'Create'} Template
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function OakRSVP() {
   const [mainTab, setMainTab] = useState("dashboard");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -382,6 +981,7 @@ export default function OakRSVP() {
             <TabsTrigger value="guests" data-testid="tab-guests">Guest List</TabsTrigger>
             <TabsTrigger value="responses" data-testid="tab-responses">Responses</TabsTrigger>
             <TabsTrigger value="follow-ups" data-testid="tab-followups">Follow-ups</TabsTrigger>
+            <TabsTrigger value="outreach" data-testid="tab-outreach">Outreach</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-4">
@@ -822,6 +1422,14 @@ export default function OakRSVP() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="outreach" className="space-y-4">
+            <OutreachTab 
+              eventId={selectedEventId} 
+              guests={guests}
+              responses={responses}
+            />
           </TabsContent>
         </Tabs>
       </div>
