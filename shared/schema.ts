@@ -1977,3 +1977,70 @@ export const deliveryChallans = pgTable("delivery_challans", {
 export const insertDeliveryChallanSchema = createInsertSchema(deliveryChallans).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDeliveryChallan = z.infer<typeof insertDeliveryChallanSchema>;
 export type DeliveryChallan = typeof deliveryChallans.$inferSelect;
+
+// Event Guests - Predefined invitee list for RSVP tracking
+export const eventGuests = pgTable("event_guests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(), // Primary contact number for WhatsApp
+  email: text("email"),
+  relationship: text("relationship"), // Bride's family, Groom's family, Friends, Colleagues, etc.
+  guestGroup: text("guest_group"), // Custom grouping (e.g., "VIP", "Extended Family")
+  invitedBy: text("invited_by"), // Who invited this guest (Bride, Groom, Parents, etc.)
+  maxAttendees: integer("max_attendees").default(1), // Max allowed attendees for this invite
+  inviteSentAt: timestamp("invite_sent_at"),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  reminderCount: integer("reminder_count").default(0),
+  notes: text("notes"), // Internal notes about the guest
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventGuestSchema = createInsertSchema(eventGuests).omit({ id: true, createdAt: true });
+export type InsertEventGuest = z.infer<typeof insertEventGuestSchema>;
+export type EventGuest = typeof eventGuests.$inferSelect;
+
+// RSVP Responses - Guest responses for event attendance
+export const rsvpResponses = pgTable("rsvp_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  guestId: varchar("guest_id").notNull().references(() => eventGuests.id, { onDelete: 'cascade' }),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  
+  // Attendance
+  attendanceStatus: text("attendance_status").notNull().default('pending'), // 'yes', 'no', 'maybe', 'pending'
+  numberOfAttendees: integer("number_of_attendees").default(1),
+  attendeeNames: text("attendee_names"), // Comma-separated names of attendees
+  
+  // Meal Preferences
+  mealPreference: text("meal_preference"), // 'vegetarian', 'non_vegetarian', 'both', 'no_preference'
+  dietaryRestrictions: text("dietary_restrictions"), // Free text for allergies, restrictions
+  
+  // Logistics
+  needsAccommodation: boolean("needs_accommodation").default(false),
+  accommodationNights: integer("accommodation_nights"), // Number of nights
+  accommodationCheckIn: date("accommodation_check_in"),
+  accommodationCheckOut: date("accommodation_check_out"),
+  needsTransportation: boolean("needs_transportation").default(false),
+  transportationDetails: text("transportation_details"), // Pickup location, arrival time, etc.
+  
+  // Additional Info
+  specialNotes: text("special_notes"), // Any special requests or notes from guest
+  responseSource: text("response_source").default('whatsapp'), // 'whatsapp', 'website', 'manual', 'phone'
+  
+  // Escalation
+  needsHumanFollowUp: boolean("needs_human_follow_up").default(false),
+  escalationReason: text("escalation_reason"),
+  humanNotes: text("human_notes"), // Notes from human coordinator
+  
+  // Conversation tracking
+  whatsappConversationId: varchar("whatsapp_conversation_id"),
+  lastInteractionAt: timestamp("last_interaction_at"),
+  
+  respondedAt: timestamp("responded_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRsvpResponseSchema = createInsertSchema(rsvpResponses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRsvpResponse = z.infer<typeof insertRsvpResponseSchema>;
+export type RsvpResponse = typeof rsvpResponses.$inferSelect;
