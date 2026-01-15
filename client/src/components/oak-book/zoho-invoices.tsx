@@ -845,10 +845,34 @@ function InvoiceFormModal({
     const subtotal = calculateSubtotal();
     const total = calculateTotal();
 
+    // Transform line items to match backend schema (name/total instead of description/amount)
+    // Ensure all numeric values are properly parsed as numbers
+    const transformedLineItems = lineItems.map((item: any) => {
+      if (item.type === "section") {
+        return {
+          name: item.heading || "",
+          quantity: 0,
+          rate: 0,
+          total: 0,
+          isHeading: true,
+        };
+      }
+      return {
+        name: item.description || "",
+        quantity: parseFloat(item.quantity) || 1,
+        rate: parseFloat(item.rate) || 0,
+        total: parseFloat(item.amount) || 0,
+        isHeading: false,
+      };
+    });
+
     onSubmit(
       {
         ...formData,
-        lineItems,
+        // Convert empty strings to null for optional foreign key fields
+        customerId: formData.customerId || null,
+        eventId: formData.eventId || null,
+        lineItems: transformedLineItems,
         subtotal: subtotal.toString(),
         discountPercent: discount.percent,
         discountAmount: discount.amount,
