@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,7 +84,7 @@ type Event = {
 
 interface ZohoInvoicesProps {
   filterType?: "standard" | "tax";
-  onDownloadPdf?: (type: string, id: string, withoutHeader: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
 }
 
 export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInvoicesProps) {
@@ -431,7 +431,7 @@ function InvoiceDetailPanel({
   onDelete: () => void;
   onSend: () => void;
   onRecordPayment: () => void;
-  onDownloadPdf?: (type: string, id: string, withoutHeader: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
 }) {
   const [activeTab, setActiveTab] = useState("details");
 
@@ -760,11 +760,42 @@ function InvoiceFormModal({
     amount: editingInvoice?.discountAmount || "0",
   });
 
-  useState(() => {
-    if (!editingInvoice) {
-      setFormData((prev) => ({ ...prev, number: nextNumber }));
+  useEffect(() => {
+    if (isOpen) {
+      if (editingInvoice) {
+        setFormData({
+          number: editingInvoice.number,
+          customerId: editingInvoice.customerId || "",
+          eventId: editingInvoice.eventId || "",
+          date: editingInvoice.date,
+          dueDate: editingInvoice.dueDate || "",
+          subject: editingInvoice.subject || "",
+          notes: editingInvoice.notes || "",
+          terms: editingInvoice.terms || "",
+        });
+        setLineItems(editingInvoice.lineItems?.length 
+          ? editingInvoice.lineItems 
+          : [{ type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]);
+        setDiscount({
+          percent: editingInvoice.discountPercent || "0",
+          amount: editingInvoice.discountAmount || "0",
+        });
+      } else {
+        setFormData({
+          number: nextNumber,
+          customerId: "",
+          eventId: "",
+          date: format(new Date(), "yyyy-MM-dd"),
+          dueDate: "",
+          subject: "",
+          notes: "",
+          terms: "",
+        });
+        setLineItems([{ type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]);
+        setDiscount({ percent: "0", amount: "0" });
+      }
     }
-  });
+  }, [isOpen, editingInvoice, nextNumber]);
 
   const calculateSubtotal = () => {
     return lineItems

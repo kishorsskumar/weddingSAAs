@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,7 +82,7 @@ type Event = {
 
 interface ZohoQuotesProps {
   filterType?: "standard" | "tax";
-  onDownloadPdf?: (type: string, id: string, withoutHeader: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
 }
 
 export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuotesProps) {
@@ -395,7 +395,7 @@ interface QuoteDetailPanelProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onDownloadPdf?: (type: string, id: string, withoutHeader: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
   onConvert?: () => void;
 }
 
@@ -762,33 +762,35 @@ function QuoteFormModal({
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
 
-  useState(() => {
-    if (editingQuote) {
-      setFormData({
-        number: editingQuote.number,
-        customerId: editingQuote.customerId || "",
-        eventId: editingQuote.eventId || "",
-        date: editingQuote.date,
-        subject: editingQuote.subject || "",
-        lineItems: editingQuote.lineItems.length > 0 ? editingQuote.lineItems : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
-        discountPercent: parseFloat(editingQuote.discountPercent) || 0,
-        notes: editingQuote.notes || "",
-        terms: editingQuote.terms || "",
-      });
-    } else {
-      setFormData({
-        number: nextNumber,
-        customerId: "",
-        eventId: "",
-        date: format(new Date(), "yyyy-MM-dd"),
-        subject: "",
-        lineItems: [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
-        discountPercent: 0,
-        notes: "",
-        terms: "",
-      });
+  useEffect(() => {
+    if (open) {
+      if (editingQuote) {
+        setFormData({
+          number: editingQuote.number,
+          customerId: editingQuote.customerId || "",
+          eventId: editingQuote.eventId || "",
+          date: editingQuote.date,
+          subject: editingQuote.subject || "",
+          lineItems: editingQuote.lineItems.length > 0 ? editingQuote.lineItems : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
+          discountPercent: parseFloat(editingQuote.discountPercent) || 0,
+          notes: editingQuote.notes || "",
+          terms: editingQuote.terms || "",
+        });
+      } else {
+        setFormData({
+          number: nextNumber,
+          customerId: "",
+          eventId: "",
+          date: format(new Date(), "yyyy-MM-dd"),
+          subject: "",
+          lineItems: [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
+          discountPercent: 0,
+          notes: "",
+          terms: "",
+        });
+      }
     }
-  });
+  }, [open, editingQuote, nextNumber]);
 
   const calculateTotals = () => {
     const subtotal = formData.lineItems
