@@ -46,6 +46,18 @@ import {
   MapPin
 } from "lucide-react";
 
+// Indian states with GST codes for Place of Supply dropdown
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands (35)", "Andhra Pradesh (37)", "Arunachal Pradesh (12)", 
+  "Assam (18)", "Bihar (10)", "Chandigarh (04)", "Chhattisgarh (22)", "Dadra and Nagar Haveli (26)",
+  "Daman and Diu (25)", "Delhi (07)", "Goa (30)", "Gujarat (24)", "Haryana (06)", 
+  "Himachal Pradesh (02)", "Jammu and Kashmir (01)", "Jharkhand (20)", "Karnataka (29)",
+  "Kerala (32)", "Ladakh (38)", "Lakshadweep (31)", "Madhya Pradesh (23)", "Maharashtra (27)",
+  "Manipur (14)", "Meghalaya (17)", "Mizoram (15)", "Nagaland (13)", "Odisha (21)",
+  "Puducherry (34)", "Punjab (03)", "Rajasthan (08)", "Sikkim (11)", "Tamil Nadu (33)",
+  "Telangana (36)", "Tripura (16)", "Uttar Pradesh (09)", "Uttarakhand (05)", "West Bengal (19)"
+];
+
 type Customer = {
   id: string;
   name: string;
@@ -754,10 +766,13 @@ function QuoteFormModal({
     eventId: "",
     date: format(new Date(), "yyyy-MM-dd"),
     subject: "",
-    lineItems: [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
+    lineItems: isTaxDocument 
+      ? [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]
+      : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
     discountPercent: 0,
     notes: "",
     terms: "",
+    placeOfSupply: "Kerala (32)",
   });
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [eventSearchOpen, setEventSearchOpen] = useState(false);
@@ -773,8 +788,17 @@ function QuoteFormModal({
               rate: item.rate || 0,
               amount: item.total || item.amount || 0,
               isHeading: item.isHeading || false,
+              ...(isTaxDocument ? {
+                hsnSac: item.hsnSac || "",
+                cgstPercent: item.cgstPercent ?? 9,
+                sgstPercent: item.sgstPercent ?? 9,
+                cgstAmount: item.cgstAmount || 0,
+                sgstAmount: item.sgstAmount || 0,
+              } : {}),
             }))
-          : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }];
+          : isTaxDocument 
+            ? [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]
+            : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }];
         
         setFormData({
           number: editingQuote.number,
@@ -786,6 +810,7 @@ function QuoteFormModal({
           discountPercent: parseFloat(editingQuote.discountPercent) || 0,
           notes: editingQuote.notes || "",
           terms: editingQuote.terms || "",
+          placeOfSupply: (editingQuote as any).placeOfSupply || "Kerala (32)",
         });
       } else {
         setFormData({
@@ -794,46 +819,67 @@ function QuoteFormModal({
           eventId: "",
           date: format(new Date(), "yyyy-MM-dd"),
           subject: "",
-          lineItems: [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
+          lineItems: isTaxDocument 
+            ? [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }]
+            : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
           discountPercent: 0,
           notes: "",
           terms: "",
+          placeOfSupply: "Kerala (32)",
         });
       }
     }
   }, [open, editingQuote, nextNumber]);
 
   const calculateTotals = () => {
-    const subtotal = formData.lineItems
-      .filter((item: any) => !item.isHeading)
-      .reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0);
-    const discountAmount = (subtotal * formData.discountPercent) / 100;
-    const total = subtotal - discountAmount;
-    return { subtotal, discountAmount, total };
+    const items = formData.lineItems.filter((item: any) => !item.isHeading);
+    const subtotal = items.reduce((sum: number, item: any) => sum + (parseFloat(item.amount) || 0), 0);
+    
+    if (isTaxDocument) {
+      // For tax documents, no discount - taxes are calculated on full line item amounts
+      const cgstTotal = items.reduce((sum: number, item: any) => sum + (parseFloat(item.cgstAmount) || 0), 0);
+      const sgstTotal = items.reduce((sum: number, item: any) => sum + (parseFloat(item.sgstAmount) || 0), 0);
+      const total = subtotal + cgstTotal + sgstTotal;
+      return { subtotal, discountAmount: 0, cgstTotal, sgstTotal, total };
+    } else {
+      // For standard estimates, apply discount
+      const discountAmount = (subtotal * (formData.discountPercent || 0)) / 100;
+      const total = subtotal - discountAmount;
+      return { subtotal, discountAmount, cgstTotal: 0, sgstTotal: 0, total };
+    }
   };
 
   const updateLineItem = (index: number, field: string, value: any) => {
     const newLineItems = [...formData.lineItems];
     newLineItems[index] = { ...newLineItems[index], [field]: value };
 
-    if (field === "quantity" || field === "rate") {
+    if (field === "quantity" || field === "rate" || field === "cgstPercent" || field === "sgstPercent") {
       const qty = parseFloat(newLineItems[index].quantity) || 0;
       const rate = parseFloat(newLineItems[index].rate) || 0;
-      newLineItems[index].amount = qty * rate;
+      const baseAmount = qty * rate;
+      newLineItems[index].amount = baseAmount;
+      
+      if (isTaxDocument) {
+        const cgstPercent = parseFloat(newLineItems[index].cgstPercent) || 0;
+        const sgstPercent = parseFloat(newLineItems[index].sgstPercent) || 0;
+        newLineItems[index].cgstAmount = baseAmount * (cgstPercent / 100);
+        newLineItems[index].sgstAmount = baseAmount * (sgstPercent / 100);
+      }
     }
 
     setFormData({ ...formData, lineItems: newLineItems });
   };
 
   const addLineItem = (isHeading = false) => {
+    const newItem = isHeading
+      ? { description: "", isHeading: true }
+      : isTaxDocument
+        ? { description: "", quantity: 1, rate: 0, amount: 0, isHeading: false, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 }
+        : { description: "", quantity: 1, rate: 0, amount: 0, isHeading: false };
+    
     setFormData({
       ...formData,
-      lineItems: [
-        ...formData.lineItems,
-        isHeading
-          ? { description: "", isHeading: true }
-          : { description: "", quantity: 1, rate: 0, amount: 0, isHeading: false },
-      ],
+      lineItems: [...formData.lineItems, newItem],
     });
   };
 
@@ -843,7 +889,7 @@ function QuoteFormModal({
   };
 
   const handleSave = (asDraft: boolean) => {
-    const { subtotal, discountAmount, total } = calculateTotals();
+    const { subtotal, discountAmount, cgstTotal, sgstTotal, total } = calculateTotals();
     
     // Transform line items to match backend schema (name/total instead of description/amount)
     // Ensure all numeric values are properly parsed as numbers
@@ -853,6 +899,13 @@ function QuoteFormModal({
       rate: parseFloat(item.rate) || 0,
       total: parseFloat(item.amount) || 0,
       isHeading: item.isHeading || false,
+      ...(isTaxDocument ? {
+        hsnSac: item.hsnSac || "",
+        cgstPercent: parseFloat(item.cgstPercent) || 9,
+        sgstPercent: parseFloat(item.sgstPercent) || 9,
+        cgstAmount: parseFloat(item.cgstAmount) || 0,
+        sgstAmount: parseFloat(item.sgstAmount) || 0,
+      } : {}),
     }));
     
     onSave(
@@ -868,15 +921,22 @@ function QuoteFormModal({
         lineItems: transformedLineItems,
         isTaxDocument,
         subtotal: subtotal.toFixed(2),
-        discountPercent: String(formData.discountPercent || 0),
-        discountAmount: discountAmount.toFixed(2),
+        // For tax documents, explicitly set discount to 0 for data consistency
+        discountPercent: isTaxDocument ? "0" : String(formData.discountPercent || 0),
+        discountAmount: isTaxDocument ? "0.00" : discountAmount.toFixed(2),
+        ...(isTaxDocument ? {
+          placeOfSupply: formData.placeOfSupply || "Kerala (32)",
+          cgstTotal: cgstTotal.toFixed(2),
+          sgstTotal: sgstTotal.toFixed(2),
+          taxTotal: (cgstTotal + sgstTotal).toFixed(2),
+        } : {}),
         total: total.toFixed(2),
       },
       asDraft
     );
   };
 
-  const { subtotal, discountAmount, total } = calculateTotals();
+  const { subtotal, discountAmount, cgstTotal, sgstTotal, total } = calculateTotals();
   const selectedCustomer = customers.find((c) => c.id === formData.customerId);
   const selectedEvent = events.find((e) => e.id === formData.eventId);
 
@@ -1029,15 +1089,23 @@ function QuoteFormModal({
                 </Button>
               </div>
 
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-hidden overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted/50">
                     <tr className="text-left text-sm">
-                      <th className="p-3 font-medium w-1/2">ITEM DETAILS</th>
-                      <th className="p-3 font-medium text-center w-24">QUANTITY</th>
-                      <th className="p-3 font-medium text-right w-32">RATE</th>
-                      <th className="p-3 font-medium text-right w-32">AMOUNT</th>
-                      <th className="p-3 w-10"></th>
+                      <th className="p-2 font-medium">ITEM DETAILS</th>
+                      {isTaxDocument && <th className="p-2 font-medium text-center w-24">HSN/SAC</th>}
+                      <th className="p-2 font-medium text-center w-20">QTY</th>
+                      <th className="p-2 font-medium text-right w-24">RATE</th>
+                      <th className="p-2 font-medium text-right w-24">AMOUNT</th>
+                      {isTaxDocument && (
+                        <>
+                          <th className="p-2 font-medium text-center w-16">CGST%</th>
+                          <th className="p-2 font-medium text-center w-16">SGST%</th>
+                          <th className="p-2 font-medium text-right w-20">TAX</th>
+                        </>
+                      )}
+                      <th className="p-2 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1045,7 +1113,7 @@ function QuoteFormModal({
                       <tr key={index} className="border-t">
                         {item.isHeading ? (
                           <>
-                            <td colSpan={4} className="p-3">
+                            <td colSpan={isTaxDocument ? 8 : 4} className="p-2">
                               <Input
                                 placeholder="Section heading..."
                                 value={item.description}
@@ -1053,7 +1121,7 @@ function QuoteFormModal({
                                 className="font-semibold text-primary bg-primary/5"
                               />
                             </td>
-                            <td className="p-3 text-center">
+                            <td className="p-2 text-center">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1066,14 +1134,24 @@ function QuoteFormModal({
                           </>
                         ) : (
                           <>
-                            <td className="p-3">
+                            <td className="p-2">
                               <Input
                                 placeholder="Type or click to select an item."
                                 value={item.description}
                                 onChange={(e) => updateLineItem(index, "description", e.target.value)}
                               />
                             </td>
-                            <td className="p-3">
+                            {isTaxDocument && (
+                              <td className="p-2">
+                                <Input
+                                  placeholder="HSN"
+                                  className="text-center"
+                                  value={item.hsnSac || ""}
+                                  onChange={(e) => updateLineItem(index, "hsnSac", e.target.value)}
+                                />
+                              </td>
+                            )}
+                            <td className="p-2">
                               <Input
                                 type="number"
                                 className="text-center"
@@ -1081,7 +1159,7 @@ function QuoteFormModal({
                                 onChange={(e) => updateLineItem(index, "quantity", e.target.value)}
                               />
                             </td>
-                            <td className="p-3">
+                            <td className="p-2">
                               <Input
                                 type="number"
                                 className="text-right"
@@ -1089,10 +1167,33 @@ function QuoteFormModal({
                                 onChange={(e) => updateLineItem(index, "rate", e.target.value)}
                               />
                             </td>
-                            <td className="p-3 text-right font-medium">
+                            <td className="p-2 text-right font-medium">
                               {parseFloat(item.amount || 0).toFixed(2)}
                             </td>
-                            <td className="p-3 text-center">
+                            {isTaxDocument && (
+                              <>
+                                <td className="p-2">
+                                  <Input
+                                    type="number"
+                                    className="text-center w-16"
+                                    value={item.cgstPercent || 9}
+                                    onChange={(e) => updateLineItem(index, "cgstPercent", e.target.value)}
+                                  />
+                                </td>
+                                <td className="p-2">
+                                  <Input
+                                    type="number"
+                                    className="text-center w-16"
+                                    value={item.sgstPercent || 9}
+                                    onChange={(e) => updateLineItem(index, "sgstPercent", e.target.value)}
+                                  />
+                                </td>
+                                <td className="p-2 text-right text-xs text-muted-foreground">
+                                  {((parseFloat(item.cgstAmount) || 0) + (parseFloat(item.sgstAmount) || 0)).toFixed(2)}
+                                </td>
+                              </>
+                            )}
+                            <td className="p-2 text-center">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1122,25 +1223,54 @@ function QuoteFormModal({
               </div>
             </div>
 
+            {isTaxDocument && (
+              <div className="space-y-2">
+                <Label>Place of Supply</Label>
+                <Select value={formData.placeOfSupply || "Kerala (32)"} onValueChange={(v) => setFormData({ ...formData, placeOfSupply: v })}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INDIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>{state}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="flex justify-end">
               <div className="w-80 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span>Sub Total</span>
                   <span className="font-medium">{subtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Discount</span>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      className="w-16 h-8 text-center"
-                      value={formData.discountPercent}
-                      onChange={(e) => setFormData({ ...formData, discountPercent: parseFloat(e.target.value) || 0 })}
-                    />
-                    <span>%</span>
-                    <span className="w-24 text-right">{discountAmount.toFixed(2)}</span>
+                {isTaxDocument ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span>CGST</span>
+                      <span className="font-medium">{cgstTotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>SGST</span>
+                      <span className="font-medium">{sgstTotal.toFixed(2)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Discount</span>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        className="w-16 h-8 text-center"
+                        value={formData.discountPercent}
+                        onChange={(e) => setFormData({ ...formData, discountPercent: parseFloat(e.target.value) || 0 })}
+                      />
+                      <span>%</span>
+                      <span className="w-24 text-right">{discountAmount.toFixed(2)}</span>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="flex justify-between font-semibold text-lg border-t pt-2">
                   <span>Total</span>
                   <span>₹{total.toFixed(2)}</span>
