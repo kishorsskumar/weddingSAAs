@@ -846,11 +846,12 @@ function QuoteFormModal({
     const { subtotal, discountAmount, total } = calculateTotals();
     
     // Transform line items to match backend schema (name/total instead of description/amount)
+    // Ensure all numeric values are properly parsed as numbers
     const transformedLineItems = formData.lineItems.map((item: any) => ({
       name: item.description || "",
-      quantity: item.quantity || 1,
-      rate: item.rate || 0,
-      total: item.amount || 0,
+      quantity: parseFloat(item.quantity) || 1,
+      rate: parseFloat(item.rate) || 0,
+      total: parseFloat(item.amount) || 0,
       isHeading: item.isHeading || false,
     }));
     
