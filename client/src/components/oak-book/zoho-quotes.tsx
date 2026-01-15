@@ -851,13 +851,12 @@ function QuoteFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingQuote ? "Edit Quote" : "New Quote"}</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-6 py-4">
+        <div className="space-y-6 py-4">
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-red-500">Customer Name*</Label>
@@ -1137,7 +1136,6 @@ function QuoteFormModal({
               />
             </div>
           </div>
-        </ScrollArea>
 
         <DialogFooter className="border-t pt-4">
           <Button variant="outline" onClick={() => handleSave(true)} disabled={isPending}>
