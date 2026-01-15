@@ -857,6 +857,9 @@ function QuoteFormModal({
     onSave(
       {
         ...formData,
+        // Convert empty strings to null for optional foreign key fields
+        customerId: formData.customerId || null,
+        eventId: formData.eventId || null,
         lineItems: transformedLineItems,
         isTaxDocument,
         subtotal: subtotal.toFixed(2),
