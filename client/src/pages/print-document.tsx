@@ -229,8 +229,8 @@ const baseStyles = `
   /* Header */
   .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
   .company-info { flex: 1; }
-  .company-logo { width: 180px; height: 60px; background: white; padding: 4px; border-radius: 4px; margin-bottom: 8px; }
-  .company-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .company-logo { width: 180px; height: auto; background: white; padding: 4px; border-radius: 4px; margin-bottom: 8px; }
+  .company-logo img { width: 100%; height: auto; max-height: 80px; object-fit: contain; }
   .company-name { display: none; }
   .company-address { font-size: 11px; color: #444; line-height: 1.5; }
   .doc-type-box { text-align: right; }
@@ -332,9 +332,13 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
-              <div>{companySettings?.phone || '7902373354'}</div>
-              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-              <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+              {!isTaxDocument && (
+                <>
+                  <div>{companySettings?.phone || '7902373354'}</div>
+                  <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+                  <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -581,9 +585,13 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
-              <div>{companySettings?.phone || '7902373354'}</div>
-              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-              <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+              {!isTaxDocument && (
+                <>
+                  <div>{companySettings?.phone || '7902373354'}</div>
+                  <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
+                  <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
+                </>
+              )}
             </div>
           </div>
         )}
