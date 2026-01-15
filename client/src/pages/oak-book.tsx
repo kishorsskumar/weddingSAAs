@@ -3510,7 +3510,10 @@ export default function OakBook() {
           <ResizableHandle withHandle />
 
           {/* Middle Panel - List View */}
-          <ResizablePanel defaultSize={42} minSize={30}>
+          <ResizablePanel 
+            defaultSize={["estimates", "standard-estimates", "tax-estimates", "invoices", "standard-invoices", "tax-invoices"].includes(activeSection) ? 82 : 42} 
+            minSize={30}
+          >
             <div className={cn(
               "h-full overflow-auto",
               // Remove padding for full-page components that have their own layout
@@ -3520,14 +3523,19 @@ export default function OakBook() {
             </div>
           </ResizablePanel>
 
-          <ResizableHandle withHandle />
+          {/* Only show right panel for sections that don't have their own detail view */}
+          {!["estimates", "standard-estimates", "tax-estimates", "invoices", "standard-invoices", "tax-invoices"].includes(activeSection) && (
+            <>
+              <ResizableHandle withHandle />
 
-          {/* Right Panel - Preview */}
-          <ResizablePanel defaultSize={40} minSize={25}>
-            <div className="h-full border-l bg-card">
-              {renderPreviewPanel()}
-            </div>
-          </ResizablePanel>
+              {/* Right Panel - Preview */}
+              <ResizablePanel defaultSize={40} minSize={25}>
+                <div className="h-full border-l bg-card">
+                  {renderPreviewPanel()}
+                </div>
+              </ResizablePanel>
+            </>
+          )}
         </ResizablePanelGroup>
       </div>
 
