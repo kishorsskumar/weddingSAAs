@@ -100,6 +100,7 @@ type SidebarSection = {
 };
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
+  { id: "customers", label: "Customers", icon: Users },
   { 
     id: "sales", 
     label: "Sales", 

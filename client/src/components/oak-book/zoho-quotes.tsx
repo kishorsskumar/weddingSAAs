@@ -861,6 +861,10 @@ function QuoteFormModal({
         // Convert empty strings to null for optional foreign key fields
         customerId: formData.customerId || null,
         eventId: formData.eventId || null,
+        // Date is required, ensure it has a value
+        date: formData.date || format(new Date(), "yyyy-MM-dd"),
+        // Omit expiryDate if empty (don't send null)
+        ...(formData.expiryDate ? { expiryDate: formData.expiryDate } : {}),
         lineItems: transformedLineItems,
         isTaxDocument,
         subtotal: subtotal.toFixed(2),

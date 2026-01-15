@@ -955,6 +955,10 @@ function InvoiceFormModal({
         // Convert empty strings to null for optional foreign key fields
         customerId: formData.customerId || null,
         eventId: formData.eventId || null,
+        // Date is required, ensure it has a value
+        date: formData.date || format(new Date(), "yyyy-MM-dd"),
+        // Omit dueDate if empty (don't send null)
+        ...(formData.dueDate ? { dueDate: formData.dueDate } : {}),
         lineItems: transformedLineItems,
         subtotal: subtotal.toFixed(2),
         discountPercent: isTaxInvoice ? "0" : discount.percent,
