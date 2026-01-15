@@ -765,13 +765,24 @@ function QuoteFormModal({
   useEffect(() => {
     if (open) {
       if (editingQuote) {
+        // Transform line items from backend format (name/total) to form format (description/amount)
+        const transformedLineItems = editingQuote.lineItems.length > 0 
+          ? editingQuote.lineItems.map((item: any) => ({
+              description: item.name || item.description || "",
+              quantity: item.quantity || 1,
+              rate: item.rate || 0,
+              amount: item.total || item.amount || 0,
+              isHeading: item.isHeading || false,
+            }))
+          : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }];
+        
         setFormData({
           number: editingQuote.number,
           customerId: editingQuote.customerId || "",
           eventId: editingQuote.eventId || "",
           date: editingQuote.date,
           subject: editingQuote.subject || "",
-          lineItems: editingQuote.lineItems.length > 0 ? editingQuote.lineItems : [{ description: "", quantity: 1, rate: 0, amount: 0, isHeading: false }],
+          lineItems: transformedLineItems,
           discountPercent: parseFloat(editingQuote.discountPercent) || 0,
           notes: editingQuote.notes || "",
           terms: editingQuote.terms || "",
@@ -833,11 +844,23 @@ function QuoteFormModal({
 
   const handleSave = (asDraft: boolean) => {
     const { subtotal, discountAmount, total } = calculateTotals();
+    
+    // Transform line items to match backend schema (name/total instead of description/amount)
+    const transformedLineItems = formData.lineItems.map((item: any) => ({
+      name: item.description || "",
+      quantity: item.quantity || 1,
+      rate: item.rate || 0,
+      total: item.amount || 0,
+      isHeading: item.isHeading || false,
+    }));
+    
     onSave(
       {
         ...formData,
+        lineItems: transformedLineItems,
         isTaxDocument,
         subtotal: subtotal.toFixed(2),
+        discountPercent: String(formData.discountPercent || 0),
         discountAmount: discountAmount.toFixed(2),
         total: total.toFixed(2),
       },
