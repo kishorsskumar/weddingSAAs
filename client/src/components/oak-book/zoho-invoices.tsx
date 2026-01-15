@@ -711,6 +711,18 @@ function InvoiceDetailPanel({
   );
 }
 
+// Indian states for GST Place of Supply
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands (35)", "Andhra Pradesh (37)", "Arunachal Pradesh (12)", 
+  "Assam (18)", "Bihar (10)", "Chandigarh (04)", "Chhattisgarh (22)", "Dadra and Nagar Haveli (26)", 
+  "Daman and Diu (25)", "Delhi (07)", "Goa (30)", "Gujarat (24)", "Haryana (06)", 
+  "Himachal Pradesh (02)", "Jammu and Kashmir (01)", "Jharkhand (20)", "Karnataka (29)", 
+  "Kerala (32)", "Ladakh (38)", "Lakshadweep (31)", "Madhya Pradesh (23)", "Maharashtra (27)", 
+  "Manipur (14)", "Meghalaya (17)", "Mizoram (15)", "Nagaland (13)", "Odisha (21)", 
+  "Puducherry (34)", "Punjab (03)", "Rajasthan (08)", "Sikkim (11)", "Tamil Nadu (33)", 
+  "Telangana (36)", "Tripura (16)", "Uttar Pradesh (09)", "Uttarakhand (05)", "West Bengal (19)"
+];
+
 function InvoiceFormModal({
   isOpen,
   onClose,
@@ -738,6 +750,8 @@ function InvoiceFormModal({
   onSubmit: (data: any, isDraft: boolean) => void;
   isSubmitting: boolean;
 }) {
+  const isTaxInvoice = filterType === "tax";
+  
   const [formData, setFormData] = useState({
     number: editingInvoice?.number || nextNumber,
     customerId: editingInvoice?.customerId || "",
@@ -747,12 +761,32 @@ function InvoiceFormModal({
     subject: editingInvoice?.subject || "",
     notes: editingInvoice?.notes || "",
     terms: editingInvoice?.terms || "",
+    placeOfSupply: (editingInvoice as any)?.placeOfSupply || "Kerala (32)",
   });
+
+  // Initialize line items with tax fields for tax invoices
+  const getDefaultLineItem = () => {
+    if (isTaxInvoice) {
+      return { type: "item", description: "", quantity: 1, rate: 0, amount: 0, hsnSac: "", cgstPercent: 9, sgstPercent: 9, cgstAmount: 0, sgstAmount: 0 };
+    }
+    return { type: "item", description: "", quantity: 1, rate: 0, amount: 0 };
+  };
 
   const [lineItems, setLineItems] = useState<any[]>(
     editingInvoice?.lineItems?.length
-      ? editingInvoice.lineItems
-      : [{ type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]
+      ? editingInvoice.lineItems.map((item: any) => ({
+          ...item,
+          description: item.name || item.description || "",
+          amount: item.total || item.amount || 0,
+          ...(isTaxInvoice ? { 
+            hsnSac: item.hsnSac || "", 
+            cgstPercent: item.cgstPercent ?? 9, 
+            sgstPercent: item.sgstPercent ?? 9,
+            cgstAmount: item.cgstAmount || 0,
+            sgstAmount: item.sgstAmount || 0
+          } : {})
+        }))
+      : [getDefaultLineItem()]
   );
 
   const [discount, setDiscount] = useState({
@@ -772,10 +806,22 @@ function InvoiceFormModal({
           subject: editingInvoice.subject || "",
           notes: editingInvoice.notes || "",
           terms: editingInvoice.terms || "",
+          placeOfSupply: (editingInvoice as any)?.placeOfSupply || "Kerala (32)",
         });
         setLineItems(editingInvoice.lineItems?.length 
-          ? editingInvoice.lineItems 
-          : [{ type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]);
+          ? editingInvoice.lineItems.map((item: any) => ({
+              ...item,
+              description: item.name || item.description || "",
+              amount: item.total || item.amount || 0,
+              ...(isTaxInvoice ? { 
+                hsnSac: item.hsnSac || "", 
+                cgstPercent: item.cgstPercent ?? 9, 
+                sgstPercent: item.sgstPercent ?? 9,
+                cgstAmount: item.cgstAmount || 0,
+                sgstAmount: item.sgstAmount || 0
+              } : {})
+            }))
+          : [getDefaultLineItem()]);
         setDiscount({
           percent: editingInvoice.discountPercent || "0",
           amount: editingInvoice.discountAmount || "0",
@@ -790,22 +836,35 @@ function InvoiceFormModal({
           subject: "",
           notes: "",
           terms: "",
+          placeOfSupply: "Kerala (32)",
         });
-        setLineItems([{ type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]);
+        setLineItems([getDefaultLineItem()]);
         setDiscount({ percent: "0", amount: "0" });
       }
     }
-  }, [isOpen, editingInvoice, nextNumber]);
+  }, [isOpen, editingInvoice, nextNumber, isTaxInvoice]);
 
   const calculateSubtotal = () => {
     return lineItems
       .filter((item) => item.type !== "section")
-      .reduce((sum, item) => sum + (item.amount || 0), 0);
+      .reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+  };
+
+  const calculateTaxTotals = () => {
+    if (!isTaxInvoice) return { cgstTotal: 0, sgstTotal: 0 };
+    const items = lineItems.filter((item) => item.type !== "section");
+    const cgstTotal = items.reduce((sum, item) => sum + (parseFloat(item.cgstAmount) || 0), 0);
+    const sgstTotal = items.reduce((sum, item) => sum + (parseFloat(item.sgstAmount) || 0), 0);
+    return { cgstTotal, sgstTotal };
   };
 
   const calculateTotal = () => {
     const subtotal = calculateSubtotal();
     const discountAmt = parseFloat(discount.amount) || 0;
+    const { cgstTotal, sgstTotal } = calculateTaxTotals();
+    if (isTaxInvoice) {
+      return Math.max(0, subtotal + cgstTotal + sgstTotal);
+    }
     return Math.max(0, subtotal - discountAmt);
   };
 
@@ -813,17 +872,25 @@ function InvoiceFormModal({
     const updated = [...lineItems];
     updated[index] = { ...updated[index], [field]: value };
 
-    if (field === "quantity" || field === "rate") {
-      const qty = field === "quantity" ? value : updated[index].quantity || 0;
-      const rate = field === "rate" ? value : updated[index].rate || 0;
-      updated[index].amount = qty * rate;
+    if (field === "quantity" || field === "rate" || field === "cgstPercent" || field === "sgstPercent") {
+      const qty = parseFloat(field === "quantity" ? value : updated[index].quantity) || 0;
+      const rate = parseFloat(field === "rate" ? value : updated[index].rate) || 0;
+      const baseAmount = qty * rate;
+      updated[index].amount = baseAmount;
+      
+      if (isTaxInvoice) {
+        const cgstPercent = parseFloat(field === "cgstPercent" ? value : updated[index].cgstPercent) || 0;
+        const sgstPercent = parseFloat(field === "sgstPercent" ? value : updated[index].sgstPercent) || 0;
+        updated[index].cgstAmount = baseAmount * (cgstPercent / 100);
+        updated[index].sgstAmount = baseAmount * (sgstPercent / 100);
+      }
     }
 
     setLineItems(updated);
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { type: "item", description: "", quantity: 1, rate: 0, amount: 0 }]);
+    setLineItems([...lineItems, getDefaultLineItem()]);
   };
 
   const addSectionHeading = () => {
@@ -844,9 +911,11 @@ function InvoiceFormModal({
   const handleSubmit = (isDraft: boolean) => {
     const subtotal = calculateSubtotal();
     const total = calculateTotal();
+    const { cgstTotal, sgstTotal } = calculateTaxTotals();
 
     // Transform line items to match backend schema (name/total instead of description/amount)
     // Ensure all numeric values are properly parsed as numbers
+    let slNo = 0;
     const transformedLineItems = lineItems.map((item: any) => {
       if (item.type === "section") {
         return {
@@ -857,13 +926,27 @@ function InvoiceFormModal({
           isHeading: true,
         };
       }
-      return {
+      slNo++;
+      const baseItem = {
         name: item.description || "",
         quantity: parseFloat(item.quantity) || 1,
         rate: parseFloat(item.rate) || 0,
         total: parseFloat(item.amount) || 0,
         isHeading: false,
+        slNo,
       };
+      
+      if (isTaxInvoice) {
+        return {
+          ...baseItem,
+          hsnSac: item.hsnSac || "",
+          cgstPercent: parseFloat(item.cgstPercent) || 9,
+          sgstPercent: parseFloat(item.sgstPercent) || 9,
+          cgstAmount: parseFloat(item.cgstAmount) || 0,
+          sgstAmount: parseFloat(item.sgstAmount) || 0,
+        };
+      }
+      return baseItem;
     });
 
     onSubmit(
@@ -873,12 +956,16 @@ function InvoiceFormModal({
         customerId: formData.customerId || null,
         eventId: formData.eventId || null,
         lineItems: transformedLineItems,
-        subtotal: subtotal.toString(),
-        discountPercent: discount.percent,
-        discountAmount: discount.amount,
-        total: total.toString(),
-        balanceDue: total.toString(),
-        isTaxDocument: filterType === "tax",
+        subtotal: subtotal.toFixed(2),
+        discountPercent: isTaxInvoice ? "0" : discount.percent,
+        discountAmount: isTaxInvoice ? "0" : discount.amount,
+        cgstTotal: cgstTotal.toFixed(2),
+        sgstTotal: sgstTotal.toFixed(2),
+        taxTotal: (cgstTotal + sgstTotal).toFixed(2),
+        total: total.toFixed(2),
+        balanceDue: total.toFixed(2),
+        isTaxDocument: isTaxInvoice,
+        placeOfSupply: isTaxInvoice ? formData.placeOfSupply : null,
       },
       isDraft
     );
@@ -956,7 +1043,14 @@ function InvoiceFormModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          {isTaxInvoice && (
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+              <p className="text-sm font-medium text-purple-800 mb-1">Tax Invoice (GST)</p>
+              <p className="text-xs text-purple-600">This invoice will be issued under Yepman International</p>
+            </div>
+          )}
+
+          <div className={`grid ${isTaxInvoice ? 'grid-cols-4' : 'grid-cols-3'} gap-4`}>
             <div>
               <Label>Invoice Date</Label>
               <Input
@@ -993,6 +1087,26 @@ function InvoiceFormModal({
                 </SelectContent>
               </Select>
             </div>
+            {isTaxInvoice && (
+              <div>
+                <Label>Place of Supply</Label>
+                <Select
+                  value={formData.placeOfSupply}
+                  onValueChange={(value) => setFormData({ ...formData, placeOfSupply: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {INDIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div>
@@ -1018,14 +1132,17 @@ function InvoiceFormModal({
                 </Button>
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
+            <div className="border rounded-lg overflow-hidden overflow-x-auto">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="p-2 text-left text-sm font-medium text-gray-600 w-1/2">Item Details</th>
-                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-20">Quantity</th>
-                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-28">Rate</th>
-                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-28">Amount</th>
+                    <th className="p-2 text-left text-sm font-medium text-gray-600" style={{width: isTaxInvoice ? '25%' : '40%'}}>Item Details</th>
+                    {isTaxInvoice && <th className="p-2 text-left text-sm font-medium text-gray-600 w-24">HSN/SAC</th>}
+                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-16">Qty</th>
+                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-24">Rate</th>
+                    <th className="p-2 text-right text-sm font-medium text-gray-600 w-24">Amount</th>
+                    {isTaxInvoice && <th className="p-2 text-center text-sm font-medium text-gray-600 w-16">CGST%</th>}
+                    {isTaxInvoice && <th className="p-2 text-center text-sm font-medium text-gray-600 w-16">SGST%</th>}
                     <th className="p-2 w-10"></th>
                   </tr>
                 </thead>
@@ -1034,7 +1151,7 @@ function InvoiceFormModal({
                     <tr key={index} className="border-t">
                       {item.type === "section" ? (
                         <>
-                          <td colSpan={4} className="p-2">
+                          <td colSpan={isTaxInvoice ? 7 : 4} className="p-2">
                             <Input
                               value={item.heading}
                               onChange={(e) => handleLineItemChange(index, "heading", e.target.value)}
@@ -1061,6 +1178,16 @@ function InvoiceFormModal({
                               placeholder="Type or click to select an item"
                             />
                           </td>
+                          {isTaxInvoice && (
+                            <td className="p-2">
+                              <Input
+                                value={item.hsnSac || ""}
+                                onChange={(e) => handleLineItemChange(index, "hsnSac", e.target.value)}
+                                placeholder="HSN/SAC"
+                                className="text-sm"
+                              />
+                            </td>
+                          )}
                           <td className="p-2">
                             <Input
                               type="number"
@@ -1082,8 +1209,32 @@ function InvoiceFormModal({
                             />
                           </td>
                           <td className="p-2 text-right font-medium">
-                            ₹{(item.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                            ₹{(parseFloat(item.amount) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                           </td>
+                          {isTaxInvoice && (
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.cgstPercent || 9}
+                                onChange={(e) =>
+                                  handleLineItemChange(index, "cgstPercent", parseFloat(e.target.value) || 0)
+                                }
+                                className="text-center w-14"
+                              />
+                            </td>
+                          )}
+                          {isTaxInvoice && (
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                value={item.sgstPercent || 9}
+                                onChange={(e) =>
+                                  handleLineItemChange(index, "sgstPercent", parseFloat(e.target.value) || 0)
+                                }
+                                className="text-center w-14"
+                              />
+                            </td>
+                          )}
                           <td className="p-2">
                             <Button
                               variant="ghost"
@@ -1103,34 +1254,51 @@ function InvoiceFormModal({
           </div>
 
           <div className="flex justify-end">
-            <div className="w-72 space-y-2">
+            <div className="w-80 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Sub Total</span>
                 <span className="font-medium">
                   ₹{calculateSubtotal().toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Discount</span>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={discount.percent}
-                    onChange={(e) => handleDiscountPercentChange(e.target.value)}
-                    className="w-16 h-8 text-right text-sm"
-                    placeholder="%"
-                  />
-                  <span className="text-sm">%</span>
-                  <Input
-                    type="number"
-                    value={discount.amount}
-                    onChange={(e) =>
-                      setDiscount({ ...discount, amount: e.target.value, percent: "0" })
-                    }
-                    className="w-24 h-8 text-right text-sm"
-                  />
+              {isTaxInvoice ? (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">CGST</span>
+                    <span className="font-medium">
+                      ₹{calculateTaxTotals().cgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">SGST</span>
+                    <span className="font-medium">
+                      ₹{calculateTaxTotals().sgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Discount</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={discount.percent}
+                      onChange={(e) => handleDiscountPercentChange(e.target.value)}
+                      className="w-16 h-8 text-right text-sm"
+                      placeholder="%"
+                    />
+                    <span className="text-sm">%</span>
+                    <Input
+                      type="number"
+                      value={discount.amount}
+                      onChange={(e) =>
+                        setDiscount({ ...discount, amount: e.target.value, percent: "0" })
+                      }
+                      className="w-24 h-8 text-right text-sm"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex justify-between pt-2 border-t font-semibold">
                 <span>Total (₹)</span>
                 <span>₹{calculateTotal().toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
