@@ -3511,7 +3511,11 @@ export default function OakBook() {
 
           {/* Middle Panel - List View */}
           <ResizablePanel defaultSize={42} minSize={30}>
-            <div className="h-full overflow-auto p-4">
+            <div className={cn(
+              "h-full overflow-auto",
+              // Remove padding for full-page components that have their own layout
+              !["estimates", "standard-estimates", "tax-estimates", "invoices", "standard-invoices", "tax-invoices", "customers", "vendors", "payments-received", "expenses", "bills", "delivery-challans", "banks"].includes(activeSection) && "p-4"
+            )}>
               {renderContent()}
             </div>
           </ResizablePanel>
@@ -3528,7 +3532,10 @@ export default function OakBook() {
       </div>
 
       {/* Mobile Content */}
-      <div className="md:hidden flex-1 overflow-auto p-4">
+      <div className={cn(
+        "md:hidden flex-1 overflow-auto",
+        !["estimates", "standard-estimates", "tax-estimates", "invoices", "standard-invoices", "tax-invoices", "customers", "vendors", "payments-received", "expenses", "bills", "delivery-challans", "banks"].includes(activeSection) && "p-4"
+      )}>
         {selectedRecord ? renderPreviewPanel() : renderContent()}
       </div>
 
