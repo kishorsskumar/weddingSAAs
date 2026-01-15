@@ -808,6 +808,11 @@ export default function OakBook() {
       number: `INV-${Date.now()}`,
       date: format(new Date(), "yyyy-MM-dd"),
       status: "draft",
+      // Ensure dueDate is not an empty string
+      dueDate: (invoice as any).dueDate || undefined,
+      // Convert empty strings to null/undefined for optional fields
+      customerId: invoice.customerId || null,
+      eventId: (invoice as any).eventId || null,
     };
     setEditingInvoice(null);
     createInvoice.mutate(clonedData);
@@ -820,6 +825,11 @@ export default function OakBook() {
       number: `EST-${Date.now()}`,
       date: format(new Date(), "yyyy-MM-dd"),
       status: "draft",
+      // Ensure expiryDate is not an empty string
+      expiryDate: (estimate as any).expiryDate || undefined,
+      // Convert empty strings to null/undefined for optional fields
+      customerId: estimate.customerId || null,
+      eventId: (estimate as any).eventId || null,
     };
     setEditingEstimate(null);
     createEstimate.mutate(clonedData);
@@ -3851,6 +3861,10 @@ function InvoiceForm({ invoice, customers, onSubmit, onCancel, onCreateCustomer 
 
     onSubmit({
       ...formData,
+      // Ensure date is always provided (required field)
+      date: formData.date || format(new Date(), "yyyy-MM-dd"),
+      // Convert empty customerId to null
+      customerId: formData.customerId || null,
       lineItems: numberedItems,
       subtotal: totals.subtotal.toFixed(2),
       discountAmount: totals.discountAmount.toFixed(2),
@@ -4290,6 +4304,10 @@ function EstimateForm({ estimate, customers, onSubmit, onCancel, onCreateCustome
 
     onSubmit({
       ...formData,
+      // Ensure date is always provided (required field)
+      date: formData.date || format(new Date(), "yyyy-MM-dd"),
+      // Convert empty customerId to null
+      customerId: formData.customerId || null,
       lineItems: numberedItems,
       subtotal: totals.subtotal.toFixed(2),
       discountAmount: totals.discountAmount.toFixed(2),
@@ -4625,7 +4643,13 @@ function PaymentForm({ payment, customers, invoices, onSubmit, onCancel }: {
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSubmit(formData)}>{payment ? "Update" : "Record"}</Button>
+        <Button onClick={() => onSubmit({
+          ...formData,
+          // Ensure date is always provided
+          date: formData.date || format(new Date(), "yyyy-MM-dd"),
+          // Convert empty customerId to null
+          customerId: formData.customerId || null,
+        })}>{payment ? "Update" : "Record"}</Button>
       </DialogFooter>
     </div>
   );

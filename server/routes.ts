@@ -5108,11 +5108,12 @@ export async function registerRoutes(
       const invoiceNumber = await storage.getNextInvoiceNumber();
       const invoice = await storage.createInvoice({
         number: invoiceNumber,
-        customerId: estimate.customerId,
-        eventId: estimate.eventId,
+        customerId: estimate.customerId || null,
+        eventId: estimate.eventId || null,
         estimateId: estimate.id,
         date: new Date().toISOString().split('T')[0],
-        dueDate: estimate.dueDate,
+        // Only include dueDate if it has a value
+        ...(estimate.dueDate ? { dueDate: estimate.dueDate } : {}),
         status: 'sent',
         lineItems: estimate.lineItems,
         subtotal: estimate.subtotal,
