@@ -549,8 +549,6 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="footer">POWERED BY</div>
     </div>
   );
 }
@@ -832,8 +830,6 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="footer">POWERED BY</div>
     </div>
   );
 }
