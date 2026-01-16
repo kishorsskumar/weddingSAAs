@@ -27,7 +27,12 @@ import {
   Info,
   AlertTriangle,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Plus,
+  MoreHorizontal,
+  Home,
+  FileText,
+  Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -82,6 +87,14 @@ const ICONS: Record<string, any> = {
 };
 
 const PAGES_WITH_OWN_SIDEBAR = ["/oak-book", "/oak-sales", "/oak-inventory"];
+
+const MOBILE_BOTTOM_NAV = [
+  { id: "dashboard", label: "Home", path: "/", icon: Home },
+  { id: "oak-book", label: "Book", path: "/oak-book", icon: Receipt },
+  { id: "event-calendar", label: "Events", path: "/events", icon: Calendar },
+  { id: "daybook", label: "Daybook", path: "/daybook", icon: BookOpen },
+  { id: "more", label: "More", path: null, icon: MoreHorizontal },
+];
 
 const NOTIFICATION_ICONS: Record<string, any> = {
   info: Info,
@@ -280,6 +293,107 @@ const ROLE_LABELS: Record<string, string> = {
   production_manager: "Production Manager",
 };
 
+function MobileBottomNav({ allowedPages, currentPath }: { allowedPages: string[], currentPath: string }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  
+  const moreMenuItems = ALL_PAGES.filter(
+    page => allowedPages.includes(page.id) && !MOBILE_BOTTOM_NAV.find(nav => nav.id === page.id)
+  );
+
+  return (
+    <>
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom">
+        <div className="flex items-center justify-around h-16">
+          {MOBILE_BOTTOM_NAV.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.path ? currentPath === item.path : false;
+            const hasAccess = item.id === "more" || allowedPages.includes(item.id);
+            
+            if (!hasAccess) return null;
+            
+            if (item.id === "more") {
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setMoreOpen(true)}
+                  className={cn(
+                    "flex flex-col items-center justify-center flex-1 h-full min-w-[64px] touch-manipulation",
+                    "text-gray-500 active:bg-gray-100 transition-colors"
+                  )}
+                  data-testid="nav-mobile-more"
+                >
+                  <Icon className="h-6 w-6 mb-1" />
+                  <span className="text-xs font-medium">{item.label}</span>
+                </button>
+              );
+            }
+            
+            return (
+              <Link key={item.id} href={item.path!}>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  className={cn(
+                    "flex flex-col items-center justify-center flex-1 h-full min-w-[64px] touch-manipulation",
+                    isActive 
+                      ? "text-primary" 
+                      : "text-gray-500 active:bg-gray-100"
+                  )}
+                  data-testid={`nav-mobile-${item.id}`}
+                >
+                  <Icon className={cn("h-6 w-6 mb-1", isActive && "text-primary")} />
+                  <span className={cn("text-xs font-medium", isActive && "text-primary")}>{item.label}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="mobileActiveTab"
+                      className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full"
+                    />
+                  )}
+                </motion.button>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl p-0">
+          <div className="p-4 border-b">
+            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-center">More Options</h3>
+          </div>
+          <ScrollArea className="h-[calc(70vh-80px)]">
+            <div className="p-4 grid grid-cols-3 gap-4">
+              {moreMenuItems.map((item) => {
+                const Icon = ICONS[item.id] || LayoutDashboard;
+                const isActive = currentPath === item.path;
+                return (
+                  <Link key={item.id} href={item.path}>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setMoreOpen(false)}
+                      className={cn(
+                        "flex flex-col items-center justify-center p-4 rounded-xl w-full",
+                        "min-h-[88px] touch-manipulation transition-colors",
+                        isActive 
+                          ? "bg-primary/10 text-primary" 
+                          : "bg-gray-50 text-gray-700 active:bg-gray-100"
+                      )}
+                      data-testid={`nav-more-${item.id}`}
+                    >
+                      <Icon className="h-7 w-7 mb-2" />
+                      <span className="text-xs font-medium text-center leading-tight">{item.label}</span>
+                    </motion.button>
+                  </Link>
+                );
+              })}
+            </div>
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
@@ -453,32 +567,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   if (hasOwnSidebar) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen md:min-h-screen min-h-[100dvh] bg-background pb-16 md:pb-0">
         {children}
+        <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen md:min-h-screen min-h-[100dvh] bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 border-r bg-sidebar">
         <NavContent />
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-sidebar border-b h-14 flex items-center justify-between px-4">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b h-14 flex items-center justify-between px-4 shadow-sm">
         <Sheet open={isMobileOpen} onOpenChange={setIsMobileOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-sidebar-foreground">
-              <Menu className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-11 w-11 touch-manipulation">
+              <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64 border-r-0">
+          <SheetContent side="left" className="p-0 w-72 border-r-0">
             <NavContent />
           </SheetContent>
         </Sheet>
-        <img src={logo} alt="Oakstreet Events" className="h-8 w-auto" />
+        <img src={logo} alt="Oakstreet Events" className="h-9 w-auto" />
         <NotificationBell />
       </div>
 
@@ -487,21 +602,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <NotificationBell />
       </div>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto h-screen">
+      {/* Main Content - Full height with proper mobile padding */}
+      <main className="flex-1 overflow-y-auto h-[100dvh] md:h-screen">
         <AnimatePresence mode="wait">
           <motion.div 
             key={location}
-            className="container mx-auto p-6 pt-16 md:pt-6 md:p-10 md:pr-16 max-w-7xl"
-            initial={{ opacity: 0, y: 20 }}
+            className="p-4 pt-16 pb-20 md:pt-6 md:pb-6 md:p-8 md:pr-12 max-w-7xl mx-auto"
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
           >
             {children}
           </motion.div>
         </AnimatePresence>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
     </div>
   );
 }
