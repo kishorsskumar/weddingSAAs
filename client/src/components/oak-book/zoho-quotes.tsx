@@ -480,7 +480,7 @@ function QuoteDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="fixed inset-0 md:relative md:inset-auto flex-1 flex flex-col bg-card md:border-l overflow-hidden z-50 md:z-auto">
+    <div className="fixed inset-0 md:relative md:inset-auto flex-1 flex flex-col bg-card md:border-l z-50 md:z-auto overflow-y-auto md:overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b bg-muted/30">
         <div>
           <p className="text-xs text-muted-foreground">Quote</p>
@@ -499,16 +499,16 @@ function QuoteDetailPanel({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 p-3 border-b bg-background">
+      <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-background">
         <Button variant="outline" size="sm" onClick={onEdit}>
-          <Edit className="h-4 w-4 mr-1" />
-          Edit
+          <Edit className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">Edit</span>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
-              <Send className="h-4 w-4 mr-1" />
-              Send
+              <Send className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Send</span>
               <ChevronDown className="h-3 w-3 ml-1" />
             </Button>
           </DropdownMenuTrigger>
@@ -517,15 +517,15 @@ function QuoteDetailPanel({
             <DropdownMenuItem>Send via WhatsApp</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" className="hidden sm:flex">
           <Share2 className="h-4 w-4 mr-1" />
           Share
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
-              <Printer className="h-4 w-4 mr-1" />
-              PDF/Print
+              <Printer className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">PDF</span>
               <ChevronDown className="h-3 w-3 ml-1" />
             </Button>
           </DropdownMenuTrigger>

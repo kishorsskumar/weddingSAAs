@@ -497,7 +497,7 @@ function InvoiceDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50 overflow-y-auto md:overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -532,26 +532,26 @@ function InvoiceDetailPanel({
         </DropdownMenu>
       </div>
 
-      <div className="flex items-center gap-2 p-3 border-b bg-white">
+      <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-white">
         <Button variant="outline" size="sm" onClick={onEdit}>
-          <Edit className="h-4 w-4 mr-1" />
-          Edit
+          <Edit className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">Edit</span>
         </Button>
         {invoice.status === "draft" && (
           <Button variant="outline" size="sm" onClick={onSend}>
-            <Send className="h-4 w-4 mr-1" />
-            Send
+            <Send className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Send</span>
           </Button>
         )}
         {(invoice.status === "sent" || invoice.status === "partial") && parseFloat(invoice.balanceDue) > 0 && (
           <Button variant="outline" size="sm" onClick={onRecordPayment} className="text-green-600 border-green-200 hover:bg-green-50">
-            <CreditCard className="h-4 w-4 mr-1" />
-            Record Payment
+            <CreditCard className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">Pay</span>
           </Button>
         )}
         <Button variant="outline" size="sm" onClick={() => onDownloadPdf?.("invoice", invoice.id, false)}>
-          <Printer className="h-4 w-4 mr-1" />
-          PDF/Print
+          <Printer className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">PDF</span>
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
