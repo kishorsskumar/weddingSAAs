@@ -2802,38 +2802,38 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-3">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-blue-500" />
-              Pending Leaves
+          <CardHeader className="p-3 pb-1 sm:pb-2 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
+              <span className="hidden sm:inline">Pending</span> Leaves
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingLeaves.length}</div>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{pendingLeaves.length}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Banknote className="h-4 w-4 text-green-500" />
-              Pending Advances
+          <CardHeader className="p-3 pb-1 sm:pb-2 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+              <Banknote className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+              Advances
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingAdvances.length}</div>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{pendingAdvances.length}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Receipt className="h-4 w-4 text-orange-500" />
-              Pending Expenses
+          <CardHeader className="p-3 pb-1 sm:pb-2 sm:p-6">
+            <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+              <Receipt className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
+              Expenses
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingExpenses.length}</div>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className="text-xl sm:text-2xl font-bold">{pendingExpenses.length}</div>
           </CardContent>
         </Card>
       </div>
@@ -2870,8 +2870,36 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
               </CardTitle>
               <CardDescription>Review and approve leave requests from your team</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+            <CardContent className="p-3 sm:p-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {pendingLeaves.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">No pending leave requests</div>
+                ) : (
+                  pendingLeaves.map((leave: any) => (
+                    <div key={leave.id} className="py-3 space-y-2" data-testid={`card-leave-${leave.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{leave.employeeName || 'Employee'}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{leave.leaveType}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs shrink-0">{formatDate(leave.startDate)} - {formatDate(leave.endDate)}</Badge>
+                      </div>
+                      {leave.reason && <p className="text-xs text-muted-foreground truncate">{leave.reason}</p>}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 text-green-600 h-8 text-xs" onClick={() => handleApprovalAction(leave, 'leave', 'approve')}>
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-red-600 h-8 text-xs" onClick={() => handleApprovalAction(leave, 'leave', 'reject')}>
+                          <XCircle className="h-3 w-3 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -2900,25 +2928,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                           <TableCell className="max-w-[150px] truncate">{leave.reason || '-'}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => handleApprovalAction(leave, 'leave', 'approve')}
-                                data-testid={`button-approve-leave-${leave.id}`}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Approve
+                              <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={() => handleApprovalAction(leave, 'leave', 'approve')} data-testid={`button-approve-leave-${leave.id}`}>
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleApprovalAction(leave, 'leave', 'reject')}
-                                data-testid={`button-reject-leave-${leave.id}`}
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Reject
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleApprovalAction(leave, 'leave', 'reject')} data-testid={`button-reject-leave-${leave.id}`}>
+                                <XCircle className="h-4 w-4 mr-1" /> Reject
                               </Button>
                             </div>
                           </TableCell>
@@ -2934,15 +2948,43 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
 
         <TabsContent value="advances">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Banknote className="h-5 w-5" />
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Banknote className="h-4 w-4 sm:h-5 sm:w-5" />
                 Pending Salary Advance Requests
               </CardTitle>
-              <CardDescription>Review and approve salary advance requests</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Review and approve salary advance requests</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+            <CardContent className="p-3 sm:p-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {pendingAdvances.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">No pending advance requests</div>
+                ) : (
+                  pendingAdvances.map((advance: any) => (
+                    <div key={advance.id} className="py-3 space-y-2" data-testid={`card-advance-${advance.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{advance.employeeName || 'Employee'}</p>
+                          <p className="text-xs text-muted-foreground">{advance.repaymentMonths} month repayment</p>
+                        </div>
+                        <p className="text-sm font-bold">₹{Number(advance.amount).toLocaleString()}</p>
+                      </div>
+                      {advance.reason && <p className="text-xs text-muted-foreground truncate">{advance.reason}</p>}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 text-green-600 h-8 text-xs" onClick={() => handleApprovalAction(advance, 'advance', 'approve')}>
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-red-600 h-8 text-xs" onClick={() => handleApprovalAction(advance, 'advance', 'reject')}>
+                          <XCircle className="h-3 w-3 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -2971,25 +3013,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                           <TableCell>{formatDate(advance.requestDate)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => handleApprovalAction(advance, 'advance', 'approve')}
-                                data-testid={`button-approve-advance-${advance.id}`}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Approve
+                              <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={() => handleApprovalAction(advance, 'advance', 'approve')} data-testid={`button-approve-advance-${advance.id}`}>
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleApprovalAction(advance, 'advance', 'reject')}
-                                data-testid={`button-reject-advance-${advance.id}`}
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Reject
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleApprovalAction(advance, 'advance', 'reject')} data-testid={`button-reject-advance-${advance.id}`}>
+                                <XCircle className="h-4 w-4 mr-1" /> Reject
                               </Button>
                             </div>
                           </TableCell>
@@ -3005,15 +3033,43 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
 
         <TabsContent value="expenses">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5" />
+            <CardHeader className="p-3 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5" />
                 Pending Expense Reimbursements
               </CardTitle>
-              <CardDescription>Review and approve expense reimbursement requests</CardDescription>
+              <CardDescription className="text-xs sm:text-sm">Review and approve expense reimbursement requests</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+            <CardContent className="p-3 sm:p-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {pendingExpenses.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">No pending expense reimbursements</div>
+                ) : (
+                  pendingExpenses.map((expense: any) => (
+                    <div key={expense.id} className="py-3 space-y-2" data-testid={`card-expense-${expense.id}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{expense.employeeName || 'Employee'}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{expense.category}</p>
+                        </div>
+                        <p className="text-sm font-bold">₹{Number(expense.amount).toLocaleString()}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{expense.description}</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1 text-green-600 h-8 text-xs" onClick={() => handleApprovalAction(expense, 'expense', 'approve')}>
+                          <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-red-600 h-8 text-xs" onClick={() => handleApprovalAction(expense, 'expense', 'reject')}>
+                          <XCircle className="h-3 w-3 mr-1" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -3042,25 +3098,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                           <TableCell>{formatDate(expense.expenseDate)}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600 hover:text-green-700"
-                                onClick={() => handleApprovalAction(expense, 'expense', 'approve')}
-                                data-testid={`button-approve-expense-${expense.id}`}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Approve
+                              <Button size="sm" variant="outline" className="text-green-600 hover:text-green-700" onClick={() => handleApprovalAction(expense, 'expense', 'approve')} data-testid={`button-approve-expense-${expense.id}`}>
+                                <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
                               </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600 hover:text-red-700"
-                                onClick={() => handleApprovalAction(expense, 'expense', 'reject')}
-                                data-testid={`button-reject-expense-${expense.id}`}
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Reject
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleApprovalAction(expense, 'expense', 'reject')} data-testid={`button-reject-expense-${expense.id}`}>
+                                <XCircle className="h-4 w-4 mr-1" /> Reject
                               </Button>
                             </div>
                           </TableCell>

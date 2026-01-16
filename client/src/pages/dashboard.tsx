@@ -520,7 +520,7 @@ export default function Dashboard() {
       >
         <h2 className="text-lg sm:text-xl font-serif font-semibold text-primary mb-4">Quick Access</h2>
         <motion.div 
-          className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+          className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
           variants={containerVariants}
           initial="hidden"
           animate="show"

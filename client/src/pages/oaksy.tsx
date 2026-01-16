@@ -43,6 +43,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
 
 interface OaksyAction {
   type: string;
@@ -287,9 +289,12 @@ export default function OaksyPage() {
   const isLoading = sendMessageMutation.isPending || createConversationMutation.isPending;
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex gap-4 p-4" data-testid="oaksy-page">
-      <Card className="w-80 flex-shrink-0 flex flex-col">
-        <CardHeader className="pb-3">
+    <div className="h-[100dvh] md:h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 md:gap-4 md:p-4" data-testid="oaksy-page">
+      <Card className={cn(
+        "w-full md:w-80 flex-shrink-0 flex flex-col rounded-none md:rounded-lg border-0 md:border",
+        activeConversationId && "hidden md:flex"
+      )}>
+        <CardHeader className="pb-3 p-3 sm:p-6 sm:pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <TreeDeciduous className="h-5 w-5 text-[#7C8B5D]" />
@@ -298,7 +303,7 @@ export default function OaksyPage() {
             <Button
               size="sm"
               onClick={handleNewConversation}
-              className="bg-[#7C8B5D] hover:bg-[#6a7950]"
+              className="bg-[#7C8B5D] hover:bg-[#6a7950] min-h-[44px] md:min-h-0"
               data-testid="button-new-conversation"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -321,9 +326,10 @@ export default function OaksyPage() {
                 {conversations.map((conv) => (
                   <div
                     key={conv.id}
-                    className={`group flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors ${
-                      activeConversationId === conv.id ? "bg-muted" : ""
-                    }`}
+                    className={cn(
+                      "group flex items-center gap-2 p-3 md:p-2 rounded-lg cursor-pointer hover:bg-muted transition-colors min-h-[56px] md:min-h-0",
+                      activeConversationId === conv.id && "bg-muted"
+                    )}
                     onClick={() => setActiveConversationId(conv.id)}
                     data-testid={`conversation-${conv.id}`}
                   >
@@ -342,14 +348,14 @@ export default function OaksyPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      className="h-8 w-8 md:h-6 md:w-6 opacity-100 md:opacity-0 group-hover:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteConversationMutation.mutate(conv.id);
                       }}
                       data-testid={`button-delete-${conv.id}`}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-4 w-4 md:h-3 md:w-3" />
                     </Button>
                   </div>
                 ))}
@@ -364,7 +370,7 @@ export default function OaksyPage() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full text-destructive hover:text-destructive"
+                  className="w-full text-destructive hover:text-destructive min-h-[44px]"
                   data-testid="button-clear-all-history"
                   disabled={clearAllHistoryMutation.isPending}
                 >
@@ -399,26 +405,38 @@ export default function OaksyPage() {
         )}
       </Card>
 
-      <Card className="flex-1 flex flex-col" data-testid="card-chat-main">
-        <CardHeader className="pb-3 border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 bg-[#9AAF6C]">
+      <Card className={cn(
+        "flex-1 flex flex-col rounded-none md:rounded-lg border-0 md:border",
+        activeConversationId ? "fixed inset-0 z-50 md:relative md:z-auto" : "hidden md:flex"
+      )} data-testid="card-chat-main">
+        <CardHeader className="pb-3 border-b p-3 sm:p-6 sm:pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden flex-shrink-0 min-h-[44px] min-w-[44px]"
+                onClick={() => setActiveConversationId(null)}
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 bg-[#9AAF6C] flex-shrink-0">
                 <AvatarFallback className="bg-[#7C8B5D] text-white">
-                  <Sparkles className="h-5 w-5" />
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <CardTitle className="text-lg" data-testid="text-oaksy-title">Oaksy AI Assistant</CardTitle>
-                <p className="text-sm text-muted-foreground" data-testid="text-oaksy-subtitle">
-                  Your helpful companion for event management
+              <div className="min-w-0">
+                <CardTitle className="text-base sm:text-lg truncate" data-testid="text-oaksy-title">Oaksy AI</CardTitle>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate" data-testid="text-oaksy-subtitle">
+                  Event management assistant
                 </p>
               </div>
             </div>
             {!activeConversationId && (
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="w-48" data-testid="select-department">
-                  <SelectValue placeholder="Select department" />
+                <SelectTrigger className="w-32 sm:w-48 min-h-[44px] sm:min-h-0" data-testid="select-department">
+                  <SelectValue placeholder="Department" />
                 </SelectTrigger>
                 <SelectContent>
                   {DEPARTMENTS.map((dept) => (
@@ -551,13 +569,16 @@ export default function OaksyPage() {
           </ScrollArea>
         </CardContent>
 
-        <div className="p-4 border-t">
+        <div className="p-3 sm:p-4 border-t bg-background">
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="icon"
               onClick={toggleRecording}
-              className={isRecording ? "bg-red-100 border-red-500 text-red-500" : ""}
+              className={cn(
+                "min-h-[44px] min-w-[44px] flex-shrink-0",
+                isRecording && "bg-red-100 border-red-500 text-red-500"
+              )}
               data-testid="button-voice-input"
             >
               {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -568,8 +589,8 @@ export default function OaksyPage() {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyPress}
+              className="flex-1 min-h-[44px]"
               disabled={isLoading}
-              className="flex-1"
               data-testid="input-message"
             />
             <Button

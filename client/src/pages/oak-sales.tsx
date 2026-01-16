@@ -427,55 +427,55 @@ function DashboardSection({
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Target className="w-6 h-6 text-blue-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Target className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Open Deals</p>
-                <p className="text-2xl font-bold">{openDeals.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Open Deals</p>
+                <p className="text-lg sm:text-2xl font-bold">{openDeals.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-green-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <DollarSign className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Pipeline Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalPipelineValue)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Pipeline</p>
+                <p className="text-lg sm:text-2xl font-bold">{formatCurrency(totalPipelineValue)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-amber-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-amber-100 rounded-lg">
+                <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Won Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(totalWonValue)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Won Value</p>
+                <p className="text-lg sm:text-2xl font-bold">{formatCurrency(totalWonValue)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <Clock className="w-6 h-6 text-purple-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Pending Tasks</p>
-                <p className="text-2xl font-bold">{pendingActivities.length}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Tasks</p>
+                <p className="text-lg sm:text-2xl font-bold">{pendingActivities.length}</p>
               </div>
             </div>
           </CardContent>
@@ -771,12 +771,14 @@ function PipelineSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Leads Pipeline</h1>
-          <p className="text-muted-foreground">Manage your sales pipeline</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Leads Pipeline</h1>
+            <p className="text-sm text-muted-foreground">Manage your sales pipeline</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedPipelineId || ''} onValueChange={setSelectedPipelineId}>
             <SelectTrigger className="w-[200px]" data-testid="select-pipeline">
               <SelectValue placeholder="Select Pipeline" />
@@ -1399,14 +1401,23 @@ function ContactsSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Contacts</h1>
-          <p className="text-muted-foreground">{contacts.length} contacts</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Contacts</h1>
+            <p className="text-sm text-muted-foreground">{contacts.length} contacts</p>
+          </div>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-contact" size="sm" className="sm:hidden">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+          </Dialog>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-contact">
+            <Button data-testid="button-add-contact-desktop" className="hidden sm:flex">
               <Plus className="w-4 h-4 mr-2" />
               Add Contact
             </Button>
@@ -1494,7 +1505,7 @@ function ContactsSection({
 
       {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search contacts..."
@@ -1507,7 +1518,7 @@ function ContactsSection({
       </div>
 
       {/* Contacts Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {filteredContacts.map(contact => {
           const company = companies.find(c => c.id === contact.companyId);
           return (
@@ -1599,14 +1610,23 @@ function CompaniesSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Companies</h1>
-          <p className="text-muted-foreground">{companies.length} companies</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Companies</h1>
+            <p className="text-sm text-muted-foreground">{companies.length} companies</p>
+          </div>
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-company" size="sm" className="sm:hidden">
+                <Plus className="w-4 h-4" />
+              </Button>
+            </DialogTrigger>
+          </Dialog>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-company">
+            <Button data-testid="button-add-company-desktop" className="hidden sm:flex">
               <Plus className="w-4 h-4 mr-2" />
               Add Company
             </Button>
@@ -1688,7 +1708,7 @@ function CompaniesSection({
 
       {/* Search */}
       <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
+        <div className="relative w-full sm:flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search companies..."
@@ -1701,7 +1721,7 @@ function CompaniesSection({
       </div>
 
       {/* Companies Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {filteredCompanies.map(company => (
           <Card key={company.id} className="hover:shadow-md transition-shadow cursor-pointer">
             <CardContent className="pt-6">

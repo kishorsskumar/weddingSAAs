@@ -686,7 +686,7 @@ export default function MonthlyPlan() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={format(currentDate, "MMMM yyyy")}
-                className="px-4 py-2 min-w-[140px] text-center font-medium bg-gradient-to-r from-[#6b9937]/10 to-[#c9a961]/10"
+                className="px-3 sm:px-4 py-2 min-w-[120px] sm:min-w-[140px] text-center font-medium bg-gradient-to-r from-[#6b9937]/10 to-[#c9a961]/10 text-sm sm:text-base"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -699,13 +699,13 @@ export default function MonthlyPlan() {
             </Button>
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-auto order-last sm:order-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search events..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 w-[180px] pl-9 bg-white"
+              className="h-9 w-full sm:w-48 lg:w-64 pl-9 bg-white"
               data-testid="input-search"
             />
           </div>
@@ -848,7 +848,97 @@ export default function MonthlyPlan() {
                 <p className="text-sm">Events will appear here once synced from the calendar</p>
               </div>
             ) : (
-              <div className="min-w-[1400px]">
+              <>
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y">
+                {sortedEntries.map((entry) => {
+                  const isComplete = entry.isComplete;
+                  return (
+                    <div 
+                      key={entry.id} 
+                      className={cn("p-4", isComplete && "bg-green-50")}
+                      data-testid={`card-${entry.id}`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            {isSuperadmin && (
+                              <Checkbox
+                                checked={!!isComplete}
+                                onCheckedChange={() => toggleComplete(entry)}
+                                className="h-4 w-4"
+                              />
+                            )}
+                            <span className="font-semibold text-sm text-[#4a7a25]">
+                              {format(new Date(entry.eventDate), "dd MMM")}
+                            </span>
+                          </div>
+                          <h3 className="font-medium text-sm truncate">{entry.subEventName || "-"}</h3>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            {entry.venue || "-"}
+                          </p>
+                        </div>
+                        {isSuperadmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-gray-400 hover:text-red-500"
+                            onClick={() => setDeleteId(entry.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mt-2">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Planner:</span>
+                          <span className="font-medium truncate ml-1">{entry.weddingPlanner || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coordinator:</span>
+                          <span className="font-medium truncate ml-1">{entry.stageManager || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Team Lead:</span>
+                          <span className="font-medium truncate ml-1">{entry.teamLead || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Team Count:</span>
+                          <span className="font-medium">{entry.productionTeamCount || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Florist:</span>
+                          <span className="font-medium truncate ml-1">{entry.florist || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Loading:</span>
+                          <span className="font-medium">{entry.loadingStartDateTime || "-"}</span>
+                        </div>
+                      </div>
+                      {(entry.productionStartTime || entry.productionEndTime || entry.dismantlingDateTime) && (
+                        <div className="grid grid-cols-3 gap-2 text-xs mt-2 pt-2 border-t">
+                          <div className="text-center">
+                            <p className="text-muted-foreground">Start</p>
+                            <p className="font-medium">{entry.productionStartTime || "-"}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-muted-foreground">End</p>
+                            <p className="font-medium">{entry.productionEndTime || "-"}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-muted-foreground">Dismantle</p>
+                            <p className="font-medium">{entry.dismantlingDateTime || "-"}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block min-w-[1400px]">
                 {groupedEntries.map((group, groupIndex) => (
                   <div key={groupIndex} className="border-b last:border-b-0">
                     {group.label && (
@@ -1169,6 +1259,7 @@ export default function MonthlyPlan() {
                   </div>
                 ))}
               </div>
+              </>
             )}
           </CardContent>
         </Card>

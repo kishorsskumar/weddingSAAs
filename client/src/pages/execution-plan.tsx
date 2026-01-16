@@ -274,25 +274,50 @@ export default function ExecutionPlanPage() {
     return (
       <div className="h-full flex flex-col">
         <div className="border-b bg-card">
-          <div className="flex items-center gap-4 p-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedPlanId(null)}
-              data-testid="button-back-to-plans"
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Back
-            </Button>
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold">{selectedPlan.title}</h1>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4">
+            <div className="flex items-center justify-between sm:justify-start gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedPlanId(null)}
+                data-testid="button-back-to-plans"
+              >
+                <ChevronLeft className="h-4 w-4 sm:mr-1" />
+                <span className="hidden sm:inline">Back</span>
+              </Button>
+              <div className="flex items-center gap-2 sm:hidden">
+                <Badge variant={selectedPlan.status === "active" ? "default" : "secondary"} className="text-xs">
+                  {selectedPlan.status}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={openEditDialog}
+                  data-testid="button-edit-plan-mobile"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  data-testid="button-delete-plan-mobile"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl font-semibold truncate">{selectedPlan.title}</h1>
               {selectedEvent && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {selectedEvent.customer} - {selectedEvent.type} ({selectedEvent.date ? format(new Date(selectedEvent.date), "MMM d, yyyy") : "No date"})
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <Badge variant={selectedPlan.status === "active" ? "default" : "secondary"}>
                 {selectedPlan.status}
               </Badge>
@@ -317,20 +342,22 @@ export default function ExecutionPlanPage() {
             </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-4 flex-1 flex flex-col">
-            <TabsList className="grid grid-cols-8 w-full max-w-4xl">
-              {SECTION_TABS.map((tab) => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="text-xs px-2"
-                  data-testid={`tab-${tab.id}`}
-                >
-                  <tab.icon className="h-3.5 w-3.5 mr-1 hidden sm:block" />
-                  <span className="truncate">{tab.label}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="px-2 sm:px-4 flex-1 flex flex-col">
+            <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+              <TabsList className="inline-flex sm:grid sm:grid-cols-8 w-max sm:w-full sm:max-w-4xl gap-1">
+                {SECTION_TABS.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="text-xs px-2 sm:px-2 whitespace-nowrap"
+                    data-testid={`tab-${tab.id}`}
+                  >
+                    <tab.icon className="h-3.5 w-3.5 sm:mr-1" />
+                    <span className="hidden sm:inline truncate">{tab.label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
             <div className="flex-1 overflow-auto p-4">
               <TabsContent value="checklist" className="m-0 h-full">
@@ -495,17 +522,17 @@ export default function ExecutionPlanPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Event Execution Plans</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl sm:text-2xl font-bold">Event Execution Plans</h1>
+          <p className="text-sm text-muted-foreground">
             Manage production checklists, item lists, manpower, and more for your events
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-plan">
+            <Button data-testid="button-create-plan" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Plan
             </Button>
@@ -721,7 +748,7 @@ export default function ExecutionPlanPage() {
         </Dialog>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {plans.map((plan) => {
           const event = plan.eventId ? events.find(e => e.id === plan.eventId) : null;
           return (

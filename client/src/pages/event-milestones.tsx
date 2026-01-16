@@ -23,6 +23,7 @@ interface PendingMilestone extends EventMilestone {
 export default function EventMilestones() {
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [addingToPhase, setAddingToPhase] = useState<number | null>(null);
+  const [mobileExpandedPhase, setMobileExpandedPhase] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
@@ -372,8 +373,123 @@ export default function EventMilestones() {
           </div>
         </motion.div>
 
-        {/* S-Curve Flow Diagram - Matching Reference Image Exactly */}
-        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-visible">
+        {/* Mobile Phase List */}
+        <div className="md:hidden space-y-3">
+          {[1, 2, 3, 4, 5, 6, 7].map((phase) => {
+            const stats = (() => {
+              const phaseData = groupedMilestones[phase];
+              const total = phaseData.milestones.length;
+              const completed = phaseData.milestones.filter(m => m.status === 'completed').length;
+              const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+              const isComplete = total > 0 && completed === total;
+              const hasOverdue = phaseData.milestones.some(m => 
+                m.status !== 'completed' && isBefore(parseISO(m.date), startOfDay(new Date()))
+              );
+              return { total, completed, progress, isComplete, hasOverdue, phaseName: phaseData.phaseName };
+            })();
+            const config = phaseConfig[phase];
+            const Icon = config.icon;
+            
+            return (
+              <motion.div
+                key={phase}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: phase * 0.05 }}
+                className={cn(
+                  "bg-white dark:bg-slate-800 rounded-xl p-4 border cursor-pointer",
+                  stats.hasOverdue && "border-red-400",
+                  stats.isComplete && "border-green-400"
+                )}
+                onClick={() => setMobileExpandedPhase(mobileExpandedPhase === phase ? null : phase)}
+                data-testid={`phase-card-mobile-${phase}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", config.bgColor)}>
+                    <Icon className={cn("w-5 h-5", config.color)} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Phase {phase}: {stats.phaseName}</h4>
+                      <span className={cn(
+                        "text-xs font-medium px-2 py-0.5 rounded-full",
+                        stats.isComplete ? "bg-green-100 text-green-700" : 
+                        stats.hasOverdue ? "bg-red-100 text-red-700" : 
+                        "bg-slate-100 text-slate-600"
+                      )}>
+                        {stats.progress}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{stats.completed}/{stats.total} tasks completed</p>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", mobileExpandedPhase === phase && "rotate-180")} />
+                </div>
+                <AnimatePresence>
+                  {mobileExpandedPhase === phase && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-3 pt-3 border-t space-y-2"
+                    >
+                      {groupedMilestones[phase].milestones.length === 0 ? (
+                        <p className="text-center text-muted-foreground text-sm py-2">No tasks in this phase</p>
+                      ) : (
+                        groupedMilestones[phase].milestones.map((milestone) => (
+                          <div
+                            key={milestone.id}
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-lg text-sm",
+                              milestone.status === 'completed' 
+                                ? "bg-green-50 dark:bg-green-900/20" 
+                                : isBefore(parseISO(milestone.date), startOfDay(new Date()))
+                                ? "bg-red-50 dark:bg-red-900/20"
+                                : "bg-slate-50 dark:bg-slate-800/50"
+                            )}
+                          >
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              <div className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0",
+                                milestone.status === 'completed' ? "bg-green-500" : "bg-slate-400"
+                              )}>
+                                {milestone.status === 'completed' ? (
+                                  <CheckCircle2 className="w-3 h-3 text-white" />
+                                ) : (
+                                  <Clock className="w-2.5 h-2.5 text-white" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={cn("truncate text-xs", milestone.status === 'completed' && "line-through text-muted-foreground")}>
+                                  {milestone.name}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">{formatDate(milestone.date)}</p>
+                              </div>
+                            </div>
+                            <Select
+                              value={milestone.status}
+                              onValueChange={(value) => updateMilestoneMutation.mutate({ id: milestone.id, data: { status: value as any } })}
+                            >
+                              <SelectTrigger className="w-20 h-7 text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="completed">Done</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* S-Curve Flow Diagram - Desktop Only */}
+        <div className="relative bg-white dark:bg-slate-900/50 rounded-3xl shadow-lg overflow-visible hidden md:block">
           <svg 
             className="w-full"
             viewBox="0 0 1200 520"
@@ -619,72 +735,93 @@ export default function EventMilestones() {
 
   return (
     <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Oak Event Milestones</h1>
-          <p className="text-sm text-muted-foreground">Track event planning progress</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Oak Event Milestones</h1>
+            <p className="text-sm text-muted-foreground hidden sm:block">Track event planning progress</p>
+          </div>
           {selectedEventId && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSelectedEventId("")}
-              className="gap-2"
-              data-testid="button-back-to-dashboard"
+              className="gap-1 sm:hidden"
+              data-testid="button-back-to-dashboard-mobile"
             >
               <ChevronLeft className="h-4 w-4" />
-              All Events
+              Back
             </Button>
           )}
-          <Select value={selectedEventId} onValueChange={setSelectedEventId}>
-            <SelectTrigger className="w-[250px]" data-testid="select-event">
-              <SelectValue placeholder="Select an event" />
-            </SelectTrigger>
-            <SelectContent>
-              {sortedEvents.map((event) => (
-                <SelectItem key={event.id} value={event.id}>
-                  {event.customer} - {formatDate(event.date)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isAdmin && selectedEventId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => generateMilestonesMutation.mutate(selectedEventId)}
-              disabled={generateMilestonesMutation.isPending}
-              className="gap-2"
-              data-testid="button-regenerate-milestones"
-            >
-              <RefreshCw className={cn("h-4 w-4", generateMilestonesMutation.isPending && "animate-spin")} />
-              {generateMilestonesMutation.isPending ? 'Generating...' : 'Regenerate'}
-            </Button>
-          )}
-          {isSuperAdmin && selectedEventId && selectedEvent?.status !== 'completed' && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => {
-                if (confirm('Mark this event as complete? This will close the event.')) {
-                  markEventCompleteMutation.mutate(selectedEventId);
-                }
-              }}
-              disabled={markEventCompleteMutation.isPending}
-              className="gap-2 bg-green-600 hover:bg-green-700"
-              data-testid="button-mark-event-complete"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {markEventCompleteMutation.isPending ? 'Completing...' : 'Mark Complete'}
-            </Button>
-          )}
-          {selectedEvent?.status === 'completed' && (
-            <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Event Completed
-            </Badge>
-          )}
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <div className="flex items-center gap-2">
+            {selectedEventId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedEventId("")}
+                className="gap-2 hidden sm:flex"
+                data-testid="button-back-to-dashboard"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                All Events
+              </Button>
+            )}
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger className="w-full sm:w-[250px]" data-testid="select-event">
+                <SelectValue placeholder="Select an event" />
+              </SelectTrigger>
+              <SelectContent>
+                {sortedEvents.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {event.customer} - {formatDate(event.date)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isAdmin && selectedEventId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => generateMilestonesMutation.mutate(selectedEventId)}
+                disabled={generateMilestonesMutation.isPending}
+                className="gap-2 flex-1 sm:flex-none"
+                data-testid="button-regenerate-milestones"
+              >
+                <RefreshCw className={cn("h-4 w-4", generateMilestonesMutation.isPending && "animate-spin")} />
+                <span className="hidden sm:inline">{generateMilestonesMutation.isPending ? 'Generating...' : 'Regenerate'}</span>
+                <span className="sm:hidden">{generateMilestonesMutation.isPending ? '...' : 'Regen'}</span>
+              </Button>
+            )}
+            {isSuperAdmin && selectedEventId && selectedEvent?.status !== 'completed' && (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Mark this event as complete? This will close the event.')) {
+                    markEventCompleteMutation.mutate(selectedEventId);
+                  }
+                }}
+                disabled={markEventCompleteMutation.isPending}
+                className="gap-2 bg-green-600 hover:bg-green-700 flex-1 sm:flex-none"
+                data-testid="button-mark-event-complete"
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                <span className="hidden sm:inline">{markEventCompleteMutation.isPending ? 'Completing...' : 'Mark Complete'}</span>
+                <span className="sm:hidden">{markEventCompleteMutation.isPending ? '...' : 'Complete'}</span>
+              </Button>
+            )}
+            {selectedEvent?.status === 'completed' && (
+              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                <span className="hidden sm:inline">Event Completed</span>
+                <span className="sm:hidden">Done</span>
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 

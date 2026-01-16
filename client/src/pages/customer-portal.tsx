@@ -185,16 +185,16 @@ export default function CustomerPortal() {
   const docType = link.documentType;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8">
-      <div className="max-w-4xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="Oakstreet Events" className="h-12 w-auto bg-primary p-2 rounded" />
-            <span className="text-xl font-semibold text-primary">
+    <div className="min-h-[100dvh] bg-gray-100 py-4 sm:py-8">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <img src={logo} alt="Oakstreet Events" className="h-10 sm:h-12 w-auto bg-primary p-1.5 sm:p-2 rounded flex-shrink-0" />
+            <span className="text-base sm:text-xl font-semibold text-primary truncate">
               {companySettings?.companyName || 'Oakstreet Events'}
             </span>
           </div>
-          <Button onClick={handleDownloadPDF} disabled={isDownloading}>
+          <Button onClick={handleDownloadPDF} disabled={isDownloading} className="min-h-[44px] w-full sm:w-auto">
             {isDownloading ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             ) : (
@@ -230,28 +230,28 @@ function EstimateView({ doc, customer, companySettings }: any) {
   const lineItems: LineItem[] = doc.lineItems || [];
 
   return (
-    <div id="portal-document" className="bg-white p-8">
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-start gap-4">
-          <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
-          <div>
-            <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">
+    <div id="portal-document" className="bg-white p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <img src={logo} alt="Oakstreet Events" className="h-12 sm:h-16 w-auto bg-primary p-1.5 sm:p-2 rounded flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-line">
               {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
             </p>
-            <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
-            <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
+            <p className="text-xs sm:text-sm">{companySettings?.phone || '7902373354'}</p>
+            <p className="text-xs sm:text-sm break-all">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
           </div>
         </div>
-        <div className="text-right">
-          <h2 className="text-3xl font-bold text-primary">Quotation</h2>
+        <div className="text-left sm:text-right">
+          <h2 className="text-2xl sm:text-3xl font-bold text-primary">Quotation</h2>
           <Badge variant={doc.status === 'accepted' ? 'default' : doc.status === 'expired' ? 'destructive' : 'secondary'} className="mt-2">
             {doc.status}
           </Badge>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <p className="text-sm text-muted-foreground">Quote No</p>
           <p className="font-medium">: {doc.number}</p>
@@ -387,28 +387,28 @@ function InvoiceView({ doc, customer, companySettings }: any) {
   const lineItems: LineItem[] = doc.lineItems || [];
 
   return (
-    <div id="portal-document" className="bg-white p-8">
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-start gap-4">
-          <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
-          <div>
-            <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">
+    <div id="portal-document" className="bg-white p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <img src={logo} alt="Oakstreet Events" className="h-12 sm:h-16 w-auto bg-primary p-1.5 sm:p-2 rounded flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-line">
               {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
             </p>
-            <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
-            <p className="text-sm">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
+            <p className="text-xs sm:text-sm">{companySettings?.phone || '7902373354'}</p>
+            <p className="text-xs sm:text-sm break-all">{companySettings?.email || 'oakstreetevents18@gmail.com'}</p>
           </div>
         </div>
-        <div className="text-right">
-          <h2 className="text-3xl font-bold text-primary">Invoice</h2>
+        <div className="text-left sm:text-right">
+          <h2 className="text-2xl sm:text-3xl font-bold text-primary">Invoice</h2>
           <Badge variant={doc.status === 'paid' ? 'default' : parseFloat(doc.balanceDue) > 0 ? 'destructive' : 'secondary'} className="mt-2">
             {doc.status}
           </Badge>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <p className="text-sm text-muted-foreground">Invoice No</p>
           <p className="font-medium">: {doc.number}</p>
@@ -546,24 +546,24 @@ function InvoiceView({ doc, customer, companySettings }: any) {
 
 function PaymentReceiptView({ doc, customer, companySettings }: any) {
   return (
-    <div id="portal-document" className="bg-white p-8">
-      <div className="flex justify-between items-start mb-6">
-        <div className="flex items-start gap-4">
-          <img src={logo} alt="Oakstreet Events" className="h-16 w-auto bg-primary p-2 rounded" />
-          <div>
-            <h1 className="text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
-            <p className="text-sm text-muted-foreground whitespace-pre-line">
+    <div id="portal-document" className="bg-white p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <img src={logo} alt="Oakstreet Events" className="h-12 sm:h-16 w-auto bg-primary p-1.5 sm:p-2 rounded flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold">{companySettings?.companyName || 'Oakstreet Events'}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-line">
               {companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'}
             </p>
-            <p className="text-sm">{companySettings?.phone || '7902373354'}</p>
+            <p className="text-xs sm:text-sm">{companySettings?.phone || '7902373354'}</p>
           </div>
         </div>
-        <div className="text-right">
-          <h2 className="text-3xl font-bold text-green-600">Payment Receipt</h2>
+        <div className="text-left sm:text-right">
+          <h2 className="text-xl sm:text-3xl font-bold text-green-600">Payment Receipt</h2>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6">
         <div className="space-y-2">
           <div>
             <p className="text-sm text-muted-foreground">Receipt No</p>

@@ -2253,18 +2253,18 @@ export default function EmployeePortal() {
           >
             <motion.div variants={staggerItem}>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
                   <div>
                     <CardTitle>Leave Balance - {leaveBalance?.fiscalYear}</CardTitle>
                     <CardDescription>Your annual leave allocation</CardDescription>
                   </div>
-                  <Button onClick={() => setIsLeaveDialogOpen(true)} data-testid="button-request-leave">
+                  <Button onClick={() => setIsLeaveDialogOpen(true)} className="w-full sm:w-auto" data-testid="button-request-leave">
                     <Plus className="h-4 w-4 mr-2" />
                     Request Leave
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                     <div className="text-center p-4 bg-muted/50 rounded-lg">
                       <p className="text-2xl font-bold text-primary">
                         {leaveBalance?.totalLeaves ?? 0}
@@ -2301,73 +2301,116 @@ export default function EmployeePortal() {
                   <CardDescription>Your leave requests and their status</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Type</TableHead>
-                          <TableHead>From</TableHead>
-                          <TableHead>To</TableHead>
-                          <TableHead>Days</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {leaveRequests.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                              No leave requests found
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          leaveRequests.map((request) => {
-                            const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
-                            return (
-                              <TableRow key={request.id} data-testid={`row-leave-${request.id}`}>
-                                <TableCell className="capitalize">{request.leaveType}</TableCell>
-                                <TableCell>{formatDate(request.startDate)}</TableCell>
-                                <TableCell>{formatDate(request.endDate)}</TableCell>
-                                <TableCell>{days}</TableCell>
-                                <TableCell className="max-w-[200px] truncate">{request.reason || '-'}</TableCell>
-                                <TableCell>{getStatusBadge(request.status)}</TableCell>
-                                <TableCell className="text-right">
-                                  {canEditDelete(request.status) && (
-                                    <div className="flex justify-end gap-1">
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8"
-                                        onClick={() => setEditingLeave(request)}
-                                        data-testid={`button-edit-leave-${request.id}`}
-                                      >
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-destructive hover:text-destructive"
-                                        onClick={() => {
-                                          if (confirm('Delete this leave request?')) {
-                                            deleteLeaveRequest.mutate(request.id);
-                                          }
-                                        }}
-                                        disabled={deleteLeaveRequest.isPending}
-                                        data-testid={`button-delete-leave-${request.id}`}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y">
+                    {leaveRequests.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No leave requests found</p>
+                    ) : (
+                      leaveRequests.map((request) => {
+                        const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
+                        return (
+                          <div key={request.id} className="py-3 space-y-2" data-testid={`card-leave-${request.id}`}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium capitalize">{request.leaveType}</span>
+                              {getStatusBadge(request.status)}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatDate(request.startDate)} - {formatDate(request.endDate)} ({days} days)
+                            </div>
+                            {request.reason && (
+                              <p className="text-sm text-muted-foreground truncate">{request.reason}</p>
+                            )}
+                            {canEditDelete(request.status) && (
+                              <div className="flex gap-2 pt-1">
+                                <Button variant="outline" size="sm" onClick={() => setEditingLeave(request)}>
+                                  <Pencil className="h-3 w-3 mr-1" /> Edit
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    if (confirm('Delete this leave request?')) {
+                                      deleteLeaveRequest.mutate(request.id);
+                                    }
+                                  }}
+                                  disabled={deleteLeaveRequest.isPending}
+                                >
+                                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
+                  {/* Desktop Table */}
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>From</TableHead>
+                        <TableHead>To</TableHead>
+                        <TableHead>Days</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {leaveRequests.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No leave requests found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        leaveRequests.map((request) => {
+                          const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
+                          return (
+                            <TableRow key={request.id} data-testid={`row-leave-${request.id}`}>
+                              <TableCell className="capitalize">{request.leaveType}</TableCell>
+                              <TableCell>{formatDate(request.startDate)}</TableCell>
+                              <TableCell>{formatDate(request.endDate)}</TableCell>
+                              <TableCell>{days}</TableCell>
+                              <TableCell className="max-w-[200px] truncate">{request.reason || '-'}</TableCell>
+                              <TableCell>{getStatusBadge(request.status)}</TableCell>
+                              <TableCell className="text-right">
+                                {canEditDelete(request.status) && (
+                                  <div className="flex justify-end gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => setEditingLeave(request)}
+                                      data-testid={`button-edit-leave-${request.id}`}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive hover:text-destructive"
+                                      onClick={() => {
+                                        if (confirm('Delete this leave request?')) {
+                                          deleteLeaveRequest.mutate(request.id);
+                                        }
+                                      }}
+                                      disabled={deleteLeaveRequest.isPending}
+                                      data-testid={`button-delete-leave-${request.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </motion.div>
@@ -2441,40 +2484,60 @@ export default function EmployeePortal() {
                 <CardDescription>Your salary payments and details</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Gross Pay</TableHead>
-                        <TableHead>Deductions</TableHead>
-                        <TableHead>Net Pay</TableHead>
-                        <TableHead>Days Worked</TableHead>
-                        <TableHead>Pay Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {payrollHistory.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No payroll history found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        payrollHistory.map((item) => (
-                          <TableRow key={item.id} data-testid={`row-payroll-${item.id}`}>
-                            <TableCell>{getMonthName(item.month)} {item.year}</TableCell>
-                            <TableCell>{formatCurrency(item.grossPay)}</TableCell>
-                            <TableCell className="text-red-600">-{formatCurrency(item.deductions)}</TableCell>
-                            <TableCell className="font-medium">{formatCurrency(item.netPay)}</TableCell>
-                            <TableCell>{item.daysWorked}</TableCell>
-                            <TableCell>{formatDate(item.payDate)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y">
+                  {payrollHistory.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No payroll history found</p>
+                  ) : (
+                    payrollHistory.map((item) => (
+                      <div key={item.id} className="py-3 space-y-2" data-testid={`card-payroll-${item.id}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{getMonthName(item.month)} {item.year}</span>
+                          <span className="font-semibold">{formatCurrency(item.netPay)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          <div>Gross: {formatCurrency(item.grossPay)}</div>
+                          <div className="text-red-600">Deductions: -{formatCurrency(item.deductions)}</div>
+                          <div>Days: {item.daysWorked}</div>
+                          <div>Paid: {formatDate(item.payDate)}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
+                {/* Desktop Table */}
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Month</TableHead>
+                      <TableHead>Gross Pay</TableHead>
+                      <TableHead>Deductions</TableHead>
+                      <TableHead>Net Pay</TableHead>
+                      <TableHead>Days Worked</TableHead>
+                      <TableHead>Pay Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payrollHistory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No payroll history found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      payrollHistory.map((item) => (
+                        <TableRow key={item.id} data-testid={`row-payroll-${item.id}`}>
+                          <TableCell>{getMonthName(item.month)} {item.year}</TableCell>
+                          <TableCell>{formatCurrency(item.grossPay)}</TableCell>
+                          <TableCell className="text-red-600">-{formatCurrency(item.deductions)}</TableCell>
+                          <TableCell className="font-medium">{formatCurrency(item.netPay)}</TableCell>
+                          <TableCell>{item.daysWorked}</TableCell>
+                          <TableCell>{formatDate(item.payDate)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </motion.div>
@@ -2492,46 +2555,68 @@ export default function EmployeePortal() {
                 <CardDescription>Your salary growth over time</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Effective Date</TableHead>
-                        <TableHead>Previous Salary</TableHead>
-                        <TableHead>New Salary</TableHead>
-                        <TableHead>Increment</TableHead>
-                        <TableHead>Percentage</TableHead>
-                        <TableHead>Reason</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {increments.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                            No increment records found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        increments.map((increment) => (
-                          <TableRow key={increment.id} data-testid={`row-increment-${increment.id}`}>
-                            <TableCell>{formatDate(increment.effectiveDate)}</TableCell>
-                            <TableCell>{formatCurrency(increment.previousSalary)}</TableCell>
-                            <TableCell className="font-medium text-green-600">
-                              {formatCurrency(increment.newSalary)}
-                            </TableCell>
-                            <TableCell className="text-green-600">
-                              +{formatCurrency(increment.incrementAmount)}
-                            </TableCell>
-                            <TableCell>
-                              {increment.incrementPercent ? `${increment.incrementPercent}%` : '-'}
-                            </TableCell>
-                            <TableCell className="capitalize">{increment.reason || '-'}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+                {/* Mobile Card View */}
+                <div className="md:hidden divide-y">
+                  {increments.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No increment records found</p>
+                  ) : (
+                    increments.map((increment) => (
+                      <div key={increment.id} className="py-3 space-y-2" data-testid={`card-increment-${increment.id}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{formatDate(increment.effectiveDate)}</span>
+                          <span className="text-green-600 font-semibold">+{formatCurrency(increment.incrementAmount)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="text-muted-foreground">Previous: {formatCurrency(increment.previousSalary)}</div>
+                          <div className="text-green-600 font-medium">New: {formatCurrency(increment.newSalary)}</div>
+                          <div className="text-muted-foreground">
+                            {increment.incrementPercent ? `${increment.incrementPercent}%` : '-'}
+                          </div>
+                          <div className="text-muted-foreground capitalize">{increment.reason || '-'}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
+                {/* Desktop Table */}
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Effective Date</TableHead>
+                      <TableHead>Previous Salary</TableHead>
+                      <TableHead>New Salary</TableHead>
+                      <TableHead>Increment</TableHead>
+                      <TableHead>Percentage</TableHead>
+                      <TableHead>Reason</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {increments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No increment records found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      increments.map((increment) => (
+                        <TableRow key={increment.id} data-testid={`row-increment-${increment.id}`}>
+                          <TableCell>{formatDate(increment.effectiveDate)}</TableCell>
+                          <TableCell>{formatCurrency(increment.previousSalary)}</TableCell>
+                          <TableCell className="font-medium text-green-600">
+                            {formatCurrency(increment.newSalary)}
+                          </TableCell>
+                          <TableCell className="text-green-600">
+                            +{formatCurrency(increment.incrementAmount)}
+                          </TableCell>
+                          <TableCell>
+                            {increment.incrementPercent ? `${increment.incrementPercent}%` : '-'}
+                          </TableCell>
+                          <TableCell className="capitalize">{increment.reason || '-'}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </motion.div>
@@ -2615,83 +2700,127 @@ export default function EmployeePortal() {
           >
             <motion.div variants={staggerItem}>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
                   <div>
                     <CardTitle>Salary Advance Requests</CardTitle>
                     <CardDescription>Request and track salary advances</CardDescription>
                   </div>
-                  <Button onClick={() => setIsAdvanceDialogOpen(true)} data-testid="button-request-advance">
+                  <Button onClick={() => setIsAdvanceDialogOpen(true)} className="w-full sm:w-auto" data-testid="button-request-advance">
                     <Plus className="h-4 w-4 mr-2" />
                     Request Advance
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y">
+                    {salaryAdvances.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No salary advance requests found</p>
+                    ) : (
+                      salaryAdvances.map((advance) => (
+                        <div key={advance.id} className="py-3 space-y-2" data-testid={`card-advance-${advance.id}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{formatCurrency(advance.amount)}</span>
+                            {getStatusBadge(advance.status)}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                            <div>Requested: {formatDate(advance.requestDate)}</div>
+                            <div>Repay: {advance.repaymentMonths} months</div>
+                            {advance.approvedAmount && (
+                              <div className="col-span-2">Approved: {formatCurrency(advance.approvedAmount)}</div>
+                            )}
+                          </div>
+                          {advance.reason && (
+                            <p className="text-sm text-muted-foreground truncate">{advance.reason}</p>
+                          )}
+                          {canEditDelete(advance.status) && (
+                            <div className="flex gap-2 pt-1">
+                              <Button variant="outline" size="sm" onClick={() => setEditingAdvance(advance)}>
+                                <Pencil className="h-3 w-3 mr-1" /> Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (confirm('Delete this salary advance request?')) {
+                                    deleteSalaryAdvance.mutate(advance.id);
+                                  }
+                                }}
+                                disabled={deleteSalaryAdvance.isPending}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Delete
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Desktop Table */}
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Request Date</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Repayment Months</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Approved Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {salaryAdvances.length === 0 ? (
                         <TableRow>
-                          <TableHead>Request Date</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Reason</TableHead>
-                          <TableHead>Repayment Months</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Approved Amount</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No salary advance requests found
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {salaryAdvances.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                              No salary advance requests found
+                      ) : (
+                        salaryAdvances.map((advance) => (
+                          <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
+                            <TableCell>{formatDate(advance.requestDate)}</TableCell>
+                            <TableCell>{formatCurrency(advance.amount)}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{advance.reason || '-'}</TableCell>
+                            <TableCell>{advance.repaymentMonths}</TableCell>
+                            <TableCell>{getStatusBadge(advance.status)}</TableCell>
+                            <TableCell>
+                              {advance.approvedAmount ? formatCurrency(advance.approvedAmount) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {canEditDelete(advance.status) && (
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setEditingAdvance(advance)}
+                                    data-testid={`button-edit-advance-${advance.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm('Delete this salary advance request?')) {
+                                        deleteSalaryAdvance.mutate(advance.id);
+                                      }
+                                    }}
+                                    disabled={deleteSalaryAdvance.isPending}
+                                    data-testid={`button-delete-advance-${advance.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          salaryAdvances.map((advance) => (
-                            <TableRow key={advance.id} data-testid={`row-advance-${advance.id}`}>
-                              <TableCell>{formatDate(advance.requestDate)}</TableCell>
-                              <TableCell>{formatCurrency(advance.amount)}</TableCell>
-                              <TableCell className="max-w-[200px] truncate">{advance.reason || '-'}</TableCell>
-                              <TableCell>{advance.repaymentMonths}</TableCell>
-                              <TableCell>{getStatusBadge(advance.status)}</TableCell>
-                              <TableCell>
-                                {advance.approvedAmount ? formatCurrency(advance.approvedAmount) : '-'}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                {canEditDelete(advance.status) && (
-                                  <div className="flex justify-end gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => setEditingAdvance(advance)}
-                                      data-testid={`button-edit-advance-${advance.id}`}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                      onClick={() => {
-                                        if (confirm('Delete this salary advance request?')) {
-                                          deleteSalaryAdvance.mutate(advance.id);
-                                        }
-                                      }}
-                                      disabled={deleteSalaryAdvance.isPending}
-                                      data-testid={`button-delete-advance-${advance.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </motion.div>
@@ -2758,7 +2887,7 @@ export default function EmployeePortal() {
           >
             <motion.div variants={staggerItem}>
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Receipt className="h-5 w-5" />
@@ -2766,76 +2895,118 @@ export default function EmployeePortal() {
                     </CardTitle>
                     <CardDescription>Track your expense reimbursement requests</CardDescription>
                   </div>
-                  <Button onClick={() => setIsExpenseDialogOpen(true)} data-testid="button-new-expense">
+                  <Button onClick={() => setIsExpenseDialogOpen(true)} className="w-full sm:w-auto" data-testid="button-new-expense">
                     <Plus className="h-4 w-4 mr-2" />
                     New Request
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y">
+                    {expenseReimbursements.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No expense reimbursement requests found</p>
+                    ) : (
+                      expenseReimbursements.map((expense) => (
+                        <div key={expense.id} className="py-3 space-y-2" data-testid={`card-expense-${expense.id}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium capitalize">{expense.category}</span>
+                            {getStatusBadge(expense.status)}
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">{formatDate(expense.expenseDate)}</span>
+                            <span className="font-semibold">{formatCurrency(expense.amount)}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{expense.description}</p>
+                          {expense.managerComments && (
+                            <p className="text-xs text-muted-foreground italic">"{expense.managerComments}"</p>
+                          )}
+                          {canEditDelete(expense.status) && (
+                            <div className="flex gap-2 pt-1">
+                              <Button variant="outline" size="sm" onClick={() => setEditingExpense(expense)}>
+                                <Pencil className="h-3 w-3 mr-1" /> Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-destructive"
+                                onClick={() => {
+                                  if (confirm('Delete this expense request?')) {
+                                    deleteExpenseReimbursement.mutate(expense.id);
+                                  }
+                                }}
+                                disabled={deleteExpenseReimbursement.isPending}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Delete
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Desktop Table */}
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Expense Date</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Comments</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expenseReimbursements.length === 0 ? (
                         <TableRow>
-                          <TableHead>Expense Date</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Comments</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            No expense reimbursement requests found
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {expenseReimbursements.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                              No expense reimbursement requests found
+                      ) : (
+                        expenseReimbursements.map((expense) => (
+                          <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
+                            <TableCell>{formatDate(expense.expenseDate)}</TableCell>
+                            <TableCell className="capitalize">{expense.category}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
+                            <TableCell>{formatCurrency(expense.amount)}</TableCell>
+                            <TableCell>{getStatusBadge(expense.status)}</TableCell>
+                            <TableCell className="max-w-[150px] truncate">{expense.managerComments || '-'}</TableCell>
+                            <TableCell className="text-right">
+                              {canEditDelete(expense.status) && (
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => setEditingExpense(expense)}
+                                    data-testid={`button-edit-expense-${expense.id}`}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm('Delete this expense request?')) {
+                                        deleteExpenseReimbursement.mutate(expense.id);
+                                      }
+                                    }}
+                                    disabled={deleteExpenseReimbursement.isPending}
+                                    data-testid={`button-delete-expense-${expense.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          expenseReimbursements.map((expense) => (
-                            <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
-                              <TableCell>{formatDate(expense.expenseDate)}</TableCell>
-                              <TableCell className="capitalize">{expense.category}</TableCell>
-                              <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                              <TableCell>{formatCurrency(expense.amount)}</TableCell>
-                              <TableCell>{getStatusBadge(expense.status)}</TableCell>
-                              <TableCell className="max-w-[150px] truncate">{expense.managerComments || '-'}</TableCell>
-                              <TableCell className="text-right">
-                                {canEditDelete(expense.status) && (
-                                  <div className="flex justify-end gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={() => setEditingExpense(expense)}
-                                      data-testid={`button-edit-expense-${expense.id}`}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 text-destructive hover:text-destructive"
-                                      onClick={() => {
-                                        if (confirm('Delete this expense request?')) {
-                                          deleteExpenseReimbursement.mutate(expense.id);
-                                        }
-                                      }}
-                                      disabled={deleteExpenseReimbursement.isPending}
-                                      data-testid={`button-delete-expense-${expense.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </motion.div>
@@ -2918,40 +3089,60 @@ export default function EmployeePortal() {
                   <CardDescription>Upcoming holidays for the current year</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
+                  {/* Mobile Card View */}
+                  <div className="md:hidden divide-y">
+                    {publicHolidays.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">No public holidays found for this year</p>
+                    ) : (
+                      publicHolidays.map((holiday) => (
+                        <div key={holiday.id} className="py-3 space-y-1" data-testid={`card-holiday-${holiday.id}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{holiday.name}</span>
+                            <Badge variant={holiday.isNational ? 'default' : 'secondary'}>
+                              {holiday.isNational ? 'National' : 'Regional'}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground">{formatDate(holiday.date)}</div>
+                          {holiday.description && (
+                            <p className="text-sm text-muted-foreground">{holiday.description}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Desktop Table */}
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Holiday</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Type</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {publicHolidays.length === 0 ? (
                         <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Holiday</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Type</TableHead>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            No public holidays found for this year
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {publicHolidays.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                              No public holidays found for this year
+                      ) : (
+                        publicHolidays.map((holiday) => (
+                          <TableRow key={holiday.id} data-testid={`row-holiday-${holiday.id}`}>
+                            <TableCell>{formatDate(holiday.date)}</TableCell>
+                            <TableCell className="font-medium">{holiday.name}</TableCell>
+                            <TableCell>{holiday.description || '-'}</TableCell>
+                            <TableCell>
+                              <Badge variant={holiday.isNational ? 'default' : 'secondary'}>
+                                {holiday.isNational ? 'National' : 'Regional'}
+                              </Badge>
                             </TableCell>
                           </TableRow>
-                        ) : (
-                          publicHolidays.map((holiday) => (
-                            <TableRow key={holiday.id} data-testid={`row-holiday-${holiday.id}`}>
-                              <TableCell>{formatDate(holiday.date)}</TableCell>
-                              <TableCell className="font-medium">{holiday.name}</TableCell>
-                              <TableCell>{holiday.description || '-'}</TableCell>
-                              <TableCell>
-                                <Badge variant={holiday.isNational ? 'default' : 'secondary'}>
-                                  {holiday.isNational ? 'National' : 'Regional'}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
             </motion.div>

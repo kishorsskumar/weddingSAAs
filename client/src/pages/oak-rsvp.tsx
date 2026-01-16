@@ -634,28 +634,17 @@ function OutreachTab({ eventId, guests, responses }: {
                 <p>No messages sent yet</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Guest</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Sent At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <>
+                <div className="md:hidden divide-y">
                   {messageLogs.map(log => {
                     const guest = guests.find(g => g.id === log.guestId);
                     return (
-                      <TableRow key={log.id}>
-                        <TableCell>
-                          <div>{guest?.name || 'Unknown'}</div>
-                          <div className="text-sm text-[#8b7355]">{log.recipientPhone}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{log.messageType}</Badge>
-                        </TableCell>
-                        <TableCell>
+                      <div key={log.id} className="p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{guest?.name || 'Unknown'}</div>
+                            <div className="text-xs text-[#8b7355]">{log.recipientPhone}</div>
+                          </div>
                           <Badge 
                             variant={
                               log.deliveryStatus === 'delivered' || log.deliveryStatus === 'read' 
@@ -664,18 +653,62 @@ function OutreachTab({ eventId, guests, responses }: {
                                   ? 'destructive' 
                                   : 'secondary'
                             }
+                            className="shrink-0"
                           >
                             {log.deliveryStatus}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-[#8b7355]">
-                          {log.sentAt ? format(parseISO(log.sentAt), 'MMM d, h:mm a') : '-'}
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <Badge variant="outline">{log.messageType}</Badge>
+                          <span className="text-[#8b7355]">{log.sentAt ? format(parseISO(log.sentAt), 'MMM d, h:mm a') : '-'}</span>
+                        </div>
+                      </div>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </div>
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Guest</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Sent At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {messageLogs.map(log => {
+                      const guest = guests.find(g => g.id === log.guestId);
+                      return (
+                        <TableRow key={log.id}>
+                          <TableCell>
+                            <div>{guest?.name || 'Unknown'}</div>
+                            <div className="text-sm text-[#8b7355]">{log.recipientPhone}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{log.messageType}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                log.deliveryStatus === 'delivered' || log.deliveryStatus === 'read' 
+                                  ? 'default' 
+                                  : log.deliveryStatus === 'failed' 
+                                    ? 'destructive' 
+                                    : 'secondary'
+                              }
+                            >
+                              {log.deliveryStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-[#8b7355]">
+                            {log.sentAt ? format(parseISO(log.sentAt), 'MMM d, h:mm a') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </>
             )}
           </CardContent>
         </Card>
@@ -1225,243 +1258,349 @@ export default function OakRSVP() {
           </TabsContent>
 
           <TabsContent value="guests" className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4 justify-between">
-              <div className="flex gap-2">
-                <div className="relative">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                <div className="relative flex-1 sm:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#8b7355]" />
                   <Input
                     placeholder="Search guests..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 w-[250px]"
+                    className="pl-9 w-full sm:w-48 lg:w-64"
                     data-testid="search-guests"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[150px]" data-testid="status-filter">
-                    <SelectValue placeholder="All statuses" />
+                  <SelectTrigger className="w-full sm:w-[130px]" data-testid="status-filter">
+                    <SelectValue placeholder="All" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="yes">Confirmed</SelectItem>
-                    <SelectItem value="no">Declined</SelectItem>
+                    <SelectItem value="all"><span className="hidden sm:inline">All Statuses</span><span className="sm:hidden">All</span></SelectItem>
+                    <SelectItem value="yes"><span className="hidden sm:inline">Confirmed</span><span className="sm:hidden">Yes</span></SelectItem>
+                    <SelectItem value="no"><span className="hidden sm:inline">Declined</span><span className="sm:hidden">No</span></SelectItem>
                     <SelectItem value="maybe">Maybe</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  onClick={() => {
-                    if (!selectedEventId) {
-                      toast({ title: "Please select an event first", variant: "destructive" });
-                      return;
-                    }
-                    setEditingGuest(null);
-                    setIsGuestDialogOpen(true);
-                  }}
-                  className="bg-[#6b8e6b] hover:bg-[#5a7a5a]"
-                  data-testid="add-guest-btn"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Guest
-                </Button>
-              </div>
+              <Button 
+                onClick={() => {
+                  if (!selectedEventId) {
+                    toast({ title: "Please select an event first", variant: "destructive" });
+                    return;
+                  }
+                  setEditingGuest(null);
+                  setIsGuestDialogOpen(true);
+                }}
+                className="bg-[#6b8e6b] hover:bg-[#5a7a5a] w-full sm:w-auto"
+                data-testid="add-guest-btn"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Guest
+              </Button>
             </div>
 
             <Card className="bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Relationship</TableHead>
-                    <TableHead>Group</TableHead>
-                    <TableHead>Max Guests</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Attendees</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {guestsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
-                        <RefreshCw className="h-5 w-5 animate-spin mx-auto text-[#8b7355]" />
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredGuestsWithResponses.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-[#8b7355]">
-                        {selectedEventId ? "No guests found" : "Select an event to view guests"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredGuestsWithResponses.map(({ guest, response }) => (
-                      <TableRow key={guest.id} data-testid={`guest-row-${guest.id}`}>
-                        <TableCell className="font-medium">{guest.name}</TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1 text-sm">
-                              <Phone className="h-3 w-3" />
-                              {guest.phone}
+              {guestsLoading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-5 w-5 animate-spin mx-auto text-[#8b7355]" />
+                </div>
+              ) : filteredGuestsWithResponses.length === 0 ? (
+                <div className="text-center py-8 text-[#8b7355]">
+                  {selectedEventId ? "No guests found" : "Select an event to view guests"}
+                </div>
+              ) : (
+                <>
+                  <div className="md:hidden divide-y">
+                    {filteredGuestsWithResponses.map(({ guest, response }) => (
+                      <div key={guest.id} className="p-3 space-y-2" data-testid={`guest-card-${guest.id}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{guest.name}</div>
+                            <div className="flex items-center gap-1 text-xs text-[#8b7355]">
+                              <Phone className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{guest.phone}</span>
                             </div>
-                            {guest.email && (
-                              <div className="flex items-center gap-1 text-xs text-[#8b7355]">
-                                <Mail className="h-3 w-3" />
-                                {guest.email}
-                              </div>
-                            )}
                           </div>
-                        </TableCell>
-                        <TableCell>{guest.relationship || '-'}</TableCell>
-                        <TableCell>{guest.guestGroup || '-'}</TableCell>
-                        <TableCell>{guest.maxAttendees}</TableCell>
-                        <TableCell>
-                          {getStatusBadge(response?.attendanceStatus || 'pending')}
-                        </TableCell>
-                        <TableCell>
-                          {response?.attendanceStatus === 'yes' ? response.numberOfAttendees : '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {(user?.role === 'superadmin' || user?.role === 'wedding_planner') && guest.phone && (
+                          <div className="shrink-0">
+                            {getStatusBadge(response?.attendanceStatus || 'pending')}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-[#8b7355]">
+                          {guest.relationship && <span>{guest.relationship}</span>}
+                          {guest.guestGroup && <span>• {guest.guestGroup}</span>}
+                          <span>• Max: {guest.maxAttendees}</span>
+                          {response?.attendanceStatus === 'yes' && <span>• {response.numberOfAttendees} attending</span>}
+                        </div>
+                        <div className="flex justify-end gap-1 pt-1">
+                          {(user?.role === 'superadmin' || user?.role === 'wedding_planner') && guest.phone && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => {
+                                const event = selectedEvent;
+                                const defaultMsg = event 
+                                  ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
+                                  : `Hello ${guest.name}! Please confirm your attendance.`;
+                                setIndividualMessage(defaultMsg);
+                                setIndividualMsgGuest(guest);
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4 text-green-600" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setEditingGuest(guest);
+                              setIsGuestDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setGuestToDelete(guest)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Relationship</TableHead>
+                        <TableHead>Group</TableHead>
+                        <TableHead>Max Guests</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Attendees</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredGuestsWithResponses.map(({ guest, response }) => (
+                        <TableRow key={guest.id} data-testid={`guest-row-${guest.id}`}>
+                          <TableCell className="font-medium">{guest.name}</TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Phone className="h-3 w-3" />
+                                {guest.phone}
+                              </div>
+                              {guest.email && (
+                                <div className="flex items-center gap-1 text-xs text-[#8b7355]">
+                                  <Mail className="h-3 w-3" />
+                                  {guest.email}
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{guest.relationship || '-'}</TableCell>
+                          <TableCell>{guest.guestGroup || '-'}</TableCell>
+                          <TableCell>{guest.maxAttendees}</TableCell>
+                          <TableCell>
+                            {getStatusBadge(response?.attendanceStatus || 'pending')}
+                          </TableCell>
+                          <TableCell>
+                            {response?.attendanceStatus === 'yes' ? response.numberOfAttendees : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {(user?.role === 'superadmin' || user?.role === 'wedding_planner') && guest.phone && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    const event = selectedEvent;
+                                    const defaultMsg = event 
+                                      ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
+                                      : `Hello ${guest.name}! Please confirm your attendance.`;
+                                    setIndividualMessage(defaultMsg);
+                                    setIndividualMsgGuest(guest);
+                                  }}
+                                  title="Send WhatsApp message"
+                                  data-testid={`whatsapp-guest-${guest.id}`}
+                                >
+                                  <MessageSquare className="h-4 w-4 text-green-600" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  const event = selectedEvent;
-                                  const defaultMsg = event 
-                                    ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
-                                    : `Hello ${guest.name}! Please confirm your attendance.`;
-                                  setIndividualMessage(defaultMsg);
-                                  setIndividualMsgGuest(guest);
+                                  setEditingGuest(guest);
+                                  setIsGuestDialogOpen(true);
                                 }}
-                                title="Send WhatsApp message"
-                                data-testid={`whatsapp-guest-${guest.id}`}
+                                data-testid={`edit-guest-${guest.id}`}
                               >
-                                <MessageSquare className="h-4 w-4 text-green-600" />
+                                <Pencil className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setEditingGuest(guest);
-                                setIsGuestDialogOpen(true);
-                              }}
-                              data-testid={`edit-guest-${guest.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setGuestToDelete(guest)}
-                              data-testid={`delete-guest-${guest.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setGuestToDelete(guest)}
+                                data-testid={`delete-guest-${guest.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
             </Card>
           </TabsContent>
 
           <TabsContent value="responses" className="space-y-4">
             <Card className="bg-white">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Guest</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Attendees</TableHead>
-                    <TableHead>Meal</TableHead>
-                    <TableHead>Accommodation</TableHead>
-                    <TableHead>Transport</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Responded</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {responsesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8">
-                        <RefreshCw className="h-5 w-5 animate-spin mx-auto text-[#8b7355]" />
-                      </TableCell>
-                    </TableRow>
-                  ) : responses.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-[#8b7355]">
-                        No responses yet
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    responses.map((response) => {
+              {responsesLoading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="h-5 w-5 animate-spin mx-auto text-[#8b7355]" />
+                </div>
+              ) : responses.length === 0 ? (
+                <div className="text-center py-8 text-[#8b7355]">
+                  No responses yet
+                </div>
+              ) : (
+                <>
+                  <div className="md:hidden divide-y">
+                    {responses.map((response) => {
                       const guest = guests.find(g => g.id === response.guestId);
                       return (
-                        <TableRow key={response.id} data-testid={`response-row-${response.id}`}>
-                          <TableCell className="font-medium">{guest?.name || 'Unknown'}</TableCell>
-                          <TableCell>{getStatusBadge(response.attendanceStatus)}</TableCell>
-                          <TableCell>
-                            {response.attendanceStatus === 'yes' ? (
-                              <div>
-                                <div>{response.numberOfAttendees}</div>
-                                {response.attendeeNames && (
-                                  <div className="text-xs text-[#8b7355]">{response.attendeeNames}</div>
-                                )}
-                              </div>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>{getMealBadge(response.mealPreference)}</TableCell>
-                          <TableCell>
-                            {response.needsAccommodation ? (
-                              <Badge variant="outline">
-                                <Hotel className="h-3 w-3 mr-1" />
-                                {response.accommodationNights || '?'} nights
-                              </Badge>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {response.needsTransportation ? (
-                              <Badge variant="outline">
-                                <Car className="h-3 w-3 mr-1" />
-                                Yes
-                              </Badge>
-                            ) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-xs">
-                              {response.responseSource}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-sm text-[#8b7355]">
-                            {response.respondedAt ? format(parseISO(response.respondedAt), 'MMM d, yyyy') : '-'}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setEditingResponse(response);
-                                setIsResponseDialogOpen(true);
-                              }}
-                              data-testid={`edit-response-${response.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
+                        <div key={response.id} className="p-3 space-y-2" data-testid={`response-card-${response.id}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm truncate">{guest?.name || 'Unknown'}</div>
+                              {response.respondedAt && (
+                                <div className="text-xs text-[#8b7355]">{format(parseISO(response.respondedAt), 'MMM d, yyyy')}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {getStatusBadge(response.attendanceStatus)}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  setEditingResponse(response);
+                                  setIsResponseDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {response.attendanceStatus === 'yes' && (
+                            <div className="flex flex-wrap gap-2 text-xs">
+                              <span className="text-[#8b7355]">{response.numberOfAttendees} attending</span>
+                              {response.mealPreference && <span>• {getMealBadge(response.mealPreference)}</span>}
+                              {response.needsAccommodation && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Hotel className="h-3 w-3 mr-1" />
+                                  {response.accommodationNights || '?'} nights
+                                </Badge>
+                              )}
+                              {response.needsTransportation && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Car className="h-3 w-3 mr-1" />
+                                  Transport
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          <Badge variant="secondary" className="text-xs">{response.responseSource}</Badge>
+                        </div>
                       );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+                    })}
+                  </div>
+                  <Table className="hidden md:table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Guest</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Attendees</TableHead>
+                        <TableHead>Meal</TableHead>
+                        <TableHead>Accommodation</TableHead>
+                        <TableHead>Transport</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Responded</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {responses.map((response) => {
+                        const guest = guests.find(g => g.id === response.guestId);
+                        return (
+                          <TableRow key={response.id} data-testid={`response-row-${response.id}`}>
+                            <TableCell className="font-medium">{guest?.name || 'Unknown'}</TableCell>
+                            <TableCell>{getStatusBadge(response.attendanceStatus)}</TableCell>
+                            <TableCell>
+                              {response.attendanceStatus === 'yes' ? (
+                                <div>
+                                  <div>{response.numberOfAttendees}</div>
+                                  {response.attendeeNames && (
+                                    <div className="text-xs text-[#8b7355]">{response.attendeeNames}</div>
+                                  )}
+                                </div>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>{getMealBadge(response.mealPreference)}</TableCell>
+                            <TableCell>
+                              {response.needsAccommodation ? (
+                                <Badge variant="outline">
+                                  <Hotel className="h-3 w-3 mr-1" />
+                                  {response.accommodationNights || '?'} nights
+                                </Badge>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {response.needsTransportation ? (
+                                <Badge variant="outline">
+                                  <Car className="h-3 w-3 mr-1" />
+                                  Yes
+                                </Badge>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-xs">
+                                {response.responseSource}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-sm text-[#8b7355]">
+                              {response.respondedAt ? format(parseISO(response.respondedAt), 'MMM d, yyyy') : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setEditingResponse(response);
+                                  setIsResponseDialogOpen(true);
+                                }}
+                                data-testid={`edit-response-${response.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
             </Card>
           </TabsContent>
 

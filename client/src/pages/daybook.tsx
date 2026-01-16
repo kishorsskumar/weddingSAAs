@@ -1567,9 +1567,54 @@ export default function Daybook() {
                 </Button>
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="px-4 sm:px-0">
-                    <Table>
+                {incomeEntries.length === 0 ? (
+                  <p className="text-center py-6 text-muted-foreground text-sm">No income entries for this day</p>
+                ) : (
+                  <>
+                    <div className="md:hidden divide-y">
+                      {incomeEntries.map((entry) => (
+                        <div key={entry.id} className="py-3 flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{entry.description}</div>
+                            <div className="text-xs text-muted-foreground">{entry.category}</div>
+                            {entry.bankId && (
+                              <div className="text-xs text-muted-foreground">{getBankName(entry.bankId)}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-mono font-bold text-green-600">+₹{Number(entry.amount).toLocaleString()}</span>
+                            {canEditEntries && (
+                              <div className="flex items-center">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-muted-foreground"
+                                  onClick={() => {
+                                    setEditingEntry(entry);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                {canDeleteEntries && (
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Table className="hidden md:table">
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-xs">Description</TableHead>
@@ -1579,64 +1624,58 @@ export default function Daybook() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {incomeEntries.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={canEditEntries ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No income entries for this day</TableCell>
-                          </TableRow>
-                        ) : (
-                          incomeEntries.map((entry) => (
-                            <TableRow key={entry.id}>
-                              <TableCell className="text-xs sm:text-sm">
-                                <div className="font-medium">{entry.description}</div>
-                                <div className="text-muted-foreground text-[10px]">{entry.category}</div>
-                              </TableCell>
-                              <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
-                              <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-green-600">
-                                +₹{Number(entry.amount).toLocaleString()}
-                              </TableCell>
-                              {canEditEntries && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
+                        {incomeEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell className="text-xs sm:text-sm">
+                              <div className="font-medium">{entry.description}</div>
+                              <div className="text-muted-foreground text-[10px]">{entry.category}</div>
+                            </TableCell>
+                            <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                            <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-green-600">
+                              +₹{Number(entry.amount).toLocaleString()}
+                            </TableCell>
+                            {canEditEntries && (
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                    onClick={() => {
+                                      setEditingEntry(entry);
+                                      setIsEditDialogOpen(true);
+                                    }}
+                                    data-testid={`button-edit-income-${entry.id}`}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  {canDeleteEntries && (
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
                                       onClick={() => {
-                                        setEditingEntry(entry);
-                                        setIsEditDialogOpen(true);
+                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
                                       }}
-                                      data-testid={`button-edit-income-${entry.id}`}
+                                      data-testid={`button-delete-income-${entry.id}`}
                                     >
-                                      <Pencil className="h-3 w-3" />
+                                      <Trash2 className="h-3 w-3" />
                                     </Button>
-                                    {canDeleteEntries && (
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
-                                        className="h-7 w-7 text-destructive hover:text-destructive"
-                                        onClick={() => {
-                                          if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                        }}
-                                        data-testid={`button-delete-income-${entry.id}`}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          ))
-                        )}
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
-                    <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                      <span className="text-sm font-medium text-muted-foreground">Total Income</span>
-                      <span className="text-lg font-bold text-green-600">
-                        ₹{incomeEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
+                  </>
+                )}
+                <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Total Income</span>
+                  <span className="text-lg font-bold text-green-600">
+                    ₹{incomeEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -1657,9 +1696,54 @@ export default function Daybook() {
                 </Button>
               </CardHeader>
               <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
-                  <div className="px-4 sm:px-0">
-                    <Table>
+                {expenseEntries.length === 0 ? (
+                  <p className="text-center py-6 text-muted-foreground text-sm">No expense entries for this day</p>
+                ) : (
+                  <>
+                    <div className="md:hidden divide-y">
+                      {expenseEntries.map((entry) => (
+                        <div key={entry.id} className="py-3 flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{entry.description}</div>
+                            <div className="text-xs text-muted-foreground">{entry.category}</div>
+                            {entry.bankId && (
+                              <div className="text-xs text-muted-foreground">{getBankName(entry.bankId)}</div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-mono font-bold text-red-600">-₹{Number(entry.amount).toLocaleString()}</span>
+                            {canEditEntries && (
+                              <div className="flex items-center">
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7 text-muted-foreground"
+                                  onClick={() => {
+                                    setEditingEntry(entry);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                {canDeleteEntries && (
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Table className="hidden md:table">
                       <TableHeader>
                         <TableRow>
                           <TableHead className="text-xs">Description</TableHead>
@@ -1669,64 +1753,58 @@ export default function Daybook() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {expenseEntries.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={canEditEntries ? 4 : 3} className="text-center py-6 text-muted-foreground text-sm">No expense entries for this day</TableCell>
-                          </TableRow>
-                        ) : (
-                          expenseEntries.map((entry) => (
-                            <TableRow key={entry.id}>
-                              <TableCell className="text-xs sm:text-sm">
-                                <div className="font-medium">{entry.description}</div>
-                                <div className="text-muted-foreground text-[10px]">{entry.category}</div>
-                              </TableCell>
-                              <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
-                              <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-red-600">
-                                -₹{Number(entry.amount).toLocaleString()}
-                              </TableCell>
-                              {canEditEntries && (
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
+                        {expenseEntries.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell className="text-xs sm:text-sm">
+                              <div className="font-medium">{entry.description}</div>
+                              <div className="text-muted-foreground text-[10px]">{entry.category}</div>
+                            </TableCell>
+                            <TableCell className="text-xs">{entry.bankId ? getBankName(entry.bankId) : "-"}</TableCell>
+                            <TableCell className="text-right font-mono font-medium text-xs sm:text-sm text-red-600">
+                              -₹{Number(entry.amount).toLocaleString()}
+                            </TableCell>
+                            {canEditEntries && (
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                    onClick={() => {
+                                      setEditingEntry(entry);
+                                      setIsEditDialogOpen(true);
+                                    }}
+                                    data-testid={`button-edit-expense-${entry.id}`}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  {canDeleteEntries && (
                                     <Button 
                                       size="icon" 
                                       variant="ghost" 
-                                      className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                      className="h-7 w-7 text-destructive hover:text-destructive"
                                       onClick={() => {
-                                        setEditingEntry(entry);
-                                        setIsEditDialogOpen(true);
+                                        if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
                                       }}
-                                      data-testid={`button-edit-expense-${entry.id}`}
+                                      data-testid={`button-delete-expense-${entry.id}`}
                                     >
-                                      <Pencil className="h-3 w-3" />
+                                      <Trash2 className="h-3 w-3" />
                                     </Button>
-                                    {canDeleteEntries && (
-                                      <Button 
-                                        size="icon" 
-                                        variant="ghost" 
-                                        className="h-7 w-7 text-destructive hover:text-destructive"
-                                        onClick={() => {
-                                          if (confirm(`Delete this entry?`)) deleteEntryMutation.mutate(entry.id);
-                                        }}
-                                        data-testid={`button-delete-expense-${entry.id}`}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          ))
-                        )}
+                                  )}
+                                </div>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
-                    <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                      <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
-                      <span className="text-lg font-bold text-red-600">
-                        ₹{expenseEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
+                  </>
+                )}
+                <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                  <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
+                  <span className="text-lg font-bold text-red-600">
+                    ₹{expenseEntries.reduce((acc, e) => acc + Number(e.amount), 0).toLocaleString()}
+                  </span>
                 </div>
               </CardContent>
             </Card>

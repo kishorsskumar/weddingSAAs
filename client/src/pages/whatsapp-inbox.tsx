@@ -110,35 +110,36 @@ export default function WhatsappInbox() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-[100dvh] flex flex-col">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 border-b bg-background sticky top-0 z-10">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <MessageSquare className="h-8 w-8 text-green-600" />
+          <h1 className="text-xl sm:text-3xl font-bold tracking-tight flex items-center gap-2">
+            <MessageSquare className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" />
             WhatsApp Inbox
           </h1>
-          <p className="text-muted-foreground">
-            Manage employee requests submitted via WhatsApp
+          <p className="text-sm text-muted-foreground">
+            Manage employee requests via WhatsApp
           </p>
         </div>
-        <Button onClick={refreshAll} variant="outline" size="sm">
+        <Button onClick={refreshAll} variant="outline" size="sm" className="min-h-[44px] sm:min-h-0">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
       </div>
 
+      <div className="flex-1 overflow-auto p-3 sm:p-6">
       <Tabs defaultValue="pending" className="w-full">
-        <TabsList>
-          <TabsTrigger value="pending" className="relative">
-            Pending Approvals
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+          <TabsTrigger value="pending" className="relative min-h-[44px] text-xs sm:text-sm whitespace-nowrap">
+            Pending
             {pendingApprovals.length > 0 && (
-              <Badge variant="destructive" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
+              <Badge variant="destructive" className="ml-1 sm:ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
                 {pendingApprovals.length}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="history">Approval History</TabsTrigger>
-          <TabsTrigger value="messages">Message Log</TabsTrigger>
+          <TabsTrigger value="history" className="min-h-[44px] text-xs sm:text-sm whitespace-nowrap">History</TabsTrigger>
+          <TabsTrigger value="messages" className="min-h-[44px] text-xs sm:text-sm whitespace-nowrap">Messages</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pending" className="mt-6">
@@ -156,60 +157,61 @@ export default function WhatsappInbox() {
             <div className="grid gap-4">
               {pendingApprovals.map((approval) => (
                 <Card key={approval.id} className="border-l-4 border-l-amber-500" data-testid={`approval-card-${approval.id}`}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg flex items-center gap-2">
+                  <CardHeader className="pb-2 p-3 sm:p-6 sm:pb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <CardTitle className="text-base sm:text-lg flex items-center gap-1 sm:gap-2 flex-wrap">
                           {approval.type === 'expense' ? (
-                            <FileText className="h-5 w-5 text-blue-600" />
+                            <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                           ) : (
-                            <Calendar className="h-5 w-5 text-purple-600" />
+                            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
                           )}
-                          {approval.approvalCode}
-                          <Badge variant="outline" className="ml-2">
+                          <span className="truncate">{approval.approvalCode}</span>
+                          <Badge variant="outline" className="text-xs">
                             {approval.type === 'expense' ? 'Expense' : 'Leave'}
                           </Badge>
                         </CardTitle>
-                        <CardDescription>
-                          From: {approval.employeeName} • {format(new Date(approval.sentAt), 'MMM d, yyyy h:mm a')}
+                        <CardDescription className="text-xs sm:text-sm mt-1">
+                          {approval.employeeName} • {format(new Date(approval.sentAt), 'MMM d, h:mm a')}
                         </CardDescription>
                       </div>
-                      <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-800 self-start flex-shrink-0">
                         Pending
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <p className="mb-3">{approval.description}</p>
+                  <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+                    <p className="mb-2 sm:mb-3 text-sm sm:text-base">{approval.description}</p>
                     {approval.amount && (
-                      <p className="text-lg font-semibold text-green-700 mb-3">₹{parseFloat(approval.amount).toLocaleString()}</p>
+                      <p className="text-base sm:text-lg font-semibold text-green-700 mb-2 sm:mb-3">₹{parseFloat(approval.amount).toLocaleString()}</p>
                     )}
                     {approval.mediaUrl && (
                       <a
                         href={approval.mediaUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center text-sm text-blue-600 hover:underline mb-3"
+                        className="inline-flex items-center text-sm text-blue-600 hover:underline mb-2 sm:mb-3 min-h-[44px]"
                       >
                         <ExternalLink className="h-4 w-4 mr-1" />
                         View Attachment
                       </a>
                     )}
-                    <div className="flex gap-2 mt-4">
+                    <div className="flex gap-2 mt-3 sm:mt-4">
                       <Button
                         onClick={() => handleAction(approval, 'approve')}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-green-600 hover:bg-green-700 flex-1 sm:flex-none min-h-[44px]"
                         data-testid={`button-approve-${approval.id}`}
                       >
-                        <Check className="h-4 w-4 mr-2" />
+                        <Check className="h-4 w-4 mr-1 sm:mr-2" />
                         Approve
                       </Button>
                       <Button
                         onClick={() => handleAction(approval, 'reject')}
                         variant="destructive"
+                        className="flex-1 sm:flex-none min-h-[44px]"
                         data-testid={`button-reject-${approval.id}`}
                       >
-                        <X className="h-4 w-4 mr-2" />
+                        <X className="h-4 w-4 mr-1 sm:mr-2" />
                         Reject
                       </Button>
                     </div>
@@ -220,7 +222,7 @@ export default function WhatsappInbox() {
           )}
         </TabsContent>
 
-        <TabsContent value="history" className="mt-6">
+        <TabsContent value="history" className="mt-4 sm:mt-6">
           {loadingAll ? (
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : allApprovals.length === 0 ? (
@@ -230,34 +232,34 @@ export default function WhatsappInbox() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {allApprovals.map((approval) => (
                 <Card key={approval.id} className={`border-l-4 ${
                   approval.status === 'approved' ? 'border-l-green-500' :
                   approval.status === 'rejected' ? 'border-l-red-500' :
                   'border-l-amber-500'
                 }`}>
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                  <CardContent className="p-3 sm:py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
                         {approval.type === 'expense' ? (
-                          <FileText className="h-5 w-5 text-blue-600" />
+                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <Calendar className="h-5 w-5 text-purple-600" />
+                          <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0 mt-0.5" />
                         )}
-                        <div>
-                          <p className="font-medium">{approval.approvalCode} - {approval.employeeName}</p>
-                          <p className="text-sm text-muted-foreground">{approval.description}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm sm:text-base truncate">{approval.approvalCode} - {approval.employeeName}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{approval.description}</p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="flex items-center justify-between sm:flex-col sm:text-right gap-2 pl-6 sm:pl-0">
                         <Badge variant={
                           approval.status === 'approved' ? 'default' :
                           approval.status === 'rejected' ? 'destructive' : 'secondary'
                         } className={approval.status === 'approved' ? 'bg-green-600' : ''}>
                           {approval.status.charAt(0).toUpperCase() + approval.status.slice(1)}
                         </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground">
                           {format(new Date(approval.sentAt), 'MMM d, yyyy')}
                         </p>
                       </div>
@@ -269,7 +271,7 @@ export default function WhatsappInbox() {
           )}
         </TabsContent>
 
-        <TabsContent value="messages" className="mt-6">
+        <TabsContent value="messages" className="mt-4 sm:mt-6">
           {loadingMessages ? (
             <div className="text-center py-8 text-muted-foreground">Loading...</div>
           ) : inboundMessages.length === 0 ? (
@@ -277,30 +279,30 @@ export default function WhatsappInbox() {
               <CardContent className="py-12 text-center text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>No messages received yet</p>
-                <p className="text-sm mt-1">WhatsApp messages will appear here once employees start sending</p>
+                <p className="text-sm mt-1">WhatsApp messages will appear here</p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-2">
               {inboundMessages.map((msg) => (
                 <Card key={msg.id}>
-                  <CardContent className="py-3">
-                    <div className="flex items-start justify-between">
-                      <div>
+                  <CardContent className="p-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{msg.fromNumber}</p>
-                        <p className="text-sm">{msg.body || '(Media message)'}</p>
+                        <p className="text-sm break-words">{msg.body || '(Media message)'}</p>
                         {msg.mediaUrl && (
                           <a
                             href={msg.mediaUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:underline"
+                            className="text-xs text-blue-600 hover:underline inline-flex items-center min-h-[44px]"
                           >
                             View attachment
                           </a>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
                         {format(new Date(msg.createdAt), 'MMM d, h:mm a')}
                       </span>
                     </div>
@@ -311,6 +313,7 @@ export default function WhatsappInbox() {
           )}
         </TabsContent>
       </Tabs>
+      </div>
 
       <Dialog open={!!selectedApproval && !!actionType} onOpenChange={() => { setSelectedApproval(null); setActionType(null); }}>
         <DialogContent>

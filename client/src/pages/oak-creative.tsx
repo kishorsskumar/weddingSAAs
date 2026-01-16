@@ -97,6 +97,7 @@ export default function OakCreative() {
   const [uploadCategory, setUploadCategory] = useState(SLIDE_CATEGORIES[0]);
   const [uploadName, setUploadName] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [showMobileSidebar, setShowMobileSidebar] = useState<'slides' | 'assets' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Queries
@@ -477,21 +478,21 @@ export default function OakCreative() {
   // Main presentation list view
   if (!selectedPresentation) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#f5f7f2] via-[#eef2e8] to-[#f0f4eb] p-6">
+      <div className="min-h-screen bg-gradient-to-br from-[#f5f7f2] via-[#eef2e8] to-[#f0f4eb] p-3 sm:p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3 mb-4 sm:mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-[#2d4a22] flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-[#6b9937] to-[#4a7a25] rounded-xl flex items-center justify-center shadow-lg">
-                  <Palette className="h-6 w-6 text-white" />
+              <h1 className="text-xl sm:text-3xl font-bold text-[#2d4a22] flex items-center gap-2 sm:gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-[#6b9937] to-[#4a7a25] rounded-xl flex items-center justify-center shadow-lg">
+                  <Palette className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 Oak Creative
               </h1>
-              <p className="text-[#5a7a4a] mt-1">Create stunning wedding proposals and presentations</p>
+              <p className="text-[#5a7a4a] mt-1 text-sm hidden sm:block">Create stunning wedding proposals and presentations</p>
             </div>
             <Button
               onClick={() => setShowNewPresentationDialog(true)}
-              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] hover:from-[#5a8830] hover:to-[#3d6920] text-white shadow-md"
+              className="bg-gradient-to-r from-[#6b9937] to-[#4a7a25] hover:from-[#5a8830] hover:to-[#3d6920] text-white shadow-md w-full sm:w-auto"
               data-testid="button-new-presentation"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -519,7 +520,7 @@ export default function OakCreative() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {presentations.map((presentation) => (
                 <Card 
                   key={presentation.id}
@@ -652,8 +653,8 @@ export default function OakCreative() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-[#f5f7f2] to-[#eef2e8]">
       {/* Top toolbar */}
-      <div className="h-14 bg-white border-b border-[#6b9937]/20 flex items-center justify-between px-4 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className="h-auto min-h-14 bg-white border-b border-[#6b9937]/20 flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:px-4 gap-2 shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -662,34 +663,54 @@ export default function OakCreative() {
               setSelectedSlide(null);
             }}
             data-testid="button-back"
+            className="h-8 px-2 sm:px-3"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            <ArrowLeft className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back</span>
           </Button>
-          <Separator orientation="vertical" className="h-8" />
-          <div>
-            <h2 className="font-semibold text-gray-900">{presentationFull?.title || "Loading..."}</h2>
-            <p className="text-xs text-gray-500">{presentationFull?.clientName || ""}</p>
+          <Separator orientation="vertical" className="h-6 hidden sm:block" />
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-gray-900 text-sm sm:text-base truncate">{presentationFull?.title || "Loading..."}</h2>
+            <p className="text-xs text-gray-500 truncate hidden sm:block">{presentationFull?.clientName || ""}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          {/* Mobile sidebar toggles */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:hidden h-8"
+            onClick={() => setShowMobileSidebar(showMobileSidebar === 'slides' ? null : 'slides')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="md:hidden h-8"
+            onClick={() => setShowMobileSidebar(showMobileSidebar === 'assets' ? null : 'assets')}
+          >
+            <ImageIcon className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowAiDialog(true)}
             data-testid="button-ai-generate"
+            className="h-8"
           >
-            <Sparkles className="h-4 w-4 mr-2" />
-            AI Generate
+            <Sparkles className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">AI Generate</span>
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportPPT}
             data-testid="button-export-ppt"
+            className="h-8"
           >
-            <Download className="h-4 w-4 mr-2" />
-            Export PPT
+            <Download className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export PPT</span>
           </Button>
           <Button
             variant="destructive"
@@ -700,25 +721,44 @@ export default function OakCreative() {
               }
             }}
             data-testid="button-delete-presentation"
+            className="h-8"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Sidebar Overlay */}
+        {showMobileSidebar && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setShowMobileSidebar(null)}
+          />
+        )}
+
         {/* Left panel - Slide thumbnails */}
-        <div className="w-64 bg-white border-r border-[#6b9937]/20 flex flex-col">
+        <div className={`${showMobileSidebar === 'slides' ? 'fixed inset-y-0 left-0 z-50 w-64' : 'hidden'} md:relative md:block md:w-64 bg-white border-r border-[#6b9937]/20 flex flex-col`}>
           <div className="p-3 border-b border-[#6b9937]/20 flex items-center justify-between bg-[#f5f7f2]">
             <span className="font-medium text-sm text-[#2d4a22]">Slides</span>
-            <Button
-              size="sm"
-              className="bg-[#6b9937] hover:bg-[#5a8830] text-white h-7 w-7 p-0"
-              onClick={() => setShowNewSlideDialog(true)}
-              data-testid="button-add-slide"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                className="bg-[#6b9937] hover:bg-[#5a8830] text-white h-7 w-7 p-0"
+                onClick={() => setShowNewSlideDialog(true)}
+                data-testid="button-add-slide"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden h-7 w-7 p-0"
+                onClick={() => setShowMobileSidebar(null)}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <ScrollArea className="flex-1 p-2">
             <div className="space-y-2">
@@ -869,7 +909,18 @@ export default function OakCreative() {
         </div>
 
         {/* Right panel - Properties & Assets */}
-        <div className="w-72 bg-white border-l border-[#6b9937]/20 flex flex-col">
+        <div className={`${showMobileSidebar === 'assets' ? 'fixed inset-y-0 right-0 z-50 w-72' : 'hidden'} md:relative md:block md:w-72 bg-white border-l border-[#6b9937]/20 flex flex-col`}>
+          {/* Mobile close button */}
+          <div className="md:hidden p-2 border-b border-[#6b9937]/20 flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={() => setShowMobileSidebar(null)}
+            >
+              <ArrowLeft className="h-4 w-4 rotate-180" />
+            </Button>
+          </div>
           <Tabs defaultValue="assets" className="flex-1 flex flex-col">
             <TabsList className="m-2 bg-[#6b9937]/10">
               <TabsTrigger value="assets" className="flex-1 data-[state=active]:bg-[#6b9937] data-[state=active]:text-white">Assets</TabsTrigger>

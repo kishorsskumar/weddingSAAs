@@ -712,10 +712,93 @@ export default function EventDatabase() {
           <CardTitle className="text-lg font-serif">All Events ({filteredEvents.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {filteredEvents.map((event) => {
+              const salesValue = Number(event.salesValue) || 0;
+              const paymentReceived = Number(event.paymentReceived) || 0;
+              const cost = Number(event.cost) || 0;
+              const balance = salesValue - paymentReceived;
+              const profit = salesValue - cost;
+              const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
+              const isProfitable = profit >= 0;
+              
+              return (
+                <div key={event.id} className="py-4 first:pt-0" data-testid={`card-event-${event.id}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-medium text-sm">{event.customer}</h3>
+                      <p className="text-xs text-muted-foreground">{generateEventId(event)}</p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
+                        <DialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>Edit Event Financials</DialogTitle>
+                          </DialogHeader>
+                          <EditEventForm event={event} onClose={() => setEditingEvent(null)} />
+                        </DialogContent>
+                      </Dialog>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDelete(event.id, event.title)}
+                          data-testid={`button-delete-${event.id}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    <span>{event.planner}</span> • <span>{event.venue}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sales:</span>
+                      <span>{formatCurrency(salesValue)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Received:</span>
+                      <span>{formatCurrency(paymentReceived)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Balance:</span>
+                      <span className={cn("font-medium", balance > 0 ? "text-amber-600" : "text-green-600")}>{formatCurrency(balance)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cost:</span>
+                      <span>{formatCurrency(cost)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Profit:</span>
+                      <span className={cn("font-medium", isProfitable ? "text-green-600" : "text-red-600")}>{formatCurrency(profit)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Margin:</span>
+                      <span className={cn("font-medium", isProfitable ? "text-green-600" : "text-red-600")}>{profitPercent.toFixed(2)}%</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredEvents.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No events found
+              </div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto -mx-4 sm:mx-0">
             <div className="px-4 sm:px-0">
               <div className="rounded-md border">
-                <Table>
+                <Table className="w-full">
                   <TableHeader>
                     <TableRow className="bg-muted/50">
                       <TableHead className="text-xs font-semibold">Wedding Planner</TableHead>

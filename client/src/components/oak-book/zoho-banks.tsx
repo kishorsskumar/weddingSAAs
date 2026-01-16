@@ -89,49 +89,60 @@ export function ZohoBanks() {
 
   return (
     <div className="flex h-[calc(100vh-120px)] bg-white rounded-lg border overflow-hidden">
-      <div className={cn("flex flex-col transition-all", selectedBankId ? "w-[calc(100%-480px)]" : "w-full")}>
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold text-gray-900">All Bank Accounts</h2>
-            <Badge variant="secondary" className="rounded-full">
+      <div className={cn("flex flex-col transition-all w-full", selectedBankId ? "md:w-[calc(100%-480px)]" : "w-full")}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <h2 className="text-base sm:text-xl font-semibold text-gray-900">Bank Accounts</h2>
+            <Badge variant="secondary" className="rounded-full hidden sm:inline-flex">
               {filteredBanks.length}
             </Badge>
+            <Button 
+              onClick={() => setIsCreateModalOpen(true)} 
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search banks..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
               />
             </div>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 hidden sm:flex">
               <Plus className="h-4 w-4 mr-1" />
               New
             </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 border-b">
-          <div className="bg-white p-4 rounded-lg border">
+        <div className={cn(
+          "grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 border-b",
+          selectedBankId && "hidden md:grid"
+        )}>
+          <div className="bg-white p-3 sm:p-4 rounded-lg border">
             <div className="flex items-center gap-2 mb-1">
               <Wallet className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-600">Total Balance</span>
+              <span className="text-xs sm:text-sm text-gray-600">Total Balance</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-lg sm:text-2xl font-bold text-gray-900">
               ₹{totalBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="bg-white p-4 rounded-lg border">
+          <div className="bg-white p-3 sm:p-4 rounded-lg border hidden sm:block">
             <div className="flex items-center gap-2 mb-1">
               <Building2 className="h-4 w-4 text-blue-500" />
               <span className="text-sm text-gray-600">Bank Accounts</span>
             </div>
             <p className="text-2xl font-bold text-blue-600">{banks.length}</p>
           </div>
-          <div className="bg-white p-4 rounded-lg border">
+          <div className="bg-white p-3 sm:p-4 rounded-lg border hidden sm:block">
             <div className="flex items-center gap-2 mb-1">
               <CreditCard className="h-4 w-4 text-green-500" />
               <span className="text-sm text-gray-600">Active</span>
@@ -140,8 +151,60 @@ export function ZohoBanks() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-50">
-          <table className="w-full">
+        <div className={cn(
+          "flex-1 overflow-auto bg-gray-50",
+          selectedBankId && "hidden md:block"
+        )}>
+          <div className="md:hidden divide-y">
+            {filteredBanks.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <Landmark className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No bank accounts found</p>
+                <p className="text-sm mt-1">Add your first bank account to get started</p>
+              </div>
+            ) : (
+              filteredBanks.map((bank) => {
+                const openingBal = parseFloat(bank.openingBalance || "0");
+                const currentBal = parseFloat(bank.balance || "0");
+                const change = currentBal - openingBal;
+                
+                return (
+                  <div
+                    key={bank.id}
+                    onClick={() => setSelectedBankId(bank.id)}
+                    className={cn(
+                      "p-4 cursor-pointer transition-colors active:bg-blue-50/50",
+                      selectedBankId === bank.id && "bg-blue-50"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <Landmark className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-blue-600 truncate">{bank.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {bank.createdAt ? format(new Date(bank.createdAt), "dd MMM yyyy") : "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold">₹{currentBal.toLocaleString("en-IN")}</p>
+                        {change !== 0 && (
+                          <p className={cn("text-xs", change > 0 ? "text-green-600" : "text-red-600")}>
+                            {change > 0 ? "+" : ""}₹{Math.abs(change).toLocaleString("en-IN")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-100 sticky top-0">
               <tr className="text-left text-sm text-gray-600">
                 <th className="p-3 w-10">
@@ -226,7 +289,10 @@ export function ZohoBanks() {
           </table>
         </div>
 
-        <div className="p-3 border-t bg-white text-sm text-gray-500">
+        <div className={cn(
+          "p-3 border-t bg-white text-sm text-gray-500",
+          selectedBankId && "hidden md:block"
+        )}>
           Showing {filteredBanks.length} account{filteredBanks.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -279,7 +345,7 @@ function BankDetailPanel({
   const change = currentBal - openingBal;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l shadow-lg flex flex-col z-50">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>

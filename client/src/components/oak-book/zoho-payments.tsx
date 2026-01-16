@@ -209,16 +209,16 @@ export function ZohoPayments() {
 
   return (
     <div className="flex h-full">
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedPayment ? "mr-[480px]" : "")}>
-        <div className="flex items-center justify-between p-4 border-b bg-white">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-gray-800">Payments Received</h2>
+      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedPayment ? "md:mr-[480px]" : "")}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800">Payments Received</h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  <Filter className="h-4 w-4 mr-2" />
-                  {modeFilter === "all" ? "All Modes" : PAYMENT_MODES.find((m) => m.value === modeFilter)?.label}
-                  <ChevronDown className="h-4 w-4 ml-2" />
+                <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  {modeFilter === "all" ? "All" : PAYMENT_MODES.find((m) => m.value === modeFilter)?.label}
+                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -231,16 +231,28 @@ export function ZohoPayments() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <Button
+              onClick={() => {
+                setEditingPayment(null);
+                setIsCreateModalOpen(true);
+              }}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New
+            </Button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search payments..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64 h-9"
+                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
               />
             </div>
             <Button
@@ -248,7 +260,7 @@ export function ZohoPayments() {
                 setEditingPayment(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -256,8 +268,47 @@ export function ZohoPayments() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-50">
-          <table className="w-full">
+        <div className={cn(
+          "flex-1 overflow-auto bg-gray-50",
+          selectedPaymentId && "hidden md:block"
+        )}>
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {filteredPayments.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No payments found</p>
+              </div>
+            ) : (
+              filteredPayments.map((payment) => (
+                <div
+                  key={payment.id}
+                  onClick={() => setSelectedPaymentId(payment.id)}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors active:bg-blue-50/50",
+                    selectedPaymentId === payment.id && "bg-blue-50"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-blue-600 font-semibold text-sm">{payment.number}</span>
+                        {getPaymentModeBadge(payment.paymentMode)}
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 truncate">{getCustomerName(payment.customerId)}</p>
+                      <p className="text-xs text-gray-500">{format(new Date(payment.date), "dd MMM yyyy")}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-green-600">₹{parseFloat(payment.amount).toLocaleString("en-IN")}</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-100 sticky top-0">
               <tr className="text-left text-sm text-gray-600">
                 <th className="p-3 w-10">
@@ -265,7 +316,7 @@ export function ZohoPayments() {
                 </th>
                 <th className="p-3 font-medium">DATE</th>
                 <th className="p-3 font-medium">PAYMENT#</th>
-                <th className="p-3 font-medium">CUSTOMER NAME</th>
+                <th className="p-3 font-medium hidden lg:table-cell">CUSTOMER NAME</th>
                 <th className="p-3 font-medium">MODE</th>
                 <th className="p-3 font-medium text-right">AMOUNT</th>
               </tr>
@@ -297,7 +348,7 @@ export function ZohoPayments() {
                     <td className="p-3">
                       <span className="text-blue-600 hover:underline font-medium">{payment.number}</span>
                     </td>
-                    <td className="p-3 text-sm text-gray-700">{getCustomerName(payment.customerId)}</td>
+                    <td className="p-3 text-sm text-gray-700 hidden lg:table-cell">{getCustomerName(payment.customerId)}</td>
                     <td className="p-3">{getPaymentModeBadge(payment.paymentMode)}</td>
                     <td className="p-3 text-sm text-right font-medium text-green-600">
                       ₹{parseFloat(payment.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
@@ -309,7 +360,10 @@ export function ZohoPayments() {
           </table>
         </div>
 
-        <div className="p-3 border-t bg-white text-sm text-gray-500">
+        <div className={cn(
+          "p-3 border-t bg-white text-sm text-gray-500",
+          selectedPaymentId && "hidden md:block"
+        )}>
           Showing {filteredPayments.length} payment{filteredPayments.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -359,7 +413,7 @@ function PaymentDetailPanel({
   const modeLabel = PAYMENT_MODES.find((m) => m.value === payment.paymentMode)?.label || payment.paymentMode;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l shadow-lg flex flex-col z-50">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>

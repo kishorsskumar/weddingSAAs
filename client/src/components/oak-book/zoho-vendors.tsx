@@ -154,15 +154,15 @@ export function ZohoVendors() {
 
   return (
     <div className="flex h-full">
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedVendor ? "mr-[480px]" : "")}>
-        <div className="flex items-center justify-between p-4 border-b bg-white">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-gray-800">Vendors</h2>
+      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedVendor ? "md:mr-[480px]" : "")}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800">Vendors</h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  <Tag className="h-4 w-4 mr-2" />
-                  {categoryFilter === "all" ? "All Categories" : getCategoryLabel(categoryFilter)}
+                <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                  <Tag className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  {categoryFilter === "all" ? "All" : getCategoryLabel(categoryFilter)}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -175,16 +175,27 @@ export function ZohoVendors() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              onClick={() => {
+                setEditingVendor(null);
+                setIsCreateModalOpen(true);
+              }}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New
+            </Button>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search vendors..."
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64 h-9"
+                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
               />
             </div>
             <Button
@@ -192,7 +203,7 @@ export function ZohoVendors() {
                 setEditingVendor(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -200,8 +211,47 @@ export function ZohoVendors() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-50">
-          <table className="w-full">
+        <div className={cn(
+          "flex-1 overflow-auto bg-gray-50",
+          selectedVendorId && "hidden md:block"
+        )}>
+          <div className="md:hidden divide-y">
+            {filteredVendors.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <Building2 className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No vendors found</p>
+              </div>
+            ) : (
+              filteredVendors.map((vendor) => (
+                <div
+                  key={vendor.id}
+                  onClick={() => setSelectedVendorId(vendor.id)}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors active:bg-blue-50/50",
+                    selectedVendorId === vendor.id && "bg-blue-50"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                        <Building2 className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-blue-600 truncate">{vendor.name}</p>
+                        {vendor.email && <p className="text-xs text-gray-500 truncate">{vendor.email}</p>}
+                        {vendor.phone && <p className="text-xs text-gray-500">{vendor.phone}</p>}
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {getCategoryBadge(vendor.category)}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-100 sticky top-0">
               <tr className="text-left text-sm text-gray-600">
                 <th className="p-3 w-10">
@@ -263,7 +313,10 @@ export function ZohoVendors() {
           </table>
         </div>
 
-        <div className="p-3 border-t bg-white text-sm text-gray-500">
+        <div className={cn(
+          "p-3 border-t bg-white text-sm text-gray-500",
+          selectedVendorId && "hidden md:block"
+        )}>
           Showing {filteredVendors.length} vendor{filteredVendors.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -317,7 +370,7 @@ function VendorDetailPanel({
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l shadow-lg flex flex-col z-50">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>

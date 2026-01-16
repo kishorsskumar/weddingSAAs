@@ -726,63 +726,68 @@ function InventoryItemsSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Inventory Items</h1>
-          <p className="text-muted-foreground">Manage your equipment and materials</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center justify-between sm:block">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Inventory Items</h1>
+            <p className="text-sm text-muted-foreground">Manage your equipment and materials</p>
+          </div>
+          <Button onClick={handleAddNew} data-testid="button-add-item" className="sm:hidden" size="sm">
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories">
-            <Edit className="w-4 h-4 mr-2" />
-            Categories
+          <Button variant="outline" size="sm" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories" className="flex-1 sm:flex-none">
+            <Edit className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Categories</span>
           </Button>
-          <Button variant="outline" onClick={handleDownloadExcel} data-testid="button-download-inventory">
-            <Download className="w-4 h-4 mr-2" />
-            Download
+          <Button variant="outline" size="sm" onClick={handleDownloadExcel} data-testid="button-download-inventory" className="flex-1 sm:flex-none">
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Download</span>
           </Button>
-          <Button onClick={handleAddNew} data-testid="button-add-item">
+          <Button onClick={handleAddNew} data-testid="button-add-item-desktop" className="hidden sm:flex">
             <Plus className="w-4 h-4 mr-2" />
             Add Item
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <Package className="w-4 h-4 sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Items</p>
-                <p className="text-2xl font-bold" data-testid="text-total-items">{totalItems}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Items</p>
+                <p className="text-lg sm:text-2xl font-bold" data-testid="text-total-items">{totalItems}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active Items</p>
-                <p className="text-2xl font-bold" data-testid="text-active-items">{activeItems}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Active Items</p>
+                <p className="text-lg sm:text-2xl font-bold" data-testid="text-active-items">{activeItems}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-lg ${lowStockCount > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
-                <AlertTriangle className={`w-6 h-6 ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'}`} />
+        <Card className="col-span-2 sm:col-span-1">
+          <CardContent className="p-3 sm:pt-6 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className={`p-2 sm:p-3 rounded-lg ${lowStockCount > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <AlertTriangle className={`w-4 h-4 sm:w-6 sm:h-6 ${lowStockCount > 0 ? 'text-red-600' : 'text-gray-600'}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Low Stock</p>
-                <p className="text-2xl font-bold" data-testid="text-low-stock">{lowStockCount}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Low Stock</p>
+                <p className="text-lg sm:text-2xl font-bold" data-testid="text-low-stock">{lowStockCount}</p>
               </div>
             </div>
           </CardContent>
@@ -790,37 +795,94 @@ function InventoryItemsSection({
       </div>
 
       <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
+        <CardHeader className="p-3 sm:p-6">
+          <div className="flex flex-col gap-3">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search items by name, SKU, or location..."
+                placeholder="Search items..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 w-full"
                 data-testid="input-search-items"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {allCategories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories">
-              <Plus className="w-4 h-4 mr-1" />
-              Categories
-            </Button>
+            <div className="flex gap-2">
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-category-filter">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {allCategories.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" onClick={() => setIsCategoryModalOpen(true)} data-testid="button-manage-categories-2" className="hidden sm:flex">
+                <Plus className="w-4 h-4 mr-1" />
+                Categories
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
+        <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {filteredItems.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No inventory items found
+              </div>
+            ) : (
+              filteredItems.map((item) => {
+                const isLowStock = item.stockQuantity < (item.minStockLevel || 0);
+                return (
+                  <div key={item.id} className="py-3 space-y-2" data-testid={`card-item-${item.id}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.category} • {item.sku || 'No SKU'}</p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewingItem(item)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(item)}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => deleteItemMutation.mutate(item.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Stock:</span>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => adjustStockMutation.mutate({ itemId: item.id, type: 'out', quantity: 1 })} disabled={item.stockQuantity <= 0}>
+                            <ArrowDown className="h-3 w-3" />
+                          </Button>
+                          <span className={isLowStock ? 'text-red-600 font-semibold' : 'font-medium'}>{item.stockQuantity}</span>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => adjustStockMutation.mutate({ itemId: item.id, type: 'in', quantity: 1 })}>
+                            <ArrowUp className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                      <span className="font-semibold">{formatCurrency(item.stockQuantity * safeNumber(item.unitCost))}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {isLowStock && <Badge variant="destructive" className="text-xs">Low Stock</Badge>}
+                      {item.isActive ? <Badge variant="default" className="text-xs">Active</Badge> : <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                      {item.location && <Badge variant="outline" className="text-xs">{item.location}</Badge>}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
