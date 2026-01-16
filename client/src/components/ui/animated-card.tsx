@@ -136,3 +136,79 @@ export function AnimatedNumber({
     </motion.span>
   );
 }
+
+interface AnimatedBadgeProps {
+  children: ReactNode;
+  className?: string;
+  variant?: "default" | "success" | "warning" | "error";
+}
+
+export function AnimatedBadge({ children, className = "", variant = "default" }: AnimatedBadgeProps) {
+  const colorClasses = {
+    default: "bg-gray-100 text-gray-800",
+    success: "bg-green-100 text-green-800",
+    warning: "bg-yellow-100 text-yellow-800",
+    error: "bg-red-100 text-red-800",
+  };
+
+  return (
+    <motion.span
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      whileHover={{ scale: 1.05 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={cn(
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+        colorClasses[variant],
+        className
+      )}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+interface AnimatedIconButtonProps {
+  children: ReactNode;
+  onClick?: () => void;
+  className?: string;
+  disabled?: boolean;
+}
+
+export function AnimatedIconButton({ children, onClick, className = "", disabled }: AnimatedIconButtonProps) {
+  return (
+    <motion.button
+      whileHover={disabled ? {} : { scale: 1.1, rotate: 5 }}
+      whileTap={disabled ? {} : { scale: 0.9 }}
+      transition={{ type: "spring", stiffness: 400, damping: 20 }}
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "p-2 rounded-lg transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
+        disabled && "opacity-50 cursor-not-allowed",
+        className
+      )}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+interface AnimatedCounterProps {
+  value: number;
+  className?: string;
+}
+
+export function AnimatedCounter({ value, className = "" }: AnimatedCounterProps) {
+  return (
+    <motion.span
+      key={value}
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+      className={className}
+    >
+      {value}
+    </motion.span>
+  );
+}

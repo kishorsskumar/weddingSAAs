@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import Layout from "@/components/layout";
+import { motion, AnimatePresence } from "framer-motion";
 import Login from "@/pages/login";
 import Dashboard from "@/pages/dashboard";
 import EventCalendar from "@/pages/event-calendar";

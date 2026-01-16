@@ -165,3 +165,54 @@ export const checkmark: Variants = {
     },
   },
 };
+
+export const tableRow: Variants = {
+  initial: { opacity: 0, x: -10 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: 10, transition: { duration: 0.15 } },
+};
+
+export const tableContainer: Variants = {
+  initial: {},
+  animate: {
+    transition: {
+      staggerChildren: 0.03,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+export const dropdownItem: Variants = {
+  initial: { opacity: 0, y: -5 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -5 },
+};
+
+export const floatingAction: Variants = {
+  initial: { scale: 0, opacity: 0 },
+  animate: { 
+    scale: 1, 
+    opacity: 1,
+    transition: { type: "spring", stiffness: 500, damping: 25 }
+  },
+  exit: { scale: 0, opacity: 0 },
+};
+
+export const successPop = {
+  scale: [1, 1.2, 1],
+  transition: { duration: 0.3 },
+};
+
+export const shake = {
+  x: [0, -10, 10, -10, 10, 0],
+  transition: { duration: 0.4 },
+};
+
+export const gentleBounce = {
+  y: [0, -5, 0],
+  transition: { 
+    duration: 0.5,
+    repeat: Infinity,
+    repeatDelay: 2,
+  },
+};

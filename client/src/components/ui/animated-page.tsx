@@ -69,3 +69,108 @@ export function AnimatedPresenceWrapper({ children, isVisible }: AnimatedPresenc
     </AnimatePresence>
   );
 }
+
+interface AnimatedSectionProps {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}
+
+export function AnimatedSection({ children, className = "", delay = 0 }: AnimatedSectionProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+interface AnimatedHeaderProps {
+  children: ReactNode;
+  className?: string;
+}
+
+export function AnimatedHeader({ children, className = "" }: AnimatedHeaderProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.4, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+interface FadeInProps {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+  duration?: number;
+}
+
+export function FadeIn({ children, className = "", delay = 0, duration = 0.4 }: FadeInProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration, delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+interface SlideInProps {
+  children: ReactNode;
+  className?: string;
+  direction?: "left" | "right" | "up" | "down";
+  delay?: number;
+}
+
+export function SlideIn({ children, className = "", direction = "up", delay = 0 }: SlideInProps) {
+  const directionMap = {
+    left: { x: -30, y: 0 },
+    right: { x: 30, y: 0 },
+    up: { x: 0, y: 30 },
+    down: { x: 0, y: -30 },
+  };
+
+  const initial = directionMap[direction];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, ...initial }}
+      animate={{ opacity: 1, x: 0, y: 0 }}
+      transition={{ duration: 0.4, delay, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+interface ScaleInProps {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}
+
+export function ScaleIn({ children, className = "", delay = 0 }: ScaleInProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: "spring", stiffness: 400, damping: 25, delay }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
