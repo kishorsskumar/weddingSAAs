@@ -130,3 +130,74 @@ Preferred communication style: Simple, everyday language.
 - `bcryptjs`: Password hashing.
 - `express-session`: Secure session management.
 - `connect-pg-simple`: PostgreSQL session store.
+
+## Critical Files & Components (DO NOT BREAK)
+
+### Layout & Navigation
+- **`client/src/components/layout.tsx`**: Main layout with sidebar navigation and mobile bottom nav
+  - Contains `MobileBottomNav` component with 5 tabs (Home, Book, Events, Daybook, More)
+  - Uses `100dvh` for full-height mobile views
+  - Includes safe-area padding for iOS devices
+  - Desktop sidebar with collapsible navigation groups
+
+### Oak Book Financial Module
+- **`client/src/components/oak-book/zoho-quotes.tsx`**: Estimates/Quotes management (Zoho Books-style)
+- **`client/src/components/oak-book/zoho-invoices.tsx`**: Invoice management (Zoho Books-style)
+- **`client/src/pages/print-document.tsx`**: PDF generation for estimates, invoices, receipts
+
+**Oak Book Design Rules:**
+- Headers use `flex-col sm:flex-row` for mobile responsiveness
+- "New" button must always be visible on mobile (placed in first row)
+- Search bars use `w-full sm:w-48 lg:w-64` for responsive width
+- Filter dropdowns show abbreviated text on mobile ("All" vs "All Quotes")
+- Tables hide less important columns on mobile with `hidden lg:table-cell`
+
+**Tax Document Rules:**
+- Tax documents use "Yepman International" branding with GSTIN
+- Tax documents have `discountPercent="0"` and `discountAmount="0.00"` (no discounts per GST rules)
+- Tax calculations: Total = Subtotal + CGST (9%) + SGST (9%)
+- Standard documents use "Oakstreet Events" branding
+
+### CSS & Styling
+- **`client/src/index.css`**: Global styles with mobile-first utilities
+  - Safe-area CSS classes: `.safe-area-top`, `.safe-area-bottom`
+  - Touch-friendly utilities: `.touch-target` (min 44x44px)
+  - Mobile optimizations for buttons and containers
+
+### Key Patterns to Maintain
+
+**Responsive Header Pattern:**
+```jsx
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
+  <div className="flex items-center justify-between sm:justify-start gap-2">
+    {/* Filter/Title + Mobile New Button */}
+  </div>
+  <div className="flex items-center gap-2">
+    {/* Search (full width mobile) + Desktop New Button */}
+  </div>
+</div>
+```
+
+**Mobile-Visible Button Pattern:**
+```jsx
+{/* Mobile button - visible only on mobile */}
+<Button size="sm" className="sm:hidden">New</Button>
+
+{/* Desktop button - hidden on mobile */}
+<Button className="hidden sm:flex">New</Button>
+```
+
+**Responsive Search Pattern:**
+```jsx
+<Input className="pl-9 w-full sm:w-48 lg:w-64 h-9" />
+```
+
+## Recent Changes Log
+
+**January 2026:**
+- Added mobile bottom navigation bar with 5 tabs
+- Implemented full-height views (100dvh) for native app feel
+- Fixed Oak Book invoice/estimate headers for mobile (New button visibility)
+- Added viewport-fit=cover for iOS safe areas
+- Added touch-friendly 44px tap targets
+- Responsive headers with flex-col/flex-row pattern
