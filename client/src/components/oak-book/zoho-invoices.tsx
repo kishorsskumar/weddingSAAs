@@ -238,18 +238,19 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
 
   return (
     <div className="flex h-full">
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedInvoice ? "mr-[480px]" : "")}>
-        <div className="flex items-center justify-between p-4 border-b bg-white">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-gray-800">
+      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedInvoice ? "md:mr-[480px]" : "")}>
+        {/* Mobile-optimized header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-800">
               {filterType === "tax" ? "Tax Invoices" : "Invoices"}
             </h2>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  <Filter className="h-4 w-4 mr-2" />
-                  {statusFilter === "all" ? "All Invoices" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                  <ChevronDown className="h-4 w-4 ml-2" />
+                <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
@@ -262,24 +263,38 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
                 <DropdownMenuItem onClick={() => setStatusFilter("overdue")}>Overdue</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search invoices..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64 h-9"
-              />
-            </div>
+            {/* New button visible on mobile in top row */}
             <Button
               onClick={() => {
                 setEditingInvoice(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              New
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
+              />
+            </div>
+            {/* Desktop New button */}
+            <Button
+              onClick={() => {
+                setEditingInvoice(null);
+                setIsCreateModalOpen(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New

@@ -235,13 +235,14 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
 
   return (
     <div className="h-full flex flex-col bg-background">
-      <div className="flex items-center justify-between p-4 border-b bg-card">
-        <div className="flex items-center gap-4">
+      {/* Mobile-optimized header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-card gap-3">
+        <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                {statusFilter === "all" ? "All Quotes" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                <ChevronDown className="h-4 w-4" />
+              <Button variant="outline" size="sm" className="gap-1 sm:gap-2 h-9 text-xs sm:text-sm">
+                {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -255,27 +256,43 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="relative">
+          {/* New button visible on mobile in top row */}
+          <Button
+            onClick={() => {
+              setEditingQuote(null);
+              setIsCreateModalOpen(true);
+            }}
+            size="sm"
+            className="bg-primary hover:bg-primary/90 h-9 sm:hidden"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search quotes..."
-              className="pl-9 w-64"
+              placeholder="Search..."
+              className="pl-9 w-full sm:w-48 lg:w-64 h-9"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-        </div>
 
-        <Button
-          onClick={() => {
-            setEditingQuote(null);
-            setIsCreateModalOpen(true);
-          }}
-          className="bg-primary hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New
-        </Button>
+          {/* Desktop New button */}
+          <Button
+            onClick={() => {
+              setEditingQuote(null);
+              setIsCreateModalOpen(true);
+            }}
+            className="bg-primary hover:bg-primary/90 hidden sm:flex"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 flex min-h-0">
