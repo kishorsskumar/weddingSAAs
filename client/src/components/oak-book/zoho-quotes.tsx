@@ -298,11 +298,50 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
       <div className="flex-1 flex min-h-0">
         <div
           className={cn(
-            "border-r overflow-auto transition-all duration-300",
-            selectedQuoteId ? "w-[400px]" : "w-full"
+            "overflow-auto transition-all duration-300 w-full",
+            selectedQuoteId && "hidden md:block md:border-r md:w-[400px]"
           )}
         >
-          <table className="w-full">
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {filteredQuotes.map((quote) => {
+              const customer = getCustomer(quote.customerId);
+              const isSelected = selectedQuoteId === quote.id;
+              return (
+                <div
+                  key={quote.id}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors active:bg-muted/50",
+                    isSelected && "bg-primary/10"
+                  )}
+                  onClick={() => setSelectedQuoteId(quote.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-primary font-semibold text-sm">{quote.number}</span>
+                        <span className={cn("text-xs px-2 py-0.5 rounded font-medium", getStatusColor(quote.status))}>
+                          {quote.status}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium text-foreground truncate">{customer?.name || "No customer"}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(quote.date), "dd MMM yyyy")}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold">₹{parseFloat(quote.total).toLocaleString("en-IN")}</p>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto mt-1" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredQuotes.length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">No quotes found</div>
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="w-full hidden md:table">
             <thead className="sticky top-0 bg-card z-10 border-b">
               <tr className="text-left text-sm text-muted-foreground">
                 <th className="p-3 w-10">
@@ -441,7 +480,7 @@ function QuoteDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="flex-1 flex flex-col bg-card border-l overflow-hidden">
+    <div className="fixed inset-0 md:relative md:inset-auto flex-1 flex flex-col bg-card md:border-l overflow-hidden z-50 md:z-auto">
       <div className="flex items-center justify-between p-4 border-b bg-muted/30">
         <div>
           <p className="text-xs text-muted-foreground">Quote</p>

@@ -302,8 +302,51 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto bg-gray-50">
-          <table className="w-full">
+        <div className={cn(
+          "flex-1 overflow-auto bg-gray-50",
+          selectedInvoiceId && "hidden md:block"
+        )}>
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y">
+            {filteredInvoices.length === 0 ? (
+              <div className="p-8 text-center text-gray-500">
+                <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No invoices found</p>
+              </div>
+            ) : (
+              filteredInvoices.map((invoice) => (
+                <div
+                  key={invoice.id}
+                  onClick={() => setSelectedInvoiceId(invoice.id)}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors active:bg-blue-50/50",
+                    selectedInvoiceId === invoice.id && "bg-blue-50"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-blue-600 font-semibold text-sm">{invoice.number}</span>
+                        {getStatusBadge(invoice.status)}
+                      </div>
+                      <p className="text-sm font-medium text-gray-900 truncate">{getCustomerName(invoice.customerId)}</p>
+                      <p className="text-xs text-gray-500">{format(new Date(invoice.date), "dd MMM yyyy")}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold">₹{parseFloat(invoice.total).toLocaleString("en-IN")}</p>
+                      {parseFloat(invoice.balanceDue) > 0 && (
+                        <p className="text-xs text-red-600">Due: ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN")}</p>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-gray-400 ml-auto mt-1" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop Table View */}
+          <table className="w-full hidden md:table">
             <thead className="bg-gray-100 sticky top-0">
               <tr className="text-left text-sm text-gray-600">
                 <th className="p-3 w-10">
@@ -365,7 +408,10 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
           </table>
         </div>
 
-        <div className="p-3 border-t bg-white text-sm text-gray-500">
+        <div className={cn(
+          "p-3 border-t bg-white text-sm text-gray-500",
+          selectedInvoiceId && "hidden md:block"
+        )}>
           Showing {filteredInvoices.length} invoice{filteredInvoices.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -451,7 +497,7 @@ function InvoiceDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[480px] bg-white border-l shadow-lg flex flex-col z-50">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
