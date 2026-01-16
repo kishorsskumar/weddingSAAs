@@ -480,7 +480,7 @@ function QuoteDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="fixed inset-0 md:relative md:inset-auto flex-1 flex flex-col bg-card md:border-l z-50 md:z-auto overflow-y-auto md:overflow-hidden">
+    <div className="fixed inset-0 md:relative md:inset-auto flex-1 flex flex-col bg-card md:border-l z-50 md:z-auto">
       <div className="flex items-center justify-between p-4 border-b bg-muted/30">
         <div>
           <p className="text-xs text-muted-foreground">Quote</p>
@@ -589,8 +589,8 @@ function QuoteDetailPanel({
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="w-full justify-start px-4 bg-transparent border-b rounded-none h-auto">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="w-full justify-start px-4 bg-transparent border-b rounded-none h-auto flex-shrink-0">
           <TabsTrigger
             value="details"
             className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
@@ -605,7 +605,7 @@ function QuoteDetailPanel({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <TabsContent value="details" className="p-4 m-0 space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -768,7 +768,7 @@ function QuoteDetailPanel({
               )}
             </div>
           </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
     </div>
   );

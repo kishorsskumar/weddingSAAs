@@ -497,7 +497,7 @@ function InvoiceDetailPanel({
   const [activeTab, setActiveTab] = useState("details");
 
   return (
-    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50 overflow-y-auto md:overflow-hidden">
+    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
       <div className="flex items-center justify-between p-4 border-b bg-gray-50">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -584,8 +584,8 @@ function InvoiceDetailPanel({
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-2 justify-start bg-transparent border-b rounded-none h-auto p-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="mx-4 mt-2 justify-start bg-transparent border-b rounded-none h-auto p-0 flex-shrink-0">
           <TabsTrigger
             value="details"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-4 py-2"
@@ -600,7 +600,7 @@ function InvoiceDetailPanel({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <TabsContent value="details" className="p-4 m-0">
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -766,7 +766,7 @@ function InvoiceDetailPanel({
               )}
             </div>
           </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
     </div>
   );
