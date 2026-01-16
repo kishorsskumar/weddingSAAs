@@ -24,6 +24,20 @@ Preferred communication style: Simple, everyday language.
 - Event dropdowns should be searchable and scrollable using a Combobox pattern (Command + Popover)
 - Use the same searchable dropdown pattern for any long lists throughout the app
 
+**Mobile-First Design Guidelines (MUST FOLLOW):**
+- Mobile version should feel like a native app (Zoho Books-style experience)
+- Use bottom navigation bar on mobile with 5 tabs: Home, Book, Events, Daybook, More
+- Full-height views using `100dvh` for app-like experience
+- Minimum 44x44px touch targets for all interactive elements
+- Use `viewport-fit=cover` in index.html for iOS safe areas
+- Headers must be responsive: stack vertically on mobile (flex-col), horizontal on desktop (sm:flex-row)
+- Action buttons (New, Add, etc.) must be visible without horizontal scrolling on mobile
+- Search bars should take full width on mobile, fixed width on desktop
+- Use responsive text sizes: `text-xs sm:text-sm` or `text-base sm:text-lg`
+- Tables should hide less important columns on mobile with `hidden lg:table-cell`
+- Dialogs should be full-height sheets on mobile
+- Always test on mobile viewport (375px width) before completing UI work
+
 **Official WhatsApp Numbers:**
 - Kishor (Superadmin): +91 7902373354
 - Fida Fathima PK: +91 9895810975
