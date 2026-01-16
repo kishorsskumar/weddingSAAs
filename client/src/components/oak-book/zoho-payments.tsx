@@ -162,6 +162,7 @@ export function ZohoPayments() {
     mutationFn: (data: any) => apiRequest("POST", "/api/customer-payments", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-payments/next-number"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/banks"] });
@@ -538,6 +539,11 @@ function PaymentFormModal({
   onSubmit: (data: any) => void;
   isSubmitting: boolean;
 }) {
+  const { data: nextNumberData } = useQuery<{ number: string }>({
+    queryKey: ["/api/customer-payments/next-number"],
+    enabled: isOpen,
+  });
+
   const [formData, setFormData] = useState({
     customerId: "",
     customerName: "",
@@ -561,7 +567,10 @@ function PaymentFormModal({
   const selectedCustomer = customers.find(c => c.id === formData.customerId);
 
   const handleSubmit = () => {
-    onSubmit(formData);
+    onSubmit({
+      ...formData,
+      number: nextNumberData?.number || `REC-${Date.now()}`,
+    });
   };
 
   return (
