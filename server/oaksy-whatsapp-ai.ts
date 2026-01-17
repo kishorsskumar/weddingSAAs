@@ -2377,10 +2377,14 @@ export async function handleOaksyWhatsAppMessage(
         console.log('[AI Leave] Execution check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, trimmedMessage, activeIntent: conversation.activeIntent, currentState: conversation.currentState, slots });
         
         if (shouldExecute && slots.startDate && slots.leaveType) {
+          try {
+            console.log('[AI Leave] EXECUTING leave request creation...');
             const endDate = slots.endDate || slots.startDate;
             const days = slots.numberOfDays || calculateLeaveDays(slots.startDate, endDate);
             const leaveType = slots.leaveType || 'casual';
             const reason = slots.reason || 'Personal';
+            
+            console.log('[AI Leave] Creating with data:', { employeeId: employee.id, leaveType, startDate: slots.startDate, endDate, reason });
             
             // Create the leave request
             const leaveRequest = await storage.createLeaveRequest({
@@ -2391,6 +2395,8 @@ export async function handleOaksyWhatsAppMessage(
               reason,
               status: 'pending',
             });
+            
+            console.log('[AI Leave] Leave request created:', leaveRequest.id);
             
             // Reset conversation state
             await storage.updateWhatsappConversation(conversation.id, {
@@ -2413,6 +2419,10 @@ export async function handleOaksyWhatsAppMessage(
             
             const dayText = days === 1 ? 'day' : 'days';
             return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
+          } catch (execError) {
+            console.error('[AI Leave] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem submitting your leave request. Please try again or contact Kishor directly.`;
+          }
         }
         
         // Not confirmed yet - save context and ask for confirmation
