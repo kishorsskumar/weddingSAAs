@@ -2835,12 +2835,31 @@ export async function handleOaksyWhatsAppMessage(
             const conflictingLeave = existingConflict.conflict.conflictingItems[0];
             await storage.cancelLeaveRequest(conflictingLeave.id);
             console.log('[AI Leave] Cancelled conflicting leave:', conflictingLeave.id);
-            // Continue to execution below
-          } else if (conflictResponse === 'keep_both') {
-            // User wants to keep both - proceed with creation
+            
+            // Mark conflict as resolved and transition to awaiting_confirmation
+            const resolvedSlots = { ...slots, conflictContext: undefined, conflictResolved: true };
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'ai_leave_request',
+              intentContext: resolvedSlots,
+              currentState: 'awaiting_confirmation',
+              conversationHistory: history,
+            });
+            
+            return `Got it! I've cancelled the old leave request.\n\n📅 *${slots.leaveType?.charAt(0).toUpperCase()}${slots.leaveType?.slice(1)} Leave*\n📆 ${slots.startDate}${slots.endDate && slots.endDate !== slots.startDate ? ` to ${slots.endDate}` : ''}\n\n_Say "yes" to submit this leave request._`;
+          } else if (conflictResponse === 'keep_both' || /new|different|both|anyway/i.test(messageText)) {
+            // User wants to keep both - mark resolved and ask for confirmation
             console.log('[AI Leave] User chose to keep both leaves');
-            // Continue to execution below
-          } else if (conflictResponse === 'cancel') {
+            
+            const resolvedSlots = { ...slots, conflictContext: undefined, conflictResolved: true };
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'ai_leave_request',
+              intentContext: resolvedSlots,
+              currentState: 'awaiting_confirmation',
+              conversationHistory: history,
+            });
+            
+            return `Got it! This will be a separate leave request.\n\n📅 *${slots.leaveType?.charAt(0).toUpperCase()}${slots.leaveType?.slice(1)} Leave*\n📆 ${slots.startDate}${slots.endDate && slots.endDate !== slots.startDate ? ` to ${slots.endDate}` : ''}\n\n_Say "yes" to submit this leave request._`;
+          } else if (conflictResponse === 'cancel' || /duplicate|same|already|forget/i.test(messageText)) {
             // User wants to cancel the new request
             await storage.updateWhatsappConversation(conversation.id, {
               activeIntent: null,
@@ -2853,14 +2872,12 @@ export async function handleOaksyWhatsAppMessage(
             // Couldn't understand response - ask again
             return `I didn't quite understand. ${existingConflict.conflict?.message}\n\nPlease say:\n• "Cancel old one" to replace it\n• "Keep both" to have both leaves\n• "Cancel" to forget about this new request`;
           }
-          
-          // Clear conflict state and proceed
-          slots.conflictContext = undefined;
         }
         
         if (shouldExecute && slots.startDate && slots.leaveType) {
           // Check for conflicts before execution (if not already resolved)
-          if (!isInConflictResolution) {
+          // Skip conflict check if conflictResolved flag is set (user already handled the conflict)
+          if (!isInConflictResolution && !slots.conflictResolved) {
             const endDate = slots.endDate || slots.startDate;
             const conflictCheck = await detectIntentConflicts('leave_request', { ...slots, endDate }, employee.id, employee.name);
             
@@ -2877,6 +2894,8 @@ export async function handleOaksyWhatsAppMessage(
               
               return `⚠️ *Hold on!*\n\n${conflictCheck.conflict.message}\n\n_Reply "cancel old" to replace, "keep both" to have both, or "cancel" to forget this request._`;
             }
+          } else if (slots.conflictResolved) {
+            console.log('[AI Leave] Skipping conflict check - already resolved by user');
           }
           
           try {
