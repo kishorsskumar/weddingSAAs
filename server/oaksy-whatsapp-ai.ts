@@ -57,6 +57,22 @@ function getPublicMediaUrl(twilioMediaUrl: string): string {
   }
 }
 
+// Conflict detection types
+interface ConflictInfo {
+  type: 'overlapping_leave' | 'duplicate_expense' | 'pending_vendor_payment' | 'duplicate_daybook' | 'pending_qr_payment';
+  conflictingItems: any[];
+  message: string;
+  proposedAction: 'cancel_old' | 'keep_both' | 'cancel_new';
+}
+
+interface ConflictContext {
+  hasConflict: boolean;
+  conflict?: ConflictInfo;
+  pendingFollowupAction?: 'replace' | 'keep_both' | 'cancel';
+  originalIntent?: string;
+  originalSlots?: any;
+}
+
 interface IntentContext {
   amount?: number;
   purpose?: string;
@@ -100,12 +116,191 @@ interface IntentContext {
   timeframe?: string;
   bankName?: string;
   customerName?: string;
+  // Conflict detection fields
+  conflictContext?: ConflictContext;
 }
 
 interface ConversationMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+}
+
+// Detect conflicts before executing actions
+async function detectIntentConflicts(
+  intent: string,
+  slots: IntentContext,
+  employeeId: string,
+  employeeName: string
+): Promise<ConflictContext> {
+  const noConflict: ConflictContext = { hasConflict: false };
+  
+  try {
+    switch (intent) {
+      case 'leave_request': {
+        if (!slots.startDate || !slots.endDate) return noConflict;
+        
+        const overlapping = await storage.findOverlappingLeaveRequests(
+          employeeId,
+          slots.startDate,
+          slots.endDate
+        );
+        
+        if (overlapping.length > 0) {
+          const existingLeave = overlapping[0];
+          const dates = existingLeave.startDate === existingLeave.endDate
+            ? existingLeave.startDate
+            : `${existingLeave.startDate} to ${existingLeave.endDate}`;
+          
+          return {
+            hasConflict: true,
+            conflict: {
+              type: 'overlapping_leave',
+              conflictingItems: overlapping,
+              message: `You already have a ${existingLeave.status} leave request for ${dates} (${existingLeave.leaveType || 'General'}). Do you want me to cancel it and create a new one, or keep both?`,
+              proposedAction: 'cancel_old',
+            },
+            originalIntent: intent,
+            originalSlots: slots,
+          };
+        }
+        break;
+      }
+      
+      case 'expense': {
+        if (!slots.amount || !slots.purpose) return noConflict;
+        
+        const similar = await storage.findRecentSimilarExpenses(
+          employeeId,
+          slots.amount,
+          slots.purpose,
+          14 // Check last 14 days
+        );
+        
+        if (similar.length > 0) {
+          const existingExpense = similar[0];
+          const existingAmount = parseFloat(existingExpense.amount);
+          
+          return {
+            hasConflict: true,
+            conflict: {
+              type: 'duplicate_expense',
+              conflictingItems: similar,
+              message: `I found a similar expense from ${existingExpense.requestDate}: ₹${existingAmount.toLocaleString('en-IN')} for "${existingExpense.description}" (${existingExpense.status}). Is this a duplicate or a new expense?`,
+              proposedAction: 'keep_both',
+            },
+            originalIntent: intent,
+            originalSlots: slots,
+          };
+        }
+        break;
+      }
+      
+      case 'vendor_payment': {
+        if (!slots.vendorName) return noConflict;
+        
+        const pending = await storage.findPendingVendorPayments(slots.vendorName);
+        
+        if (pending.length > 0) {
+          const existingPayment = pending[0];
+          const existingAmount = existingPayment.amount ? parseFloat(existingPayment.amount) : 0;
+          
+          return {
+            hasConflict: true,
+            conflict: {
+              type: 'pending_vendor_payment',
+              conflictingItems: pending,
+              message: `There's already a pending vendor payment for "${slots.vendorName}" (₹${existingAmount.toLocaleString('en-IN')}) waiting for approval. Do you want to add another payment or wait for the first one to be processed?`,
+              proposedAction: 'keep_both',
+            },
+            originalIntent: intent,
+            originalSlots: slots,
+          };
+        }
+        break;
+      }
+      
+      case 'daybook_entry': {
+        if (!slots.amount || !slots.purpose) return noConflict;
+        
+        const today = new Date().toISOString().split('T')[0];
+        const duplicates = await storage.findDuplicateDaybookEntries(
+          today,
+          slots.amount,
+          slots.purpose
+        );
+        
+        if (duplicates.length > 0) {
+          const existing = duplicates[0];
+          
+          return {
+            hasConflict: true,
+            conflict: {
+              type: 'duplicate_daybook',
+              conflictingItems: duplicates,
+              message: `There's already a daybook entry today for ₹${parseFloat(existing.amount).toLocaleString('en-IN')} with a similar description. Is this a duplicate or a separate entry?`,
+              proposedAction: 'keep_both',
+            },
+            originalIntent: intent,
+            originalSlots: slots,
+          };
+        }
+        break;
+      }
+      
+      case 'qr_payment': {
+        const pendingQr = await storage.findPendingQrPaymentRequests(employeeId);
+        
+        if (pendingQr.length > 0) {
+          const existing = pendingQr[0];
+          
+          return {
+            hasConflict: true,
+            conflict: {
+              type: 'pending_qr_payment',
+              conflictingItems: pendingQr,
+              message: `You have a pending QR payment request for ₹${parseFloat(existing.amount).toLocaleString('en-IN')} that's still waiting for approval. Do you want to submit another one or wait for the first to be processed?`,
+              proposedAction: 'keep_both',
+            },
+            originalIntent: intent,
+            originalSlots: slots,
+          };
+        }
+        break;
+      }
+    }
+  } catch (error) {
+    console.error('[Conflict Detection] Error:', error);
+    // On error, proceed without blocking
+  }
+  
+  return noConflict;
+}
+
+// Handle user response to conflict resolution
+function parseConflictResponse(message: string): 'replace' | 'keep_both' | 'cancel' | null {
+  const lower = message.toLowerCase().trim();
+  
+  // Patterns for "cancel old and create new" or "replace"
+  if (/^(yes|yeah|yep|sure|ok|okay|cancel|replace|new|create new)/i.test(lower) ||
+      /cancel.*(first|old|previous|existing)/i.test(lower) ||
+      /replace.*(first|old|previous|existing)/i.test(lower)) {
+    return 'replace';
+  }
+  
+  // Patterns for "keep both" or "it's different"
+  if (/(keep|both|different|new|separate|another)/i.test(lower) ||
+      /^(no|nope|not duplicate)/i.test(lower) && /(different|new|separate)/i.test(lower)) {
+    return 'keep_both';
+  }
+  
+  // Patterns for "cancel this request"
+  if (/(cancel|stop|never ?mind|forget it|don't|dont)/i.test(lower) && 
+      !/(cancel.*(first|old|previous|existing))/i.test(lower)) {
+    return 'cancel';
+  }
+  
+  return null;
 }
 
 const OAKSY_SYSTEM_PROMPT = `You are Oaksy AI, the intelligent companion for Oakstreet Events. You are a versatile assistant who adapts to each user's role and needs.
@@ -2624,7 +2819,64 @@ export async function handleOaksyWhatsAppMessage(
         
         console.log('[AI Leave] Execution check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, trimmedMessage, activeIntent: conversation.activeIntent, currentState: conversation.currentState, slots });
         
+        // Check if we're in conflict resolution state
+        const isInConflictResolution = conversation.currentState === 'conflict_resolution';
+        const existingConflict = context.conflictContext;
+        
+        // Handle conflict resolution response
+        if (isInConflictResolution && existingConflict?.hasConflict) {
+          const conflictResponse = parseConflictResponse(messageText);
+          console.log('[AI Leave] Conflict resolution response:', conflictResponse);
+          
+          if (conflictResponse === 'replace' && existingConflict.conflict?.type === 'overlapping_leave') {
+            // Cancel existing leave and proceed with new one
+            const conflictingLeave = existingConflict.conflict.conflictingItems[0];
+            await storage.cancelLeaveRequest(conflictingLeave.id);
+            console.log('[AI Leave] Cancelled conflicting leave:', conflictingLeave.id);
+            // Continue to execution below
+          } else if (conflictResponse === 'keep_both') {
+            // User wants to keep both - proceed with creation
+            console.log('[AI Leave] User chose to keep both leaves');
+            // Continue to execution below
+          } else if (conflictResponse === 'cancel') {
+            // User wants to cancel the new request
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            return "👍 No problem! I've cancelled the new leave request.\n\n_What else can I help you with?_ 🌳";
+          } else {
+            // Couldn't understand response - ask again
+            return `I didn't quite understand. ${existingConflict.conflict?.message}\n\nPlease say:\n• "Cancel old one" to replace it\n• "Keep both" to have both leaves\n• "Cancel" to forget about this new request`;
+          }
+          
+          // Clear conflict state and proceed
+          slots.conflictContext = undefined;
+        }
+        
         if (shouldExecute && slots.startDate && slots.leaveType) {
+          // Check for conflicts before execution (if not already resolved)
+          if (!isInConflictResolution) {
+            const endDate = slots.endDate || slots.startDate;
+            const conflictCheck = await detectIntentConflicts('leave_request', { ...slots, endDate }, employee.id, employee.name);
+            
+            if (conflictCheck.hasConflict && conflictCheck.conflict) {
+              console.log('[AI Leave] Conflict detected:', conflictCheck.conflict.type);
+              
+              // Save conflict context and ask user
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_leave_request',
+                intentContext: { ...slots, conflictContext: conflictCheck },
+                currentState: 'conflict_resolution',
+                conversationHistory: history,
+              });
+              
+              return `⚠️ *Hold on!*\n\n${conflictCheck.conflict.message}\n\n_Reply "cancel old" to replace, "keep both" to have both, or "cancel" to forget this request._`;
+            }
+          }
+          
           try {
             console.log('[AI Leave] EXECUTING leave request creation...');
             const endDate = slots.endDate || slots.startDate;
@@ -2742,7 +2994,7 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       // EXPENSE EXECUTION HANDLER - Natural language expense submission
       // ============================================================================
-      if (aiResult.intent === 'expense' || (aiResult.intent === 'confirmation' && conversation.activeIntent === 'ai_expense') || conversation.activeIntent === 'ai_expense') {
+      if (aiResult.intent === 'expense' || conversation.activeIntent === 'ai_expense') {
         // Role check - only allowed submitters can create expenses
         if (!isAllowedExpenseSubmitter(normalizedPhone)) {
           return `❌ Sorry ${employee.name}, expense submission is only available for Wedding Planners and Accountants.\n\n_Contact Kishor if you need to submit an expense._ 🌳`;
@@ -2760,7 +3012,54 @@ export async function handleOaksyWhatsAppMessage(
         
         console.log('[AI Expense] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
         
+        // Check if we're in conflict resolution state
+        const isInConflictResolution = conversation.currentState === 'conflict_resolution';
+        const existingConflict = context.conflictContext;
+        
+        // Handle conflict resolution response for expenses
+        if (isInConflictResolution && existingConflict?.hasConflict && existingConflict.conflict?.type === 'duplicate_expense') {
+          const conflictResponse = parseConflictResponse(messageText);
+          console.log('[AI Expense] Conflict resolution response:', conflictResponse);
+          
+          if (conflictResponse === 'keep_both' || /new|different|separate/i.test(messageText)) {
+            // User says it's a new/different expense - proceed
+            console.log('[AI Expense] User confirmed this is a new expense');
+            slots.conflictContext = undefined;
+          } else if (conflictResponse === 'cancel' || /duplicate|same|already/i.test(messageText)) {
+            // User confirms it's a duplicate - cancel
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            return "👍 Got it! I've cancelled this expense since it was a duplicate.\n\n_What else can I help you with?_ 🌳";
+          } else {
+            // Couldn't understand response - ask again
+            return `I didn't quite understand. ${existingConflict.conflict.message}\n\nPlease say:\n• "It's a new expense" to submit it\n• "It's a duplicate" to cancel`;
+          }
+        }
+        
         if (shouldExecute && slots.amount && slots.purpose) {
+          // Check for conflicts before execution (if not already resolved)
+          if (!isInConflictResolution) {
+            const conflictCheck = await detectIntentConflicts('expense', slots, employee.id, employee.name);
+            
+            if (conflictCheck.hasConflict && conflictCheck.conflict) {
+              console.log('[AI Expense] Conflict detected:', conflictCheck.conflict.type);
+              
+              // Save conflict context and ask user
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_expense',
+                intentContext: { ...slots, conflictContext: conflictCheck },
+                currentState: 'conflict_resolution',
+                conversationHistory: history,
+              });
+              
+              return `⚠️ *Wait a moment!*\n\n${conflictCheck.conflict.message}\n\n_Reply "new expense" if this is different, or "duplicate" if it's the same._`;
+            }
+          }
+          
           try {
             console.log('[AI Expense] EXECUTING expense submission...');
             
@@ -2911,7 +3210,54 @@ export async function handleOaksyWhatsAppMessage(
         
         console.log('[AI Vendor] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
         
+        // Check if we're in conflict resolution state
+        const isInConflictResolution = conversation.currentState === 'conflict_resolution';
+        const existingConflict = context.conflictContext;
+        
+        // Handle conflict resolution response for vendor payments
+        if (isInConflictResolution && existingConflict?.hasConflict && existingConflict.conflict?.type === 'pending_vendor_payment') {
+          const conflictResponse = parseConflictResponse(messageText);
+          console.log('[AI Vendor] Conflict resolution response:', conflictResponse);
+          
+          if (conflictResponse === 'keep_both' || /yes|add|another|new/i.test(messageText)) {
+            // User wants to add another payment - proceed
+            console.log('[AI Vendor] User wants to add another vendor payment');
+            slots.conflictContext = undefined;
+          } else if (conflictResponse === 'cancel' || /wait|no|later/i.test(messageText)) {
+            // User wants to wait for the first one
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            return "👍 No problem! Let's wait for the first payment to be approved.\n\n_What else can I help you with?_ 🌳";
+          } else {
+            // Couldn't understand response - ask again
+            return `I didn't quite understand. ${existingConflict.conflict.message}\n\nPlease say:\n• "Add another" to submit a new payment\n• "Wait" to hold off until the first is processed`;
+          }
+        }
+        
         if (shouldExecute && slots.amount && slots.vendorName) {
+          // Check for conflicts before execution (if not already resolved)
+          if (!isInConflictResolution) {
+            const conflictCheck = await detectIntentConflicts('vendor_payment', slots, employee.id, employee.name);
+            
+            if (conflictCheck.hasConflict && conflictCheck.conflict) {
+              console.log('[AI Vendor] Conflict detected:', conflictCheck.conflict.type);
+              
+              // Save conflict context and ask user
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_vendor_payment',
+                intentContext: { ...slots, conflictContext: conflictCheck },
+                currentState: 'conflict_resolution',
+                conversationHistory: history,
+              });
+              
+              return `⚠️ *Hold on!*\n\n${conflictCheck.conflict.message}\n\n_Reply "add another" to submit anyway, or "wait" to hold off._`;
+            }
+          }
+          
           try {
             console.log('[AI Vendor] EXECUTING vendor payment submission...');
             
@@ -3018,9 +3364,8 @@ export async function handleOaksyWhatsAppMessage(
               date: new Date().toISOString().split('T')[0],
               type: slots.daybookType,
               amount: String(slots.amount),
-              description: description,
+              description: `${description} (by ${employee.name})`,
               category: slots.daybookCategory || 'General',
-              submittedBy: employee.name,
               bankId: null,
               eventId: null,
             });
@@ -5582,9 +5927,8 @@ async function handleSuperadminApproval(message: string, fromPhone: string): Pro
         date: new Date().toISOString().split('T')[0],
         type: 'expense',
         amount: String(amount),
-        description: `Vendor Payment: ${approval.description}`,
+        description: `Vendor Payment: ${approval.description} (by ${approval.employeeName})`,
         category: 'Vendor Payment',
-        submittedBy: approval.employeeName,
         bankId: null,
         eventId: null,
       });

@@ -298,7 +298,7 @@ import {
   type InsertRsvpMessageLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, or } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -4674,14 +4674,13 @@ export class DatabaseStorage implements IStorage {
   async findRecentSimilarExpenses(employeeId: string, amount: number, description: string, daysBack: number = 14): Promise<ExpenseReimbursement[]> {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
-    const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
     
     const allExpenses = await db.select().from(expenseReimbursements)
       .where(and(
         eq(expenseReimbursements.employeeId, employeeId),
-        gte(expenseReimbursements.submittedAt, cutoffDate)
+        gte(expenseReimbursements.createdAt, cutoffDate)
       ))
-      .orderBy(desc(expenseReimbursements.submittedAt));
+      .orderBy(desc(expenseReimbursements.createdAt));
     
     const lowerDesc = description.toLowerCase();
     const tolerance = amount * 0.02;
