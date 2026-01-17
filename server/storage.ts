@@ -296,6 +296,9 @@ import {
   rsvpMessageLogs,
   type RsvpMessageLog,
   type InsertRsvpMessageLog,
+  oaksyReminders,
+  type OaksyReminder,
+  type InsertOaksyReminder,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or } from "drizzle-orm";
@@ -876,6 +879,13 @@ export interface IStorage {
   findDuplicateDaybookEntries(date: string, amount: number, description: string): Promise<DaybookEntry[]>;
   findPendingQrPaymentRequests(employeeId: string): Promise<QrPaymentRequest[]>;
   cancelLeaveRequest(id: string): Promise<void>;
+
+  // Oaksy Reminders
+  createReminder(reminder: InsertOaksyReminder): Promise<OaksyReminder>;
+  getDueReminders(): Promise<OaksyReminder[]>;
+  getEmployeeReminders(employeeId: string): Promise<OaksyReminder[]>;
+  markReminderAsSent(id: string): Promise<void>;
+  cancelReminder(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4815,6 +4825,43 @@ export class DatabaseStorage implements IStorage {
     await db.update(leaveRequests)
       .set({ status: 'cancelled' })
       .where(eq(leaveRequests.id, id));
+  }
+
+  // Oaksy Reminders
+  async createReminder(reminder: InsertOaksyReminder): Promise<OaksyReminder> {
+    const [newReminder] = await db.insert(oaksyReminders).values(reminder).returning();
+    return newReminder;
+  }
+
+  async getDueReminders(): Promise<OaksyReminder[]> {
+    const now = new Date();
+    return await db.select().from(oaksyReminders)
+      .where(and(
+        eq(oaksyReminders.status, 'pending'),
+        lte(oaksyReminders.dueAt, now)
+      ))
+      .orderBy(oaksyReminders.dueAt);
+  }
+
+  async getEmployeeReminders(employeeId: string): Promise<OaksyReminder[]> {
+    return await db.select().from(oaksyReminders)
+      .where(and(
+        eq(oaksyReminders.employeeId, employeeId),
+        eq(oaksyReminders.status, 'pending')
+      ))
+      .orderBy(oaksyReminders.dueAt);
+  }
+
+  async markReminderAsSent(id: string): Promise<void> {
+    await db.update(oaksyReminders)
+      .set({ status: 'sent', sentAt: new Date() })
+      .where(eq(oaksyReminders.id, id));
+  }
+
+  async cancelReminder(id: string): Promise<void> {
+    await db.update(oaksyReminders)
+      .set({ status: 'cancelled' })
+      .where(eq(oaksyReminders.id, id));
   }
 }
 
