@@ -868,6 +868,14 @@ export interface IStorage {
   updateMonthlyProductionPlanEntry(id: string, entry: Partial<InsertMonthlyProductionPlan>): Promise<MonthlyProductionPlan | undefined>;
   deleteMonthlyProductionPlanEntry(id: string): Promise<void>;
   generateMonthlyPlanFromEvents(month: number, year: number): Promise<MonthlyProductionPlan[]>;
+
+  // Conflict Detection for Oaksy AI
+  findOverlappingLeaveRequests(employeeId: string, startDate: string, endDate: string): Promise<LeaveRequest[]>;
+  findRecentSimilarExpenses(employeeId: string, amount: number, description: string, daysBack?: number): Promise<ExpenseReimbursement[]>;
+  findPendingVendorPayments(vendorName: string): Promise<WhatsappPendingApproval[]>;
+  findDuplicateDaybookEntries(date: string, amount: number, description: string): Promise<DaybookEntry[]>;
+  findPendingQrPaymentRequests(employeeId: string): Promise<QrPaymentRequest[]>;
+  cancelLeaveRequest(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4638,6 +4646,96 @@ export class DatabaseStorage implements IStorage {
       greetingsSent: logs.filter(l => l.messageType === 'greeting').length,
       remindersSent: logs.filter(l => l.messageType === 'reminder').length,
     };
+  }
+
+  // Conflict Detection for Oaksy AI
+  async findOverlappingLeaveRequests(employeeId: string, startDate: string, endDate: string): Promise<LeaveRequest[]> {
+    return await db.select().from(leaveRequests)
+      .where(and(
+        eq(leaveRequests.employeeId, employeeId),
+        or(
+          eq(leaveRequests.status, 'pending'),
+          eq(leaveRequests.status, 'approved')
+        ),
+        or(
+          and(
+            lte(leaveRequests.startDate, endDate),
+            gte(leaveRequests.endDate, startDate)
+          ),
+          and(
+            gte(leaveRequests.startDate, startDate),
+            lte(leaveRequests.startDate, endDate)
+          )
+        )
+      ))
+      .orderBy(desc(leaveRequests.createdAt));
+  }
+
+  async findRecentSimilarExpenses(employeeId: string, amount: number, description: string, daysBack: number = 14): Promise<ExpenseReimbursement[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysBack);
+    const cutoffDateStr = cutoffDate.toISOString().split('T')[0];
+    
+    const allExpenses = await db.select().from(expenseReimbursements)
+      .where(and(
+        eq(expenseReimbursements.employeeId, employeeId),
+        gte(expenseReimbursements.submittedAt, cutoffDate)
+      ))
+      .orderBy(desc(expenseReimbursements.submittedAt));
+    
+    const lowerDesc = description.toLowerCase();
+    const tolerance = amount * 0.02;
+    
+    return allExpenses.filter(exp => {
+      const amountMatch = Math.abs(parseFloat(exp.amount) - amount) <= tolerance;
+      const descMatch = exp.description?.toLowerCase().includes(lowerDesc) || 
+                        lowerDesc.includes(exp.description?.toLowerCase() || '');
+      return amountMatch || descMatch;
+    });
+  }
+
+  async findPendingVendorPayments(vendorName: string): Promise<WhatsappPendingApproval[]> {
+    const pending = await db.select().from(whatsappPendingApprovals)
+      .where(and(
+        eq(whatsappPendingApprovals.type, 'vendor_payment'),
+        eq(whatsappPendingApprovals.status, 'pending')
+      ))
+      .orderBy(desc(whatsappPendingApprovals.createdAt));
+    
+    const lowerVendor = vendorName.toLowerCase();
+    return pending.filter(p => 
+      p.description?.toLowerCase().includes(lowerVendor)
+    );
+  }
+
+  async findDuplicateDaybookEntries(date: string, amount: number, description: string): Promise<DaybookEntry[]> {
+    const entries = await db.select().from(daybookEntries)
+      .where(eq(daybookEntries.date, date))
+      .orderBy(desc(daybookEntries.createdAt));
+    
+    const lowerDesc = description.toLowerCase();
+    const tolerance = amount * 0.01;
+    
+    return entries.filter(entry => {
+      const amountMatch = Math.abs(parseFloat(entry.amount) - amount) <= tolerance;
+      const descMatch = entry.description?.toLowerCase().includes(lowerDesc);
+      return amountMatch && descMatch;
+    });
+  }
+
+  async findPendingQrPaymentRequests(employeeId: string): Promise<QrPaymentRequest[]> {
+    return await db.select().from(qrPaymentRequests)
+      .where(and(
+        eq(qrPaymentRequests.employeeId, employeeId),
+        eq(qrPaymentRequests.status, 'pending')
+      ))
+      .orderBy(desc(qrPaymentRequests.createdAt));
+  }
+
+  async cancelLeaveRequest(id: string): Promise<void> {
+    await db.update(leaveRequests)
+      .set({ status: 'cancelled' })
+      .where(eq(leaveRequests.id, id));
   }
 }
 
