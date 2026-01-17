@@ -2362,20 +2362,42 @@ export async function handleOaksyWhatsAppMessage(
   if (isConfirmationWord && hasLeaveSlots && isAwaitingLeaveConfirm) {
     console.log('[Direct Confirm] BYPASSING AI - executing leave request directly');
     try {
-      const endDate = (context.endDate || context.startDate) as string;
+      const rawEndDate = (context.endDate || context.startDate) as string;
+      const rawStartDate = context.startDate as string;
       const numDays = (context as any).numberOfDays as number | undefined;
-      const days = numDays || calculateLeaveDays(context.startDate as string, endDate);
+      const days = numDays || calculateLeaveDays(rawStartDate, rawEndDate);
       const leaveType = context.leaveType as string || 'casual';
       const reason = context.reason as string || 'Personal';
       
-      console.log('[Direct Confirm] Creating leave request:', { employeeId: employee.id, leaveType, startDate: context.startDate, endDate, reason });
+      // Convert DD/MM/YYYY to YYYY-MM-DD for database
+      const convertDateFormat = (dateStr: string): string => {
+        // Handle various formats: DD/MM/YYYY, D/M/YYYY, etc.
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          const day = parts[0].padStart(2, '0');
+          const month = parts[1].padStart(2, '0');
+          const year = parts[2];
+          return `${year}-${month}-${day}`;
+        }
+        // Try parsing with parseAIDate if not in expected format
+        const parsed = parseAIDate(dateStr);
+        if (parsed) {
+          return parsed.toISOString().split('T')[0];
+        }
+        return dateStr; // Return as-is if we can't parse
+      };
+      
+      const startDateDb = convertDateFormat(rawStartDate);
+      const endDateDb = convertDateFormat(rawEndDate);
+      
+      console.log('[Direct Confirm] Creating leave request:', { employeeId: employee.id, leaveType, startDate: startDateDb, endDate: endDateDb, reason, rawStartDate, rawEndDate });
       
       // Create the leave request
       const leaveRequest = await storage.createLeaveRequest({
         employeeId: employee.id,
         leaveType: leaveType,
-        startDate: context.startDate as string,
-        endDate: endDate as string,
+        startDate: startDateDb,
+        endDate: endDateDb,
         reason,
         status: 'pending',
       });
