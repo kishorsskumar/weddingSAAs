@@ -481,17 +481,23 @@ REMINDER DETECTION RULES:
 - EXPLICIT: "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
 - EXPLICIT: "set a reminder for 5pm to call client" = reminder
 - EXPLICIT: "remind me at 3:30pm to check deliveries" = reminder
+- EXPLICIT: "remind me after 5 minutes to call Kishor" = reminder (relative time)
+- EXPLICIT: "remind me in 10 minutes" = reminder (relative time)
+- EXPLICIT: "can you remind me to call Kishor after 5 minutes" = reminder
 - IMPLICIT: "call Kishor at 4.45 am today" = reminder (action + time = reminder)
 - IMPLICIT: "pay vendor at 3pm" = reminder (task with specific time = reminder)
 - IMPLICIT: "check flowers at 10am tomorrow" = reminder
 - IMPLICIT: "send invoice to client at 5pm" = reminder
 - KEY PATTERN: If the message contains a TASK/ACTION + a SPECIFIC TIME/DATE, treat it as an IMPLICIT REMINDER
+- RELATIVE TIMES: "after X minutes", "in X hours", "in X minutes" are VALID reminder times - calculate from current time
 - Parse time naturally: "9am", "5:30 PM", "4.45am", "10:00", "morning" (default 9am), "evening" (default 5pm)
-- Parse date naturally: "tomorrow", "today", "Monday", "next week" (default next Monday), "in 2 hours"
+- Parse date naturally: "tomorrow", "today", "Monday", "next week" (default next Monday), "in 2 hours", "after 30 mins"
 - The reminderMessage should be a clean task description (what to do), e.g., "call Kishor" not the full sentence with time
 - If no date/time specified but a clear task is mentioned, ask "When should I remind you?"
 - Use Indian timezone (Asia/Kolkata) for all times
+- For relative times like "in 5 minutes" or "after 10 mins", add that duration to the CURRENT time in IST
 - IMPORTANT: Set "reminderExplicitToday" to true if user explicitly says "today" or specifies current date
+- CRITICAL: ANY message with "remind me" or "reminder" MUST return intent="reminder", never intent="general"
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
