@@ -131,6 +131,9 @@ interface IntentContext {
   conflictResolved?: boolean;
   // Number of days for leave
   numberOfDays?: number;
+  // Reminder fields
+  reminderDateTime?: string;
+  reminderMessage?: string;
 }
 
 interface ConversationMessage {
@@ -383,9 +386,19 @@ QUERY TYPE DETECTION:
 - "pending rsvps", "who hasn't responded", "rsvp follow-up" = rsvp_query with queryType: "pending"
 - "meal count", "food preferences", "veg non-veg count" = rsvp_query with queryType: "meals"
 
+REMINDER DETECTION RULES:
+- "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
+- "set a reminder for 5pm to call client" = reminder
+- "remind me at 3:30pm to check deliveries" = reminder
+- Parse time naturally: "9am", "5:30 PM", "10:00", "morning" (default 9am), "evening" (default 5pm)
+- Parse date naturally: "tomorrow", "today", "Monday", "next week" (default next Monday), "in 2 hours"
+- The reminderMessage should be a clean task description (what to do), not the full user sentence
+- If no date/time specified, ask for clarification
+- Use Indian timezone (Asia/Kolkata) for all times
+
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "rsvp_query" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "rsvp_query" | "reminder" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null (ONLY if explicitly mentioned, never from address numbers),
     "purpose": string or null,
@@ -402,9 +415,11 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "deliveryAddress": string or null (full physical location),
     "itemDescription": string or null,
     "vehicleNumber": string or null,
-    "bankName": string or null
+    "bankName": string or null,
+    "reminderDateTime": string or null (ISO format datetime for reminder, e.g., "2024-01-17T09:00:00"),
+    "reminderMessage": string or null (clean task description, e.g., "call flower vendor")
   },
-  "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation"] or [],
+  "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation", "reminderTime"] or [],
   "isComplete": boolean,
   "message": "Your friendly, helpful response"
 }`;
@@ -4737,6 +4752,115 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
 
+  // Handle reminder flow - awaiting time or message
+  if (conversation.activeIntent === 'reminder') {
+    const reminderContext = context as any;
+    
+    // Awaiting time for the reminder
+    if (conversation.currentState === 'awaiting_reminder_time') {
+      // Use AI to parse the time
+      const timeParsePrompt = `Parse this time/date into ISO format datetime (Asia/Kolkata timezone).
+Current date/time: ${new Date().toISOString()}
+User input: "${messageText}"
+
+If the user says:
+- "tomorrow at 9am" -> add 1 day and set time to 09:00
+- "5pm today" -> set time to 17:00 today
+- "morning" -> default to 09:00
+- "evening" -> default to 17:00
+- "in 2 hours" -> add 2 hours to current time
+
+Return ONLY the ISO datetime string (e.g., "2026-01-18T09:00:00+05:30") or "INVALID" if cannot parse.`;
+
+      try {
+        const timeResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: timeParsePrompt }],
+          max_tokens: 100,
+        });
+        
+        const parsedTime = timeResponse.choices[0]?.message?.content?.trim() || '';
+        
+        if (parsedTime && parsedTime !== 'INVALID' && !parsedTime.includes('INVALID')) {
+          const dueAt = new Date(parsedTime);
+          const now = new Date();
+          
+          if (dueAt <= now) {
+            return `⏰ That time has already passed! Try something like:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
+          }
+          
+          // Create the reminder
+          await storage.createReminder({
+            employeeId: employee.id,
+            employeeName: employee.name,
+            employeePhone: employee.phone || normalizedPhone,
+            reminderMessage: reminderContext.reminderMessage || 'Reminder',
+            dueAt: dueAt,
+            timezone: 'Asia/Kolkata',
+            status: 'pending',
+          });
+          
+          // Reset conversation
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: null,
+            intentContext: null,
+            currentState: 'idle',
+            conversationHistory: [],
+          });
+          
+          const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+          const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+          
+          return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderContext.reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
+        }
+      } catch (err) {
+        console.error('[Oaksy] Error parsing reminder time:', err);
+      }
+      
+      return `⏰ I couldn't understand that time. Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "Monday morning"\n• "in 2 hours"`;
+    }
+    
+    // Awaiting message for the reminder
+    if (conversation.currentState === 'awaiting_reminder_message') {
+      const reminderMessage = messageText.trim();
+      
+      if (!reminderMessage || reminderMessage.length < 2) {
+        return `📝 Please tell me what to remind you about.\n\n_Example: "call flower vendor" or "check delivery"_`;
+      }
+      
+      try {
+        const dueAt = new Date(reminderContext.reminderDateTime);
+        
+        // Create the reminder
+        await storage.createReminder({
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: employee.phone || normalizedPhone,
+          reminderMessage: reminderMessage,
+          dueAt: dueAt,
+          timezone: 'Asia/Kolkata',
+          status: 'pending',
+        });
+        
+        // Reset conversation
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        
+        const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        
+        return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
+      } catch (err) {
+        console.error('[Oaksy] Error creating reminder:', err);
+        return `❌ Sorry, something went wrong. Please try again.\n\n_Say "remind me" to start over_`;
+      }
+    }
+  }
+
   // Handle pending vendor payment state - awaiting amount
   if (conversation.currentState === 'awaiting_vendor_amount') {
     const amount = extractAmount(messageText);
@@ -6034,6 +6158,68 @@ export async function handleOaksyWhatsAppMessage(
     const eventName = aiAnalysis.extractedData.eventName;
     const result = await getRsvpStatus(eventName, queryType);
     return result;
+  }
+
+  // Handle AI-detected reminder intent
+  if (aiAnalysis.intent === 'reminder') {
+    const reminderDateTime = aiAnalysis.extractedData.reminderDateTime;
+    const reminderMessage = aiAnalysis.extractedData.reminderMessage;
+    
+    if (reminderDateTime && reminderMessage) {
+      try {
+        const dueAt = new Date(reminderDateTime);
+        const now = new Date();
+        
+        // Validate the reminder time is in the future
+        if (dueAt <= now) {
+          return `⏰ That time has already passed! Please set a reminder for a future time.\n\n_Example: "remind me tomorrow at 9am to call vendor"_`;
+        }
+        
+        // Create the reminder
+        await storage.createReminder({
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: employee.phone || normalizedPhone,
+          reminderMessage: reminderMessage,
+          dueAt: dueAt,
+          timezone: 'Asia/Kolkata',
+          status: 'pending',
+        });
+        
+        // Format the time for display
+        const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        
+        return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
+      } catch (err) {
+        console.error('[Oaksy] Error creating reminder:', err);
+        return `❌ Sorry, I couldn't set that reminder. Please try again with a clear time.\n\n_Example: "remind me tomorrow at 9am to pay vendor"_`;
+      }
+    } else if (!reminderDateTime) {
+      // Need the time - preserve existing context and add reminderMessage
+      const mergedContext = { ...context, reminderMessage };
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'reminder',
+        intentContext: mergedContext,
+        conversationHistory: history,
+        currentState: 'awaiting_reminder_time',
+      });
+      
+      return `⏰ When should I remind you?\n\n_Example: "tomorrow at 9am" or "5pm today"_`;
+    } else if (!reminderMessage) {
+      // Need the message - preserve existing context and add reminderDateTime
+      const mergedContext = { ...context, reminderDateTime };
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'reminder',
+        intentContext: mergedContext,
+        conversationHistory: history,
+        currentState: 'awaiting_reminder_message',
+      });
+      
+      return `📝 What should I remind you about?\n\n_Example: "pay flower vendor" or "call caterer"_`;
+    }
+    
+    return aiAnalysis.message || `🔔 *Set a Reminder*\n\nJust tell me when and what!\n\n_Example: "remind me tomorrow at 9am to pay vendor"_`;
   }
 
   // Return AI's response for other intents
