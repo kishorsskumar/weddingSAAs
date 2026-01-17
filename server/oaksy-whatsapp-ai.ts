@@ -2359,13 +2359,20 @@ export async function handleOaksyWhatsAppMessage(
       console.log('[AI Flow] Result:', JSON.stringify({ intent: aiResult.intent, readyToExecute: aiResult.readyToExecute, userConfirmed: aiResult.userConfirmed }, null, 2));
       
       // Handle leave request confirmation and execution
-      if (aiResult.intent === 'leave_request' || conversation.activeIntent === 'ai_leave_request') {
+      if (aiResult.intent === 'leave_request' || aiResult.intent === 'confirmation' || conversation.activeIntent === 'ai_leave_request') {
+        
+        // Merge stored context with any new slots from AI
+        const slots = { ...context, ...aiResult.slots };
         
         // User confirmed - execute the leave request
-        if (aiResult.readyToExecute && aiResult.userConfirmed) {
-          const slots = { ...context, ...aiResult.slots };
-          
-          if (slots.startDate && slots.leaveType) {
+        // Check both AI flags AND simple confirmation words when in leave request flow
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit)$/i.test(messageText.trim());
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && conversation.activeIntent === 'ai_leave_request' && conversation.currentState === 'awaiting_confirmation');
+        
+        console.log('[AI Leave] Execution check:', { shouldExecute, isSimpleConfirm, activeIntent: conversation.activeIntent, currentState: conversation.currentState, slots });
+        
+        if (shouldExecute && slots.startDate && slots.leaveType) {
             const endDate = slots.endDate || slots.startDate;
             const days = slots.numberOfDays || calculateLeaveDays(slots.startDate, endDate);
             const leaveType = slots.leaveType || 'casual';
@@ -2402,7 +2409,6 @@ export async function handleOaksyWhatsAppMessage(
             
             const dayText = days === 1 ? 'day' : 'days';
             return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
-          }
         }
         
         // Not confirmed yet - save context and ask for confirmation
