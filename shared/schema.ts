@@ -2105,3 +2105,21 @@ export const rsvpMessageLogs = pgTable("rsvp_message_logs", {
 export const insertRsvpMessageLogSchema = createInsertSchema(rsvpMessageLogs).omit({ id: true, createdAt: true });
 export type InsertRsvpMessageLog = z.infer<typeof insertRsvpMessageLogSchema>;
 export type RsvpMessageLog = typeof rsvpMessageLogs.$inferSelect;
+
+// Oaksy Reminders - Scheduled reminders set by employees via WhatsApp
+export const oaksyReminders = pgTable("oaksy_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  employeeName: text("employee_name").notNull(),
+  employeePhone: text("employee_phone").notNull(),
+  reminderMessage: text("reminder_message").notNull(),
+  dueAt: timestamp("due_at").notNull(),
+  timezone: text("timezone").default('Asia/Kolkata'),
+  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'cancelled'
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOaksyReminderSchema = createInsertSchema(oaksyReminders).omit({ id: true, createdAt: true });
+export type InsertOaksyReminder = z.infer<typeof insertOaksyReminderSchema>;
+export type OaksyReminder = typeof oaksyReminders.$inferSelect;
