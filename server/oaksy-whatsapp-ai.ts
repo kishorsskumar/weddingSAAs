@@ -4887,16 +4887,14 @@ Return "INVALID" if you cannot parse the input.`;
         
         if (parsedTime && parsedTime !== 'INVALID' && !parsedTime.includes('INVALID')) {
           // Use our helper to properly parse the time as IST
-          const dueAt = parseReminderDateTime(parsedTime);
+          let dueAt = parseReminderDateTime(parsedTime);
           
           if (!dueAt) {
             return `⏰ I couldn't understand that time. Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
           }
           
-          if (!isReminderTimeInFuture(dueAt)) {
-            console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', new Date().toISOString());
-            return `⏰ That time seems to be in the past. Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
-          }
+          // Auto-adjust past times to tomorrow (e.g., "4am" at night means tomorrow 4am)
+          dueAt = autoAdjustPastTimeToTomorrow(dueAt);
           
           // Create the reminder
           await storage.createReminder({
@@ -4917,8 +4915,8 @@ Return "INVALID" if you cannot parse the input.`;
             conversationHistory: [],
           });
           
-          const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
-          const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+          const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+          const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
           
           return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderContext.reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
         }
