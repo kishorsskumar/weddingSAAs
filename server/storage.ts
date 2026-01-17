@@ -4682,14 +4682,52 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(expenseReimbursements.createdAt));
     
-    const lowerDesc = description.toLowerCase();
-    const tolerance = amount * 0.02;
+    // Synonym maps for common expense terms
+    const synonyms: Record<string, string[]> = {
+      'cab': ['taxi', 'uber', 'ola', 'ride', 'transport', 'travel'],
+      'taxi': ['cab', 'uber', 'ola', 'ride', 'transport', 'travel'],
+      'fuel': ['petrol', 'diesel', 'gas', 'petroleum'],
+      'petrol': ['fuel', 'diesel', 'gas', 'petroleum'],
+      'diesel': ['fuel', 'petrol', 'gas', 'petroleum'],
+      'food': ['meal', 'lunch', 'dinner', 'breakfast', 'refreshments', 'tea', 'coffee'],
+      'meal': ['food', 'lunch', 'dinner', 'breakfast', 'refreshments'],
+      'lunch': ['food', 'meal', 'dinner', 'breakfast'],
+      'dinner': ['food', 'meal', 'lunch', 'breakfast'],
+      'stationery': ['office', 'supplies', 'paper', 'print'],
+      'courier': ['delivery', 'shipping', 'transport', 'parcel'],
+      'delivery': ['courier', 'shipping', 'transport', 'parcel'],
+      'flowers': ['flower', 'floral', 'bouquet', 'garland'],
+      'flower': ['flowers', 'floral', 'bouquet', 'garland'],
+      'decorations': ['decor', 'decoration', 'decorating'],
+      'decor': ['decoration', 'decorations', 'decorating'],
+    };
+    
+    // Normalize description: lowercase, remove extra spaces, extract key words
+    const normalizeText = (text: string) => text.toLowerCase().trim().replace(/\s+/g, ' ');
+    const extractKeyWords = (text: string) => normalizeText(text).split(' ').filter(w => w.length > 2);
+    
+    // Expand keywords with synonyms
+    const expandWithSynonyms = (words: string[]) => {
+      const expanded = new Set(words);
+      words.forEach(w => {
+        if (synonyms[w]) synonyms[w].forEach(s => expanded.add(s));
+      });
+      return Array.from(expanded);
+    };
+    
+    const inputKeyWords = expandWithSynonyms(extractKeyWords(description));
+    const tolerance = amount * 0.05; // 5% tolerance for amount matching
     
     return allExpenses.filter(exp => {
+      // Amount must be within tolerance
       const amountMatch = Math.abs(parseFloat(exp.amount) - amount) <= tolerance;
-      const descMatch = exp.description?.toLowerCase().includes(lowerDesc) || 
-                        lowerDesc.includes(exp.description?.toLowerCase() || '');
-      return amountMatch || descMatch;
+      
+      // Check for keyword overlap (at least one matching keyword including synonyms)
+      const expKeyWords = expandWithSynonyms(extractKeyWords(exp.description || ''));
+      const hasKeywordOverlap = inputKeyWords.some(kw => expKeyWords.some(ew => ew.includes(kw) || kw.includes(ew)));
+      
+      // Match if both amount is close AND keywords overlap, or if exact amount match with pending status
+      return (amountMatch && hasKeywordOverlap) || (Math.abs(parseFloat(exp.amount) - amount) < 1 && exp.status === 'pending');
     });
   }
 
@@ -4701,10 +4739,17 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(whatsappPendingApprovals.createdAt));
     
-    const lowerVendor = vendorName.toLowerCase();
-    return pending.filter(p => 
-      p.description?.toLowerCase().includes(lowerVendor)
-    );
+    // Normalize vendor name for matching
+    const normalizeVendor = (v: string) => v.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '');
+    const normalizedInput = normalizeVendor(vendorName);
+    const inputWords = normalizedInput.split(' ').filter(w => w.length > 2);
+    
+    return pending.filter(p => {
+      const descNormalized = normalizeVendor(p.description || '');
+      // Check for exact vendor name in description, or significant word overlap
+      return descNormalized.includes(normalizedInput) || 
+             inputWords.some(word => descNormalized.includes(word) && word.length > 3);
+    });
   }
 
   async findDuplicateDaybookEntries(date: string, amount: number, description: string): Promise<DaybookEntry[]> {
@@ -4712,13 +4757,48 @@ export class DatabaseStorage implements IStorage {
       .where(eq(daybookEntries.date, date))
       .orderBy(desc(daybookEntries.createdAt));
     
-    const lowerDesc = description.toLowerCase();
-    const tolerance = amount * 0.01;
+    // Synonym maps for common daybook terms
+    const synonyms: Record<string, string[]> = {
+      'fuel': ['petrol', 'diesel', 'gas', 'petroleum'],
+      'petrol': ['fuel', 'diesel', 'gas', 'petroleum'],
+      'diesel': ['fuel', 'petrol', 'gas', 'petroleum'],
+      'payment': ['pay', 'paid', 'paying'],
+      'salary': ['wages', 'salaries', 'pay'],
+      'vendor': ['supplier', 'provider'],
+      'flowers': ['flower', 'floral', 'bouquet', 'garland'],
+      'flower': ['flowers', 'floral', 'bouquet', 'garland'],
+      'decorations': ['decor', 'decoration', 'decorating'],
+      'decor': ['decoration', 'decorations', 'decorating'],
+      'rental': ['rent', 'hire', 'renting'],
+      'rent': ['rental', 'hire', 'renting'],
+    };
+    
+    // Normalize description for matching
+    const normalizeText = (text: string) => text.toLowerCase().trim().replace(/\s+/g, ' ');
+    const extractKeyWords = (text: string) => normalizeText(text).split(' ').filter(w => w.length > 2);
+    
+    // Expand keywords with synonyms
+    const expandWithSynonyms = (words: string[]) => {
+      const expanded = new Set(words);
+      words.forEach(w => {
+        if (synonyms[w]) synonyms[w].forEach(s => expanded.add(s));
+      });
+      return Array.from(expanded);
+    };
+    
+    const inputKeyWords = expandWithSynonyms(extractKeyWords(description));
+    const tolerance = amount * 0.02; // 2% tolerance
     
     return entries.filter(entry => {
       const amountMatch = Math.abs(parseFloat(entry.amount) - amount) <= tolerance;
-      const descMatch = entry.description?.toLowerCase().includes(lowerDesc);
-      return amountMatch && descMatch;
+      const entryKeyWords = expandWithSynonyms(extractKeyWords(entry.description || ''));
+      
+      // Check for keyword overlap (including synonyms)
+      const hasKeywordOverlap = inputKeyWords.some(kw => 
+        entryKeyWords.some(ew => ew.includes(kw) || kw.includes(ew))
+      );
+      
+      return amountMatch && hasKeywordOverlap;
     });
   }
 

@@ -221,13 +221,15 @@ async function detectIntentConflicts(
       }
       
       case 'daybook_entry': {
-        if (!slots.amount || !slots.purpose) return noConflict;
+        // Use daybookDescription or purpose for conflict detection
+        const description = slots.daybookDescription || slots.purpose;
+        if (!slots.amount || !description) return noConflict;
         
         const today = new Date().toISOString().split('T')[0];
         const duplicates = await storage.findDuplicateDaybookEntries(
           today,
           slots.amount,
-          slots.purpose
+          description
         );
         
         if (duplicates.length > 0) {
@@ -3022,9 +3024,22 @@ export async function handleOaksyWhatsAppMessage(
           console.log('[AI Expense] Conflict resolution response:', conflictResponse);
           
           if (conflictResponse === 'keep_both' || /new|different|separate/i.test(messageText)) {
-            // User says it's a new/different expense - proceed
+            // User says it's a new/different expense - proceed to confirmation
             console.log('[AI Expense] User confirmed this is a new expense');
-            slots.conflictContext = undefined;
+            
+            // Mark conflict as resolved so we don't re-trigger detection
+            const resolvedSlots = { ...slots, conflictContext: undefined, conflictResolved: true };
+            
+            // Transition out of conflict_resolution to proceed with execution
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'ai_expense',
+              intentContext: resolvedSlots,
+              currentState: 'awaiting_confirmation',
+              conversationHistory: history,
+            });
+            
+            // Ask for final confirmation
+            return `Got it! This is a separate expense.\n\n📋 *${slots.purpose}*\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n\n_Say "yes" to submit this expense request._`;
           } else if (conflictResponse === 'cancel' || /duplicate|same|already/i.test(messageText)) {
             // User confirms it's a duplicate - cancel
             await storage.updateWhatsappConversation(conversation.id, {
@@ -3042,7 +3057,7 @@ export async function handleOaksyWhatsAppMessage(
         
         if (shouldExecute && slots.amount && slots.purpose) {
           // Check for conflicts before execution (if not already resolved)
-          if (!isInConflictResolution) {
+          if (!isInConflictResolution && !slots.conflictResolved) {
             const conflictCheck = await detectIntentConflicts('expense', slots, employee.id, employee.name);
             
             if (conflictCheck.hasConflict && conflictCheck.conflict) {
@@ -3353,7 +3368,69 @@ export async function handleOaksyWhatsAppMessage(
         
         console.log('[AI Daybook] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
         
+        // Check if we're in conflict resolution state
+        const isInConflictResolution = conversation.currentState === 'conflict_resolution';
+        const existingConflict = context.conflictContext;
+        
+        // Handle conflict resolution response for daybook entries
+        if (isInConflictResolution && existingConflict?.hasConflict && existingConflict.conflict?.type === 'duplicate_daybook') {
+          const conflictResponse = parseConflictResponse(messageText);
+          console.log('[AI Daybook] Conflict resolution response:', conflictResponse);
+          
+          if (conflictResponse === 'keep_both' || /new|different|separate|add anyway/i.test(messageText)) {
+            // User says it's a new/different entry - proceed to confirmation
+            console.log('[AI Daybook] User confirmed this is a new entry');
+            
+            // Mark conflict as resolved so we don't re-trigger detection
+            const resolvedSlots = { ...slots, conflictContext: undefined, conflictResolved: true };
+            
+            // Transition out of conflict_resolution to proceed with execution
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'ai_daybook_entry',
+              intentContext: resolvedSlots,
+              currentState: 'awaiting_confirmation',
+              conversationHistory: history,
+            });
+            
+            const typeEmoji = slots.daybookType === 'income' ? '💚' : '💸';
+            const description = slots.daybookDescription || slots.purpose || 'Entry via WhatsApp';
+            // Ask for final confirmation
+            return `Got it! This is a separate entry.\n\n${typeEmoji} *${slots.daybookType?.toUpperCase()}*\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n\n_Say "yes" to add this daybook entry._`;
+          } else if (conflictResponse === 'cancel' || /duplicate|same|already/i.test(messageText)) {
+            // User confirms it's a duplicate - cancel
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            return "👍 Got it! I've cancelled this entry since it was a duplicate.\n\n_What else can I help you with?_ 🌳";
+          } else {
+            // Couldn't understand response - ask again
+            return `I didn't quite understand. ${existingConflict.conflict.message}\n\nPlease say:\n• "Add anyway" to submit it\n• "It's a duplicate" to cancel`;
+          }
+        }
+        
         if (shouldExecute && slots.amount && slots.daybookType) {
+          // Check for conflicts before execution (if not already resolved)
+          if (!isInConflictResolution && !slots.conflictResolved) {
+            const conflictCheck = await detectIntentConflicts('daybook_entry', slots, employee.id, employee.name);
+            
+            if (conflictCheck.hasConflict && conflictCheck.conflict) {
+              console.log('[AI Daybook] Conflict detected:', conflictCheck.conflict.type);
+              
+              // Save conflict context and ask user
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_daybook_entry',
+                intentContext: { ...slots, conflictContext: conflictCheck },
+                currentState: 'conflict_resolution',
+                conversationHistory: history,
+              });
+              
+              return `⚠️ *Wait a moment!*\n\n${conflictCheck.conflict.message}\n\n_Reply "add anyway" if this is different, or "duplicate" if it's the same._`;
+            }
+          }
+          
           try {
             console.log('[AI Daybook] EXECUTING daybook entry creation...');
             
