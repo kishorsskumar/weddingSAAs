@@ -484,6 +484,8 @@ REMINDER DETECTION RULES:
 - EXPLICIT: "remind me after 5 minutes to call Kishor" = reminder (relative time)
 - EXPLICIT: "remind me in 10 minutes" = reminder (relative time)
 - EXPLICIT: "can you remind me to call Kishor after 5 minutes" = reminder
+- EXPLICIT: "create a reminder to call Kishor at 5.10am today" = reminder (dot notation for time)
+- EXPLICIT: "create a reminder to call Kishor at 5pm" = reminder
 - IMPLICIT: "call Kishor at 4.45 am today" = reminder (action + time = reminder)
 - IMPLICIT: "pay vendor at 3pm" = reminder (task with specific time = reminder)
 - IMPLICIT: "check flowers at 10am tomorrow" = reminder
@@ -1633,7 +1635,23 @@ async function analyzeWithAI(
     roleContext = 'Manager (can view team data)';
   }
   
-  const userPrompt = `Current conversation context: ${currentContext}
+  // Get current date/time in IST for the AI to know "today", "in 5 minutes", etc.
+  const nowIST = toZonedTime(new Date(), INDIA_TIMEZONE);
+  const currentDateTimeIST = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}T${String(nowIST.getHours()).padStart(2, '0')}:${String(nowIST.getMinutes()).padStart(2, '0')}:00`;
+  const readableDateTime = nowIST.toLocaleString('en-IN', { 
+    weekday: 'short', 
+    day: 'numeric', 
+    month: 'short', 
+    year: 'numeric', 
+    hour: 'numeric', 
+    minute: '2-digit', 
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
+  });
+
+  const userPrompt = `CURRENT DATE/TIME (IST - India): ${currentDateTimeIST} (${readableDateTime})
+
+Current conversation context: ${currentContext}
 User: ${userName || 'Unknown'} (Role: ${roleContext})
 Has image attached: ${hasMedia ? 'Yes' : 'No'}
 
@@ -1641,6 +1659,11 @@ Recent conversation:
 ${historyText}
 
 New message: "${message}"
+
+IMPORTANT FOR REMINDERS:
+- Use the CURRENT DATE/TIME above when calculating relative times like "in 5 minutes", "after 30 mins", "in 2 hours"
+- For "in 5 minutes" at current time, add 5 minutes to the current time and return as reminderDateTime
+- Any message containing "remind me" or "create a reminder" or "set a reminder" MUST be intent="reminder"
 
 Understand the intent flexibly - don't require specific formats. Be helpful and conversational.`;
 
