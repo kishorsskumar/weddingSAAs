@@ -491,6 +491,7 @@ REMINDER DETECTION RULES:
 - The reminderMessage should be a clean task description (what to do), e.g., "call Kishor" not the full sentence with time
 - If no date/time specified but a clear task is mentioned, ask "When should I remind you?"
 - Use Indian timezone (Asia/Kolkata) for all times
+- IMPORTANT: Set "reminderExplicitToday" to true if user explicitly says "today" or specifies current date
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
@@ -513,7 +514,8 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "vehicleNumber": string or null,
     "bankName": string or null,
     "reminderDateTime": string or null (ISO format datetime for reminder, e.g., "2024-01-17T09:00:00"),
-    "reminderMessage": string or null (clean task description, e.g., "call flower vendor")
+    "reminderMessage": string or null (clean task description, e.g., "call flower vendor"),
+    "reminderExplicitToday": boolean or null (true if user explicitly said "today" or current date)
   },
   "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation", "reminderTime"] or [],
   "isComplete": boolean,
@@ -4966,6 +4968,69 @@ Return "INVALID" if you cannot parse the input.`;
         return `❌ Sorry, something went wrong. Please try again.\n\n_Say "remind me" to start over_`;
       }
     }
+    
+    // Awaiting confirmation for past time (user said "today" but time passed)
+    if (conversation.currentState === 'awaiting_past_time_confirmation') {
+      const lowerMessage = messageText.toLowerCase().trim();
+      
+      // Check if user confirmed tomorrow
+      if (lowerMessage === 'yes' || lowerMessage === 'y' || lowerMessage === 'ok' || lowerMessage === 'sure' || lowerMessage === 'tomorrow') {
+        try {
+          // Parse the stored datetime and adjust to tomorrow
+          let dueAt = parseReminderDateTime(reminderContext.reminderDateTime);
+          if (dueAt) {
+            dueAt = autoAdjustPastTimeToTomorrow(dueAt);
+            
+            await storage.createReminder({
+              employeeId: employee.id,
+              employeeName: employee.name,
+              employeePhone: employee.phone || normalizedPhone,
+              reminderMessage: reminderContext.reminderMessage || 'Reminder',
+              dueAt: dueAt,
+              timezone: 'Asia/Kolkata',
+              status: 'pending',
+            });
+            
+            // Reset conversation
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+            const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+            
+            return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderContext.reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
+          }
+        } catch (err) {
+          console.error('[Oaksy] Error creating reminder after confirmation:', err);
+        }
+        return `❌ Sorry, something went wrong. Please try again with a new reminder.`;
+      }
+      
+      // User wants to cancel or provide a different time
+      if (lowerMessage === 'no' || lowerMessage === 'n' || lowerMessage === 'cancel') {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        return `👍 Okay, no reminder set. Just tell me whenever you need one!`;
+      }
+      
+      // Try to parse as a new time
+      // Reset to awaiting_reminder_time state and let that handler process it
+      await storage.updateWhatsappConversation(conversation.id, {
+        currentState: 'awaiting_reminder_time',
+      });
+      
+      // Continue to awaiting_reminder_time handler by recursing through the same logic
+      // For now, just prompt for clarification
+      return `⏰ What time would you like the reminder?\n\n_Example: "tomorrow at 9am" or "5pm today"_`;
+    }
   }
 
   // Handle pending vendor payment state - awaiting amount
@@ -6285,8 +6350,31 @@ Return "INVALID" if you cannot parse the input.`;
           return `⏰ I couldn't understand that time. Try saying:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
         }
         
-        // Auto-adjust past times to tomorrow (e.g., "4am" at night means tomorrow 4am)
-        dueAt = autoAdjustPastTimeToTomorrow(dueAt);
+        // Check if time is in the past
+        const timeIsInPast = !isReminderTimeInFuture(dueAt);
+        const explicitToday = aiAnalysis.extractedData.reminderExplicitToday === true;
+        
+        if (timeIsInPast) {
+          if (explicitToday) {
+            // User explicitly said "today" but time has passed - ask for clarification
+            console.log('[Oaksy] Reminder time in past with explicit today. dueAt:', dueAt.toISOString());
+            const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+            
+            // Save context for follow-up
+            const mergedContext = { ...context, reminderMessage, reminderDateTime, pendingTomorrowAdjust: true };
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'reminder',
+              intentContext: mergedContext,
+              conversationHistory: history,
+              currentState: 'awaiting_past_time_confirmation',
+            });
+            
+            return `⏰ That time (${timeStr}) has already passed today.\n\nWould you like me to set it for *tomorrow at ${timeStr}* instead?\n\n_Reply "yes" or give me a different time._`;
+          } else {
+            // No explicit "today" - auto-adjust to tomorrow
+            dueAt = autoAdjustPastTimeToTomorrow(dueAt);
+          }
+        }
         
         // Create the reminder
         await storage.createReminder({
