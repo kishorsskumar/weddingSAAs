@@ -2347,6 +2347,69 @@ export async function handleOaksyWhatsAppMessage(
       conversation.activeIntent?.includes(flow)
     );
   
+  // ============================================================================
+  // DIRECT CONFIRMATION BYPASS: Execute leave request immediately if user confirms
+  // This runs BEFORE the AI to ensure confirmations are handled reliably
+  // ============================================================================
+  const trimmedLower = messageText.trim().toLowerCase();
+  const isConfirmationWord = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji|theek|thik|y|yep|yup)$/i.test(trimmedLower);
+  const hasLeaveSlots = context.startDate && context.leaveType;
+  const isAwaitingLeaveConfirm = conversation.activeIntent === 'ai_leave_request' && 
+                                  conversation.currentState === 'awaiting_confirmation';
+  
+  console.log('[Direct Confirm Check]', { isConfirmationWord, hasLeaveSlots, isAwaitingLeaveConfirm, trimmedLower, context });
+  
+  if (isConfirmationWord && hasLeaveSlots && isAwaitingLeaveConfirm) {
+    console.log('[Direct Confirm] BYPASSING AI - executing leave request directly');
+    try {
+      const endDate = (context.endDate || context.startDate) as string;
+      const numDays = (context as any).numberOfDays as number | undefined;
+      const days = numDays || calculateLeaveDays(context.startDate as string, endDate);
+      const leaveType = context.leaveType as string || 'casual';
+      const reason = context.reason as string || 'Personal';
+      
+      console.log('[Direct Confirm] Creating leave request:', { employeeId: employee.id, leaveType, startDate: context.startDate, endDate, reason });
+      
+      // Create the leave request
+      const leaveRequest = await storage.createLeaveRequest({
+        employeeId: employee.id,
+        leaveType: leaveType,
+        startDate: context.startDate as string,
+        endDate: endDate as string,
+        reason,
+        status: 'pending',
+      });
+      
+      console.log('[Direct Confirm] Leave request created:', leaveRequest.id);
+      
+      // Reset conversation state
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+      
+      // Notify Kishor
+      const startDateObj = parseAIDate(context.startDate as string);
+      const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : context.startDate;
+      
+      try {
+        const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "A LR${leaveRequest.id.slice(-4)}" to approve_`;
+        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+        console.log('[Direct Confirm] Notification sent to superadmin');
+      } catch (notifyError) {
+        console.error('[Direct Confirm] Failed to notify superadmin:', notifyError);
+      }
+      
+      const dayText = days === 1 ? 'day' : 'days';
+      return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
+    } catch (directExecError) {
+      console.error('[Direct Confirm] FAILED:', directExecError);
+      return `❌ Sorry, there was a problem submitting your leave request. Please try again.`;
+    }
+  }
+  
   // Run AI orchestrator for text messages that look like natural requests
   const shouldUseAi = !mediaUrl && !isInLegacyFlow && 
     (looksLikeLeave || looksLikeExpense || looksLikeQuery || isInAiFlow || isShortMessage);
