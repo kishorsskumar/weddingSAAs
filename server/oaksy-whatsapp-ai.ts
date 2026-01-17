@@ -5,8 +5,76 @@ import type { WhatsappConversation, InsertExpenseReimbursement, InsertLeaveReque
 import { objectStorageClient } from './objectStorage';
 import { randomUUID } from 'crypto';
 import { analyzeImageFromUrl } from './transaction-scanner';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// India timezone constant
+const INDIA_TIMEZONE = 'Asia/Kolkata';
+
+/**
+ * Parse a reminder datetime string from AI and return a proper UTC Date object.
+ * Handles various formats the AI might return.
+ */
+function parseReminderDateTime(dateTimeStr: string): Date | null {
+  if (!dateTimeStr) return null;
+  
+  try {
+    // Clean up the string - remove any markdown or extra text
+    const cleanStr = dateTimeStr.replace(/[`"']/g, '').trim();
+    
+    // Try parsing as ISO with explicit offset (e.g., "2026-01-18T09:00:00+05:30")
+    if (cleanStr.includes('+') || cleanStr.includes('T') && cleanStr.endsWith('Z')) {
+      const parsed = new Date(cleanStr);
+      if (!isNaN(parsed.getTime())) {
+        console.log('[Oaksy] Parsed reminder time with offset:', cleanStr, '->', parsed.toISOString());
+        return parsed;
+      }
+    }
+    
+    // Try parsing as local time without offset - assume IST
+    // Format: "2026-01-18T09:00:00" or "2026-01-18 09:00"
+    const localMatch = cleanStr.match(/(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}(?::\d{2})?)/);
+    if (localMatch) {
+      const [, datePart, timePart] = localMatch;
+      const timeWithSeconds = timePart.includes(':') && timePart.split(':').length === 3 
+        ? timePart 
+        : `${timePart}:00`;
+      
+      // Create a date object treating this as IST time, then convert to UTC
+      const istDateStr = `${datePart}T${timeWithSeconds}`;
+      // fromZonedTime converts a local time in a timezone to UTC
+      const utcDate = fromZonedTime(istDateStr, INDIA_TIMEZONE);
+      
+      if (!isNaN(utcDate.getTime())) {
+        console.log('[Oaksy] Parsed reminder time as IST:', cleanStr, '->', utcDate.toISOString());
+        return utcDate;
+      }
+    }
+    
+    // Fallback: try direct parsing
+    const fallback = new Date(cleanStr);
+    if (!isNaN(fallback.getTime())) {
+      console.log('[Oaksy] Parsed reminder time with fallback:', cleanStr, '->', fallback.toISOString());
+      return fallback;
+    }
+    
+    console.log('[Oaksy] Failed to parse reminder time:', cleanStr);
+    return null;
+  } catch (err) {
+    console.error('[Oaksy] Error parsing reminder datetime:', err);
+    return null;
+  }
+}
+
+/**
+ * Check if a reminder time is in the future (with 30-second grace period)
+ */
+function isReminderTimeInFuture(dueAt: Date): boolean {
+  const now = new Date();
+  const gracePeriodMs = 30 * 1000; // 30 seconds grace
+  return dueAt.getTime() > now.getTime() - gracePeriodMs;
+}
 
 // Allowed employees for expense/income submission (normalized phone numbers)
 // Only these employees can submit expenses or income via WhatsApp
@@ -4758,24 +4826,26 @@ export async function handleOaksyWhatsAppMessage(
     
     // Awaiting time for the reminder
     if (conversation.currentState === 'awaiting_reminder_time') {
-      // Get current time in IST for accurate comparison
-      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      // Get current time in IST for the AI prompt
+      const nowIST = toZonedTime(new Date(), INDIA_TIMEZONE);
+      const nowISTStr = `${nowIST.getFullYear()}-${String(nowIST.getMonth() + 1).padStart(2, '0')}-${String(nowIST.getDate()).padStart(2, '0')}T${String(nowIST.getHours()).padStart(2, '0')}:${String(nowIST.getMinutes()).padStart(2, '0')}:00`;
       
       // Use AI to parse the time
-      const timeParsePrompt = `Parse this time/date into ISO format datetime (Asia/Kolkata timezone, UTC+5:30).
-Current date/time in India: ${nowIST.toISOString().replace('Z', '+05:30')}
+      const timeParsePrompt = `Parse this time/date into ISO format datetime.
+Current date/time in India (IST): ${nowISTStr}
 User input: "${messageText}"
 
-IMPORTANT: The user is in India (IST timezone). Always use +05:30 offset.
+The user is in India (IST timezone, UTC+5:30). Parse their input as IST time.
 
 If the user says:
-- "tomorrow at 9am" -> add 1 day and set time to 09:00 IST
-- "5pm today" -> set time to 17:00 IST today
-- "morning" -> default to 09:00 IST
-- "evening" -> default to 17:00 IST
-- "in 2 hours" -> add 2 hours to current time
+- "tomorrow at 9am" -> add 1 day and set time to 09:00
+- "5pm today" -> set time to 17:00 today
+- "morning" -> default to 09:00
+- "evening" -> default to 17:00
+- "in 2 hours" -> add 2 hours to current IST time
 
-Return ONLY the ISO datetime string with offset (e.g., "2026-01-18T09:00:00+05:30") or "INVALID" if cannot parse.`;
+Return ONLY the datetime in format: YYYY-MM-DDTHH:MM:SS (no timezone offset, I will handle it).
+Return "INVALID" if you cannot parse the input.`;
 
       try {
         const timeResponse = await openai.chat.completions.create({
@@ -4785,17 +4855,19 @@ Return ONLY the ISO datetime string with offset (e.g., "2026-01-18T09:00:00+05:3
         });
         
         const parsedTime = timeResponse.choices[0]?.message?.content?.trim() || '';
-        console.log('[Oaksy] Reminder time parsed:', parsedTime, 'from input:', messageText);
+        console.log('[Oaksy] Reminder time raw from AI:', parsedTime, 'from input:', messageText);
         
         if (parsedTime && parsedTime !== 'INVALID' && !parsedTime.includes('INVALID')) {
-          const dueAt = new Date(parsedTime);
-          const now = new Date();
+          // Use our helper to properly parse the time as IST
+          const dueAt = parseReminderDateTime(parsedTime);
           
-          // Add 1 minute grace period to avoid edge cases
-          const gracePeriodMs = 60 * 1000;
-          if (dueAt.getTime() <= now.getTime() - gracePeriodMs) {
-            console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', now.toISOString());
-            return `⏰ That time seems to be in the past. Try something like:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
+          if (!dueAt) {
+            return `⏰ I couldn't understand that time. Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
+          }
+          
+          if (!isReminderTimeInFuture(dueAt)) {
+            console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', new Date().toISOString());
+            return `⏰ That time seems to be in the past. Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
           }
           
           // Create the reminder
@@ -6178,19 +6250,18 @@ Return ONLY the ISO datetime string with offset (e.g., "2026-01-18T09:00:00+05:3
     
     if (reminderDateTime && reminderMessage) {
       try {
-        const dueAt = new Date(reminderDateTime);
-        const now = new Date();
+        // Use our helper to properly parse the time as IST
+        const dueAt = parseReminderDateTime(reminderDateTime);
         
         // Check if date is valid
-        if (isNaN(dueAt.getTime())) {
+        if (!dueAt) {
           console.log('[Oaksy] Invalid reminder date parsed:', reminderDateTime);
           return `⏰ I couldn't understand that time. Try saying:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
         }
         
-        // Add 1 minute grace period to avoid edge cases
-        const gracePeriodMs = 60 * 1000;
-        if (dueAt.getTime() <= now.getTime() - gracePeriodMs) {
-          console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', now.toISOString());
+        // Check if time is in the future
+        if (!isReminderTimeInFuture(dueAt)) {
+          console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', new Date().toISOString());
           return `⏰ That time seems to be in the past. Try:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
         }
         
