@@ -500,8 +500,8 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
 
 interface AIParseResult {
   intent: 'leave_request' | 'expense' | 'vendor_payment' | 'income' | 'qr_payment' | 'status_check' | 
-          'event_query' | 'bank_query' | 'team_query' | 'greeting' | 'confirmation' | 'correction' | 
-          'cancellation' | 'help' | 'general_question' | 'unknown';
+          'event_query' | 'bank_query' | 'team_query' | 'delivery_challan' | 'daybook_entry' |
+          'greeting' | 'confirmation' | 'correction' | 'cancellation' | 'help' | 'general_question' | 'unknown';
   slots: {
     leaveType?: 'casual' | 'sick' | 'vacation' | 'personal';
     startDate?: string;
@@ -516,6 +516,15 @@ interface AIParseResult {
     bankName?: string;
     queryType?: string;
     timeframe?: string;
+    // DC slots
+    dcItems?: string;
+    dcVehicle?: string;
+    dcDestination?: string;
+    dcDriver?: string;
+    // Daybook slots
+    daybookType?: 'income' | 'expense';
+    daybookCategory?: string;
+    daybookDescription?: string;
   };
   confidence: number;
   needsClarification: string[];
@@ -533,8 +542,14 @@ YOUR CAPABILITIES:
 2. EXPENSES - petty cash, reimbursements, payments made
 3. VENDOR PAYMENTS - payments to vendors/suppliers for events
 4. INCOME - client payments, deposits received
-5. STATUS CHECKS - pending requests, approvals, balances
-6. QUERIES - events, team, financial info
+5. DELIVERY CHALLAN (DC) - create delivery challans for items being sent to venues
+   - Need: items, destination/venue, vehicle number (optional), driver name (optional)
+   - Example: "create DC for 5 chairs and 2 tables to Marina Hall"
+6. DAYBOOK ENTRY - record income or expense entries
+   - Need: type (income/expense), amount, description, category
+   - Example: "add daybook entry - expense 5000 for petrol"
+7. STATUS CHECKS - pending requests, approvals, balances
+8. QUERIES - events, team, financial info, RSVP status
 
 CONVERSATION STYLE:
 - Be warm and friendly like a helpful colleague
@@ -574,26 +589,38 @@ const aiParseMessageFunction = {
       intent: {
         type: "string",
         enum: ["leave_request", "expense", "vendor_payment", "income", "qr_payment", "status_check", 
-               "event_query", "bank_query", "team_query", "greeting", "confirmation", "correction", 
-               "cancellation", "help", "general_question", "unknown"],
+               "event_query", "bank_query", "team_query", "delivery_challan", "daybook_entry",
+               "greeting", "confirmation", "correction", "cancellation", "help", "general_question", "unknown"],
         description: "The primary intent of the user's message"
       },
       slots: {
         type: "object",
         properties: {
+          // Leave request slots
           leaveType: { type: "string", enum: ["casual", "sick", "vacation", "personal"], description: "Type of leave requested" },
           startDate: { type: "string", description: "Start date in DD/MM/YYYY format" },
           endDate: { type: "string", description: "End date in DD/MM/YYYY format (same as startDate for single day)" },
           numberOfDays: { type: "number", description: "Number of days for leave" },
           reason: { type: "string", description: "Reason for leave or expense" },
+          // Expense/payment slots
           amount: { type: "number", description: "Amount in rupees (convert 5k to 5000, 1 lakh to 100000)" },
           purpose: { type: "string", description: "Purpose of expense or payment" },
           vendorName: { type: "string", description: "Name of vendor for payment" },
           eventName: { type: "string", description: "Event name if mentioned" },
           clientName: { type: "string", description: "Client name for income" },
           bankName: { type: "string", description: "Bank name if mentioned" },
+          // Query slots
           queryType: { type: "string", description: "Type of query (balance, status, list, etc.)" },
-          timeframe: { type: "string", description: "Timeframe for queries (today, this_week, etc.)" }
+          timeframe: { type: "string", description: "Timeframe for queries (today, this_week, etc.)" },
+          // Delivery challan slots
+          dcItems: { type: "string", description: "Items being delivered (comma-separated or description)" },
+          dcVehicle: { type: "string", description: "Vehicle number or description" },
+          dcDestination: { type: "string", description: "Delivery destination/venue" },
+          dcDriver: { type: "string", description: "Driver name" },
+          // Daybook slots
+          daybookType: { type: "string", enum: ["income", "expense"], description: "Type of daybook entry" },
+          daybookCategory: { type: "string", description: "Category for daybook entry" },
+          daybookDescription: { type: "string", description: "Description for daybook entry" }
         },
         description: "Extracted slot values from the message"
       },
@@ -2701,7 +2728,7 @@ export async function handleOaksyWhatsAppMessage(
       
       // Handle help requests
       if (aiResult.intent === 'help') {
-        return `👋 Hi ${employee.name}! I'm *Oaksy*, your AI assistant.\n\n*I can help you with:*\n📅 Leave requests - "casual leave on 20th Jan"\n💰 Status checks - "what's pending?"\n📋 General questions\n\n_Just tell me what you need in your own words!_ 🌳`;
+        return `👋 Hi ${employee.name}! I'm *Oaksy*, your AI assistant.\n\n*I can help you with:*\n📅 Leave requests - "casual leave on 20th Jan"\n💰 Expenses - "spent 500 on cab for client visit"\n💸 Vendor payments - "pay 5k to Flower World"\n📦 Delivery challans - "create DC for chairs to Marina Hall"\n📊 Daybook entries - "add expense 2000 for petrol"\n📋 Status checks - "what's pending?"\n\n_Just tell me what you need in your own words!_ 🌳`;
       }
       
       // Handle status checks
@@ -2709,14 +2736,276 @@ export async function handleOaksyWhatsAppMessage(
         return await getEmployeeStatus(employee.id, employee.name);
       }
       
-      // Handle expenses - save context for follow-up
-      if (aiResult.intent === 'expense' && Object.keys(aiResult.slots).length > 0) {
-        await storage.updateWhatsappConversation(conversation.id, {
-          activeIntent: 'ai_expense',
-          intentContext: { ...context, ...aiResult.slots },
-          currentState: aiResult.readyToExecute ? 'awaiting_confirmation' : 'gathering_info',
-          conversationHistory: history,
-        });
+      // ============================================================================
+      // EXPENSE EXECUTION HANDLER - Natural language expense submission
+      // ============================================================================
+      if (aiResult.intent === 'expense' || (aiResult.intent === 'confirmation' && conversation.activeIntent === 'ai_expense') || conversation.activeIntent === 'ai_expense') {
+        const slots = { ...context, ...aiResult.slots };
+        
+        // Check for confirmation when in awaiting_confirmation state
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
+        const isInAwaitingState = conversation.activeIntent === 'ai_expense' && 
+                                   conversation.currentState === 'awaiting_confirmation';
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && slots.amount && slots.purpose);
+        
+        console.log('[AI Expense] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        
+        if (shouldExecute && slots.amount && slots.purpose) {
+          try {
+            console.log('[AI Expense] EXECUTING expense submission...');
+            
+            // Generate expense code
+            const expenseCode = `EXP${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            
+            // Reset conversation state
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            // Notify Kishor for approval
+            const notifyMsg = `💰 *Expense Request*\n\n👤 ${employee.name}\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${expenseCode}\n\n_Reply "approved" or "rejected"_`;
+            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            
+            // Save pending approval context
+            await saveSuperadminPendingContext({
+              type: 'expense',
+              requestId: expenseCode,
+              employeeId: employee.id,
+              employeeName: employee.name,
+              employeePhone: normalizedPhone,
+              details: `Expense: ₹${slots.amount.toLocaleString('en-IN')} for ${slots.purpose}`,
+              amount: slots.amount,
+              purpose: slots.purpose,
+              eventName: slots.eventName,
+            });
+            
+            return `✅ *Expense Submitted!*\n\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n🔑 Code: ${expenseCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+          } catch (execError) {
+            console.error('[AI Expense] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem submitting your expense. Please try again.`;
+          }
+        }
+        
+        // Not confirmed yet - save context and return AI's response
+        if (slots.amount && slots.purpose && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_expense',
+            intentContext: slots,
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+        } else if (Object.keys(aiResult.slots).length > 0) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_expense',
+            intentContext: slots,
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+        }
+        
+        return aiResult.suggestedResponse;
+      }
+      
+      // ============================================================================
+      // DELIVERY CHALLAN EXECUTION HANDLER - Natural language DC creation
+      // ============================================================================
+      if (aiResult.intent === 'delivery_challan' || conversation.activeIntent === 'ai_delivery_challan') {
+        const slots = { ...context, ...aiResult.slots };
+        
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
+        const isInAwaitingState = conversation.activeIntent === 'ai_delivery_challan' && 
+                                   conversation.currentState === 'awaiting_confirmation';
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && slots.dcItems && slots.dcDestination);
+        
+        console.log('[AI DC] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        
+        if (shouldExecute && slots.dcItems && slots.dcDestination) {
+          try {
+            console.log('[AI DC] EXECUTING delivery challan creation...');
+            
+            // Generate DC number
+            const dcNumber = `DC${Date.now().toString().slice(-6)}`;
+            
+            // Reset conversation state
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            // Notify superadmin about new DC
+            const notifyMsg = `📦 *Delivery Challan Created*\n\n👤 By: ${employee.name}\n📋 Items: ${slots.dcItems}\n📍 To: ${slots.dcDestination}\n${slots.dcVehicle ? `🚗 Vehicle: ${slots.dcVehicle}\n` : ''}${slots.dcDriver ? `👨‍✈️ Driver: ${slots.dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}`;
+            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            
+            return `✅ *Delivery Challan Created!*\n\n📦 Items: ${slots.dcItems}\n📍 Destination: ${slots.dcDestination}\n${slots.dcVehicle ? `🚗 Vehicle: ${slots.dcVehicle}\n` : ''}${slots.dcDriver ? `👨‍✈️ Driver: ${slots.dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}\n\n_Kishor has been notified_ 🌳`;
+          } catch (execError) {
+            console.error('[AI DC] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem creating the delivery challan. Please try again.`;
+          }
+        }
+        
+        // Not confirmed yet - save context
+        if (slots.dcItems && slots.dcDestination && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_delivery_challan',
+            intentContext: slots,
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+        } else if (Object.keys(aiResult.slots).length > 0) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_delivery_challan',
+            intentContext: slots,
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+        }
+        
+        return aiResult.suggestedResponse;
+      }
+      
+      // ============================================================================
+      // VENDOR PAYMENT EXECUTION HANDLER - Natural language vendor payments
+      // ============================================================================
+      if (aiResult.intent === 'vendor_payment' || conversation.activeIntent === 'ai_vendor_payment') {
+        const slots = { ...context, ...aiResult.slots };
+        
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
+        const isInAwaitingState = conversation.activeIntent === 'ai_vendor_payment' && 
+                                   conversation.currentState === 'awaiting_confirmation';
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && slots.amount && slots.vendorName);
+        
+        console.log('[AI Vendor] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        
+        if (shouldExecute && slots.amount && slots.vendorName) {
+          try {
+            console.log('[AI Vendor] EXECUTING vendor payment submission...');
+            
+            // Generate payment code
+            const paymentCode = `VP${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            
+            // Reset conversation state
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            // Notify Kishor for approval
+            const notifyMsg = `💸 *Vendor Payment Request*\n\n👤 From: ${employee.name}\n🏪 Vendor: ${slots.vendorName}\n💵 Amount: ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${paymentCode}\n\n_Reply "approved" or "rejected"_`;
+            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            
+            // Save pending approval context
+            await saveSuperadminPendingContext({
+              type: 'vendor_payment',
+              requestId: paymentCode,
+              employeeId: employee.id,
+              employeeName: employee.name,
+              employeePhone: normalizedPhone,
+              details: `Vendor: ${slots.vendorName} - ₹${slots.amount.toLocaleString('en-IN')}`,
+              amount: slots.amount,
+              vendorName: slots.vendorName,
+              purpose: slots.purpose,
+              eventName: slots.eventName,
+            });
+            
+            return `✅ *Vendor Payment Submitted!*\n\n🏪 ${slots.vendorName}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}🔑 Code: ${paymentCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+          } catch (execError) {
+            console.error('[AI Vendor] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem submitting the vendor payment. Please try again.`;
+          }
+        }
+        
+        // Not confirmed yet - save context
+        if (slots.amount && slots.vendorName && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_vendor_payment',
+            intentContext: slots,
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+        } else if (Object.keys(aiResult.slots).length > 0) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_vendor_payment',
+            intentContext: slots,
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+        }
+        
+        return aiResult.suggestedResponse;
+      }
+      
+      // ============================================================================
+      // DAYBOOK ENTRY HANDLER - Natural language daybook entries
+      // ============================================================================
+      if (aiResult.intent === 'daybook_entry' || conversation.activeIntent === 'ai_daybook_entry') {
+        const slots = { ...context, ...aiResult.slots };
+        
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
+        const isInAwaitingState = conversation.activeIntent === 'ai_daybook_entry' && 
+                                   conversation.currentState === 'awaiting_confirmation';
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && slots.amount && slots.daybookType);
+        
+        console.log('[AI Daybook] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        
+        if (shouldExecute && slots.amount && slots.daybookType) {
+          try {
+            console.log('[AI Daybook] EXECUTING daybook entry creation...');
+            
+            const entryCode = `DB${Date.now().toString().slice(-6)}`;
+            const description = slots.daybookDescription || slots.purpose || 'Entry via WhatsApp';
+            
+            // Reset conversation state
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            // Notify superadmin
+            const typeEmoji = slots.daybookType === 'income' ? '💚' : '💸';
+            const notifyMsg = `${typeEmoji} *Daybook Entry*\n\n👤 By: ${employee.name}\n📋 Type: ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n${slots.daybookCategory ? `📁 Category: ${slots.daybookCategory}\n` : ''}\n🔑 Code: ${entryCode}`;
+            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            
+            return `✅ *Daybook Entry Recorded!*\n\n${typeEmoji} ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n🔑 Code: ${entryCode}\n\n_Kishor has been notified_ 🌳`;
+          } catch (execError) {
+            console.error('[AI Daybook] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem creating the daybook entry. Please try again.`;
+          }
+        }
+        
+        // Not confirmed yet - save context
+        if (slots.amount && slots.daybookType && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_daybook_entry',
+            intentContext: slots,
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+        } else if (Object.keys(aiResult.slots).length > 0) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_daybook_entry',
+            intentContext: slots,
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+        }
+        
         return aiResult.suggestedResponse;
       }
       
