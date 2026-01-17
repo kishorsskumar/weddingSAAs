@@ -84,6 +84,21 @@ function isReminderTimeInFuture(dueAt: Date): boolean {
   return dueAt.getTime() > now.getTime() - gracePeriodMs;
 }
 
+/**
+ * Auto-adjust a reminder time to tomorrow if it's in the past.
+ * This handles cases like "remind me at 4am" when it's already 11pm.
+ */
+function autoAdjustPastTimeToTomorrow(dueAt: Date): Date {
+  const now = new Date();
+  if (dueAt.getTime() < now.getTime()) {
+    // Time is in the past - add 24 hours to move it to tomorrow
+    const adjusted = new Date(dueAt.getTime() + 24 * 60 * 60 * 1000);
+    console.log('[Oaksy] Auto-adjusted past reminder time to tomorrow:', dueAt.toISOString(), '->', adjusted.toISOString());
+    return adjusted;
+  }
+  return dueAt;
+}
+
 // Allowed employees for expense/income submission (normalized phone numbers)
 // Only these employees can submit expenses or income via WhatsApp
 const ALLOWED_EXPENSE_SUBMITTERS = [
@@ -6264,7 +6279,7 @@ Return "INVALID" if you cannot parse the input.`;
     if (reminderDateTime && reminderMessage) {
       try {
         // Use our helper to properly parse the time as IST
-        const dueAt = parseReminderDateTime(reminderDateTime);
+        let dueAt = parseReminderDateTime(reminderDateTime);
         
         // Check if date is valid
         if (!dueAt) {
@@ -6272,11 +6287,8 @@ Return "INVALID" if you cannot parse the input.`;
           return `⏰ I couldn't understand that time. Try saying:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
         }
         
-        // Check if time is in the future
-        if (!isReminderTimeInFuture(dueAt)) {
-          console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', new Date().toISOString());
-          return `⏰ That time seems to be in the past. Try:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
-        }
+        // Auto-adjust past times to tomorrow (e.g., "4am" at night means tomorrow 4am)
+        dueAt = autoAdjustPastTimeToTomorrow(dueAt);
         
         // Create the reminder
         await storage.createReminder({
@@ -6289,9 +6301,9 @@ Return "INVALID" if you cannot parse the input.`;
           status: 'pending',
         });
         
-        // Format the time for display
-        const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
-        const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+        // Format the time for display in IST
+        const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+        const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
         
         return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
       } catch (err) {
