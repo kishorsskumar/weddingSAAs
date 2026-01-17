@@ -21,7 +21,15 @@ function parseReminderDateTime(dateTimeStr: string): Date | null {
   
   try {
     // Clean up the string - remove any markdown or extra text
-    const cleanStr = dateTimeStr.replace(/[`"']/g, '').trim();
+    let cleanStr = dateTimeStr.replace(/[`"']/g, '').trim();
+    
+    // Normalize dot-separated times to colon-separated (e.g., "4.45 am" -> "4:45 am")
+    // Match patterns like "4.45", "10.30", "4.45 am", "4.45pm"
+    cleanStr = cleanStr.replace(/(\d{1,2})\.(\d{2})\s*(am|pm|AM|PM)?/gi, (match, hour, minute, ampm) => {
+      return `${hour}:${minute}${ampm ? ' ' + ampm : ''}`;
+    });
+    
+    console.log('[Oaksy] parseReminderDateTime normalized:', dateTimeStr, '->', cleanStr);
     
     // Try parsing as ISO with explicit offset (e.g., "2026-01-18T09:00:00+05:30")
     if (cleanStr.includes('+') || cleanStr.includes('T') && cleanStr.endsWith('Z')) {
