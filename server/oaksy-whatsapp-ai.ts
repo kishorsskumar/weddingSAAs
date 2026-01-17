@@ -959,8 +959,7 @@ async function getRsvpStatus(eventName?: string, queryType: string = 'status'): 
     const searchTerm = eventName.toLowerCase();
     targetEvent = events.find(e => 
       e.title?.toLowerCase().includes(searchTerm) || 
-      e.customer?.toLowerCase().includes(searchTerm) ||
-      e.name?.toLowerCase().includes(searchTerm)
+      e.customer?.toLowerCase().includes(searchTerm)
     );
     
     if (!targetEvent) {
@@ -1861,7 +1860,7 @@ export async function handleOaksyWhatsAppMessage(
       await storage.updateIncomeSubmission(incomeSubmission.id, {
         status: 'approved',
         approvedAt: new Date(),
-        eventAssignment: eventName,
+        eventName: eventName,
       });
       
       const amount = parseFloat(incomeSubmission.amount);
@@ -1871,7 +1870,6 @@ export async function handleOaksyWhatsAppMessage(
         category: incomeSubmission.type === 'bank_transfer' ? 'bank_transfer' : 'client_payment',
         description: `[${incCode}] ${incomeSubmission.description}`,
         amount: amount.toString(),
-        mode: incomeSubmission.type === 'bank_transfer' ? 'bank' : 'upi',
         person: incomeSubmission.clientName,
         eventName: eventName === 'General' ? 'General' : eventName,
         approvedBy: 'Kishor',
@@ -3751,7 +3749,7 @@ export async function handleOaksyWhatsAppMessage(
       
       // Helper: extract name from segment that might contain "Name Address" 
       // Keeps multi-word names until first clear address token (digit, fraction, address keyword)
-      function extractNameFromSegment(segment: string): { name: string; address: string } {
+      const extractNameFromSegment = (segment: string): { name: string; address: string } => {
         const cleaned = segment.replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
         const words = cleaned.split(/\s+/);
         
@@ -3791,7 +3789,7 @@ export async function handleOaksyWhatsAppMessage(
         
         // No clear address token found - everything is name
         return { name: cleaned, address: '' };
-      }
+      };
       
       if (parts.length >= 2) {
         // Comma-separated format: "Name Address..., More Address..."
@@ -4317,7 +4315,7 @@ export async function handleOaksyWhatsAppMessage(
     
     // Helper: extract name from segment that might contain "Name Address"
     // Keeps multi-word names until first clear address token (digit, fraction, address keyword)
-    function extractNameFromSegmentAI(segment: string): { name: string; address: string } {
+    const extractNameFromSegmentAI = (segment: string): { name: string; address: string } => {
       const cleaned = segment.replace(/^(dc|challan|delivery)\s*(to|for)?\s*/i, '').trim();
       const words = cleaned.split(/\s+/);
       
@@ -4357,7 +4355,7 @@ export async function handleOaksyWhatsAppMessage(
       
       // No clear address token found - everything is name
       return { name: cleaned, address: '' };
-    }
+    };
     
     if (parts.length >= 2) {
       // Comma-separated format: "Name Address..., More Address..."
