@@ -111,6 +111,15 @@ interface IntentContext {
   deliveryAddress?: string;
   itemDescription?: string;
   vehicleNumber?: string;
+  // AI Delivery challan fields (for ai_delivery_challan intent)
+  dcItems?: string;
+  dcDestination?: string;
+  dcVehicle?: string;
+  dcDriver?: string;
+  // Daybook entry fields
+  daybookDescription?: string;
+  daybookCategory?: string;
+  daybookTransactionType?: 'income' | 'expense';
   // Query fields for new AI intents
   queryType?: string;
   timeframe?: string;
@@ -118,6 +127,10 @@ interface IntentContext {
   customerName?: string;
   // Conflict detection fields
   conflictContext?: ConflictContext;
+  // Flag to indicate conflict has been resolved
+  conflictResolved?: boolean;
+  // Number of days for leave
+  numberOfDays?: number;
 }
 
 interface ConversationMessage {
@@ -2789,6 +2802,53 @@ export async function handleOaksyWhatsAppMessage(
     } catch (directExecError) {
       console.error('[Direct Confirm] FAILED:', directExecError);
       return `❌ Sorry, there was a problem submitting your leave request. Please try again.`;
+    }
+  }
+  
+  // ============================================================================
+  // DIRECT CONFIRMATION BYPASS: Execute DC immediately if user confirms
+  // This runs BEFORE the AI to ensure confirmations are handled reliably
+  // ============================================================================
+  const hasDcSlots = context.dcItems && context.dcDestination;
+  const isAwaitingDcConfirm = conversation.activeIntent === 'ai_delivery_challan' && 
+                               conversation.currentState === 'awaiting_confirmation';
+  
+  console.log('[Direct DC Confirm Check]', { isConfirmationWord, hasDcSlots, isAwaitingDcConfirm, trimmedLower, context });
+  
+  if (isConfirmationWord && hasDcSlots && isAwaitingDcConfirm) {
+    console.log('[Direct DC Confirm] BYPASSING AI - executing delivery challan directly');
+    try {
+      const dcItems = context.dcItems as string;
+      const dcDestination = context.dcDestination as string;
+      const dcVehicle = context.dcVehicle as string | undefined;
+      const dcDriver = context.dcDriver as string | undefined;
+      
+      // Generate DC number
+      const dcNumber = `DC${Date.now().toString().slice(-6)}`;
+      
+      console.log('[Direct DC Confirm] Creating DC:', { dcItems, dcDestination, dcVehicle, dcDriver, dcNumber });
+      
+      // Reset conversation state
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: null,
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+      
+      // Notify superadmin about new DC (DC doesn't need approval, just notification)
+      try {
+        const notifyMsg = `📦 *Delivery Challan Created*\n\n👤 By: ${employee.name}\n📋 Items: ${dcItems}\n📍 To: ${dcDestination}\n${dcVehicle ? `🚗 Vehicle: ${dcVehicle}\n` : ''}${dcDriver ? `👨‍✈️ Driver: ${dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}`;
+        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+        console.log('[Direct DC Confirm] Notification sent to superadmin');
+      } catch (notifyError) {
+        console.error('[Direct DC Confirm] Failed to notify superadmin:', notifyError);
+      }
+      
+      return `✅ *Delivery Challan Created!*\n\n📦 Items: ${dcItems}\n📍 Destination: ${dcDestination}\n${dcVehicle ? `🚗 Vehicle: ${dcVehicle}\n` : ''}${dcDriver ? `👨‍✈️ Driver: ${dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}\n\n_Kishor has been notified_ 🌳`;
+    } catch (directDcError) {
+      console.error('[Direct DC Confirm] FAILED:', directDcError);
+      return `❌ Sorry, there was a problem creating the delivery challan. Please try again.`;
     }
   }
   
