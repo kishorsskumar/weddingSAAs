@@ -4758,19 +4758,24 @@ export async function handleOaksyWhatsAppMessage(
     
     // Awaiting time for the reminder
     if (conversation.currentState === 'awaiting_reminder_time') {
+      // Get current time in IST for accurate comparison
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      
       // Use AI to parse the time
-      const timeParsePrompt = `Parse this time/date into ISO format datetime (Asia/Kolkata timezone).
-Current date/time: ${new Date().toISOString()}
+      const timeParsePrompt = `Parse this time/date into ISO format datetime (Asia/Kolkata timezone, UTC+5:30).
+Current date/time in India: ${nowIST.toISOString().replace('Z', '+05:30')}
 User input: "${messageText}"
 
+IMPORTANT: The user is in India (IST timezone). Always use +05:30 offset.
+
 If the user says:
-- "tomorrow at 9am" -> add 1 day and set time to 09:00
-- "5pm today" -> set time to 17:00 today
-- "morning" -> default to 09:00
-- "evening" -> default to 17:00
+- "tomorrow at 9am" -> add 1 day and set time to 09:00 IST
+- "5pm today" -> set time to 17:00 IST today
+- "morning" -> default to 09:00 IST
+- "evening" -> default to 17:00 IST
 - "in 2 hours" -> add 2 hours to current time
 
-Return ONLY the ISO datetime string (e.g., "2026-01-18T09:00:00+05:30") or "INVALID" if cannot parse.`;
+Return ONLY the ISO datetime string with offset (e.g., "2026-01-18T09:00:00+05:30") or "INVALID" if cannot parse.`;
 
       try {
         const timeResponse = await openai.chat.completions.create({
@@ -4780,13 +4785,17 @@ Return ONLY the ISO datetime string (e.g., "2026-01-18T09:00:00+05:30") or "INVA
         });
         
         const parsedTime = timeResponse.choices[0]?.message?.content?.trim() || '';
+        console.log('[Oaksy] Reminder time parsed:', parsedTime, 'from input:', messageText);
         
         if (parsedTime && parsedTime !== 'INVALID' && !parsedTime.includes('INVALID')) {
           const dueAt = new Date(parsedTime);
           const now = new Date();
           
-          if (dueAt <= now) {
-            return `⏰ That time has already passed! Try something like:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
+          // Add 1 minute grace period to avoid edge cases
+          const gracePeriodMs = 60 * 1000;
+          if (dueAt.getTime() <= now.getTime() - gracePeriodMs) {
+            console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', now.toISOString());
+            return `⏰ That time seems to be in the past. Try something like:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
           }
           
           // Create the reminder
@@ -6165,14 +6174,24 @@ Return ONLY the ISO datetime string (e.g., "2026-01-18T09:00:00+05:30") or "INVA
     const reminderDateTime = aiAnalysis.extractedData.reminderDateTime;
     const reminderMessage = aiAnalysis.extractedData.reminderMessage;
     
+    console.log('[Oaksy] Reminder intent detected. DateTime:', reminderDateTime, 'Message:', reminderMessage);
+    
     if (reminderDateTime && reminderMessage) {
       try {
         const dueAt = new Date(reminderDateTime);
         const now = new Date();
         
-        // Validate the reminder time is in the future
-        if (dueAt <= now) {
-          return `⏰ That time has already passed! Please set a reminder for a future time.\n\n_Example: "remind me tomorrow at 9am to call vendor"_`;
+        // Check if date is valid
+        if (isNaN(dueAt.getTime())) {
+          console.log('[Oaksy] Invalid reminder date parsed:', reminderDateTime);
+          return `⏰ I couldn't understand that time. Try saying:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
+        }
+        
+        // Add 1 minute grace period to avoid edge cases
+        const gracePeriodMs = 60 * 1000;
+        if (dueAt.getTime() <= now.getTime() - gracePeriodMs) {
+          console.log('[Oaksy] Reminder time in past. dueAt:', dueAt.toISOString(), 'now:', now.toISOString());
+          return `⏰ That time seems to be in the past. Try:\n\n• "remind me tomorrow at 9am to pay vendor"\n• "remind me in 2 hours to call caterer"`;
         }
         
         // Create the reminder
