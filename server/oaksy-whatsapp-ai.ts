@@ -493,6 +493,232 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
   return { isIncome: false, type: 'client_payment' };
 }
 
+// ============================================================================
+// CONVERSATIONAL AI ORCHESTRATOR
+// Uses GPT-4o function calling for natural language understanding
+// ============================================================================
+
+interface AIParseResult {
+  intent: 'leave_request' | 'expense' | 'vendor_payment' | 'income' | 'qr_payment' | 'status_check' | 
+          'event_query' | 'bank_query' | 'team_query' | 'greeting' | 'confirmation' | 'correction' | 
+          'cancellation' | 'help' | 'general_question' | 'unknown';
+  slots: {
+    leaveType?: 'casual' | 'sick' | 'vacation' | 'personal';
+    startDate?: string;
+    endDate?: string;
+    numberOfDays?: number;
+    reason?: string;
+    amount?: number;
+    purpose?: string;
+    vendorName?: string;
+    eventName?: string;
+    clientName?: string;
+    bankName?: string;
+    queryType?: string;
+    timeframe?: string;
+  };
+  confidence: number;
+  needsClarification: string[];
+  suggestedResponse: string;
+  readyToExecute: boolean;
+  userConfirmed: boolean;
+}
+
+const AI_ORCHESTRATOR_PROMPT = `You are Oaksy AI, the intelligent WhatsApp assistant for Oakstreet Events. Your job is to understand what employees want to do and help them accomplish it naturally.
+
+ROLE: You're a friendly, smart assistant that understands natural language. You don't require specific formats - you figure out what people mean.
+
+YOUR CAPABILITIES:
+1. LEAVE REQUESTS - casual leave, sick leave, vacation, personal leave
+2. EXPENSES - petty cash, reimbursements, payments made
+3. VENDOR PAYMENTS - payments to vendors/suppliers for events
+4. INCOME - client payments, deposits received
+5. STATUS CHECKS - pending requests, approvals, balances
+6. QUERIES - events, team, financial info
+
+CONVERSATION STYLE:
+- Be warm and friendly like a helpful colleague
+- Use simple language
+- ALWAYS confirm before taking action
+- Ask ONE clarifying question at a time if needed
+- Be smart about extracting dates - "tomorrow", "next Monday", "19th" should be understood
+
+DATE UNDERSTANDING (Today is ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}):
+- "tomorrow" = next day
+- "19th" or "19 Jan" = January 19th of current/next occurrence
+- "next Monday" = coming Monday
+- "2 days from tomorrow" = calculate appropriately
+- Convert all dates to DD/MM/YYYY format
+
+AMOUNT UNDERSTANDING:
+- "5k" = 5000, "1 lakh" = 100000, "5 thousand" = 5000
+- "Rs 5000", "₹5000", "5000/-" = 5000
+
+CONFIRMATION FLOW:
+- NEVER execute actions without confirmation
+- After understanding the request, summarize and ask "Should I send this for approval?"
+- Only set readyToExecute=true when user explicitly confirms (yes, ok, confirm, sure, go ahead, do it)
+
+HANDLING CORRECTIONS:
+- If user says "no, 2 days" or "actually 3 days", understand they're correcting
+- Update the slots and ask for confirmation again
+
+Respond with valid JSON only.`;
+
+const aiParseMessageFunction = {
+  name: "parse_employee_message",
+  description: "Parse an employee's WhatsApp message to understand their intent and extract relevant details",
+  parameters: {
+    type: "object",
+    properties: {
+      intent: {
+        type: "string",
+        enum: ["leave_request", "expense", "vendor_payment", "income", "qr_payment", "status_check", 
+               "event_query", "bank_query", "team_query", "greeting", "confirmation", "correction", 
+               "cancellation", "help", "general_question", "unknown"],
+        description: "The primary intent of the user's message"
+      },
+      slots: {
+        type: "object",
+        properties: {
+          leaveType: { type: "string", enum: ["casual", "sick", "vacation", "personal"], description: "Type of leave requested" },
+          startDate: { type: "string", description: "Start date in DD/MM/YYYY format" },
+          endDate: { type: "string", description: "End date in DD/MM/YYYY format (same as startDate for single day)" },
+          numberOfDays: { type: "number", description: "Number of days for leave" },
+          reason: { type: "string", description: "Reason for leave or expense" },
+          amount: { type: "number", description: "Amount in rupees (convert 5k to 5000, 1 lakh to 100000)" },
+          purpose: { type: "string", description: "Purpose of expense or payment" },
+          vendorName: { type: "string", description: "Name of vendor for payment" },
+          eventName: { type: "string", description: "Event name if mentioned" },
+          clientName: { type: "string", description: "Client name for income" },
+          bankName: { type: "string", description: "Bank name if mentioned" },
+          queryType: { type: "string", description: "Type of query (balance, status, list, etc.)" },
+          timeframe: { type: "string", description: "Timeframe for queries (today, this_week, etc.)" }
+        },
+        description: "Extracted slot values from the message"
+      },
+      confidence: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        description: "How confident you are in understanding the intent (0-1)"
+      },
+      needsClarification: {
+        type: "array",
+        items: { type: "string" },
+        description: "List of missing information needed (e.g., ['endDate', 'reason'])"
+      },
+      suggestedResponse: {
+        type: "string",
+        description: "A friendly response to send to the user. If all info is available, ask for confirmation. If info is missing, ask for it."
+      },
+      readyToExecute: {
+        type: "boolean",
+        description: "True ONLY if user explicitly confirmed (said yes/ok/confirm/sure/go ahead). False otherwise."
+      },
+      userConfirmed: {
+        type: "boolean",
+        description: "True if the current message is a confirmation (yes, ok, confirm, sure, proceed, go ahead, do it)"
+      }
+    },
+    required: ["intent", "slots", "confidence", "needsClarification", "suggestedResponse", "readyToExecute", "userConfirmed"]
+  }
+};
+
+async function aiParseMessage(
+  message: string, 
+  conversationHistory: ConversationMessage[], 
+  currentContext: IntentContext,
+  employeeName: string,
+  employeeRole: string
+): Promise<AIParseResult> {
+  try {
+    // Build context from conversation history
+    const historyContext = conversationHistory.slice(-6).map(msg => ({
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content
+    }));
+
+    // Add current context if we're in a flow
+    let contextPrompt = '';
+    if (currentContext && Object.keys(currentContext).length > 0) {
+      contextPrompt = `\n\nCURRENT PENDING REQUEST:
+${JSON.stringify(currentContext, null, 2)}
+If the user confirms, set readyToExecute=true and userConfirmed=true.
+If the user corrects something, update the slots and ask for confirmation again.`;
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { 
+          role: "system", 
+          content: AI_ORCHESTRATOR_PROMPT + contextPrompt + `\n\nEmployee: ${employeeName} (${employeeRole})`
+        },
+        ...historyContext,
+        { role: "user", content: message }
+      ],
+      tools: [{ type: "function", function: aiParseMessageFunction }],
+      tool_choice: { type: "function", function: { name: "parse_employee_message" } },
+      temperature: 0.3,
+    });
+
+    const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+    if (toolCall && 'function' in toolCall && toolCall.function?.arguments) {
+      const parsed = JSON.parse(toolCall.function.arguments) as AIParseResult;
+      console.log('[AI Orchestrator] Parsed:', JSON.stringify(parsed, null, 2));
+      return parsed;
+    }
+
+    // Fallback if function calling fails
+    return {
+      intent: 'unknown',
+      slots: {},
+      confidence: 0.3,
+      needsClarification: [],
+      suggestedResponse: "I'm not quite sure what you need. Could you tell me more? For example:\n• Leave request\n• Expense submission\n• Check status",
+      readyToExecute: false,
+      userConfirmed: false
+    };
+  } catch (error: any) {
+    console.error('[AI Orchestrator] Error:', error.message);
+    return {
+      intent: 'unknown',
+      slots: {},
+      confidence: 0,
+      needsClarification: [],
+      suggestedResponse: "I'm having trouble understanding. Could you please rephrase that?",
+      readyToExecute: false,
+      userConfirmed: false
+    };
+  }
+}
+
+// Helper to format date from DD/MM/YYYY to Date object
+function parseAIDate(dateStr: string): Date | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const [day, month, year] = parts.map(p => parseInt(p, 10));
+    return new Date(year, month - 1, day);
+  }
+  return null;
+}
+
+// Calculate number of days between two dates (inclusive)
+function calculateLeaveDays(startDate: string, endDate: string): number {
+  const start = parseAIDate(startDate);
+  const end = parseAIDate(endDate);
+  if (!start || !end) return 1;
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays;
+}
+
+// ============================================================================
+// END CONVERSATIONAL AI ORCHESTRATOR
+// ============================================================================
+
 // Detect if message is a vendor payment submission
 // Simplified: triggers on "vendor payment", "vendor payments", or "vendor pending payment"
 // Format: vendor name, amount (optional event)
@@ -2099,6 +2325,174 @@ export async function handleOaksyWhatsAppMessage(
   if (lowerMessage === 'status' || lowerMessage === 'my status' || lowerMessage.includes('check status')) {
     return await getEmployeeStatus(employee.id, employee.name);
   }
+
+  // ============================================================================
+  // AI-FIRST APPROACH: Use conversational AI for natural language understanding
+  // This handles leave requests, expenses, and other requests with smart confirmation
+  // ============================================================================
+  
+  // Check if we're in an AI-managed conversation flow
+  const isInAiFlow = conversation.activeIntent?.startsWith('ai_');
+  
+  // Detect if this looks like a natural language request (no media, not in legacy flow)
+  // Run AI for: leave requests, general questions, greetings, or when in AI flow
+  const looksLikeLeave = /leave|day\s+off|off\s+on|sick|casual|vacation|annual|personal\s+day|time\s+off|chutti|छुट्टी/i.test(messageText);
+  const looksLikeExpense = /expense|reimburse|spent|paid for|petty cash/i.test(messageText);
+  const looksLikeQuery = /how|what|when|where|who|check|status|balance|pending|list|show me/i.test(messageText);
+  const isShortMessage = messageText.length < 100 && !mediaUrl;
+  
+  // Legacy flows that should NOT use AI (they need specific state handling)
+  const isInLegacyFlow = conversation.activeIntent && !conversation.activeIntent.startsWith('ai_') && 
+    ['qr_payment', 'income_submission', 'pending_delivery_challan', 'vendor_payment'].some(flow => 
+      conversation.activeIntent?.includes(flow)
+    );
+  
+  // Run AI orchestrator for text messages that look like natural requests
+  const shouldUseAi = !mediaUrl && !isInLegacyFlow && 
+    (looksLikeLeave || looksLikeExpense || looksLikeQuery || isInAiFlow || isShortMessage);
+  
+  if (shouldUseAi) {
+    try {
+      const employeeRole = employee.designation || 'employee';
+      const aiResult = await aiParseMessage(messageText, history, context, employee.name, employeeRole);
+      
+      console.log('[AI Flow] Result:', JSON.stringify({ intent: aiResult.intent, readyToExecute: aiResult.readyToExecute, userConfirmed: aiResult.userConfirmed }, null, 2));
+      
+      // Handle leave request confirmation and execution
+      if (aiResult.intent === 'leave_request' || conversation.activeIntent === 'ai_leave_request') {
+        
+        // User confirmed - execute the leave request
+        if (aiResult.readyToExecute && aiResult.userConfirmed) {
+          const slots = { ...context, ...aiResult.slots };
+          
+          if (slots.startDate && slots.leaveType) {
+            const endDate = slots.endDate || slots.startDate;
+            const days = slots.numberOfDays || calculateLeaveDays(slots.startDate, endDate);
+            const leaveType = slots.leaveType || 'casual';
+            const reason = slots.reason || 'Personal';
+            
+            // Create the leave request
+            const leaveRequest = await storage.createLeaveRequest({
+              employeeId: employee.id,
+              leaveType: leaveType,
+              startDate: slots.startDate,
+              endDate: endDate,
+              reason,
+              status: 'pending',
+            });
+            
+            // Reset conversation state
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            // Notify Kishor
+            const startDateObj = parseAIDate(slots.startDate);
+            const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : slots.startDate;
+            
+            try {
+              const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "A LR${leaveRequest.id.slice(-4)}" to approve_`;
+              await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            } catch (notifyError) {
+              console.error('[AI Leave] Failed to notify superadmin:', notifyError);
+            }
+            
+            const dayText = days === 1 ? 'day' : 'days';
+            return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
+          }
+        }
+        
+        // Not confirmed yet - save context and ask for confirmation
+        if (aiResult.slots.startDate && aiResult.slots.leaveType && !aiResult.readyToExecute) {
+          // Save the extracted slots to context
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_leave_request',
+            intentContext: { ...context, ...aiResult.slots },
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+        } else if (Object.keys(aiResult.slots).length > 0) {
+          // Partial info - save and ask for more
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_leave_request',
+            intentContext: { ...context, ...aiResult.slots },
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+        }
+        
+        // Return AI's response (clarifying question or confirmation request)
+        return aiResult.suggestedResponse;
+      }
+      
+      // Handle cancellation
+      if (aiResult.intent === 'cancellation') {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        return "👍 No problem! I've cancelled that.\n\n_What else can I help you with?_ 🌳";
+      }
+      
+      // Handle greetings
+      if (aiResult.intent === 'greeting') {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: null,
+          intentContext: null,
+          currentState: 'idle',
+          conversationHistory: [],
+        });
+        return aiResult.suggestedResponse;
+      }
+      
+      // Handle help requests
+      if (aiResult.intent === 'help') {
+        return `👋 Hi ${employee.name}! I'm *Oaksy*, your AI assistant.\n\n*I can help you with:*\n📅 Leave requests - "casual leave on 20th Jan"\n💰 Status checks - "what's pending?"\n📋 General questions\n\n_Just tell me what you need in your own words!_ 🌳`;
+      }
+      
+      // Handle status checks
+      if (aiResult.intent === 'status_check') {
+        return await getEmployeeStatus(employee.id, employee.name);
+      }
+      
+      // Handle expenses - save context for follow-up
+      if (aiResult.intent === 'expense' && Object.keys(aiResult.slots).length > 0) {
+        await storage.updateWhatsappConversation(conversation.id, {
+          activeIntent: 'ai_expense',
+          intentContext: { ...context, ...aiResult.slots },
+          currentState: aiResult.readyToExecute ? 'awaiting_confirmation' : 'gathering_info',
+          conversationHistory: history,
+        });
+        return aiResult.suggestedResponse;
+      }
+      
+      // For other AI intents with good confidence, return the suggested response
+      if (aiResult.confidence > 0.5) {
+        // Save context for multi-turn conversation
+        if (aiResult.intent !== 'general_question' && aiResult.intent !== 'unknown') {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: `ai_${aiResult.intent}`,
+            intentContext: { ...context, ...aiResult.slots },
+            conversationHistory: history,
+          });
+        }
+        return aiResult.suggestedResponse;
+      }
+      
+    } catch (aiError: any) {
+      console.error('[AI Flow] Error:', aiError.message);
+      // Fall through to existing handlers on AI error
+    }
+  }
+  
+  // ============================================================================
+  // END AI-FIRST APPROACH - Continue with existing state machine handlers
+  // ============================================================================
 
   // VENDOR PAYMENT CORRECTION FLOW - Handle "no", "change", or amount corrections after vendor payment
   if (conversation.currentState === 'vendor_payment_recorded') {
