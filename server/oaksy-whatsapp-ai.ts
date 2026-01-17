@@ -1427,14 +1427,17 @@ function generateUniqueApprovalCode(prefix: string): string {
 
 // Save pending approval context to superadmin's conversation for natural language approval
 async function saveSuperadminPendingContext(pendingContext: {
-  type: 'leave_request' | 'expense' | 'qr_payment' | 'income';
-  requestId: string;
+  type: 'leave_request' | 'expense' | 'vendor_payment' | 'qr_payment' | 'income';
+  requestId: string | number;
   employeeId: string;
   employeeName: string;
   employeePhone: string;
   details: string;
   reason?: string;
-  amount?: string;
+  amount?: number | string;
+  vendorName?: string;
+  purpose?: string;
+  eventName?: string;
 }): Promise<void> {
   try {
     // Get or create superadmin's conversation
@@ -2740,6 +2743,11 @@ export async function handleOaksyWhatsAppMessage(
       // EXPENSE EXECUTION HANDLER - Natural language expense submission
       // ============================================================================
       if (aiResult.intent === 'expense' || (aiResult.intent === 'confirmation' && conversation.activeIntent === 'ai_expense') || conversation.activeIntent === 'ai_expense') {
+        // Role check - only allowed submitters can create expenses
+        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, expense submission is only available for Wedding Planners and Accountants.\n\n_Contact Kishor if you need to submit an expense._ 🌳`;
+        }
+        
         const slots = { ...context, ...aiResult.slots };
         
         // Check for confirmation when in awaiting_confirmation state
@@ -2756,8 +2764,14 @@ export async function handleOaksyWhatsAppMessage(
           try {
             console.log('[AI Expense] EXECUTING expense submission...');
             
-            // Generate expense code
-            const expenseCode = `EXP${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            // Use existing createExpenseRequest function which handles both expense and pending approval
+            const { approvalCode, requestId } = await createExpenseRequest(
+              employee.id,
+              employee.name,
+              slots.purpose,
+              slots.amount,
+              undefined // no media URL from chat
+            );
             
             // Reset conversation state
             await storage.updateWhatsappConversation(conversation.id, {
@@ -2768,13 +2782,13 @@ export async function handleOaksyWhatsAppMessage(
             });
             
             // Notify Kishor for approval
-            const notifyMsg = `💰 *Expense Request*\n\n👤 ${employee.name}\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${expenseCode}\n\n_Reply "approved" or "rejected"_`;
+            const notifyMsg = `💰 *Expense Request*\n\n👤 ${employee.name}\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${approvalCode}\n\n_Reply "approved" or "rejected"_`;
             await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
             
-            // Save pending approval context
+            // Save pending approval context for natural language approval
             await saveSuperadminPendingContext({
               type: 'expense',
-              requestId: expenseCode,
+              requestId: requestId,
               employeeId: employee.id,
               employeeName: employee.name,
               employeePhone: normalizedPhone,
@@ -2784,7 +2798,7 @@ export async function handleOaksyWhatsAppMessage(
               eventName: slots.eventName,
             });
             
-            return `✅ *Expense Submitted!*\n\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n🔑 Code: ${expenseCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+            return `✅ *Expense Submitted!*\n\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n🔑 Code: ${approvalCode}\n\n_Waiting for Kishor's approval_ 🌳`;
           } catch (execError) {
             console.error('[AI Expense] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem submitting your expense. Please try again.`;
@@ -2815,6 +2829,11 @@ export async function handleOaksyWhatsAppMessage(
       // DELIVERY CHALLAN EXECUTION HANDLER - Natural language DC creation
       // ============================================================================
       if (aiResult.intent === 'delivery_challan' || conversation.activeIntent === 'ai_delivery_challan') {
+        // Role check - only allowed submitters can create DCs (Wedding Planners, Accountants)
+        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, delivery challan creation is only available for Wedding Planners and Accountants.\n\n_Contact Kishor for DC requests._ 🌳`;
+        }
+        
         const slots = { ...context, ...aiResult.slots };
         
         const trimmedMessage = messageText.trim().toLowerCase();
@@ -2841,7 +2860,7 @@ export async function handleOaksyWhatsAppMessage(
               conversationHistory: [],
             });
             
-            // Notify superadmin about new DC
+            // Notify superadmin about new DC (DC doesn't need approval, just notification)
             const notifyMsg = `📦 *Delivery Challan Created*\n\n👤 By: ${employee.name}\n📋 Items: ${slots.dcItems}\n📍 To: ${slots.dcDestination}\n${slots.dcVehicle ? `🚗 Vehicle: ${slots.dcVehicle}\n` : ''}${slots.dcDriver ? `👨‍✈️ Driver: ${slots.dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}`;
             await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
             
@@ -2876,6 +2895,11 @@ export async function handleOaksyWhatsAppMessage(
       // VENDOR PAYMENT EXECUTION HANDLER - Natural language vendor payments
       // ============================================================================
       if (aiResult.intent === 'vendor_payment' || conversation.activeIntent === 'ai_vendor_payment') {
+        // Role check - only allowed submitters can request vendor payments
+        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, vendor payment requests are only available for Wedding Planners and Accountants.\n\n_Contact Kishor for vendor payments._ 🌳`;
+        }
+        
         const slots = { ...context, ...aiResult.slots };
         
         const trimmedMessage = messageText.trim().toLowerCase();
@@ -2891,8 +2915,24 @@ export async function handleOaksyWhatsAppMessage(
           try {
             console.log('[AI Vendor] EXECUTING vendor payment submission...');
             
-            // Generate payment code
-            const paymentCode = `VP${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+            // Generate approval code for vendor payment
+            const approvalCode = generateUniqueApprovalCode('VP');
+            const superadminPhone = await getSuperadminPhone();
+            const description = `${slots.vendorName}${slots.purpose ? ` - ${slots.purpose}` : ''}`;
+            
+            // Create pending approval record (daybook entry will be created only after approval)
+            await storage.createWhatsappPendingApproval({
+              approvalCode,
+              type: 'vendor_payment',
+              requestId: approvalCode, // Use approval code as request ID for vendor payments
+              employeeId: employee.id,
+              employeeName: employee.name,
+              description: description,
+              amount: slots.amount.toString(),
+              mediaUrl: null,
+              status: 'pending',
+              approverPhone: superadminPhone,
+            });
             
             // Reset conversation state
             await storage.updateWhatsappConversation(conversation.id, {
@@ -2903,13 +2943,13 @@ export async function handleOaksyWhatsAppMessage(
             });
             
             // Notify Kishor for approval
-            const notifyMsg = `💸 *Vendor Payment Request*\n\n👤 From: ${employee.name}\n🏪 Vendor: ${slots.vendorName}\n💵 Amount: ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${paymentCode}\n\n_Reply "approved" or "rejected"_`;
+            const notifyMsg = `💸 *Vendor Payment Request*\n\n👤 From: ${employee.name}\n🏪 Vendor: ${slots.vendorName}\n💵 Amount: ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${approvalCode}\n\n_Reply "approved" or "rejected"_`;
             await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
             
-            // Save pending approval context
+            // Save pending approval context for natural language approval
             await saveSuperadminPendingContext({
               type: 'vendor_payment',
-              requestId: paymentCode,
+              requestId: approvalCode,
               employeeId: employee.id,
               employeeName: employee.name,
               employeePhone: normalizedPhone,
@@ -2920,7 +2960,7 @@ export async function handleOaksyWhatsAppMessage(
               eventName: slots.eventName,
             });
             
-            return `✅ *Vendor Payment Submitted!*\n\n🏪 ${slots.vendorName}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}🔑 Code: ${paymentCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+            return `✅ *Vendor Payment Submitted!*\n\n🏪 ${slots.vendorName}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}🔑 Code: ${approvalCode}\n\n_Waiting for Kishor's approval_ 🌳`;
           } catch (execError) {
             console.error('[AI Vendor] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem submitting the vendor payment. Please try again.`;
@@ -2951,6 +2991,11 @@ export async function handleOaksyWhatsAppMessage(
       // DAYBOOK ENTRY HANDLER - Natural language daybook entries
       // ============================================================================
       if (aiResult.intent === 'daybook_entry' || conversation.activeIntent === 'ai_daybook_entry') {
+        // Role check - only allowed submitters can create daybook entries
+        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, daybook entries are only available for Wedding Planners and Accountants.\n\n_Contact Kishor for daybook entries._ 🌳`;
+        }
+        
         const slots = { ...context, ...aiResult.slots };
         
         const trimmedMessage = messageText.trim().toLowerCase();
@@ -2966,8 +3011,19 @@ export async function handleOaksyWhatsAppMessage(
           try {
             console.log('[AI Daybook] EXECUTING daybook entry creation...');
             
-            const entryCode = `DB${Date.now().toString().slice(-6)}`;
             const description = slots.daybookDescription || slots.purpose || 'Entry via WhatsApp';
+            
+            // Create actual daybook entry in database
+            const daybookEntry = await storage.createDaybookEntry({
+              date: new Date().toISOString().split('T')[0],
+              type: slots.daybookType,
+              amount: String(slots.amount),
+              description: description,
+              category: slots.daybookCategory || 'General',
+              submittedBy: employee.name,
+              bankId: null,
+              eventId: null,
+            });
             
             // Reset conversation state
             await storage.updateWhatsappConversation(conversation.id, {
@@ -2979,10 +3035,10 @@ export async function handleOaksyWhatsAppMessage(
             
             // Notify superadmin
             const typeEmoji = slots.daybookType === 'income' ? '💚' : '💸';
-            const notifyMsg = `${typeEmoji} *Daybook Entry*\n\n👤 By: ${employee.name}\n📋 Type: ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n${slots.daybookCategory ? `📁 Category: ${slots.daybookCategory}\n` : ''}\n🔑 Code: ${entryCode}`;
+            const notifyMsg = `${typeEmoji} *Daybook Entry*\n\n👤 By: ${employee.name}\n📋 Type: ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n${slots.daybookCategory ? `📁 Category: ${slots.daybookCategory}\n` : ''}\n🔑 ID: ${daybookEntry.id}`;
             await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
             
-            return `✅ *Daybook Entry Recorded!*\n\n${typeEmoji} ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n🔑 Code: ${entryCode}\n\n_Kishor has been notified_ 🌳`;
+            return `✅ *Daybook Entry Recorded!*\n\n${typeEmoji} ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n🔑 ID: ${daybookEntry.id}\n\n_Kishor has been notified_ 🌳`;
           } catch (execError) {
             console.error('[AI Daybook] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem creating the daybook entry. Please try again.`;
@@ -5519,6 +5575,19 @@ async function handleSuperadminApproval(message: string, fromPhone: string): Pro
 
     if (approval.type === 'expense') {
       await storage.updateExpenseReimbursement(approval.requestId, { status: 'approved' });
+    } else if (approval.type === 'vendor_payment') {
+      // Create daybook entry for approved vendor payment
+      const amount = approval.amount ? parseFloat(approval.amount) : 0;
+      await storage.createDaybookEntry({
+        date: new Date().toISOString().split('T')[0],
+        type: 'expense',
+        amount: String(amount),
+        description: `Vendor Payment: ${approval.description}`,
+        category: 'Vendor Payment',
+        submittedBy: approval.employeeName,
+        bankId: null,
+        eventId: null,
+      });
     } else {
       await storage.updateLeaveRequest(approval.requestId, { status: 'approved' });
     }
@@ -5526,9 +5595,14 @@ async function handleSuperadminApproval(message: string, fromPhone: string): Pro
     const employee = await storage.getEmployee(approval.employeeId);
     if (employee?.phone) {
       const amount = approval.amount ? `₹${parseFloat(approval.amount).toLocaleString('en-IN')}` : '';
-      const notifyMessage = approval.type === 'expense'
-        ? `🎉 *Great news!*\n\nYour expense request for ${amount} has been *approved*! ✅\n\nYou'll receive your reimbursement shortly. 💰`
-        : `🎉 *Great news!*\n\nYour leave request has been *approved*! ✅\n\nEnjoy your time off! 🌴`;
+      let notifyMessage: string;
+      if (approval.type === 'expense') {
+        notifyMessage = `🎉 *Great news!*\n\nYour expense request for ${amount} has been *approved*! ✅\n\nYou'll receive your reimbursement shortly. 💰`;
+      } else if (approval.type === 'vendor_payment') {
+        notifyMessage = `🎉 *Great news!*\n\nYour vendor payment request for ${amount} has been *approved*! ✅\n\nThe payment has been recorded in the daybook. 💸`;
+      } else {
+        notifyMessage = `🎉 *Great news!*\n\nYour leave request has been *approved*! ✅\n\nEnjoy your time off! 🌴`;
+      }
       
       await sendWhatsAppMessage(employee.phone, notifyMessage);
     }
@@ -5558,15 +5632,22 @@ async function handleSuperadminApproval(message: string, fromPhone: string): Pro
 
     if (approval.type === 'expense') {
       await storage.updateExpenseReimbursement(approval.requestId, { status: 'rejected' });
+    } else if (approval.type === 'vendor_payment') {
+      // Vendor payment rejection - no additional action needed, just update the pending approval
     } else {
       await storage.updateLeaveRequest(approval.requestId, { status: 'rejected' });
     }
 
     const employee = await storage.getEmployee(approval.employeeId);
     if (employee?.phone) {
-      const notifyMessage = approval.type === 'expense'
-        ? `ℹ️ *Update on your expense request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`
-        : `ℹ️ *Update on your leave request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`;
+      let notifyMessage: string;
+      if (approval.type === 'expense') {
+        notifyMessage = `ℹ️ *Update on your expense request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`;
+      } else if (approval.type === 'vendor_payment') {
+        notifyMessage = `ℹ️ *Update on your vendor payment request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please contact Kishor._`;
+      } else {
+        notifyMessage = `ℹ️ *Update on your leave request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`;
+      }
       
       await sendWhatsAppMessage(employee.phone, notifyMessage);
     }
