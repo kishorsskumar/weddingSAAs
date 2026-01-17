@@ -1398,6 +1398,41 @@ function generateUniqueApprovalCode(prefix: string): string {
   return `${prefix}${timestamp.slice(-4)}${random}`;
 }
 
+// Save pending approval context to superadmin's conversation for natural language approval
+async function saveSuperadminPendingContext(pendingContext: {
+  type: 'leave_request' | 'expense' | 'qr_payment' | 'income';
+  requestId: string;
+  employeeId: string;
+  employeeName: string;
+  employeePhone: string;
+  details: string;
+  reason?: string;
+  amount?: string;
+}): Promise<void> {
+  try {
+    // Get or create superadmin's conversation
+    let superadminConvo = await storage.getWhatsappConversationByPhone(SUPERADMIN_WHATSAPP);
+    
+    if (!superadminConvo) {
+      superadminConvo = await storage.createWhatsappConversation({
+        phoneNumber: SUPERADMIN_WHATSAPP,
+        currentState: 'idle',
+      });
+    }
+    
+    // Save the pending context for natural language approval
+    await storage.updateWhatsappConversation(superadminConvo.id, {
+      activeIntent: 'pending_approval',
+      intentContext: pendingContext,
+      currentState: 'awaiting_approval_decision',
+    });
+    
+    console.log('[Superadmin Context] Saved pending approval:', pendingContext.type, pendingContext.requestId);
+  } catch (err) {
+    console.error('[Superadmin Context] Failed to save context:', err);
+  }
+}
+
 async function createExpenseRequest(
   employeeId: string,
   employeeName: string,
@@ -2002,6 +2037,92 @@ export async function handleOaksyWhatsAppMessage(
       return handleSuperadminApproval(messageText, normalizedPhone);
     }
     
+    // ============================================================================
+    // NATURAL LANGUAGE APPROVAL: Handle "approved", "rejected", etc.
+    // ============================================================================
+    const isApprovalWord = /^(approved?|yes|ok|okay|accept|go ahead|proceed|grant|allow|fine|done|yep)$/i.test(lowerMessage.trim());
+    const isRejectionWord = /^(rejected?|no|deny|denied|decline|not approved|cancel|refuse|nope)$/i.test(lowerMessage.trim());
+    
+    if ((isApprovalWord || isRejectionWord) && conversation.activeIntent === 'pending_approval') {
+      let pendingCtx: any = {};
+      try {
+        if (typeof conversation.intentContext === 'string') {
+          pendingCtx = JSON.parse(conversation.intentContext) || {};
+        } else if (conversation.intentContext) {
+          pendingCtx = conversation.intentContext;
+        }
+      } catch { pendingCtx = {}; }
+      
+      console.log('[Natural Approval] Processing:', { isApprovalWord, isRejectionWord, pendingCtx });
+      
+      if (pendingCtx.requestId && pendingCtx.type) {
+        const action = isApprovalWord ? 'approved' : 'rejected';
+        
+        try {
+          if (pendingCtx.type === 'leave_request') {
+            // Update leave request status
+            await storage.updateLeaveRequest(pendingCtx.requestId, { 
+              status: action,
+              approvedAt: action === 'approved' ? new Date() : undefined,
+            });
+            
+            // Reset superadmin conversation
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+            });
+            
+            // Notify employee
+            if (pendingCtx.employeePhone) {
+              const emoji = action === 'approved' ? '🎉' : '😔';
+              const statusText = action === 'approved' ? 'approved! ✅\n\nEnjoy your time off! 🌴' : 'not approved. ❌';
+              try {
+                await sendWhatsAppMessage(pendingCtx.employeePhone, 
+                  `${emoji} *Leave Request Update*\n\nYour leave request has been *${statusText}*`);
+              } catch (notifyErr) {
+                console.error('[Natural Approval] Failed to notify employee:', notifyErr);
+              }
+            }
+            
+            const emoji = action === 'approved' ? '✅' : '❌';
+            return `${emoji} Leave request for *${pendingCtx.employeeName}* ${action}.\n\n_Employee has been notified._ 🌳`;
+          } else if (pendingCtx.type === 'expense') {
+            // Update expense status
+            await storage.updateExpenseReimbursement(pendingCtx.requestId, { status: action });
+            
+            // Reset conversation
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+            });
+            
+            // Notify employee
+            if (pendingCtx.employeePhone) {
+              const emoji = action === 'approved' ? '🎉' : '😔';
+              const amountText = pendingCtx.amount ? `₹${parseFloat(pendingCtx.amount).toLocaleString('en-IN')}` : '';
+              try {
+                await sendWhatsAppMessage(pendingCtx.employeePhone,
+                  `${emoji} *Expense Update*\n\nYour expense request${amountText ? ` for ${amountText}` : ''} has been *${action}*!`);
+              } catch (notifyErr) {
+                console.error('[Natural Approval] Failed to notify employee:', notifyErr);
+              }
+            }
+            
+            const emoji = action === 'approved' ? '✅' : '❌';
+            return `${emoji} Expense for *${pendingCtx.employeeName}* ${action}.\n\n_Employee has been notified._ 🌳`;
+          }
+        } catch (approvalErr) {
+          console.error('[Natural Approval] Error:', approvalErr);
+          return `❌ Sorry, there was a problem processing the ${action}. Please try again.`;
+        }
+      } else {
+        // No pending context - ask what they want to approve
+        return `I don't have a pending request to ${isApprovalWord ? 'approve' : 'reject'}. \n\n_To approve a specific request, you can still use codes like "A EXP123" or wait for a new request notification._ 🌳`;
+      }
+    }
+    
     // Check if Kishor is in a QR payment flow (awaiting screenshot or event)
     if (conversation.activeIntent === 'kishor_qr_payment') {
       let kishorContext: any = {};
@@ -2417,9 +2538,21 @@ export async function handleOaksyWhatsAppMessage(
       const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : context.startDate;
       
       try {
-        const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "A LR${leaveRequest.id.slice(-4)}" to approve_`;
+        const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "approved" or "rejected"_`;
         await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
-        console.log('[Direct Confirm] Notification sent to superadmin');
+        
+        // Save pending approval context for superadmin's natural language approval
+        await saveSuperadminPendingContext({
+          type: 'leave_request',
+          requestId: leaveRequest.id,
+          employeeId: employee.id,
+          employeeName: employee.name,
+          employeePhone: normalizedPhone,
+          details: `${leaveType} leave: ${formattedDate}${days > 1 ? ` (${days} days)` : ''}`,
+          reason,
+        });
+        
+        console.log('[Direct Confirm] Notification sent to superadmin with pending context');
       } catch (notifyError) {
         console.error('[Direct Confirm] Failed to notify superadmin:', notifyError);
       }
@@ -2496,8 +2629,19 @@ export async function handleOaksyWhatsAppMessage(
             const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : slots.startDate;
             
             try {
-              const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "A LR${leaveRequest.id.slice(-4)}" to approve_`;
+              const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "approved" or "rejected"_`;
               await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+              
+              // Save pending approval context for natural language approval
+              await saveSuperadminPendingContext({
+                type: 'leave_request',
+                requestId: leaveRequest.id,
+                employeeId: employee.id,
+                employeeName: employee.name,
+                employeePhone: normalizedPhone,
+                details: `${leaveType} leave: ${formattedDate}${days > 1 ? ` (${days} days)` : ''}`,
+                reason,
+              });
             } catch (notifyError) {
               console.error('[AI Leave] Failed to notify superadmin:', notifyError);
             }
