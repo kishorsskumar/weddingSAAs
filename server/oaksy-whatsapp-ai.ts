@@ -1704,6 +1704,9 @@ export async function handleOaksyWhatsAppMessage(
   // GLOBAL STOP/CANCEL COMMAND - Allows users to exit any ongoing flow
   const isStopCommand = /^(stop|cancel|exit|reset|start over|nevermind|never mind|forget it|cancel transaction|abort)$/i.test(lowerMessage);
   
+  // Common greetings that should reset ongoing flows
+  const isGreeting = /^(hi|hello|hey|hii|hiii|hiiii|hai|hola|good morning|good afternoon|good evening|namaste|yo)$/i.test(lowerMessage.trim());
+  
   if (isStopCommand && conversation.activeIntent) {
     // User wants to cancel the current flow
     await storage.updateWhatsappConversation(conversation.id, {
@@ -1714,6 +1717,17 @@ export async function handleOaksyWhatsAppMessage(
     });
     
     return `👍 Got it! I've cancelled the current action.\n\n_What would you like to do? Just say "help" if you need options._ 🌳`;
+  }
+  
+  // If user sends a greeting while in an active flow, reset and greet them fresh
+  if (isGreeting && conversation.activeIntent) {
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: null,
+      currentState: 'idle',
+      conversationHistory: [],
+    });
+    // Don't return here - let the greeting be processed normally below
   }
   
   // LOOP DETECTION - Check if we've sent the same message multiple times
