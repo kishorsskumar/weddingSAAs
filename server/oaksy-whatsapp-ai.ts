@@ -1673,20 +1673,30 @@ export async function handleOaksyWhatsAppMessage(
   mediaContentType?: string,
   messageId?: string
 ): Promise<string> {
-  const normalizedPhone = normalizePhoneNumber(fromNumber);
+  console.log('[Oaksy] Processing message from:', fromNumber, 'Body:', body?.substring(0, 50));
   
-  await storage.createWhatsappInboundMessage({
-    messageId: messageId || `msg_${Date.now()}`,
-    fromNumber: normalizedPhone,
-    toNumber: process.env.TWILIO_WHATSAPP_NUMBER || '',
-    body,
-    mediaUrl,
-    mediaContentType,
-    conversationId: null,
-    processedAt: new Date(),
-  });
+  const normalizedPhone = normalizePhoneNumber(fromNumber);
+  console.log('[Oaksy] Normalized phone:', normalizedPhone);
+  
+  try {
+    await storage.createWhatsappInboundMessage({
+      messageId: messageId || `msg_${Date.now()}`,
+      fromNumber: normalizedPhone,
+      toNumber: process.env.TWILIO_WHATSAPP_NUMBER || '',
+      body,
+      mediaUrl,
+      mediaContentType,
+      conversationId: null,
+      processedAt: new Date(),
+    });
+    console.log('[Oaksy] Saved inbound message');
+  } catch (inboundError: any) {
+    console.error('[Oaksy] Failed to save inbound message:', inboundError.message);
+    // Continue processing even if saving inbound message fails
+  }
 
   const conversation = await storage.getOrCreateWhatsappConversation(normalizedPhone);
+  console.log('[Oaksy] Got conversation:', conversation.id);
   
   const messageText = body.trim();
   const lowerMessage = messageText.toLowerCase();
@@ -1868,11 +1878,9 @@ export async function handleOaksyWhatsAppMessage(
         date: new Date().toISOString().split('T')[0],
         type: 'income',
         category: incomeSubmission.type === 'bank_transfer' ? 'bank_transfer' : 'client_payment',
-        description: `[${incCode}] ${incomeSubmission.description}`,
+        description: `[${incCode}] ${incomeSubmission.description} - ${incomeSubmission.clientName} (Approved by Kishor)`,
         amount: amount.toString(),
-        person: incomeSubmission.clientName,
         eventName: eventName === 'General' ? 'General' : eventName,
-        approvedBy: 'Kishor',
         bankId: (incomeSubmission as any).bankId || null,
       });
       
