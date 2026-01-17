@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
+import { startReminderScheduler } from "./reminder-scheduler";
 
 const DEFAULT_ROLES = [
   { name: 'superadmin', label: 'Super Admin', description: 'Full system access with role management', isSystem: true },
@@ -154,6 +155,7 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      startReminderScheduler();
     },
   );
 })();
