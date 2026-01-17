@@ -2366,11 +2366,15 @@ export async function handleOaksyWhatsAppMessage(
         
         // User confirmed - execute the leave request
         // Check both AI flags AND simple confirmation words when in leave request flow
-        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit)$/i.test(messageText.trim());
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji|theek|thik)/i.test(trimmedMessage) ||
+                                trimmedMessage === 'y' || trimmedMessage === 'yep' || trimmedMessage === 'yup';
+        const isInAwaitingState = conversation.activeIntent === 'ai_leave_request' && 
+                                   (conversation.currentState === 'awaiting_confirmation' || conversation.currentState === 'gathering_info');
         const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
-                              (isSimpleConfirm && conversation.activeIntent === 'ai_leave_request' && conversation.currentState === 'awaiting_confirmation');
+                              (isSimpleConfirm && isInAwaitingState && slots.startDate && slots.leaveType);
         
-        console.log('[AI Leave] Execution check:', { shouldExecute, isSimpleConfirm, activeIntent: conversation.activeIntent, currentState: conversation.currentState, slots });
+        console.log('[AI Leave] Execution check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, trimmedMessage, activeIntent: conversation.activeIntent, currentState: conversation.currentState, slots });
         
         if (shouldExecute && slots.startDate && slots.leaveType) {
             const endDate = slots.endDate || slots.startDate;
