@@ -455,13 +455,18 @@ QUERY TYPE DETECTION:
 - "meal count", "food preferences", "veg non-veg count" = rsvp_query with queryType: "meals"
 
 REMINDER DETECTION RULES:
-- "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
-- "set a reminder for 5pm to call client" = reminder
-- "remind me at 3:30pm to check deliveries" = reminder
-- Parse time naturally: "9am", "5:30 PM", "10:00", "morning" (default 9am), "evening" (default 5pm)
+- EXPLICIT: "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
+- EXPLICIT: "set a reminder for 5pm to call client" = reminder
+- EXPLICIT: "remind me at 3:30pm to check deliveries" = reminder
+- IMPLICIT: "call Kishor at 4.45 am today" = reminder (action + time = reminder)
+- IMPLICIT: "pay vendor at 3pm" = reminder (task with specific time = reminder)
+- IMPLICIT: "check flowers at 10am tomorrow" = reminder
+- IMPLICIT: "send invoice to client at 5pm" = reminder
+- KEY PATTERN: If the message contains a TASK/ACTION + a SPECIFIC TIME/DATE, treat it as an IMPLICIT REMINDER
+- Parse time naturally: "9am", "5:30 PM", "4.45am", "10:00", "morning" (default 9am), "evening" (default 5pm)
 - Parse date naturally: "tomorrow", "today", "Monday", "next week" (default next Monday), "in 2 hours"
-- The reminderMessage should be a clean task description (what to do), not the full user sentence
-- If no date/time specified, ask for clarification
+- The reminderMessage should be a clean task description (what to do), e.g., "call Kishor" not the full sentence with time
+- If no date/time specified but a clear task is mentioned, ask "When should I remind you?"
 - Use Indian timezone (Asia/Kolkata) for all times
 
 RESPONSE FORMAT - Always respond with valid JSON:
