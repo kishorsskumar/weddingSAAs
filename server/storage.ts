@@ -586,9 +586,11 @@ export interface IStorage {
   // Oak Inventory - Inventory Items
   getAllInventoryItems(): Promise<InventoryItem[]>;
   getInventoryItem(id: string): Promise<InventoryItem | undefined>;
+  getInventoryItemBySku(sku: string): Promise<InventoryItem | undefined>;
   createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem>;
   updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem | undefined>;
   deleteInventoryItem(id: string): Promise<void>;
+  generateInventorySku(): Promise<string>;
 
   // Oak Inventory - Inventory Transactions
   getInventoryTransactionsByItemId(itemId: string): Promise<InventoryTransaction[]>;
@@ -2417,9 +2419,37 @@ export class DatabaseStorage implements IStorage {
     return item || undefined;
   }
 
+  async getInventoryItemBySku(sku: string): Promise<InventoryItem | undefined> {
+    const [item] = await db.select().from(inventoryItems).where(eq(inventoryItems.sku, sku));
+    return item || undefined;
+  }
+
   async createInventoryItem(item: InsertInventoryItem): Promise<InventoryItem> {
     const [created] = await db.insert(inventoryItems).values(item).returning();
     return created;
+  }
+
+  async generateInventorySku(): Promise<string> {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const prefix = `INV-${year}${month}`;
+    
+    const existingItems = await db.select()
+      .from(inventoryItems)
+      .where(sql`${inventoryItems.sku} LIKE ${prefix + '%'}`)
+      .orderBy(desc(inventoryItems.sku));
+    
+    let nextNumber = 1;
+    if (existingItems.length > 0 && existingItems[0].sku) {
+      const lastSku = existingItems[0].sku;
+      const lastNumberStr = lastSku.split('-').pop();
+      if (lastNumberStr) {
+        nextNumber = parseInt(lastNumberStr) + 1;
+      }
+    }
+    
+    return `${prefix}-${String(nextNumber).padStart(4, '0')}`;
   }
 
   async updateInventoryItem(id: string, item: Partial<InsertInventoryItem>): Promise<InventoryItem | undefined> {

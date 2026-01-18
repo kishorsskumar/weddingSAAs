@@ -232,6 +232,7 @@ interface IntentContext {
   inventoryItemPhotoUrl?: string;
   inventoryItemLocation?: string;
   inventoryItemColour?: string;
+  inventoryItemUnitCost?: number;
   // Reminder explicit today flag
   reminderExplicitToday?: boolean;
 }
@@ -552,7 +553,8 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "inventoryItemName": string or null (name of the item to add to inventory),
     "inventoryItemQuantity": number or null (quantity of items),
     "inventoryItemCategory": string or null (category like "Furniture", "Decor", "Fabric", default "General"),
-    "inventoryItemLocation": string or null (warehouse location, default "Warehouse")
+    "inventoryItemLocation": string or null (warehouse location, default "Warehouse"),
+    "inventoryItemUnitCost": number or null (unit rate/price per item in rupees, parse "₹50/unit", "Rs 100 each", "50 rupees per piece")
   },
   "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation", "reminderTime"] or [],
   "isComplete": boolean,
@@ -993,7 +995,8 @@ const aiParseMessageFunction = {
           inventoryItemName: { type: "string", description: "Name of the inventory item" },
           inventoryItemQuantity: { type: "number", description: "Quantity of items to add" },
           inventoryItemCategory: { type: "string", description: "Category like Furniture, Decor, Fabric, etc." },
-          inventoryItemLocation: { type: "string", description: "Warehouse location" }
+          inventoryItemLocation: { type: "string", description: "Warehouse location" },
+          inventoryItemUnitCost: { type: "number", description: "Unit rate/price per item in rupees" }
         },
         description: "Extracted slot values from the message"
       },
