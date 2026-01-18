@@ -44,7 +44,9 @@ import {
   X,
   MoreHorizontal,
   Menu,
+  FileText,
 } from "lucide-react";
+import { ZohoQuotes } from "@/components/oak-book/zoho-quotes";
 import type { 
   SalesPipeline, 
   SalesStage, 
@@ -57,7 +59,7 @@ import type {
   User
 } from "@shared/schema";
 
-type Section = 'dashboard' | 'pipeline' | 'contacts' | 'companies' | 'activities' | 'pipeline-setup' | 'automations' | 'reports' | 'settings';
+type Section = 'dashboard' | 'pipeline' | 'contacts' | 'companies' | 'activities' | 'pipeline-setup' | 'automations' | 'reports' | 'settings' | 'estimates';
 
 const formatCurrency = (amount: string | number | null) => {
   if (!amount) return '₹0';
@@ -79,7 +81,7 @@ export default function OakSales() {
   const getInitialSection = (): Section => {
     const params = new URLSearchParams(window.location.search);
     const section = params.get('section');
-    if (section && ['dashboard', 'pipeline', 'contacts', 'companies', 'activities', 'pipeline-setup', 'automations', 'reports', 'settings'].includes(section)) {
+    if (section && ['dashboard', 'pipeline', 'contacts', 'companies', 'activities', 'pipeline-setup', 'automations', 'reports', 'settings', 'estimates'].includes(section)) {
       return section as Section;
     }
     return 'dashboard';
@@ -186,6 +188,7 @@ export default function OakSales() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'pipeline', label: 'Leads Pipeline', icon: Target },
     { id: 'contacts', label: 'Contacts', icon: Users },
+    { id: 'estimates', label: 'Estimates', icon: FileText },
     { id: 'pipeline-setup', label: 'Pipeline Setup', icon: Workflow },
     { id: 'automations', label: 'Automations', icon: Settings },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -379,6 +382,22 @@ export default function OakSales() {
                 weddingPlanners={weddingPlanners}
                 isSuperAdmin={isSuperAdmin}
               />
+            )}
+            {activeSection === 'estimates' && (
+              <div className="space-y-4">
+                <Tabs defaultValue="standard" className="w-full">
+                  <TabsList>
+                    <TabsTrigger value="standard">Standard Estimates</TabsTrigger>
+                    <TabsTrigger value="tax">Tax Estimates</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="standard" className="mt-4">
+                    <ZohoQuotes filterType="standard" />
+                  </TabsContent>
+                  <TabsContent value="tax" className="mt-4">
+                    <ZohoQuotes filterType="tax" />
+                  </TabsContent>
+                </Tabs>
+              </div>
             )}
           </div>
         )}

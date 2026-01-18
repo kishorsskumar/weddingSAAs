@@ -45,6 +45,13 @@ import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "sales", label: "Sales", path: "/oak-sales", subPages: [
+    { id: "sales-leads", label: "Leads", path: "/oak-sales?section=dashboard" },
+    { id: "sales-pipeline", label: "Pipeline", path: "/oak-sales?section=pipeline" },
+    { id: "sales-estimates", label: "Estimates", path: "/oak-sales?section=estimates" },
+    { id: "sales-reports", label: "Reports", path: "/oak-sales?section=reports" },
+    { id: "sales-settings", label: "Settings", path: "/oak-sales?section=settings" },
+  ] },
   { id: "event-calendar", label: "Oak Event Calendar", path: "/events", subPages: [
     { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan" },
   ] },
@@ -53,13 +60,6 @@ const ALL_PAGES = [
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
-  { id: "sales", label: "Sales", path: "/oak-sales", subPages: [
-    { id: "sales-leads", label: "Leads", path: "/oak-sales?section=dashboard" },
-    { id: "sales-pipeline", label: "Pipeline", path: "/oak-sales?section=pipeline" },
-    { id: "sales-quotations", label: "Quotations", path: "/oak-book?tab=quotes" },
-    { id: "sales-reports", label: "Reports", path: "/oak-sales?section=reports" },
-    { id: "sales-settings", label: "Settings", path: "/oak-sales?section=settings" },
-  ] },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "execution-plan", label: "Execution Plan", path: "/execution-plan" },
   { id: "hr", label: "Oak HR", path: "/hr" },
@@ -83,7 +83,7 @@ const ICONS: Record<string, any> = {
   "sales": Target,
   "sales-leads": Users,
   "sales-pipeline": Target,
-  "sales-quotations": FileText,
+  "sales-estimates": FileText,
   "sales-reports": LayoutDashboard,
   "sales-settings": Settings,
   "oak-inventory": Package,
