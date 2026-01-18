@@ -473,7 +473,7 @@ export default function EventDatabase() {
 
     return (
       <div className="h-full flex flex-col bg-white">
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 pr-14 md:pr-16 border-b">
           <div className="flex items-center gap-2">
             <h2 className="font-semibold text-lg">Event Details</h2>
             {isSuperadmin && !panelIsEditing && (
