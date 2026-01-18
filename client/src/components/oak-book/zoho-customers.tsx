@@ -231,8 +231,10 @@ export function ZohoCustomers() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-primary truncate">{customer.name}</p>
+                          {customer.customerCode && (
+                            <p className="text-xs text-primary/70 font-mono">{customer.customerCode}</p>
+                          )}
                           {customer.email && <p className="text-xs text-gray-500 truncate">{customer.email}</p>}
-                          {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
                         </div>
                       </div>
                       <div className="text-right shrink-0">
@@ -290,8 +292,8 @@ export function ZohoCustomers() {
                           </div>
                           <div>
                             <span className="text-primary hover:underline font-medium">{customer.name}</span>
-                            {customer.gstNumber && (
-                              <p className="text-xs text-gray-500">GST: {customer.gstNumber}</p>
+                            {customer.customerCode && (
+                              <p className="text-xs text-primary/70 font-mono">{customer.customerCode}</p>
                             )}
                           </div>
                         </div>
@@ -391,7 +393,14 @@ function CustomerDetailPanel({
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{customer.name}</h3>
-              <p className="text-sm text-gray-500">{customer.email || "No email"}</p>
+              <div className="flex items-center gap-2">
+                {customer.customerCode && (
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 font-mono text-xs">
+                    {customer.customerCode}
+                  </Badge>
+                )}
+                <p className="text-sm text-gray-500">{customer.email || "No email"}</p>
+              </div>
             </div>
           </div>
         </div>
