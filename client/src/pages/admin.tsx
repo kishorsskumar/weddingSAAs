@@ -36,26 +36,68 @@ type LeaveCategory = {
   createdAt: string | null;
 };
 
-const ALL_PAGES = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "event-calendar", label: "Oak Event Calendar" },
-  { id: "monthly-plan", label: "Monthly Plan" },
-  { id: "team-calendar", label: "Oak Team Calendar" },
-  { id: "event-database", label: "Oak Event Database" },
-  { id: "event-milestones", label: "Oak Event Milestones" },
-  { id: "daybook", label: "Oak Daybook" },
-  { id: "oak-book", label: "Oak Book" },
-  { id: "oak-sales", label: "Oak Sales" },
-  { id: "oak-inventory", label: "Oak Inventory" },
-  { id: "execution-plan", label: "Execution Plan" },
-  { id: "hr", label: "Oak HR" },
-  { id: "employee-portal", label: "Employee Portal" },
-  { id: "oaksy", label: "Oaksy AI" },
-  { id: "oak-creative", label: "Oak Creative" },
-  { id: "whatsapp-inbox", label: "WhatsApp Inbox" },
-  { id: "oak-rsvp", label: "Oak RSVP" },
-  { id: "admin", label: "Admin Panel" },
+const PERMISSION_PAGES = [
+  { id: "dashboard", label: "Dashboard", isParent: false },
+  { id: "sales", label: "Sales", isParent: true, subPages: [
+    { id: "sales-leads", label: "Leads" },
+    { id: "sales-pipeline", label: "Pipeline" },
+    { id: "sales-estimates", label: "Estimates" },
+    { id: "sales-reports", label: "Reports" },
+    { id: "sales-settings", label: "Settings" },
+  ] },
+  { id: "event-hub", label: "Event Hub", isParent: true, subPages: [
+    { id: "event-calendar", label: "Calendar" },
+    { id: "event-milestones", label: "Timeline" },
+    { id: "execution-plan", label: "Execution" },
+  ] },
+  { id: "operations", label: "Operations", isParent: true, subPages: [
+    { id: "ops-items", label: "Inventory Items" },
+    { id: "ops-purchase-orders", label: "Purchase Orders" },
+    { id: "ops-templates", label: "Templates" },
+    { id: "ops-event-inventory", label: "Event Inventory" },
+    { id: "ops-rentals", label: "Rentals" },
+    { id: "ops-production", label: "Production Planning" },
+    { id: "ops-execution", label: "Execution Plans" },
+    { id: "ops-transportation", label: "Transportation" },
+    { id: "ops-manpower", label: "Manpower" },
+  ] },
+  { id: "finance", label: "Finance", isParent: true, subPages: [
+    { id: "finance-customers", label: "Customers" },
+    { id: "finance-vendors", label: "Vendors" },
+    { id: "finance-estimates", label: "Estimates" },
+    { id: "finance-invoices", label: "Invoices" },
+    { id: "finance-payments", label: "Payments Received" },
+    { id: "daybook", label: "Day Book" },
+    { id: "finance-reports", label: "Reports" },
+    { id: "finance-settings", label: "Settings" },
+  ] },
+  { id: "people", label: "People", isParent: true, subPages: [
+    { id: "hr", label: "HR Management" },
+    { id: "employee-portal", label: "Employee Portal" },
+    { id: "team-calendar", label: "Team Calendar" },
+  ] },
+  { id: "tools", label: "Tools", isParent: true, subPages: [
+    { id: "whatsapp-inbox", label: "WhatsApp Inbox" },
+    { id: "oak-rsvp", label: "Oak RSVP" },
+    { id: "oaksy", label: "Oaksy AI" },
+    { id: "oak-creative", label: "Oak Creative" },
+  ] },
+  { id: "management-mis", label: "Management MIS", isParent: true, superadminOnly: true, subPages: [
+    { id: "mis-overview", label: "Overview Dashboard" },
+    { id: "event-database", label: "Event Database" },
+    { id: "mis-financial", label: "Financial Summary" },
+    { id: "mis-sales", label: "Sales Performance" },
+    { id: "mis-operations", label: "Operations Snapshot" },
+  ] },
+  { id: "admin", label: "Admin Panel", isParent: false },
 ];
+
+const ALL_PAGES = PERMISSION_PAGES.flatMap(page => {
+  if (page.isParent && page.subPages) {
+    return [{ id: page.id, label: page.label }, ...page.subPages];
+  }
+  return [{ id: page.id, label: page.label }];
+});
 
 type Role = {
   id: string;
@@ -1771,21 +1813,88 @@ export default function Admin() {
                           
                           <div className="space-y-2">
                             <p className="text-xs text-muted-foreground font-medium">Page Permissions:</p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {ALL_PAGES.filter(p => p.id !== 'dashboard').map(page => (
-                                <label 
-                                  key={page.id} 
-                                  className="flex items-center gap-2 text-xs sm:text-sm cursor-pointer p-2 rounded hover:bg-muted/50"
-                                >
-                                  <Checkbox 
-                                    checked={user.allowedPages?.includes(page.id)}
-                                    onCheckedChange={() => togglePermission(user.id, page.id, user.allowedPages || [])}
-                                    disabled={user.role === 'admin' || user.role === 'superadmin'}
-                                    data-testid={`checkbox-${user.id}-${page.id}`}
-                                  />
-                                  <span className="truncate">{page.label}</span>
-                                </label>
-                              ))}
+                            <div className="space-y-3">
+                              {PERMISSION_PAGES.filter(p => p.id !== 'dashboard' && (!(p as any).superadminOnly || isSuperAdmin)).map(page => {
+                                const isParent = page.isParent && page.subPages;
+                                const subPages = page.subPages || [];
+                                const userPages = user.allowedPages || [];
+                                const checkedCount = subPages.filter(sp => userPages.includes(sp.id)).length;
+                                const allSubPagesChecked = isParent && checkedCount === subPages.length;
+                                const someSubPagesChecked = isParent && checkedCount > 0;
+                                const isIndeterminate = someSubPagesChecked && !allSubPagesChecked;
+                                
+                                const handleParentToggle = async () => {
+                                  if (isParent) {
+                                    const subPageIds = subPages.map(sp => sp.id);
+                                    if (allSubPagesChecked) {
+                                      for (const spId of subPageIds) {
+                                        if (userPages.includes(spId)) {
+                                          await togglePermission(user.id, spId, userPages.filter(p => p !== spId));
+                                        }
+                                      }
+                                      if (userPages.includes(page.id)) {
+                                        await togglePermission(user.id, page.id, userPages.filter(p => p !== page.id && !subPageIds.includes(p)));
+                                      }
+                                    } else {
+                                      for (const spId of subPageIds) {
+                                        if (!userPages.includes(spId)) {
+                                          await togglePermission(user.id, spId, [...userPages, spId]);
+                                        }
+                                      }
+                                      if (!userPages.includes(page.id)) {
+                                        await togglePermission(user.id, page.id, [...userPages, page.id, ...subPageIds]);
+                                      }
+                                    }
+                                  } else {
+                                    togglePermission(user.id, page.id, userPages);
+                                  }
+                                };
+
+                                return (
+                                  <div key={page.id} className="border rounded-lg p-2 bg-muted/20">
+                                    <label className="flex items-center gap-2 text-sm font-medium cursor-pointer p-1 rounded hover:bg-muted/50">
+                                      <Checkbox 
+                                        checked={isParent ? allSubPagesChecked : userPages.includes(page.id)}
+                                        onCheckedChange={handleParentToggle}
+                                        disabled={user.role === 'admin' || user.role === 'superadmin'}
+                                        data-testid={`checkbox-${user.id}-${page.id}`}
+                                        ref={(el: any) => {
+                                          if (el && isIndeterminate) {
+                                            el.dataset.state = 'indeterminate';
+                                          }
+                                        }}
+                                      />
+                                      <span>{page.label}</span>
+                                      {(page as any).superadminOnly && (
+                                        <Badge variant="outline" className="text-xs ml-1">Superadmin</Badge>
+                                      )}
+                                      {isParent && (
+                                        <span className="text-xs text-muted-foreground ml-auto">
+                                          {checkedCount}/{subPages.length}
+                                        </span>
+                                      )}
+                                    </label>
+                                    {isParent && subPages.length > 0 && (
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 mt-2 ml-6 border-l-2 border-muted pl-3">
+                                        {subPages.map((subPage: any) => (
+                                          <label 
+                                            key={subPage.id} 
+                                            className="flex items-center gap-2 text-xs cursor-pointer p-1.5 rounded hover:bg-muted/50"
+                                          >
+                                            <Checkbox 
+                                              checked={userPages.includes(subPage.id)}
+                                              onCheckedChange={() => togglePermission(user.id, subPage.id, userPages)}
+                                              disabled={user.role === 'admin' || user.role === 'superadmin'}
+                                              data-testid={`checkbox-${user.id}-${subPage.id}`}
+                                            />
+                                            <span className="truncate">{subPage.label}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         </div>
