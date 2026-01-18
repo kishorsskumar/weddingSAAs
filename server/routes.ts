@@ -1268,8 +1268,28 @@ export async function registerRoutes(
           const milestones = generateMilestonesForEvent(event.id, event.date, event.time);
           await storage.createManyMilestones(milestones);
           console.log(`Auto-generated ${milestones.length} milestones for event ${event.title}`);
+          
+          // Mark timeline as created
+          await storage.updateEvent(event.id, { timelineCreated: true } as any);
+          
+          // Log automation success
+          await storage.createAutomationLog({
+            eventId: event.id,
+            actionType: 'timeline_init',
+            status: 'success',
+            metadata: { milestonesCount: milestones.length, eventTitle: event.title }
+          });
+          
+          console.log(`[Automation] Timeline created for event ${event.title}`);
         } catch (milestoneError) {
           console.error('Failed to auto-generate milestones:', milestoneError);
+          // Log automation failure
+          await storage.createAutomationLog({
+            eventId: event.id,
+            actionType: 'timeline_init',
+            status: 'failed',
+            metadata: { error: (milestoneError as Error).message }
+          });
           // Don't fail the event creation if milestones fail
         }
       }
