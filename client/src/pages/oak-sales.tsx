@@ -192,18 +192,18 @@ export default function OakSales() {
           <span className="text-sm font-medium">Dashboard</span>
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-            <Target className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+            <Target className="w-4 h-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-semibold text-lg">Oak Sales</h1>
+            <h1 className="font-semibold text-sm">Oak Sales</h1>
             <p className="text-xs text-muted-foreground">CRM</p>
           </div>
         </div>
       </div>
       
       <ScrollArea className="flex-1">
-        <nav className="p-2 space-y-1">
+        <nav className="p-2 space-y-0.5">
           {sidebarItems.map((item) => (
             <button
               key={item.id}
@@ -211,14 +211,14 @@ export default function OakSales() {
                 setActiveSection(item.id as Section);
                 onNavClick?.();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors ${
                 activeSection === item.id
-                  ? 'bg-amber-500/10 text-amber-600 font-medium'
+                  ? 'bg-primary/10 text-primary font-medium'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
               data-testid={`nav-${item.id}`}
             >
-              <item.icon className="w-5 h-5 shrink-0" />
+              <item.icon className={`w-4 h-4 shrink-0 ${activeSection === item.id ? 'text-primary' : ''}`} />
               <span>{item.label}</span>
             </button>
           ))}
@@ -229,21 +229,21 @@ export default function OakSales() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Zoho Bigin style */}
       {!isMobile && (
-        <aside className={`${sidebarCollapsed ? 'w-16' : 'w-64'} bg-card border-r transition-all duration-300 flex flex-col`}>
-          <div className="p-4 border-b">
-            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-3">
+        <aside className={`${sidebarCollapsed ? 'w-16' : 'w-56'} bg-white border-r border-border transition-all duration-200 flex flex-col`}>
+          <div className="p-3 border-b border-border">
+            <Link href="/" className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-2">
               <LayoutDashboard className="w-4 h-4" />
-              {!sidebarCollapsed && <span className="text-sm font-medium">Dashboard</span>}
+              {!sidebarCollapsed && <span className="text-xs font-medium">Dashboard</span>}
             </Link>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center">
-                <Target className="w-5 h-5 text-white" />
+              <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+                <Target className="w-4 h-4 text-primary-foreground" />
               </div>
               {!sidebarCollapsed && (
                 <div>
-                  <h1 className="font-semibold text-lg">Oak Sales</h1>
+                  <h1 className="font-semibold text-sm">Oak Sales</h1>
                   <p className="text-xs text-muted-foreground">CRM</p>
                 </div>
               )}
@@ -251,26 +251,26 @@ export default function OakSales() {
           </div>
           
           <ScrollArea className="flex-1">
-            <nav className="p-2 space-y-1">
+            <nav className="p-2 space-y-0.5">
               {sidebarItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id as Section)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm transition-colors ${
                     activeSection === item.id
-                      ? 'bg-amber-500/10 text-amber-600 font-medium'
+                      ? 'bg-primary/10 text-primary font-medium'
                       : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                   data-testid={`nav-${item.id}`}
                 >
-                  <item.icon className="w-5 h-5 shrink-0" />
+                  <item.icon className={`w-4 h-4 shrink-0 ${activeSection === item.id ? 'text-primary' : ''}`} />
                   {!sidebarCollapsed && <span>{item.label}</span>}
                 </button>
               ))}
             </nav>
           </ScrollArea>
 
-          <div className="p-4 border-t">
+          <div className="p-2 border-t border-border">
             <Button
               variant="ghost"
               size="sm"
@@ -278,7 +278,7 @@ export default function OakSales() {
                 setSidebarManuallyToggled(true);
                 setSidebarCollapsed(!sidebarCollapsed);
               }}
-              className="w-full justify-center"
+              className="w-full justify-center h-8"
             >
               <ChevronRight className={`w-4 h-4 transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
             </Button>
@@ -1024,24 +1024,25 @@ function PipelineSection({
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage.id)}
               >
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-3">
+                {/* Zoho Bigin-style stage column */}
+                <div className="bg-muted/30 rounded-md">
+                  <div className="flex items-center justify-between p-3 border-b border-border/50">
                     <div className="flex items-center gap-2">
                       <div 
-                        className="w-3 h-3 rounded-full" 
+                        className="w-2 h-2 rounded-full" 
                         style={{ backgroundColor: stage.color || '#6B7280' }}
                       />
-                      <h3 className="font-medium text-sm">{stage.name}</h3>
+                      <h3 className="font-medium text-sm text-foreground">{stage.name}</h3>
+                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {stageDeals.length}
+                      </span>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {stageDeals.length}
-                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-3">
+                  <div className="p-2 text-xs text-muted-foreground border-b border-border/30">
                     {formatCurrency(stageValue)}
-                  </p>
+                  </div>
                   
-                  <div className="space-y-2 min-h-[200px]">
+                  <div className="p-2 space-y-2 min-h-[200px]">
                     {stageDeals.map(deal => {
                       const contact = contacts.find(c => c.id === deal.contactId);
                       return (
@@ -1050,21 +1051,21 @@ function PipelineSection({
                           draggable
                           onDragStart={(e) => handleDragStart(e, deal.id)}
                           onClick={() => setSelectedDeal(deal)}
-                          className="bg-card p-3 rounded-lg border cursor-move hover:shadow-md transition-shadow"
+                          className="bg-white p-3 rounded border border-border cursor-move hover:shadow-sm transition-shadow"
                           data-testid={`deal-card-${deal.id}`}
                         >
-                          <div className="flex items-start justify-between mb-2">
-                            <GripVertical className="w-4 h-4 text-muted-foreground" />
-                            <Badge variant="outline" className="text-xs">
+                          <div className="flex items-start justify-between mb-1.5">
+                            <GripVertical className="w-3 h-3 text-muted-foreground/50" />
+                            <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
                               {deal.eventType || 'Event'}
-                            </Badge>
+                            </span>
                           </div>
-                          <h4 className="font-medium text-sm mb-1">{deal.title}</h4>
-                          <p className="text-amber-600 font-semibold text-sm">
+                          <h4 className="font-medium text-sm mb-1 text-foreground">{deal.title}</h4>
+                          <p className="text-primary font-semibold text-sm">
                             {formatCurrency(deal.value)}
                           </p>
                           {contact && (
-                            <div className="mt-2 space-y-0.5">
+                            <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5">
                               <p className="text-xs text-muted-foreground">
                                 {contact.firstName} {contact.lastName}
                               </p>
@@ -1080,8 +1081,8 @@ function PipelineSection({
                       );
                     })}
                     {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        This stage is empty
+                      <div className="text-center py-8 text-muted-foreground text-xs">
+                        No deals in this stage
                       </div>
                     )}
                   </div>

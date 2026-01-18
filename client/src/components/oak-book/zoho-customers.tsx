@@ -169,7 +169,7 @@ export function ZohoCustomers() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -191,7 +191,7 @@ export function ZohoCustomers() {
                 setEditingCustomer(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -224,10 +224,10 @@ export function ZohoCustomers() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                          <User className="h-5 w-5 text-blue-600" />
+                          <User className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-blue-600 truncate">{customer.name}</p>
+                          <p className="text-sm font-medium text-primary truncate">{customer.name}</p>
                           {customer.email && <p className="text-xs text-gray-500 truncate">{customer.email}</p>}
                           {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
                         </div>
@@ -283,10 +283,10 @@ export function ZohoCustomers() {
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
-                            <User className="h-4 w-4 text-blue-600" />
+                            <User className="h-4 w-4 text-primary" />
                           </div>
                           <div>
-                            <span className="text-blue-600 hover:underline font-medium">{customer.name}</span>
+                            <span className="text-primary hover:underline font-medium">{customer.name}</span>
                             {customer.gstNumber && (
                               <p className="text-xs text-gray-500">GST: {customer.gstNumber}</p>
                             )}
@@ -383,7 +383,7 @@ function CustomerDetailPanel({
           </Button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <User className="h-5 w-5 text-blue-600" />
+              <User className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{customer.name}</h3>
@@ -495,7 +495,7 @@ function CustomerDetailPanel({
                 <div className="grid grid-cols-2 gap-3">
                   <div className="p-3 border rounded-lg">
                     <div className="flex items-center gap-2 mb-1">
-                      <FileText className="h-4 w-4 text-blue-500" />
+                      <FileText className="h-4 w-4 text-primary/80" />
                       <span className="text-sm font-medium">Quotes</span>
                     </div>
                     <p className="text-2xl font-bold">{estimates.length}</p>
@@ -545,7 +545,7 @@ function CustomerDetailPanel({
                         <Badge variant="outline" className={cn(
                           "text-xs",
                           invoice.status === "paid" && "bg-green-50 text-green-700",
-                          invoice.status === "sent" && "bg-blue-50 text-blue-700",
+                          invoice.status === "sent" && "bg-blue-50 text-primary",
                           invoice.status === "draft" && "bg-gray-100 text-gray-700"
                         )}>
                           {invoice.status}
@@ -557,7 +557,7 @@ function CustomerDetailPanel({
                     <div key={estimate.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <FileText className="h-4 w-4 text-blue-600" />
+                          <FileText className="h-4 w-4 text-primary" />
                         </div>
                         <div>
                           <p className="text-sm font-medium">{estimate.number}</p>
@@ -686,7 +686,7 @@ function CustomerFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.name}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {editingCustomer ? "Update" : "Save"}
           </Button>

@@ -99,7 +99,7 @@ export function ZohoBanks() {
             <Button 
               onClick={() => setIsCreateModalOpen(true)} 
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -115,7 +115,7 @@ export function ZohoBanks() {
                 className="pl-9 w-full sm:w-48 lg:w-64 h-9"
               />
             </div>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700 hidden sm:flex">
+            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-primary hover:bg-primary/90 hidden sm:flex">
               <Plus className="h-4 w-4 mr-1" />
               New
             </Button>
@@ -137,10 +137,10 @@ export function ZohoBanks() {
           </div>
           <div className="bg-white p-3 sm:p-4 rounded-lg border hidden sm:block">
             <div className="flex items-center gap-2 mb-1">
-              <Building2 className="h-4 w-4 text-blue-500" />
+              <Building2 className="h-4 w-4 text-primary/80" />
               <span className="text-sm text-gray-600">Bank Accounts</span>
             </div>
-            <p className="text-2xl font-bold text-blue-600">{banks.length}</p>
+            <p className="text-2xl font-bold text-primary">{banks.length}</p>
           </div>
           <div className="bg-white p-3 sm:p-4 rounded-lg border hidden sm:block">
             <div className="flex items-center gap-2 mb-1">
@@ -180,10 +180,10 @@ export function ZohoBanks() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                          <Landmark className="h-5 w-5 text-blue-600" />
+                          <Landmark className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-blue-600 truncate">{bank.name}</p>
+                          <p className="text-sm font-medium text-primary truncate">{bank.name}</p>
                           <p className="text-xs text-gray-500">
                             {bank.createdAt ? format(new Date(bank.createdAt), "dd MMM yyyy") : "—"}
                           </p>
@@ -246,9 +246,9 @@ export function ZohoBanks() {
                       <td className="p-3">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Landmark className="h-5 w-5 text-blue-600" />
+                            <Landmark className="h-5 w-5 text-primary" />
                           </div>
-                          <span className="text-blue-600 hover:underline font-medium">{bank.name}</span>
+                          <span className="text-primary hover:underline font-medium">{bank.name}</span>
                         </div>
                       </td>
                       <td className="p-3 text-sm text-right text-gray-600">
@@ -353,7 +353,7 @@ function BankDetailPanel({
           </Button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <Landmark className="h-5 w-5 text-blue-600" />
+              <Landmark className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{bank.name}</h3>
@@ -395,8 +395,8 @@ function BankDetailPanel({
       <div className="p-4 bg-blue-50 border-b border-blue-100">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-blue-600 uppercase font-medium">Current Balance</p>
-            <p className="text-2xl font-bold text-blue-700">
+            <p className="text-xs text-primary uppercase font-medium">Current Balance</p>
+            <p className="text-2xl font-bold text-primary">
               ₹{currentBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </p>
           </div>
@@ -548,7 +548,7 @@ function BankFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.name}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {editingBank ? "Update" : "Add Account"}
           </Button>

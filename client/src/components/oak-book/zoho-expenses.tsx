@@ -161,7 +161,7 @@ export function ZohoExpenses() {
 
   const getCategoryBadge = (category: string | null) => {
     const colors: Record<string, string> = {
-      travel: "bg-blue-50 text-blue-700 border-blue-200",
+      travel: "bg-blue-50 text-primary border-blue-200",
       food: "bg-orange-50 text-orange-700 border-orange-200",
       materials: "bg-purple-50 text-purple-700 border-purple-200",
       equipment: "bg-green-50 text-green-700 border-green-200",
@@ -208,7 +208,7 @@ export function ZohoExpenses() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -230,7 +230,7 @@ export function ZohoExpenses() {
                 setEditingExpense(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -262,7 +262,7 @@ export function ZohoExpenses() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-blue-600 font-semibold text-sm">{expense.number}</span>
+                        <span className="text-primary font-semibold text-sm">{expense.number}</span>
                         {getCategoryBadge(expense.category)}
                       </div>
                       <p className="text-sm font-medium text-gray-900 truncate">{getVendorName(expense.vendorId)}</p>
@@ -316,7 +316,7 @@ export function ZohoExpenses() {
                       {format(new Date(expense.date), "dd MMM yyyy")}
                     </td>
                     <td className="p-3">
-                      <span className="text-blue-600 hover:underline font-medium">{expense.number}</span>
+                      <span className="text-primary hover:underline font-medium">{expense.number}</span>
                     </td>
                     <td className="p-3 text-sm text-gray-600 hidden lg:table-cell">
                       {getVendorName(expense.vendorId)}
@@ -664,7 +664,7 @@ function ExpenseFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.category || !formData.amount}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {editingExpense ? "Update" : "Save"}
           </Button>

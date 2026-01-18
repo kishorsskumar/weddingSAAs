@@ -195,7 +195,7 @@ export function ZohoPayments() {
   const getPaymentModeBadge = (mode: string) => {
     const colors: Record<string, string> = {
       cash: "bg-green-50 text-green-700 border-green-200",
-      bank_transfer: "bg-blue-50 text-blue-700 border-blue-200",
+      bank_transfer: "bg-blue-50 text-primary border-blue-200",
       cheque: "bg-purple-50 text-purple-700 border-purple-200",
       upi: "bg-orange-50 text-orange-700 border-orange-200",
       card: "bg-pink-50 text-pink-700 border-pink-200",
@@ -239,7 +239,7 @@ export function ZohoPayments() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -261,7 +261,7 @@ export function ZohoPayments() {
                 setEditingPayment(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -293,7 +293,7 @@ export function ZohoPayments() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-blue-600 font-semibold text-sm">{payment.number}</span>
+                        <span className="text-primary font-semibold text-sm">{payment.number}</span>
                         {getPaymentModeBadge(payment.paymentMode)}
                       </div>
                       <p className="text-sm font-medium text-gray-900 truncate">{getCustomerName(payment.customerId)}</p>
@@ -347,7 +347,7 @@ export function ZohoPayments() {
                       {format(new Date(payment.date), "dd MMM yyyy")}
                     </td>
                     <td className="p-3">
-                      <span className="text-blue-600 hover:underline font-medium">{payment.number}</span>
+                      <span className="text-primary hover:underline font-medium">{payment.number}</span>
                     </td>
                     <td className="p-3 text-sm text-gray-700 hidden lg:table-cell">{getCustomerName(payment.customerId)}</td>
                     <td className="p-3">{getPaymentModeBadge(payment.paymentMode)}</td>
@@ -628,7 +628,7 @@ function PaymentFormModal({
                             <span className="text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded">Event</span>
                           )}
                           {customer.source === 'oakbook' && (
-                            <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Oak Book</span>
+                            <span className="text-xs text-primary bg-blue-50 px-1.5 py-0.5 rounded">Oak Book</span>
                           )}
                         </CommandItem>
                       ))}
@@ -748,7 +748,7 @@ function PaymentFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.customerId || !formData.amount}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             Save
           </Button>

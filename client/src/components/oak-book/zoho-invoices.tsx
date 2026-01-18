@@ -214,7 +214,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   const getStatusBadge = (status: string) => {
     const statusStyles: Record<string, string> = {
       draft: "bg-gray-100 text-gray-700 border-gray-200",
-      sent: "bg-blue-50 text-blue-700 border-blue-200",
+      sent: "bg-blue-50 text-primary border-blue-200",
       partial: "bg-yellow-50 text-yellow-700 border-yellow-200",
       paid: "bg-green-50 text-green-700 border-green-200",
       overdue: "bg-red-50 text-red-700 border-red-200",
@@ -271,7 +271,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -294,7 +294,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
                 setEditingInvoice(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -326,7 +326,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-blue-600 font-semibold text-sm">{invoice.number}</span>
+                        <span className="text-primary font-semibold text-sm">{invoice.number}</span>
                         {getStatusBadge(invoice.status)}
                       </div>
                       <p className="text-sm font-medium text-gray-900 truncate">{getCustomerName(invoice.customerId)}</p>
@@ -386,7 +386,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
                       {format(new Date(invoice.date), "dd MMM yyyy")}
                     </td>
                     <td className="p-3">
-                      <span className="text-blue-600 hover:underline font-medium">{invoice.number}</span>
+                      <span className="text-primary hover:underline font-medium">{invoice.number}</span>
                     </td>
                     <td className="p-3 text-sm text-gray-600 hidden lg:table-cell">
                       {getEventName(invoice.eventId)}
@@ -618,7 +618,7 @@ function InvoiceDetailPanel({
                   <p className="text-xs text-gray-500 uppercase mb-1">Status</p>
                   <div className="mt-1">
                     {invoice.status === "draft" && <Badge variant="outline" className="bg-gray-100">Draft</Badge>}
-                    {invoice.status === "sent" && <Badge variant="outline" className="bg-blue-50 text-blue-700">Sent</Badge>}
+                    {invoice.status === "sent" && <Badge variant="outline" className="bg-blue-50 text-primary">Sent</Badge>}
                     {invoice.status === "partial" && <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Partial</Badge>}
                     {invoice.status === "paid" && <Badge variant="outline" className="bg-green-50 text-green-700">Paid</Badge>}
                     {invoice.status === "overdue" && <Badge variant="outline" className="bg-red-50 text-red-700">Overdue</Badge>}
@@ -733,7 +733,7 @@ function InvoiceDetailPanel({
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-blue-600" />
+                  <FileText className="h-4 w-4 text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">Invoice Created</p>
@@ -1409,7 +1409,7 @@ function InvoiceFormModal({
           <Button
             onClick={() => handleSubmit(false)}
             disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             Save and Send
           </Button>
@@ -1478,7 +1478,7 @@ function NewCustomerForm({
         <Button
           onClick={() => onSubmit(formData)}
           disabled={isSubmitting || !formData.name}
-          className="bg-blue-600 hover:bg-blue-700"
+          className="bg-primary hover:bg-primary/90"
         >
           Save
         </Button>

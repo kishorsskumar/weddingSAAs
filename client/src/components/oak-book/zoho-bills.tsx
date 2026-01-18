@@ -56,7 +56,7 @@ const BILL_STATUSES = [
   { value: "pending", label: "Pending", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
   { value: "paid", label: "Paid", color: "bg-green-50 text-green-700 border-green-200" },
   { value: "overdue", label: "Overdue", color: "bg-red-50 text-red-700 border-red-200" },
-  { value: "partially_paid", label: "Partially Paid", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "partially_paid", label: "Partially Paid", color: "bg-blue-50 text-primary border-blue-200" },
 ];
 
 export function ZohoBills() {
@@ -199,7 +199,7 @@ export function ZohoBills() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -221,7 +221,7 @@ export function ZohoBills() {
                 setEditingBill(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -277,7 +277,7 @@ export function ZohoBills() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-blue-600 font-semibold text-sm">{bill.number}</span>
+                        <span className="text-primary font-semibold text-sm">{bill.number}</span>
                         {getStatusBadge(bill.status || "draft")}
                       </div>
                       <p className="text-sm font-medium text-gray-900 truncate">{getVendorName(bill.vendorId)}</p>
@@ -335,7 +335,7 @@ export function ZohoBills() {
                       {format(new Date(bill.date), "dd MMM yyyy")}
                     </td>
                     <td className="p-3">
-                      <span className="text-blue-600 hover:underline font-medium">{bill.number}</span>
+                      <span className="text-primary hover:underline font-medium">{bill.number}</span>
                     </td>
                     <td className="p-3 text-sm text-gray-700 hidden lg:table-cell">{getVendorName(bill.vendorId)}</td>
                     <td className="p-3">{getStatusBadge(bill.status || "draft")}</td>
@@ -614,7 +614,7 @@ function BillFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.vendorId || !formData.total}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {editingBill ? "Update" : "Save"}
           </Button>

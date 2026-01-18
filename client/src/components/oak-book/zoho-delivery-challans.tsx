@@ -67,7 +67,7 @@ const CHALLAN_TYPES = [
 
 const CHALLAN_STATUSES = [
   { value: "draft", label: "Draft", color: "bg-gray-50 text-gray-700 border-gray-200" },
-  { value: "sent", label: "Sent", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "sent", label: "Sent", color: "bg-blue-50 text-primary border-blue-200" },
   { value: "delivered", label: "Delivered", color: "bg-green-50 text-green-700 border-green-200" },
 ];
 
@@ -174,7 +174,7 @@ export function ZohoDeliveryChallans() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -196,7 +196,7 @@ export function ZohoDeliveryChallans() {
                 setEditingChallan(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -228,7 +228,7 @@ export function ZohoDeliveryChallans() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-blue-600 font-semibold text-sm">{challan.challanNumber}</span>
+                        <span className="text-primary font-semibold text-sm">{challan.challanNumber}</span>
                         {getStatusBadge(challan.status)}
                       </div>
                       <p className="text-sm font-medium text-gray-900 truncate">{challan.deliverTo || "—"}</p>
@@ -286,7 +286,7 @@ export function ZohoDeliveryChallans() {
                       {format(new Date(challan.challanDate), "dd MMM yyyy")}
                     </td>
                     <td className="p-3">
-                      <span className="text-blue-600 hover:underline font-medium">{challan.challanNumber}</span>
+                      <span className="text-primary hover:underline font-medium">{challan.challanNumber}</span>
                     </td>
                     <td className="p-3 text-sm text-gray-700 max-w-[200px] truncate hidden lg:table-cell">
                       {challan.deliverTo || "—"}

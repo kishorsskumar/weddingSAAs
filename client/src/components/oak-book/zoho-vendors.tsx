@@ -140,7 +140,7 @@ export function ZohoVendors() {
       catering: "bg-orange-50 text-orange-700 border-orange-200",
       decoration: "bg-pink-50 text-pink-700 border-pink-200",
       photography: "bg-purple-50 text-purple-700 border-purple-200",
-      venue: "bg-blue-50 text-blue-700 border-blue-200",
+      venue: "bg-blue-50 text-primary border-blue-200",
       sound: "bg-yellow-50 text-yellow-700 border-yellow-200",
       transport: "bg-green-50 text-green-700 border-green-200",
       other: "bg-gray-50 text-gray-700 border-gray-200",
@@ -181,7 +181,7 @@ export function ZohoVendors() {
                 setIsCreateModalOpen(true);
               }}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:hidden ml-auto"
+              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
             >
               <Plus className="h-4 w-4 mr-1" />
               New
@@ -203,7 +203,7 @@ export function ZohoVendors() {
                 setEditingVendor(null);
                 setIsCreateModalOpen(true);
               }}
-              className="bg-blue-600 hover:bg-blue-700 hidden sm:flex"
+              className="bg-primary hover:bg-primary/90 hidden sm:flex"
             >
               <Plus className="h-4 w-4 mr-2" />
               New
@@ -237,7 +237,7 @@ export function ZohoVendors() {
                         <Building2 className="h-5 w-5 text-purple-600" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-blue-600 truncate">{vendor.name}</p>
+                        <p className="text-sm font-medium text-primary truncate">{vendor.name}</p>
                         {vendor.email && <p className="text-xs text-gray-500 truncate">{vendor.email}</p>}
                         {vendor.phone && <p className="text-xs text-gray-500">{vendor.phone}</p>}
                       </div>
@@ -290,7 +290,7 @@ export function ZohoVendors() {
                           <Building2 className="h-4 w-4 text-purple-600" />
                         </div>
                         <div>
-                          <span className="text-blue-600 hover:underline font-medium">{vendor.name}</span>
+                          <span className="text-primary hover:underline font-medium">{vendor.name}</span>
                           {vendor.gstNumber && (
                             <p className="text-xs text-gray-500">GST: {vendor.gstNumber}</p>
                           )}
@@ -613,7 +613,7 @@ function VendorFormModal({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.name}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-primary hover:bg-primary/90"
           >
             {editingVendor ? "Update" : "Save"}
           </Button>

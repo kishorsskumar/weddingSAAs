@@ -42,106 +42,107 @@
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 }
 
-/* LIGHT MODE - Oak Event Theme */
+/* LIGHT MODE - Zoho-inspired Clean Professional Theme */
 :root {
-  /* Natural, earthy, professional base */
-  --background: 40 20% 98%; /* Soft warm white */
-  --foreground: 140 20% 15%; /* Dark forest green almost black */
+  /* Pure white background like Zoho Books */
+  --background: 0 0% 100%; /* Pure white */
+  --foreground: 220 14% 20%; /* Dark gray-blue text */
 
-  /* Cards: Clean white with subtle warmth */
+  /* Cards: Clean white */
   --card: 0 0% 100%;
-  --card-foreground: 140 20% 15%;
+  --card-foreground: 220 14% 20%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 140 20% 15%;
+  --popover-foreground: 220 14% 20%;
 
-  /* Primary: Oak Green */
-  --primary: 135 35% 30%; 
-  --primary-foreground: 40 20% 98%;
+  /* Primary: Amber/Oak brand color */
+  --primary: 38 92% 50%; /* Amber - brand color */
+  --primary-foreground: 0 0% 100%;
 
-  /* Secondary: Muted Earth/Beige */
-  --secondary: 40 20% 92%;
-  --secondary-foreground: 135 35% 20%;
+  /* Secondary: Light gray like Zoho */
+  --secondary: 220 14% 96%;
+  --secondary-foreground: 220 14% 35%;
 
-  /* Muted: Soft Gray-Green */
-  --muted: 140 10% 94%;
-  --muted-foreground: 140 10% 40%;
+  /* Muted: Very light gray */
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 46%;
 
-  /* Accent: Gold/Brass for elegance */
-  --accent: 40 40% 94%;
-  --accent-foreground: 135 35% 30%;
+  /* Accent: Light amber tint */
+  --accent: 38 100% 97%;
+  --accent-foreground: 38 92% 40%;
 
   --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 140 10% 88%;
-  --input: 140 10% 88%;
-  --ring: 135 35% 30%;
+  /* Borders: Light gray like Zoho */
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 38 92% 50%;
 
-  --radius: 0.5rem;
+  --radius: 0.375rem; /* Slightly smaller radius like Zoho */
 
-  /* Charts */
-  --chart-1: 135 35% 30%; /* Oak */
-  --chart-2: 40 50% 55%; /* Gold */
-  --chart-3: 170 40% 40%; /* Sage */
-  --chart-4: 25 60% 50%; /* Terracotta */
-  --chart-5: 200 40% 40%; /* Slate Blue */
+  /* Charts - keeping brand colors */
+  --chart-1: 38 92% 50%; /* Amber */
+  --chart-2: 142 71% 45%; /* Green */
+  --chart-3: 199 89% 48%; /* Blue */
+  --chart-4: 280 68% 60%; /* Purple */
+  --chart-5: 12 76% 61%; /* Orange */
 
-  /* Sidebar */
-  --sidebar: 135 30% 15%; /* Dark Green Oak */
-  --sidebar-foreground: 40 20% 90%;
-  --sidebar-primary: 40 50% 55%; /* Gold */
-  --sidebar-primary-foreground: 135 30% 15%;
-  --sidebar-accent: 135 25% 20%;
-  --sidebar-accent-foreground: 40 20% 95%;
-  --sidebar-border: 135 25% 20%;
-  --sidebar-ring: 40 50% 55%;
+  /* Sidebar: Clean white with border */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 220 14% 35%;
+  --sidebar-primary: 38 92% 50%; /* Amber */
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 38 100% 97%;
+  --sidebar-accent-foreground: 38 92% 40%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 38 92% 50%;
 }
 
 .dark {
-  /* Dark Mode - Deep Forest */
-  --background: 140 30% 5%;
-  --foreground: 40 20% 90%;
+  /* Dark Mode - Clean dark like Zoho dark mode */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
 
-  --card: 140 30% 7%;
-  --card-foreground: 40 20% 90%;
+  --card: 222 47% 13%;
+  --card-foreground: 210 40% 98%;
 
-  --popover: 140 30% 7%;
-  --popover-foreground: 40 20% 90%;
+  --popover: 222 47% 13%;
+  --popover-foreground: 210 40% 98%;
 
-  --primary: 135 35% 40%; /* Lighter Oak */
-  --primary-foreground: 40 20% 95%;
+  --primary: 38 92% 50%; /* Amber stays consistent */
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 140 20% 15%;
-  --secondary-foreground: 40 20% 90%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
 
-  --muted: 140 20% 15%;
-  --muted-foreground: 140 10% 60%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
 
-  --accent: 140 20% 15%;
-  --accent-foreground: 40 20% 90%;
+  --accent: 38 100% 15%;
+  --accent-foreground: 38 92% 70%;
 
-  --destructive: 0 62% 30%;
+  --destructive: 0 62% 50%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 140 20% 18%;
-  --input: 140 20% 18%;
-  --ring: 135 35% 40%;
+  --border: 217 33% 20%;
+  --input: 217 33% 20%;
+  --ring: 38 92% 50%;
 
-  --chart-1: 135 35% 50%;
-  --chart-2: 40 50% 65%;
-  --chart-3: 170 40% 50%;
-  --chart-4: 25 60% 60%;
-  --chart-5: 200 40% 50%;
+  --chart-1: 38 92% 60%;
+  --chart-2: 142 71% 55%;
+  --chart-3: 199 89% 58%;
+  --chart-4: 280 68% 70%;
+  --chart-5: 12 76% 71%;
 
-  --sidebar: 140 30% 4%;
-  --sidebar-foreground: 40 20% 90%;
-  --sidebar-primary: 135 35% 40%;
-  --sidebar-primary-foreground: 40 20% 98%;
-  --sidebar-accent: 140 20% 12%;
-  --sidebar-accent-foreground: 40 20% 90%;
-  --sidebar-border: 140 20% 12%;
-  --sidebar-ring: 135 35% 40%;
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 38 92% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 217 33% 17%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 217 33% 20%;
+  --sidebar-ring: 38 92% 50%;
 }
 
 @layer base {
@@ -150,70 +151,78 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
+  /* Zoho uses sans-serif for all text including headings */
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-weight: 600;
   }
 }
 
-/* Modern UI Enhancements */
+/* Zoho-inspired Clean UI */
 @layer utilities {
   /* Smooth scrolling */
   .smooth-scroll {
     scroll-behavior: smooth;
   }
   
-  /* Glass morphism effect */
-  .glass {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+  /* Zoho-style card - clean with subtle border */
+  .zoho-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    transition: box-shadow 0.15s ease;
   }
   
-  .dark .glass {
-    background: rgba(20, 30, 20, 0.7);
+  .zoho-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
   
-  /* Modern card hover effect */
+  /* Zoho-style subtle card hover */
   .card-hover {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.15s ease;
   }
   
   .card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
   
   .dark .card-hover:hover {
-    box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   }
   
-  /* Modern button glow effect */
-  .btn-glow {
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
+  /* Zoho-style section header */
+  .zoho-header {
+    @apply flex items-center justify-between py-4 border-b border-border;
   }
   
-  .btn-glow::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s ease, height 0.6s ease;
-    border-radius: 50%;
+  /* Zoho-style action bar */
+  .zoho-action-bar {
+    @apply flex items-center gap-3 py-3 px-4 bg-muted/30 border-b border-border;
   }
   
-  .btn-glow:hover::before {
-    width: 300px;
-    height: 300px;
+  /* Zoho-style table header */
+  .zoho-table-header {
+    @apply bg-muted/50 text-muted-foreground text-xs font-medium uppercase tracking-wider;
   }
   
-  /* Gradient text */
+  /* Zoho-style sidebar item */
+  .zoho-sidebar-item {
+    @apply flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors;
+    @apply text-muted-foreground hover:bg-muted hover:text-foreground;
+  }
+  
+  .zoho-sidebar-item.active {
+    @apply bg-primary/10 text-primary font-medium;
+  }
+  
+  /* Zoho-style badge */
+  .zoho-badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+  
+  /* Gradient text - simplified */
   .gradient-text {
     background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--chart-2)) 100%);
     -webkit-background-clip: text;

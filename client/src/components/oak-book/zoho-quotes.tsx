@@ -215,7 +215,7 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
       case "draft":
         return "bg-gray-100 text-gray-700";
       case "sent":
-        return "bg-blue-100 text-blue-700";
+        return "bg-blue-100 text-primary";
       case "accepted":
         return "bg-green-100 text-green-700";
       case "declined":
@@ -575,13 +575,13 @@ function QuoteDetailPanel({
 
       {quote.status === "sent" && (
         <div className="p-4 border-b bg-blue-50">
-          <div className="flex items-center gap-2 text-blue-700">
+          <div className="flex items-center gap-2 text-primary">
             <RefreshCw className="h-4 w-4" />
             <span className="text-sm font-medium">WHAT'S NEXT?</span>
           </div>
-          <p className="text-sm text-blue-600 mt-1">Convert this quote to an invoice or a sales order.</p>
+          <p className="text-sm text-primary mt-1">Convert this quote to an invoice or a sales order.</p>
           <div className="flex gap-2 mt-2">
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => onConvert?.()}>
+            <Button size="sm" className="bg-primary hover:bg-primary/90" onClick={() => onConvert?.()}>
               Convert
               <ChevronDown className="h-3 w-3 ml-1" />
             </Button>
@@ -758,7 +758,7 @@ function QuoteDetailPanel({
               {quote.status === "sent" && (
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                    <Send className="h-4 w-4 text-blue-600" />
+                    <Send className="h-4 w-4 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-medium">Quote Sent</p>
@@ -778,7 +778,7 @@ function QuoteDetailPanel({
       case "draft":
         return "bg-gray-100 text-gray-700";
       case "sent":
-        return "bg-blue-100 text-blue-700";
+        return "bg-blue-100 text-primary";
       case "accepted":
         return "bg-green-100 text-green-700";
       case "declined":
