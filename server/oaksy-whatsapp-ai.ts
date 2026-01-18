@@ -5985,13 +5985,13 @@ Return "INVALID" if you cannot parse the input.`;
 
   // FORCE REMINDER INTENT: If AI returned "general" but message clearly contains reminder keywords
   // This is a safety net because the AI sometimes fails to detect reminder intent
-  const lowerMessage = messageText.toLowerCase();
+  const lowerMsgForReminder = messageText.toLowerCase();
   const hasReminderKeywords = 
-    lowerMessage.includes('remind me') || 
-    lowerMessage.includes('reminder') || 
-    lowerMessage.includes('set a reminder') ||
-    lowerMessage.includes('create a reminder') ||
-    lowerMessage.includes('set reminder');
+    lowerMsgForReminder.includes('remind me') || 
+    lowerMsgForReminder.includes('reminder') || 
+    lowerMsgForReminder.includes('set a reminder') ||
+    lowerMsgForReminder.includes('create a reminder') ||
+    lowerMsgForReminder.includes('set reminder');
   
   if (hasReminderKeywords && aiAnalysis.intent !== 'reminder') {
     console.log('[Oaksy] Forcing reminder intent - AI returned:', aiAnalysis.intent, 'but message contains reminder keywords');
