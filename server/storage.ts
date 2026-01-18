@@ -304,7 +304,7 @@ import {
   type InsertNotificationLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, gte, lte, desc, sql, or } from "drizzle-orm";
+import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -4913,7 +4913,10 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(events.date, targetDateStr),
         eq(events.status, 'confirmed'),
-        eq(events.payment60DayReminderSent, false)
+        or(
+          eq(events.payment60DayReminderSent, false),
+          isNull(events.payment60DayReminderSent)
+        )
       ));
   }
 
