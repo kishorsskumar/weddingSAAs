@@ -1,0 +1,102 @@
+We need to implement Estimate-to-Production automation with dual-channel notifications (WhatsApp + Dashboard).
+
+--------------------------------
+TRIGGER 1 — ON ADVANCE PAYMENT CONFIRMATION
+--------------------------------
+
+When Event is created after customer creation:
+
+1. Auto-generate Event Timeline using default template milestones.
+2. Create empty Production Container linked to event_id.
+3. Set flags:
+   timeline_created = true
+   production_container_created = true
+
+--------------------------------
+TRIGGER 2 — PUSH ESTIMATE TO PRODUCTION (Planner Action)
+--------------------------------
+
+Add button in Sales → Quotation page:
+
+"Push To Production"
+
+When clicked:
+
+1. Extract only item list from estimate:
+   - Item Name
+   - Quantity
+   - Category
+   - Specification
+
+2. Do NOT copy pricing or rates.
+
+3. Insert items into:
+   event_production_items table
+   with status = "draft"
+
+4. Send notifications:
+
+WhatsApp to Warehouse Manager:
+"Production Items Ready:
+{{event_name}}
+Estimate pushed to production. Please review and finalize sourcing."
+
+Dashboard Notification:
+Title: Production Items Generated
+Message: Estimate pushed to production for {{event_name}}
+Redirect: Event Hub → Production
+
+--------------------------------
+TRIGGER 3 — WAREHOUSE FINALIZATION
+--------------------------------
+
+Warehouse Manager selects fulfillment type per item:
+
+Options:
+- Warehouse
+- Purchase
+- Rent
+
+When Warehouse clicks:
+
+"Finalize Event Inventory"
+
+Actions:
+
+1. Lock production item list.
+2. Mark:
+   event.inventory_finalized = true
+3. Move items to Event Inventory execution list.
+
+4. Send notifications:
+
+WhatsApp to Planner:
+"Event Inventory Finalized:
+{{event_name}}
+Warehouse sourcing completed."
+
+Dashboard Notification:
+Title: Inventory Finalized
+Message: Inventory finalized for {{event_name}}
+
+--------------------------------
+NOTIFICATION RULES
+--------------------------------
+
+For every automation:
+- Send WhatsApp via Oaksy AI
+- Create Dashboard notification
+
+--------------------------------
+SYSTEM SAFETY
+--------------------------------
+
+1. Prevent duplicate triggers using flags.
+2. Log all automation activity:
+   event_id
+   action_type
+   timestamp
+   status
+
+Do NOT modify existing finance or inventory data.
+Proceed safely.

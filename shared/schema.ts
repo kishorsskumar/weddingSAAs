@@ -66,8 +66,43 @@ export const events = pgTable("events", {
   googleCalendarEventId: text("google_calendar_event_id"), // Google Calendar sync
   outlookCalendarEventId: text("outlook_calendar_event_id"), // Outlook Calendar sync
   payment60DayReminderSent: boolean("payment_60day_reminder_sent").default(false), // 60-day payment milestone reminder
+  timelineCreated: boolean("timeline_created").default(false), // Auto-created event timeline
+  productionContainerCreated: boolean("production_container_created").default(false), // Production container exists
+  inventoryFinalized: boolean("inventory_finalized").default(false), // Warehouse has finalized sourcing
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const eventProductionItems = pgTable("event_production_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  estimateId: varchar("estimate_id"), // Source estimate if pushed from quotation
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  category: text("category"), // e.g., "Decor", "Furniture", "Lighting"
+  specification: text("specification"), // Item details/notes
+  fulfillmentType: text("fulfillment_type"), // 'warehouse' | 'purchase' | 'rent'
+  status: text("status").notNull().default('draft'), // 'draft' | 'locked'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEventProductionItemSchema = createInsertSchema(eventProductionItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEventProductionItem = z.infer<typeof insertEventProductionItemSchema>;
+export type EventProductionItem = typeof eventProductionItems.$inferSelect;
+
+export const automationLogs = pgTable("automation_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id),
+  actionType: text("action_type").notNull(), // 'timeline_init' | 'push_production' | 'finalize_inventory' | 'notification_sent'
+  status: text("status").notNull().default('success'), // 'success' | 'failed'
+  metadata: jsonb("metadata").$type<Record<string, any>>(), // Flexible payload for audit details
+  userId: varchar("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAutomationLogSchema = createInsertSchema(automationLogs).omit({ id: true, createdAt: true });
+export type InsertAutomationLog = z.infer<typeof insertAutomationLogSchema>;
+export type AutomationLog = typeof automationLogs.$inferSelect;
 
 export const notificationLogs = pgTable("notification_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -495,7 +530,7 @@ export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, eventCode: true, payment60DayReminderSent: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, eventCode: true, payment60DayReminderSent: true, timelineCreated: true, productionContainerCreated: true, inventoryFinalized: true });
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
 export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit({ id: true, createdAt: true });
