@@ -1900,6 +1900,7 @@ async function handleInventoryItemCreation(
     const quantity = context.inventoryItemQuantity || 0;
     const category = context.inventoryItemCategory || 'General';
     const location = context.inventoryItemLocation || 'Warehouse';
+    const unitCost = context.inventoryItemUnitCost || 0;
     
     if (!itemName) {
       return { success: false, message: 'Missing item name' };
@@ -1913,6 +1914,9 @@ async function handleInventoryItemCreation(
       }
     }
     
+    // Generate automatic SKU
+    const sku = await storage.generateInventorySku();
+    
     const inventoryItem = await storage.createInventoryItem({
       name: itemName,
       category: category,
@@ -1920,10 +1924,11 @@ async function handleInventoryItemCreation(
       location: location,
       photos: photoUrl ? [photoUrl] : [],
       isActive: true,
-      unitCost: '0',
+      unitCost: unitCost.toString(),
+      sku: sku,
     });
     
-    console.log('[Inventory] Item created:', inventoryItem.id, itemName, quantity);
+    console.log('[Inventory] Item created:', inventoryItem.id, itemName, quantity, 'SKU:', sku, 'UnitCost:', unitCost);
     
     await storage.updateWhatsappConversation(conversation.id, {
       activeIntent: null,
@@ -1932,10 +1937,11 @@ async function handleInventoryItemCreation(
       currentState: 'idle',
     });
     
-    const photoNote = photoUrl ? ' Photo saved too!' : '';
+    const photoNote = photoUrl ? '\n📷 Photo saved' : '';
+    const unitCostNote = unitCost > 0 ? `\n💰 Unit Rate: ₹${unitCost}` : '';
     return {
       success: true,
-      message: `Done! ${itemName} (${quantity} units) has been added to the warehouse.${photoNote}\n\nCategory: ${category} | Location: ${location}`
+      message: `✅ *Added to Inventory!*\n\n📦 *${itemName}* - ${quantity} units\n🏷️ SKU: ${sku}${unitCostNote}\n📍 ${location} | ${category}${photoNote}`
     };
   } catch (error: any) {
     console.error('[Inventory] Error creating item:', error.message);
@@ -3921,19 +3927,60 @@ export async function handleOaksyWhatsAppMessage(
           if (qtyFromReply && !slots.inventoryItemQuantity) {
             slots.inventoryItemQuantity = parseInt(qtyFromReply[1]);
             console.log('[AI Inventory] Extracted quantity from follow-up:', slots.inventoryItemQuantity);
+            
+            // After getting quantity, ask for unit cost
+            if (slots.inventoryItemQuantity && !slots.inventoryItemUnitCost) {
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_inventory_item',
+                intentContext: slots,
+                currentState: 'awaiting_inventory_unit_cost',
+                conversationHistory: history,
+              });
+              return `Got it - ${slots.inventoryItemQuantity} units. What's the unit rate (price per piece)?`;
+            }
           }
-          
-          // Also check if user is providing rate/price info (ignore it for now, focus on quantity)
-          const hasRateInfo = /per\s+unit|each|rate|cost|price|rupees|rs|₹/i.test(messageText);
-          if (hasRateInfo && !slots.inventoryItemQuantity) {
-            // User is providing rate but we need quantity - prompt for quantity instead
-            await storage.updateWhatsappConversation(conversation.id, {
-              activeIntent: 'ai_inventory_item',
-              intentContext: slots,
-              currentState: 'awaiting_inventory_quantity',
-              conversationHistory: history,
-            });
-            return `Got it on the rate! But first, how many ${slots.inventoryItemName || 'of these'} do we have? Just send me the number.`;
+        }
+        
+        // HANDLE UNIT COST FOLLOW-UP: When awaiting unit cost, extract price from reply
+        if (conversation.activeIntent === 'ai_inventory_item' && 
+            conversation.currentState === 'awaiting_inventory_unit_cost') {
+          // Try to extract unit cost from follow-up (e.g., "100", "₹50", "Rs 200", "50 rupees")
+          const costFromReply = extractAmount(messageText);
+          if (costFromReply && !slots.inventoryItemUnitCost) {
+            slots.inventoryItemUnitCost = costFromReply;
+            console.log('[AI Inventory] Extracted unit cost from follow-up:', slots.inventoryItemUnitCost);
+            
+            // Now we have all required data - execute for Superadmin, or confirm for others
+            const isSuperadminPhone = normalizedPhone === '917902373354';
+            
+            if (isSuperadminPhone && slots.inventoryItemName && slots.inventoryItemQuantity) {
+              // Auto-execute for Superadmin
+              try {
+                const result = await handleInventoryItemCreation(
+                  slots as IntentContext,
+                  mediaUrl,
+                  fromNumber,
+                  conversation
+                );
+                return result.message;
+              } catch (execError: any) {
+                console.error('[AI Inventory] EXECUTION FAILED:', execError);
+                return `❌ Sorry, there was a problem adding the inventory item. Please try again.`;
+              }
+            } else {
+              // Ask for confirmation
+              await storage.updateWhatsappConversation(conversation.id, {
+                activeIntent: 'ai_inventory_item',
+                intentContext: slots,
+                currentState: 'awaiting_confirmation',
+                conversationHistory: history,
+              });
+              
+              const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
+              const hasPhoto = slots.inventoryItemPhotoUrl ? ' with photo' : '';
+              
+              return `Perfect! Here's what I'm adding to inventory${hasPhoto}:\n\n${slots.inventoryItemName}${colour} - ${slots.inventoryItemQuantity} units @ ₹${slots.inventoryItemUnitCost}/unit\n\nDoes that look right? Just say yes to confirm.`;
+            }
           }
         }
         
@@ -3942,17 +3989,17 @@ export async function handleOaksyWhatsAppMessage(
         const isInAwaitingState = conversation.activeIntent === 'ai_inventory_item' && 
                                    conversation.currentState === 'awaiting_confirmation';
         
-        // AUTO-EXECUTE for Superadmin: If we have both item name and quantity, execute immediately
-        // This provides a streamlined experience for authorized users
-        const hasAllRequiredData = slots.inventoryItemName && slots.inventoryItemQuantity && slots.inventoryItemQuantity > 0;
+        // AUTO-EXECUTE for Superadmin: If we have name, quantity, AND unit cost - execute immediately
+        const hasBasicData = slots.inventoryItemName && slots.inventoryItemQuantity && slots.inventoryItemQuantity > 0;
+        const hasAllRequiredData = hasBasicData && slots.inventoryItemUnitCost !== undefined && slots.inventoryItemUnitCost !== null;
         const isSuperadminPhone = normalizedPhone === '917902373354';
         const shouldAutoExecute = hasAllRequiredData && isSuperadminPhone;
         
         const shouldExecute = shouldAutoExecute || 
-                              (aiResult.readyToExecute && aiResult.userConfirmed) || 
-                              (isSimpleConfirm && isInAwaitingState && slots.inventoryItemName);
+                              (aiResult.readyToExecute && aiResult.userConfirmed && hasAllRequiredData) || 
+                              (isSimpleConfirm && isInAwaitingState && hasAllRequiredData);
         
-        console.log('[AI Inventory] Check:', { shouldExecute, shouldAutoExecute, hasAllRequiredData, isSimpleConfirm, isInAwaitingState, slots });
+        console.log('[AI Inventory] Check:', { shouldExecute, shouldAutoExecute, hasAllRequiredData, hasBasicData, isSimpleConfirm, isInAwaitingState, slots });
         
         if (shouldExecute && slots.inventoryItemName) {
           try {
@@ -3976,9 +4023,21 @@ export async function handleOaksyWhatsAppMessage(
           }
         }
         
-        // Not confirmed yet - save context and ask for missing info
-        if (slots.inventoryItemName && slots.inventoryItemQuantity && !aiResult.readyToExecute) {
-          // Have both name and quantity - ask for confirmation
+        // Have name and quantity but missing unit cost - ask for unit rate
+        if (hasBasicData && !slots.inventoryItemUnitCost && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_inventory_item',
+            intentContext: slots,
+            currentState: 'awaiting_inventory_unit_cost',
+            conversationHistory: history,
+          });
+          
+          const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
+          return `Got it - ${slots.inventoryItemName}${colour}, ${slots.inventoryItemQuantity} units.\n\nWhat's the unit rate (price per piece)?`;
+        }
+        
+        // Have all data but not confirmed - ask for confirmation
+        if (hasAllRequiredData && !aiResult.readyToExecute) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'ai_inventory_item',
             intentContext: slots,
@@ -3986,12 +4045,10 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: history,
           });
           
-          const quantity = slots.inventoryItemQuantity;
           const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
           const hasPhoto = slots.inventoryItemPhotoUrl ? ' with photo' : '';
           
-          // Natural, conversational response like ChatGPT
-          return `Perfect! Here's what I'm adding to inventory${hasPhoto}:\n\n${slots.inventoryItemName}${colour} - ${quantity} units\n\nDoes that look right? Just say yes to confirm, or let me know if anything needs changing.`;
+          return `Perfect! Here's what I'm adding to inventory${hasPhoto}:\n\n${slots.inventoryItemName}${colour} - ${slots.inventoryItemQuantity} units @ ₹${slots.inventoryItemUnitCost}/unit\n\nDoes that look right? Just say yes to confirm.`;
         } else if (slots.inventoryItemName && !slots.inventoryItemQuantity) {
           // Have item name but need quantity
           await storage.updateWhatsappConversation(conversation.id, {
@@ -6524,15 +6581,17 @@ Return "INVALID" if you cannot parse the input.`;
     const category = aiAnalysis.extractedData.inventoryItemCategory || 'General';
     const location = aiAnalysis.extractedData.inventoryItemLocation || 'Warehouse';
     const colour = aiAnalysis.extractedData.inventoryItemColour;
+    const unitCost = aiAnalysis.extractedData.inventoryItemUnitCost;
     
-    console.log('[Oaksy] Inventory intent handler - name:', itemName, 'qty:', quantity, 'colour:', colour);
+    console.log('[Oaksy] Inventory intent handler - name:', itemName, 'qty:', quantity, 'colour:', colour, 'unitCost:', unitCost);
     
-    // If we have both name and quantity, execute immediately for Superadmin
+    // If we have name, quantity, and unit rate - execute
     const isSuperadminPhone = normalizedPhone === '917902373354' || normalizedPhone === '+917902373354';
-    const hasAllData = itemName && quantity && quantity > 0;
+    const hasBasicData = itemName && quantity && quantity > 0;
+    const hasAllData = hasBasicData && unitCost !== undefined && unitCost !== null;
     
     if (hasAllData && isSuperadminPhone) {
-      // Auto-execute for Superadmin
+      // Auto-execute for Superadmin with full data
       try {
         const result = await handleInventoryItemCreation(
           {
@@ -6542,6 +6601,7 @@ Return "INVALID" if you cannot parse the input.`;
             inventoryItemLocation: location,
             inventoryItemColour: colour,
             inventoryItemPhotoUrl: mediaUrl,
+            inventoryItemUnitCost: unitCost,
           } as IntentContext,
           mediaUrl,
           fromNumber,
@@ -6552,6 +6612,24 @@ Return "INVALID" if you cannot parse the input.`;
         console.error('[Oaksy] Inventory creation error:', error.message);
         return `Hmm, something went wrong adding that to inventory. Can you try again?`;
       }
+    } else if (hasBasicData && (unitCost === undefined || unitCost === null)) {
+      // Have name and quantity but need unit rate
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'ai_inventory_item',
+        intentContext: {
+          inventoryItemName: itemName,
+          inventoryItemQuantity: quantity,
+          inventoryItemCategory: category,
+          inventoryItemLocation: location,
+          inventoryItemColour: colour,
+          inventoryItemPhotoUrl: mediaUrl,
+        },
+        currentState: 'awaiting_inventory_unit_cost',
+        conversationHistory: history,
+      });
+      
+      const colourNote = colour ? ` (${colour})` : '';
+      return `Got it - ${itemName}${colourNote}, ${quantity} units.\n\nWhat's the unit rate (price per piece)?`;
     } else if (hasAllData) {
       // Non-superadmin with full data - save state and ask for confirmation
       await storage.updateWhatsappConversation(conversation.id, {
@@ -6563,6 +6641,7 @@ Return "INVALID" if you cannot parse the input.`;
           inventoryItemLocation: location,
           inventoryItemColour: colour,
           inventoryItemPhotoUrl: mediaUrl,
+          inventoryItemUnitCost: unitCost,
         },
         currentState: 'awaiting_confirmation',
         conversationHistory: history,
@@ -6570,7 +6649,8 @@ Return "INVALID" if you cannot parse the input.`;
       
       const colourNote = colour ? ` (${colour})` : '';
       const photoNote = mediaUrl ? ' with photo' : '';
-      return `Perfect! Here's what I'm adding to inventory${photoNote}:\n\n${itemName}${colourNote} - ${quantity} units\n\nDoes that look right? Just say yes to confirm.`;
+      const unitCostNote = unitCost ? ` @ ₹${unitCost}/unit` : '';
+      return `Perfect! Here's what I'm adding to inventory${photoNote}:\n\n${itemName}${colourNote} - ${quantity} units${unitCostNote}\n\nDoes that look right? Just say yes to confirm.`;
     } else if (itemName && !quantity) {
       // Have item but need quantity
       await storage.updateWhatsappConversation(conversation.id, {
@@ -6603,7 +6683,7 @@ Return "INVALID" if you cannot parse the input.`;
     }
     
     // Not enough info - return AI's suggested response
-    return aiAnalysis.message || `📦 I can add items to inventory! Just tell me the item name and quantity.\n\n_Example: "Add 50 chairs" or send a photo with "Item: Lamp, Quantity: 20"_`;
+    return aiAnalysis.message || `📦 I can add items to inventory! Just tell me the item name, quantity, and unit rate.\n\n_Example: "Add 50 chairs at ₹100 each"_`;
   }
 
   // Handle AI-detected vendor payment intent
