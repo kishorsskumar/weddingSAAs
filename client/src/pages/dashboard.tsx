@@ -70,7 +70,7 @@ const ALL_PAGES = [
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
   { id: "event-database", label: "Oak Event Database", path: "/database", icon: Database, description: "Event records" },
   { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
-  { id: "daybook", label: "Oak Daybook", path: "/daybook", icon: BookOpen, description: "Daily finances" },
+  { id: "daybook", label: "Day Book", path: "/daybook", icon: BookOpen, description: "Daily finances" },
   { id: "execution-plan", label: "Execution Plan", path: "/execution-plan", icon: ClipboardList, description: "Event production planning" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];

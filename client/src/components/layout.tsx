@@ -76,6 +76,7 @@ const ALL_PAGES = [
     { id: "finance-estimates", label: "Estimates", path: "/oak-book?section=standard-estimates", group: "Sales" },
     { id: "finance-invoices", label: "Invoices", path: "/oak-book?section=standard-invoices", group: "Sales" },
     { id: "finance-payments", label: "Payments Received", path: "/oak-book?section=payments-received", group: "Sales" },
+    { id: "daybook", label: "Day Book", path: "/daybook" },
     { id: "finance-reports", label: "Reports", path: "/oak-book?section=reports" },
     { id: "finance-settings", label: "Settings", path: "/oak-book?section=settings" },
   ] },
@@ -91,7 +92,6 @@ const ALL_PAGES = [
     { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
   ] },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
-  { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
