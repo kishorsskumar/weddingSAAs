@@ -3,16 +3,17 @@ import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Download, Upload, Trash2, Loader2, Plus } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Download, Upload, Trash2, Loader2, Plus, X, Calendar, MapPin, User, DollarSign, Edit, ChevronRight } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function EventDatabase() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,13 +21,14 @@ export default function EventDatabase() {
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedQuarter, setSelectedQuarter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
+  const isSuperadmin = user?.role === 'superadmin';
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
   const { data: events = [] } = useQuery<Event[]>({
@@ -37,6 +39,10 @@ export default function EventDatabase() {
       return res.json();
     },
   });
+
+  const selectedEvent = useMemo(() => {
+    return events.find(e => e.id === selectedEventId) || null;
+  }, [events, selectedEventId]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<Event> }) => {
@@ -50,7 +56,9 @@ export default function EventDatabase() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
-      setEditingEvent(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update event", variant: "destructive" });
     },
   });
 
@@ -62,6 +70,8 @@ export default function EventDatabase() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setSelectedEventId(null);
+      toast({ title: "Success", description: "Event deleted successfully" });
     },
   });
 
@@ -148,27 +158,6 @@ export default function EventDatabase() {
       return matchesSearch && matchesPlanner && matchesYear && matchesQuarter && matchesMonth;
     });
   }, [events, searchTerm, selectedPlanner, selectedYear, selectedQuarter, selectedMonth]);
-
-  const yearFilteredEvents = useMemo(() => {
-    if (selectedYear === "all") return events;
-    return events.filter(event => {
-      const eventDate = new Date(event.date);
-      return getFinancialYear(eventDate) === selectedYear;
-    });
-  }, [events, selectedYear]);
-
-  const calculateTotals = (eventList: Event[]) => {
-    const salesValue = eventList.reduce((sum, e) => sum + Number(e.salesValue || 0), 0);
-    const paymentReceived = eventList.reduce((sum, e) => sum + Number(e.paymentReceived || 0), 0);
-    const actualCost = eventList.reduce((sum, e) => sum + Number(e.cost || 0), 0);
-    const balance = salesValue - paymentReceived;
-    const profit = salesValue - actualCost;
-    const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
-    return { salesValue, paymentReceived, balance, actualCost, profit, profitPercent };
-  };
-
-  const fyTotals = calculateTotals(yearFilteredEvents);
-  const filteredTotals = calculateTotals(filteredEvents);
 
   const formatCurrency = (value: number) => {
     return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -446,445 +435,427 @@ export default function EventDatabase() {
     );
   };
 
-  const EditEventForm = ({ event, onClose }: { event: Event; onClose: () => void }) => {
-    const { register, handleSubmit, watch } = useForm<Event>({ defaultValues: event });
+  const EventDetailPanel = ({ event }: { event: Event }) => {
+    const [panelIsEditing, setPanelIsEditing] = useState(false);
+    const { register, handleSubmit, watch, reset } = useForm<Event>({ 
+      defaultValues: event,
+      values: event 
+    });
     
     const salesValue = watch("salesValue");
     const cost = watch("cost");
     const paymentReceived = watch("paymentReceived");
     const profit = (Number(salesValue) || 0) - (Number(cost) || 0);
-    const profitPercent = salesValue ? ((profit / Number(salesValue)) * 100).toFixed(2) : "0";
+    const profitPercent = salesValue && Number(salesValue) > 0 ? ((profit / Number(salesValue)) * 100).toFixed(2) : "0";
     const balance = (Number(salesValue) || 0) - (Number(paymentReceived) || 0);
+    const isProfitable = profit >= 0;
 
     const onSubmit = (data: Event) => {
-      updateMutation.mutate({ id: event.id, data });
+      updateMutation.mutate({ 
+        id: event.id, 
+        data: {
+          ...data,
+          salesValue: data.salesValue?.toString() || '0',
+          paymentReceived: data.paymentReceived?.toString() || '0',
+          cost: data.cost?.toString() || '0',
+        }
+      }, {
+        onSuccess: () => {
+          setPanelIsEditing(false);
+        }
+      });
+    };
+
+    const handleCancel = () => {
+      reset(event);
+      setPanelIsEditing(false);
     };
 
     return (
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-           <div className="space-y-2">
-            <Label>Sales Value</Label>
-            <Input type="number" {...register("salesValue")} />
+      <div className="h-full flex flex-col bg-white">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-lg">Event Details</h2>
+            {isSuperadmin && !panelIsEditing && (
+              <Button variant="ghost" size="sm" onClick={() => setPanelIsEditing(true)} data-testid="button-edit-event">
+                <Edit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>Cost</Label>
-            <Input type="number" {...register("cost")} />
-          </div>
-          <div className="space-y-2">
-            <Label>Payment Received</Label>
-            <Input type="number" {...register("paymentReceived")} />
-          </div>
-          <div className="space-y-2">
-            <Label>Balance</Label>
-            <Input disabled value={balance.toString()} />
-          </div>
+          <Button variant="ghost" size="icon" onClick={() => setSelectedEventId(null)} data-testid="button-close-panel">
+            <X className="h-4 w-4" />
+          </Button>
         </div>
         
-        <div className="bg-muted p-3 sm:p-4 rounded-lg flex justify-between items-center">
-            <div>
-                <span className="text-xs sm:text-sm text-muted-foreground">Est. Profit</span>
-                <div className="text-lg sm:text-xl font-bold text-primary">₹{profit.toLocaleString()}</div>
-            </div>
-             <div className="text-right">
-                <span className="text-xs sm:text-sm text-muted-foreground">Margin</span>
-                <div className="text-lg sm:text-xl font-bold text-primary">{profitPercent}%</div>
-            </div>
-        </div>
+        <ScrollArea className="flex-1">
+          <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-3 bg-primary/5 rounded-lg">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Event ID</p>
+                  <p className="font-medium">{generateEventId(event)}</p>
+                </div>
+              </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-            <Label>Wedding Planner</Label>
-            <Input {...register("planner")} />
-          </div>
-           <div className="space-y-2">
-            <Label>Venue</Label>
-            <Input {...register("venue")} />
-          </div>
-        </div>
+              <div className="space-y-2">
+                <Label>Event Title</Label>
+                {panelIsEditing ? (
+                  <Input {...register("title")} data-testid="input-edit-title" />
+                ) : (
+                  <p className="text-sm font-medium p-2 bg-muted rounded">{event.title}</p>
+                )}
+              </div>
 
-        <Button type="submit" className="w-full" disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </form>
+              <div className="space-y-2">
+                <Label>Customer Name</Label>
+                {panelIsEditing ? (
+                  <Input {...register("customer")} data-testid="input-edit-customer" />
+                ) : (
+                  <p className="text-sm font-medium p-2 bg-muted rounded">{event.customer}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Event Date</Label>
+                  {panelIsEditing ? (
+                    <Input type="date" {...register("date")} data-testid="input-edit-date" />
+                  ) : (
+                    <p className="text-sm font-medium p-2 bg-muted rounded">
+                      {format(new Date(event.date), 'dd MMM yyyy')}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Event Type</Label>
+                  {panelIsEditing ? (
+                    <select {...register("type")} className="w-full h-10 px-3 rounded-md border border-input bg-background" data-testid="select-edit-type">
+                      <option value="wedding">Wedding</option>
+                      <option value="corporate">Corporate</option>
+                      <option value="birthday">Birthday</option>
+                      <option value="other">Other</option>
+                    </select>
+                  ) : (
+                    <p className="text-sm font-medium p-2 bg-muted rounded capitalize">{event.type}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Wedding Planner</Label>
+                {panelIsEditing ? (
+                  <Input {...register("planner")} data-testid="input-edit-planner" />
+                ) : (
+                  <p className="text-sm font-medium p-2 bg-muted rounded">{event.planner}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Venue</Label>
+                {panelIsEditing ? (
+                  <Input {...register("venue")} data-testid="input-edit-venue" />
+                ) : (
+                  <p className="text-sm font-medium p-2 bg-muted rounded">{event.venue}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <h4 className="font-medium mb-4 flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Financial Details
+              </h4>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Sales Value (₹)</Label>
+                    {panelIsEditing ? (
+                      <Input type="number" {...register("salesValue")} data-testid="input-edit-sales" />
+                    ) : (
+                      <p className="text-sm font-medium p-2 bg-muted rounded">{formatCurrency(Number(event.salesValue) || 0)}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment Received (₹)</Label>
+                    {panelIsEditing ? (
+                      <Input type="number" {...register("paymentReceived")} data-testid="input-edit-payment" />
+                    ) : (
+                      <p className="text-sm font-medium p-2 bg-muted rounded">{formatCurrency(Number(event.paymentReceived) || 0)}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Total Cost (₹)</Label>
+                    {panelIsEditing ? (
+                      <Input type="number" {...register("cost")} data-testid="input-edit-cost" />
+                    ) : (
+                      <p className="text-sm font-medium p-2 bg-muted rounded">{formatCurrency(Number(event.cost) || 0)}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Balance (₹)</Label>
+                    <p className={cn("text-sm font-medium p-2 rounded", balance > 0 ? "bg-orange-50 text-orange-600" : "bg-green-50 text-green-600")}>
+                      {formatCurrency(balance)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-muted p-4 rounded-lg grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Estimated Profit</p>
+                    <p className={cn("text-xl font-bold", isProfitable ? "text-green-600" : "text-red-600")}>
+                      {formatCurrency(profit)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Profit Margin</p>
+                    <p className={cn("text-xl font-bold", isProfitable ? "text-green-600" : "text-red-600")}>
+                      {profitPercent}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {panelIsEditing && (
+              <div className="flex gap-2 pt-4 border-t">
+                <Button type="button" variant="outline" className="flex-1" onClick={handleCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1" disabled={updateMutation.isPending} data-testid="button-save-event">
+                  {updateMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : 'Save Changes'}
+                </Button>
+              </div>
+            )}
+
+            {isSuperadmin && !panelIsEditing && (
+              <div className="pt-4 border-t">
+                <Button 
+                  type="button"
+                  variant="destructive" 
+                  className="w-full"
+                  onClick={() => handleDelete(event.id, event.title)}
+                  data-testid="button-delete-event"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Event
+                </Button>
+              </div>
+            )}
+          </form>
+        </ScrollArea>
+      </div>
     );
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 px-2 sm:px-0">
-      <div className="flex flex-col gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Event Database</h1>
-          <p className="text-sm text-muted-foreground">Track financials and details for all events</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".csv"
-            onChange={handleImport}
-            className="hidden"
-            data-testid="input-import-file"
-          />
-          <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
-                data-testid="button-add-event"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline">Add Event</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Event</DialogTitle>
-              </DialogHeader>
-              <AddEventForm onClose={() => setIsAddEventOpen(false)} />
-            </DialogContent>
-          </Dialog>
-          <Button 
-            variant="outline" 
-            className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            data-testid="button-import"
-          >
-            {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            <span className="hidden sm:inline">{isImporting ? 'Importing...' : 'Import'}</span>
-          </Button>
-          <Button 
-            variant="outline" 
-            className="gap-2 text-xs sm:text-sm flex-1 sm:flex-none"
-            onClick={handleExport}
-            data-testid="button-export"
-          >
-            <Download className="h-4 w-4" /> <span className="hidden sm:inline">Export</span>
-          </Button>
-        </div>
-      </div>
+    <div className="flex h-full">
+      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedEvent ? "lg:mr-[420px]" : "")}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
+          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+            <h1 className="text-lg font-semibold">Event Database</h1>
+            <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="sm:hidden" data-testid="button-add-event-mobile">
+                  <Plus className="h-4 w-4 mr-1" />
+                  New
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+                <DialogHeader>
+                  <DialogTitle>Add New Event</DialogTitle>
+                </DialogHeader>
+                <AddEventForm onClose={() => setIsAddEventOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by customer name..."
-          className="pl-10 bg-card border"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          data-testid="input-search"
-        />
-      </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search events..."
+                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                data-testid="input-search"
+              />
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".csv"
+              onChange={handleImport}
+              className="hidden"
+              data-testid="input-import-file"
+            />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="hidden sm:flex"
+              data-testid="button-import"
+            >
+              {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              <span className="ml-1 hidden lg:inline">{isImporting ? 'Importing...' : 'Import'}</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleExport}
+              className="hidden sm:flex"
+              data-testid="button-export"
+            >
+              <Download className="h-4 w-4" />
+              <span className="ml-1 hidden lg:inline">Export</span>
+            </Button>
+            <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="hidden sm:flex" data-testid="button-add-event">
+                  <Plus className="h-4 w-4 mr-1" />
+                  New Event
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+          </div>
+        </div>
 
-      <Card className="bg-card">
-        <CardContent className="p-4">
+        <div className="p-3 sm:p-4 border-b bg-white">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Financial Year</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="text-sm" data-testid="select-year">
-                  <SelectValue placeholder="All Years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Years</SelectItem>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Quarter</Label>
-              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                <SelectTrigger className="text-sm" data-testid="select-quarter">
-                  <SelectValue placeholder="All Quarters" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Quarters</SelectItem>
-                  <SelectItem value="Q1">Q1 (Apr-Jun)</SelectItem>
-                  <SelectItem value="Q2">Q2 (Jul-Sep)</SelectItem>
-                  <SelectItem value="Q3">Q3 (Oct-Dec)</SelectItem>
-                  <SelectItem value="Q4">Q4 (Jan-Mar)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Month</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="text-sm" data-testid="select-month">
-                  <SelectValue placeholder="All Months" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Months</SelectItem>
-                  {months.map(month => (
-                    <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground mb-1.5 block">Wedding Planner</Label>
-              <Select value={selectedPlanner} onValueChange={setSelectedPlanner}>
-                <SelectTrigger className="text-sm" data-testid="select-planner">
-                  <SelectValue placeholder="All Planners" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Planners</SelectItem>
-                  {availablePlanners.map(planner => (
-                    <SelectItem key={planner} value={planner}>{planner}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="h-9 text-sm" data-testid="select-year">
+                <SelectValue placeholder="All Years" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Years</SelectItem>
+                {availableYears.map(year => (
+                  <SelectItem key={year} value={year}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+              <SelectTrigger className="h-9 text-sm" data-testid="select-quarter">
+                <SelectValue placeholder="All Quarters" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Quarters</SelectItem>
+                <SelectItem value="Q1">Q1 (Apr-Jun)</SelectItem>
+                <SelectItem value="Q2">Q2 (Jul-Sep)</SelectItem>
+                <SelectItem value="Q3">Q3 (Oct-Dec)</SelectItem>
+                <SelectItem value="Q4">Q4 (Jan-Mar)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="h-9 text-sm" data-testid="select-month">
+                <SelectValue placeholder="All Months" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Months</SelectItem>
+                {months.map(month => (
+                  <SelectItem key={month.value} value={month.value}>{month.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedPlanner} onValueChange={setSelectedPlanner}>
+              <SelectTrigger className="h-9 text-sm" data-testid="select-planner">
+                <SelectValue placeholder="All Planners" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Planners</SelectItem>
+                {availablePlanners.map(planner => (
+                  <SelectItem key={planner} value={planner}>{planner}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-3 sm:p-4">
+            <p className="text-sm text-muted-foreground mb-3">{filteredEvents.length} events found</p>
+            <div className="space-y-2">
+              {filteredEvents.map((event) => {
+                const salesValue = Number(event.salesValue) || 0;
+                const paymentReceived = Number(event.paymentReceived) || 0;
+                const cost = Number(event.cost) || 0;
+                const balance = salesValue - paymentReceived;
+                const profit = salesValue - cost;
+                const isProfitable = profit >= 0;
+                const isSelected = selectedEventId === event.id;
+                
+                return (
+                  <div
+                    key={event.id}
+                    onClick={() => setSelectedEventId(event.id)}
+                    className={cn(
+                      "p-3 sm:p-4 rounded-lg border cursor-pointer transition-all hover:shadow-sm",
+                      isSelected ? "border-primary bg-primary/5 shadow-sm" : "bg-white hover:border-gray-300"
+                    )}
+                    data-testid={`card-event-${event.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-sm truncate">{event.customer}</h3>
+                          <span className="text-xs text-muted-foreground">{generateEventId(event)}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(event.date), 'dd MMM yyyy')}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {event.venue}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {event.planner}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-semibold">{formatCurrency(salesValue)}</p>
+                        <p className={cn("text-xs font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
+                          {isProfitable ? "+" : ""}{formatCurrency(profit)}
+                        </p>
+                      </div>
+                      <ChevronRight className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", isSelected && "rotate-90")} />
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredEvents.length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No events found</p>
+                  <p className="text-sm mt-1">Try adjusting your filters or add a new event</p>
+                </div>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-card border-l-4 border-l-purple-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-purple-500 text-base font-medium">
-              Selected FY Total {selectedYear === "all" ? "(All)" : `(${selectedYear})`}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sales Value:</span>
-              <span className="font-medium">{formatCurrency(fyTotals.salesValue)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Payment Received:</span>
-              <span className="font-medium">{formatCurrency(fyTotals.paymentReceived)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Balance Payment:</span>
-              <span className="font-medium">{formatCurrency(fyTotals.balance)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Actual Cost:</span>
-              <span className="font-medium">{formatCurrency(fyTotals.actualCost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Profit:</span>
-              <span className="font-medium text-purple-500">{formatCurrency(fyTotals.profit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Profit %:</span>
-              <span className="font-medium text-purple-500">{fyTotals.profitPercent.toFixed(2)}%</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border-l-4 border-l-green-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-green-500 text-base font-medium">Filtered Total</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sales Value:</span>
-              <span className="font-medium">{formatCurrency(filteredTotals.salesValue)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Payment Received:</span>
-              <span className="font-medium">{formatCurrency(filteredTotals.paymentReceived)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Balance Payment:</span>
-              <span className="font-medium">{formatCurrency(filteredTotals.balance)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Actual Cost:</span>
-              <span className="font-medium">{formatCurrency(filteredTotals.actualCost)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Profit:</span>
-              <span className="font-medium text-green-500">{formatCurrency(filteredTotals.profit)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Profit %:</span>
-              <span className="font-medium text-green-500">{filteredTotals.profitPercent.toFixed(2)}%</span>
-            </div>
-          </CardContent>
-        </Card>
+        </ScrollArea>
       </div>
 
-      <Card>
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-lg font-serif">All Events ({filteredEvents.length})</CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
-          {/* Mobile Card View */}
-          <div className="md:hidden divide-y">
-            {filteredEvents.map((event) => {
-              const salesValue = Number(event.salesValue) || 0;
-              const paymentReceived = Number(event.paymentReceived) || 0;
-              const cost = Number(event.cost) || 0;
-              const balance = salesValue - paymentReceived;
-              const profit = salesValue - cost;
-              const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
-              const isProfitable = profit >= 0;
-              
-              return (
-                <div key={event.id} className="py-4 first:pt-0" data-testid={`card-event-${event.id}`}>
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="font-medium text-sm">{event.customer}</h3>
-                      <p className="text-xs text-muted-foreground">{generateEventId(event)}</p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-[95vw] sm:max-w-lg">
-                          <DialogHeader>
-                            <DialogTitle>Edit Event Financials</DialogTitle>
-                          </DialogHeader>
-                          <EditEventForm event={event} onClose={() => setEditingEvent(null)} />
-                        </DialogContent>
-                      </Dialog>
-                      {isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDelete(event.id, event.title)}
-                          data-testid={`button-delete-${event.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground mb-2">
-                    <span>{event.planner}</span> • <span>{event.venue}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Sales:</span>
-                      <span>{formatCurrency(salesValue)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Received:</span>
-                      <span>{formatCurrency(paymentReceived)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Balance:</span>
-                      <span className={cn("font-medium", balance > 0 ? "text-amber-600" : "text-green-600")}>{formatCurrency(balance)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Cost:</span>
-                      <span>{formatCurrency(cost)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Profit:</span>
-                      <span className={cn("font-medium", isProfitable ? "text-green-600" : "text-red-600")}>{formatCurrency(profit)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Margin:</span>
-                      <span className={cn("font-medium", isProfitable ? "text-green-600" : "text-red-600")}>{profitPercent.toFixed(2)}%</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredEvents.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No events found
-              </div>
-            )}
+      {selectedEvent && (
+        <>
+          <div 
+            className="fixed inset-0 bg-black/20 z-40 lg:hidden"
+            onClick={() => setSelectedEventId(null)}
+          />
+          <div className="fixed top-0 right-0 w-full sm:w-[420px] h-full bg-white border-l shadow-lg z-50 lg:z-0">
+            <EventDetailPanel event={selectedEvent} />
           </div>
-
-          {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto -mx-4 sm:mx-0">
-            <div className="px-4 sm:px-0">
-              <div className="rounded-md border">
-                <Table className="w-full">
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs font-semibold">Wedding Planner</TableHead>
-                      <TableHead className="text-xs font-semibold">Client Name</TableHead>
-                      <TableHead className="text-xs font-semibold">Event ID</TableHead>
-                      <TableHead className="text-xs font-semibold">Venue</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Sales Value</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Payment Received</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Balance</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Total Cost</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Profit</TableHead>
-                      <TableHead className="text-right text-xs font-semibold">Profit %</TableHead>
-                      <TableHead className="w-20"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEvents.map((event) => {
-                        const salesValue = Number(event.salesValue) || 0;
-                        const paymentReceived = Number(event.paymentReceived) || 0;
-                        const cost = Number(event.cost) || 0;
-                        const balance = salesValue - paymentReceived;
-                        const profit = salesValue - cost;
-                        const profitPercent = salesValue > 0 ? ((profit / salesValue) * 100) : 0;
-                        const isProfitable = profit >= 0;
-                        
-                        return (
-                        <TableRow key={event.id} className="hover:bg-muted/30">
-                            <TableCell className="text-xs">{event.planner}</TableCell>
-                            <TableCell className="text-xs font-medium">{event.customer}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{generateEventId(event)}</TableCell>
-                            <TableCell className="text-xs">{event.venue}</TableCell>
-                            <TableCell className="text-right text-xs">{formatCurrency(salesValue)}</TableCell>
-                            <TableCell className="text-right text-xs">{formatCurrency(paymentReceived)}</TableCell>
-                            <TableCell className={cn("text-right text-xs font-medium", balance > 0 ? "text-amber-600" : "text-green-600")}>
-                              {formatCurrency(balance)}
-                            </TableCell>
-                            <TableCell className="text-right text-xs">{formatCurrency(cost)}</TableCell>
-                            <TableCell className={cn("text-right text-xs font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
-                              {formatCurrency(profit)}
-                            </TableCell>
-                            <TableCell className={cn("text-right text-xs font-medium", isProfitable ? "text-green-600" : "text-red-600")}>
-                              {profitPercent.toFixed(2)}%
-                            </TableCell>
-                            <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Dialog open={editingEvent?.id === event.id} onOpenChange={(open) => !open && setEditingEvent(null)}>
-                                      <DialogTrigger asChild>
-                                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setEditingEvent(event)} data-testid={`button-edit-${event.id}`}>Edit</Button>
-                                      </DialogTrigger>
-                                      <DialogContent className="max-w-[95vw] sm:max-w-lg">
-                                          <DialogHeader>
-                                              <DialogTitle>Edit Event Financials</DialogTitle>
-                                          </DialogHeader>
-                                          <EditEventForm event={event} onClose={() => setEditingEvent(null)} />
-                                      </DialogContent>
-                                  </Dialog>
-                                  {isAdmin && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                      onClick={() => handleDelete(event.id, event.title)}
-                                      data-testid={`button-delete-${event.id}`}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                        );
-                    })}
-                    {filteredEvents.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
-                          No events found
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </>
+      )}
     </div>
   );
 }
