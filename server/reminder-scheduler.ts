@@ -9,7 +9,7 @@ export async function processReminders(): Promise<void> {
     
     for (const reminder of dueReminders) {
       try {
-        const message = `🔔 *Reminder from Oaksy*\n\n${reminder.reminderMessage}\n\n_Set on ${new Date(reminder.createdAt!).toLocaleDateString('en-IN')}_`;
+        const message = `🔔 *Reminder from Oaksy*\n\n${reminder.reminderMessage}\n\n_Set on ${new Date(reminder.createdAt!).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}_`;
         
         await sendWhatsAppMessage(reminder.employeePhone, message);
         await storage.markReminderAsSent(reminder.id);
