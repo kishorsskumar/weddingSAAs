@@ -69,6 +69,7 @@ Preferred communication style: Simple, everyday language.
 - **Oak RSVP:** Guest management, RSVP tracking, logistics tracking, dashboard analytics, follow-up management, bulk import, WhatsApp integration, and outreach system with message templates and history.
 - **Calendar Integration:** Google Calendar (active, two-way sync).
 - **Automation:** Estimate-to-Production automation including timeline creation, push to production, and inventory finalization, with logging and WhatsApp notifications.
+- **Event Staff Assignment Automation:** WhatsApp notifications sent to staff when assigned to events, with supervisor summary messages and duplicate prevention via `notificationSent` flag.
 
 ### Critical Files & Components
 - **`client/src/components/layout.tsx`**: Main layout, sidebar navigation, mobile bottom nav.

@@ -8266,44 +8266,55 @@ export async function registerRoutes(
           }
         }
         
-        // Send summary to planner/supervisor
-        try {
-          const PLANNER_PHONES: Record<string, string> = {
-            'fida fathima': '+919895810975',
-            'fida': '+919895810975',
-            'femina km': '+917306687284',
-            'femina': '+917306687284',
-            'kishor': '+917902373354',
-          };
-          
-          const plannerName = event.planner?.toLowerCase() || '';
-          let plannerPhone = PLANNER_PHONES['kishor']; // Default
-          
-          for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
-            if (plannerName.includes(key)) {
-              plannerPhone = phone;
-              break;
+        // Send summary to planner/supervisor only if at least one notification was sent
+        const successfulNotifications = notificationResults.filter(r => r.status === 'sent').length;
+        const failedNotifications = notificationResults.filter(r => r.status === 'failed').length;
+        const skippedNotifications = notificationResults.filter(r => r.status === 'skipped').length;
+        
+        if (successfulNotifications > 0) {
+          try {
+            const PLANNER_PHONES: Record<string, string> = {
+              'fida fathima': '+919895810975',
+              'fida': '+919895810975',
+              'femina km': '+917306687284',
+              'femina': '+917306687284',
+              'kishor': '+917902373354',
+            };
+            
+            const plannerName = event.planner?.toLowerCase() || '';
+            let plannerPhone = PLANNER_PHONES['kishor']; // Default
+            
+            for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
+              if (plannerName.includes(key)) {
+                plannerPhone = phone;
+                break;
+              }
             }
+            
+            let summaryStatus = `Notified: ${successfulNotifications}`;
+            if (failedNotifications > 0) summaryStatus += `, Failed: ${failedNotifications}`;
+            if (skippedNotifications > 0) summaryStatus += `, Skipped: ${skippedNotifications}`;
+            
+            const supervisorMessage = `*Team Assigned Successfully:*\n${event.title}\n\nTotal Staff Assigned: ${created.length}\n${summaryStatus}`;
+            await sendWhatsAppMessage(plannerPhone, supervisorMessage);
+            
+            // Log supervisor notification
+            await storage.createAutomationLog({
+              eventId: eventId,
+              actionType: 'staff_assignment_summary',
+              status: 'success',
+              metadata: { 
+                supervisorPhone: plannerPhone,
+                staffCount: created.length,
+                eventTitle: event.title,
+                notificationStats: { sent: successfulNotifications, failed: failedNotifications, skipped: skippedNotifications }
+              }
+            });
+            
+            console.log(`[Automation] Sent staff assignment summary to planner ${event.planner}`);
+          } catch (summaryError) {
+            console.error('[Automation] Failed to send summary to planner:', summaryError);
           }
-          
-          const supervisorMessage = `*Team Assigned Successfully:*\n${event.title}\n\nTotal Staff Assigned: ${created.length}\n\nAll assigned members have been notified.`;
-          await sendWhatsAppMessage(plannerPhone, supervisorMessage);
-          
-          // Log supervisor notification
-          await storage.createAutomationLog({
-            eventId: eventId,
-            actionType: 'staff_assignment_summary',
-            status: 'success',
-            metadata: { 
-              supervisorPhone: plannerPhone,
-              staffCount: created.length,
-              eventTitle: event.title
-            }
-          });
-          
-          console.log(`[Automation] Sent staff assignment summary to planner ${event.planner}`);
-        } catch (summaryError) {
-          console.error('[Automation] Failed to send summary to planner:', summaryError);
         }
       }
       
