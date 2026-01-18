@@ -75,7 +75,17 @@ const getIndianFiscalYear = (date: Date = new Date()): string => {
 };
 
 export default function OakSales() {
-  const [activeSection, setActiveSection] = useState<Section>('dashboard');
+  // Read initial section from URL query params (only on mount)
+  const getInitialSection = (): Section => {
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get('section');
+    if (section && ['dashboard', 'pipeline', 'contacts', 'companies', 'activities', 'pipeline-setup', 'automations', 'reports', 'settings'].includes(section)) {
+      return section as Section;
+    }
+    return 'dashboard';
+  };
+  
+  const [activeSection, setActiveSection] = useState<Section>(getInitialSection);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarManuallyToggled, setSidebarManuallyToggled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

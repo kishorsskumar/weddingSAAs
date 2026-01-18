@@ -53,7 +53,13 @@ const ALL_PAGES = [
   { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
-  { id: "oak-sales", label: "Oak Sales", path: "/oak-sales" },
+  { id: "sales", label: "Sales", path: "/oak-sales", subPages: [
+    { id: "sales-leads", label: "Leads", path: "/oak-sales?section=dashboard" },
+    { id: "sales-pipeline", label: "Pipeline", path: "/oak-sales?section=pipeline" },
+    { id: "sales-quotations", label: "Quotations", path: "/oak-book?tab=quotes" },
+    { id: "sales-reports", label: "Reports", path: "/oak-sales?section=reports" },
+    { id: "sales-settings", label: "Settings", path: "/oak-sales?section=settings" },
+  ] },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "execution-plan", label: "Execution Plan", path: "/execution-plan" },
   { id: "hr", label: "Oak HR", path: "/hr" },
@@ -74,7 +80,12 @@ const ICONS: Record<string, any> = {
   "event-milestones": CheckSquare,
   daybook: BookOpen,
   "oak-book": Receipt,
-  "oak-sales": Target,
+  "sales": Target,
+  "sales-leads": Users,
+  "sales-pipeline": Target,
+  "sales-quotations": FileText,
+  "sales-reports": LayoutDashboard,
+  "sales-settings": Settings,
   "oak-inventory": Package,
   "execution-plan": ClipboardList,
   hr: Briefcase,
@@ -423,31 +434,42 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item, index) => {
           const Icon = ICONS[item.id] || LayoutDashboard;
-          const isActive = location === item.path;
           const hasSubPages = (item as any).subPages?.length > 0;
           const subPages = (item as any).subPages || [];
-          const isSubPageActive = subPages.some((sp: any) => location === sp.path);
+          
+          // Check if current URL matches the parent or any subpage
+          const currentFullUrl = window.location.pathname + window.location.search;
+          const parentPath = item.path.split('?')[0];
+          const isActive = location === item.path && !hasSubPages;
+          const isParentOfActive = hasSubPages && (location === parentPath || subPages.some((sp: any) => {
+            const spPath = sp.path.split('?')[0];
+            return location === spPath || currentFullUrl === sp.path;
+          }));
+          
+          // Sales menu links to first child, other menus link to their own path
+          const parentHref = item.id === 'sales' ? (subPages[0]?.path || item.path) : item.path;
           
           return (
             <div key={item.id}>
-              <Link href={item.path}>
+              <Link href={parentHref}>
                 <button
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                    isActive
+                    isActive || isParentOfActive
                       ? "bg-primary/10 text-primary font-medium"
                       : "text-sidebar-foreground hover:bg-sidebar-accent"
                   )}
                   onClick={() => setIsMobileOpen(false)}
                   data-testid={`nav-${item.id}`}
                 >
-                  <Icon className={cn("h-4 w-4", isActive ? "text-primary" : "text-sidebar-foreground/70")} />
+                  <Icon className={cn("h-4 w-4", isActive || isParentOfActive ? "text-primary" : "text-sidebar-foreground/70")} />
                   <span>{item.label}</span>
                 </button>
               </Link>
               {hasSubPages && subPages.map((subPage: any) => {
                 const SubIcon = ICONS[subPage.id] || Calendar;
-                const isSubActive = location === subPage.path;
+                const isSubActive = currentFullUrl === subPage.path || 
+                  (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
                 const hasAccess = allowedPages.includes(subPage.id);
                 if (!hasAccess) return null;
                 return (

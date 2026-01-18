@@ -60,7 +60,7 @@ const ALL_PAGES = [
   { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook", icon: BookOpen, description: "Daily finances" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book", icon: Receipt, description: "Invoices & estimates" },
-  { id: "oak-sales", label: "Oak Sales", path: "/oak-sales", icon: Target, description: "CRM & pipeline" },
+  { id: "sales", label: "Sales", path: "/oak-sales", icon: Target, description: "Leads, pipeline & CRM" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory", icon: Package, description: "Inventory & rentals" },
   { id: "execution-plan", label: "Execution Plan", path: "/execution-plan", icon: ClipboardList, description: "Event production planning" },
   { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
