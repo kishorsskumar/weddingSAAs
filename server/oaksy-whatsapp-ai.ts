@@ -4309,10 +4309,22 @@ export async function handleOaksyWhatsAppMessage(
     const textProvidedAmount = extractAmountFlexible(messageText);
     const purposeText = messageText.replace(/₹?\s*\d+[,\d]*\.?\d*/g, '').replace(/rs\.?\s*/gi, '').trim();
     
-    // Explicit QR indicator - only for actual QR code images user wants to pay
-    const explicitQr = /\b(qr|qr\s*code|scan|pay\s+here)\b/i.test(lowerText);
+    // EARLY INVENTORY CHECK: If user is authorized for inventory and message looks like inventory item
+    // Skip the expense flow and let the AI handle it for inventory processing
+    const looksLikeInventoryEarly = /inventory|warehouse|stock|create inventory|add item|new item|item\s*:/i.test(lowerText);
+    const hasQuantityPatternEarly = /quantity\s*[:]\s*\d+|\d+\s*(nos|pcs|pieces|units)/i.test(lowerText);
+    const isAuthorizedForInventoryEarly = isAuthorizedInventoryCreator(normalizedPhone);
     
-    // ALWAYS analyze images with AI to extract amount and type
+    if (isAuthorizedForInventoryEarly && (looksLikeInventoryEarly || hasQuantityPatternEarly)) {
+      console.log('[Oaksy] Early inventory detection triggered, skipping expense flow for AI processing');
+      // Store the photo URL in context and let AI handle it
+      context.inventoryItemPhotoUrl = mediaUrl;
+      // Don't return - continue to AI processing below
+    } else {
+      // Explicit QR indicator - only for actual QR code images user wants to pay
+      const explicitQr = /\b(qr|qr\s*code|scan|pay\s+here)\b/i.test(lowerText);
+    
+      // ALWAYS analyze images with AI to extract amount and type
     let imageAnalysis: { imageType: string; amount: number | null; transactionType: string; counterparty: string | null; confidence: number; description: string } | null = null;
     
     console.log('[Oaksy] Analyzing image with AI for:', mediaUrl);
@@ -4486,6 +4498,7 @@ export async function handleOaksyWhatsAppMessage(
     await storage.updateWhatsappConversation(conversation.id, { conversationHistory: history });
     
     return imageResponse;
+    } // End of else block for non-inventory photos
   }
   
   // Handle image classification flow
