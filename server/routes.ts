@@ -6491,7 +6491,26 @@ export async function registerRoutes(
 
   app.patch('/api/sales/deals/:id', async (req, res) => {
     try {
-      const deal = await storage.updateSalesDeal(req.params.id, req.body);
+      const updateData = { ...req.body };
+      
+      // If stageId is being updated, check if it's a Closed Won or Closed Lost stage
+      if (updateData.stageId) {
+        const stage = await storage.getSalesStage(updateData.stageId);
+        if (stage) {
+          const stageName = stage.name.toLowerCase();
+          if (stageName.includes('closed won') || stageName.includes('won')) {
+            updateData.status = 'won';
+            updateData.actualCloseDate = new Date().toISOString().split('T')[0];
+          } else if (stageName.includes('closed lost') || stageName.includes('lost')) {
+            updateData.status = 'lost';
+            updateData.actualCloseDate = new Date().toISOString().split('T')[0];
+          } else {
+            updateData.status = 'open';
+          }
+        }
+      }
+      
+      const deal = await storage.updateSalesDeal(req.params.id, updateData);
       res.json(deal);
     } catch (error) {
       res.status(400).json({ error: 'Failed to update deal' });
