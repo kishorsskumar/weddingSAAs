@@ -40,7 +40,8 @@ import {
   Sparkles,
   ClipboardList,
   Palette,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -58,17 +59,19 @@ const ALL_PAGES = [
   { id: "event-calendar", label: "Oak Event Calendar", path: "/events", icon: Calendar, description: "Manage events" },
   { id: "operations", label: "Operations", path: "/oak-inventory", icon: Package, description: "Operations & fulfilment" },
   { id: "finance", label: "Finance", path: "/oak-book", icon: Receipt, description: "Accounting & invoicing" },
-  { id: "team-calendar", label: "Oak Team Calendar", path: "/team", icon: Users, description: "Team scheduling" },
+  { id: "people", label: "People", path: "/hr", icon: Users, description: "HR & team management" },
+  { id: "hr", label: "HR Management", path: "/hr", icon: Briefcase, description: "HR & payroll" },
+  { id: "employee-portal", label: "Employee Portal", path: "/employee-portal", icon: UserCircle, description: "Your profile & requests" },
+  { id: "team-calendar", label: "Team Calendar", path: "/team", icon: Users, description: "Team scheduling" },
+  { id: "tools", label: "Tools", path: "/whatsapp-inbox", icon: Settings, description: "Communication & AI tools" },
+  { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox", icon: MessageSquare, description: "Employee requests via WhatsApp" },
+  { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp", icon: Users, description: "Event guest management" },
+  { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
+  { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
   { id: "event-database", label: "Oak Event Database", path: "/database", icon: Database, description: "Event records" },
   { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook", icon: BookOpen, description: "Daily finances" },
   { id: "execution-plan", label: "Execution Plan", path: "/execution-plan", icon: ClipboardList, description: "Event production planning" },
-  { id: "hr", label: "Oak HR", path: "/hr", icon: Briefcase, description: "HR & payroll" },
-  { id: "employee-portal", label: "Employee Portal", path: "/employee-portal", icon: UserCircle, description: "Your profile & requests" },
-  { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
-  { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
-  { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox", icon: MessageSquare, description: "Employee requests via WhatsApp" },
-  { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp", icon: Users, description: "Event guest management" },
   { id: "admin", label: "Admin Panel", path: "/admin", icon: Shield, description: "User management" },
 ];
 

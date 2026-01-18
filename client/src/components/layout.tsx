@@ -79,15 +79,19 @@ const ALL_PAGES = [
     { id: "finance-reports", label: "Reports", path: "/oak-book?section=reports" },
     { id: "finance-settings", label: "Settings", path: "/oak-book?section=settings" },
   ] },
-  { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
+  { id: "people", label: "People", path: "/hr", subPages: [
+    { id: "hr", label: "HR Management", path: "/hr" },
+    { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
+    { id: "team-calendar", label: "Team Calendar", path: "/team" },
+  ] },
+  { id: "tools", label: "Tools", path: "/whatsapp-inbox", subPages: [
+    { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
+    { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp" },
+    { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
+    { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
+  ] },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
-  { id: "hr", label: "Oak HR", path: "/hr" },
-  { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
-  { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
-  { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
-  { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
-  { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp" },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -125,8 +129,10 @@ const ICONS: Record<string, any> = {
   "ops-transportation": Package,
   "ops-manpower": Users,
   "execution-plan": ClipboardList,
+  "people": Users,
   hr: Briefcase,
   "employee-portal": UserCircle,
+  "tools": Settings,
   oaksy: Sparkles,
   "oak-creative": Palette,
   "whatsapp-inbox": MessageSquare,
@@ -446,7 +452,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true, "people": true, "tools": true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
@@ -489,8 +495,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // For collapsible menus (Sales, Event Hub, Operations, Finance), use button to toggle; for others use Link
-          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations' || item.id === 'finance';
+          // For collapsible menus (Sales, Event Hub, Operations, Finance, People, Tools), use button to toggle; for others use Link
+          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations' || item.id === 'finance' || item.id === 'people' || item.id === 'tools';
           if (hasSubPages && isCollapsibleMenu) {
             return (
               <div key={item.id}>
