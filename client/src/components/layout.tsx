@@ -58,11 +58,21 @@ const ALL_PAGES = [
     { id: "event-milestones", label: "Timeline", path: "/milestones" },
     { id: "execution-plan", label: "Execution", path: "/execution-plan" },
   ] },
+  { id: "operations", label: "Operations", path: "/oak-inventory", subPages: [
+    { id: "ops-items", label: "Inventory Items", path: "/oak-inventory?section=items", group: "Stock & Assets" },
+    { id: "ops-purchase-orders", label: "Purchase Orders", path: "/oak-inventory?section=purchase-orders", group: "Stock & Assets" },
+    { id: "ops-templates", label: "Templates", path: "/oak-inventory?section=templates", group: "Stock & Assets" },
+    { id: "ops-event-inventory", label: "Event Inventory", path: "/oak-inventory?section=event-inventory", group: "Event Fulfilment" },
+    { id: "ops-rentals", label: "Rentals", path: "/oak-inventory?section=rentals", group: "Event Fulfilment" },
+    { id: "ops-production", label: "Production Planning", path: "/oak-inventory?section=decor-planning", group: "Production" },
+    { id: "ops-execution", label: "Execution Plans", path: "/oak-inventory?section=production-plans", group: "Production" },
+    { id: "ops-transportation", label: "Event Transportation", path: "/oak-inventory?section=transportation", group: "Logistics" },
+    { id: "ops-manpower", label: "Event Manpower", path: "/oak-inventory?section=manpower", group: "Workforce" },
+  ] },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
-  { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
@@ -87,7 +97,16 @@ const ICONS: Record<string, any> = {
   "sales-estimates": FileText,
   "sales-reports": LayoutDashboard,
   "sales-settings": Settings,
-  "oak-inventory": Package,
+  "operations": Package,
+  "ops-items": Package,
+  "ops-purchase-orders": ClipboardList,
+  "ops-templates": ClipboardList,
+  "ops-event-inventory": Package,
+  "ops-rentals": Package,
+  "ops-production": ClipboardList,
+  "ops-execution": ClipboardList,
+  "ops-transportation": Package,
+  "ops-manpower": Users,
   "execution-plan": ClipboardList,
   hr: Briefcase,
   "employee-portal": UserCircle,
@@ -410,7 +429,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
@@ -453,8 +472,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // For collapsible menus (Sales and Event Hub), use button to toggle; for others use Link
-          if (hasSubPages && (item.id === 'sales' || item.id === 'event-hub')) {
+          // For collapsible menus (Sales, Event Hub, Operations), use button to toggle; for others use Link
+          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations';
+          if (hasSubPages && isCollapsibleMenu) {
             return (
               <div key={item.id}>
                 <button
@@ -486,30 +506,44 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      {subPages.map((subPage: any) => {
-                        const SubIcon = ICONS[subPage.id] || Calendar;
-                        const isSubActive = currentFullUrl === subPage.path || 
-                          (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
-                        const hasAccess = allowedPages.includes(subPage.id);
-                        if (!hasAccess) return null;
-                        return (
-                          <Link key={subPage.id} href={subPage.path}>
-                            <button
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors",
-                                isSubActive
-                                  ? "bg-primary/10 text-primary font-medium"
-                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                      {(() => {
+                        let lastGroup: string | null = null;
+                        return subPages.map((subPage: any) => {
+                          const SubIcon = ICONS[subPage.id] || Calendar;
+                          const isSubActive = currentFullUrl === subPage.path || 
+                            (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
+                          const hasAccess = allowedPages.includes(subPage.id);
+                          if (!hasAccess) return null;
+                          
+                          const showGroupHeader = subPage.group && subPage.group !== lastGroup;
+                          if (subPage.group) lastGroup = subPage.group;
+                          
+                          return (
+                            <div key={subPage.id}>
+                              {showGroupHeader && (
+                                <div className="px-3 py-1.5 pl-10 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 mt-2 first:mt-0">
+                                  {subPage.group}
+                                </div>
                               )}
-                              onClick={() => setIsMobileOpen(false)}
-                              data-testid={`nav-${subPage.id}`}
-                            >
-                              <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
-                              <span>{subPage.label}</span>
-                            </button>
-                          </Link>
-                        );
-                      })}
+                              <Link href={subPage.path}>
+                                <button
+                                  className={cn(
+                                    "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors",
+                                    isSubActive
+                                      ? "bg-primary/10 text-primary font-medium"
+                                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                                  )}
+                                  onClick={() => setIsMobileOpen(false)}
+                                  data-testid={`nav-${subPage.id}`}
+                                >
+                                  <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
+                                  <span>{subPage.label}</span>
+                                </button>
+                              </Link>
+                            </div>
+                          );
+                        });
+                      })()}
                     </motion.div>
                   )}
                 </AnimatePresence>

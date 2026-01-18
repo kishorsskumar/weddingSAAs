@@ -109,17 +109,44 @@ const safeNumber = (value: string | number | null | undefined): number => {
   return isNaN(num) ? 0 : num;
 };
 
-const sidebarItems = [
-  { id: 'items', label: 'Inventory Items', icon: Package },
-  { id: 'event-inventory', label: 'Event Inventory', icon: Boxes },
-  { id: 'rentals', label: 'Rentals', icon: Truck },
-  { id: 'templates', label: 'Templates', icon: FileText },
-  { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
-  { id: 'production-plans', label: 'Execution Plans', icon: Factory },
-  { id: 'decor-planning', label: 'Production Planning', icon: ClipboardList },
-  { id: 'transportation', label: 'Event Transportation', icon: Truck },
-  { id: 'manpower', label: 'Event Manpower', icon: Users },
+const sidebarGroups = [
+  { 
+    label: 'Stock & Assets',
+    items: [
+      { id: 'items', label: 'Inventory Items', icon: Package },
+      { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
+      { id: 'templates', label: 'Templates', icon: FileText },
+    ]
+  },
+  {
+    label: 'Event Fulfilment',
+    items: [
+      { id: 'event-inventory', label: 'Event Inventory', icon: Boxes },
+      { id: 'rentals', label: 'Rentals', icon: Truck },
+    ]
+  },
+  {
+    label: 'Production',
+    items: [
+      { id: 'decor-planning', label: 'Production Planning', icon: ClipboardList },
+      { id: 'production-plans', label: 'Execution Plans', icon: Factory },
+    ]
+  },
+  {
+    label: 'Logistics',
+    items: [
+      { id: 'transportation', label: 'Event Transportation', icon: Truck },
+    ]
+  },
+  {
+    label: 'Workforce',
+    items: [
+      { id: 'manpower', label: 'Event Manpower', icon: Users },
+    ]
+  },
 ];
+
+const sidebarItems = sidebarGroups.flatMap(g => g.items);
 
 function ImageUpload({ 
   photos, 
@@ -354,33 +381,42 @@ export default function OakInventory() {
           {!sidebarCollapsed && <span className="text-sm font-medium">Dashboard</span>}
         </Link>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
             <Package className="w-5 h-5 text-white" />
           </div>
           {!sidebarCollapsed && (
             <div>
-              <h1 className="font-semibold text-lg">Oak Inventory</h1>
-              <p className="text-xs text-sidebar-foreground/60">Stock & Equipment</p>
+              <h1 className="font-semibold text-lg">Operations</h1>
+              <p className="text-xs text-sidebar-foreground/60">Operations & Fulfilment</p>
             </div>
           )}
         </div>
       </div>
       <ScrollArea className="flex-1">
         <nav className="p-2 space-y-1">
-          {sidebarItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => handleNavClick(item.id as Section)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
-                activeSection === item.id
-                  ? 'bg-amber-600/10 text-amber-600 font-medium'
-                  : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              }`}
-              data-testid={`nav-${item.id}`}
-            >
-              <item.icon className="w-5 h-5 shrink-0" />
-              {!sidebarCollapsed && <span>{item.label}</span>}
-            </button>
+          {sidebarGroups.map((group) => (
+            <div key={group.label} className="mb-3">
+              {!sidebarCollapsed && (
+                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+                  {group.label}
+                </div>
+              )}
+              {group.items.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavClick(item.id as Section)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                    activeSection === item.id
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  }`}
+                  data-testid={`nav-${item.id}`}
+                >
+                  <item.icon className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span>{item.label}</span>}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
       </ScrollArea>
@@ -415,8 +451,8 @@ export default function OakInventory() {
               <Menu className="h-5 w-5" />
             </Button>
             <div className="flex items-center gap-2">
-              <Package className="h-5 w-5 text-amber-600" />
-              <span className="font-semibold">Oak Inventory</span>
+              <Package className="h-5 w-5 text-primary" />
+              <span className="font-semibold">Operations</span>
             </div>
             <div className="w-10" />
           </div>
