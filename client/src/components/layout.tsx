@@ -32,7 +32,8 @@ import {
   MoreHorizontal,
   Home,
   FileText,
-  Settings
+  Settings,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -409,11 +410,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
   const hasOwnSidebar = PAGES_WITH_OWN_SIDEBAR.includes(location);
   const navItems = ALL_PAGES.filter((page) => allowedPages.includes(page.id));
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenus(prev => ({ ...prev, [menuId]: !prev[menuId] }));
+  };
 
   const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar border-r border-sidebar-border">
@@ -436,6 +442,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           const Icon = ICONS[item.id] || LayoutDashboard;
           const hasSubPages = (item as any).subPages?.length > 0;
           const subPages = (item as any).subPages || [];
+          const isExpanded = expandedMenus[item.id] ?? false;
           
           // Check if current URL matches the parent or any subpage
           const currentFullUrl = window.location.pathname + window.location.search;
@@ -446,8 +453,72 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // Sales menu links to first child, other menus link to their own path
-          const parentHref = item.id === 'sales' ? (subPages[0]?.path || item.path) : item.path;
+          // For collapsible menus (like Sales), use button to toggle; for others use Link
+          if (hasSubPages && item.id === 'sales') {
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => toggleMenu(item.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors",
+                    isParentOfActive
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent"
+                  )}
+                  data-testid={`nav-${item.id}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className={cn("h-4 w-4", isParentOfActive ? "text-primary" : "text-sidebar-foreground/70")} />
+                    <span>{item.label}</span>
+                  </div>
+                  <ChevronDown className={cn(
+                    "h-4 w-4 transition-transform duration-200",
+                    isExpanded ? "rotate-0" : "-rotate-90",
+                    isParentOfActive ? "text-primary" : "text-sidebar-foreground/50"
+                  )} />
+                </button>
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      {subPages.map((subPage: any) => {
+                        const SubIcon = ICONS[subPage.id] || Calendar;
+                        const isSubActive = currentFullUrl === subPage.path || 
+                          (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
+                        const hasAccess = allowedPages.includes(subPage.id);
+                        if (!hasAccess) return null;
+                        return (
+                          <Link key={subPage.id} href={subPage.path}>
+                            <button
+                              className={cn(
+                                "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors",
+                                isSubActive
+                                  ? "bg-primary/10 text-primary font-medium"
+                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                              )}
+                              onClick={() => setIsMobileOpen(false)}
+                              data-testid={`nav-${subPage.id}`}
+                            >
+                              <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
+                              <span>{subPage.label}</span>
+                            </button>
+                          </Link>
+                        );
+                      })}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          }
+          
+          // Regular menu items (with or without subpages)
+          const parentHref = hasSubPages ? item.path : item.path;
           
           return (
             <div key={item.id}>
