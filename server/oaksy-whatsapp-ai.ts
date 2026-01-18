@@ -446,6 +446,7 @@ CAPABILITIES:
 10. VENDOR LOOKUPS: Vendor contact info, past payment rates, payment history
 11. QUICK REPORTS: Event profitability, client payment status, monthly summaries (superadmin only)
 12. RSVP TRACKING: Check guest RSVP status, attendance counts, meal preferences, follow-up with pending guests (wedding planners and superadmin)
+13. INVENTORY MANAGEMENT: Add items to warehouse inventory with photos, names, quantities (Superadmin and Praveen only)
 
 FLEXIBILITY GUIDELINES:
 - Understand natural language - don't require specific formats
@@ -483,6 +484,15 @@ QUERY TYPE DETECTION:
 - "pending rsvps", "who hasn't responded", "rsvp follow-up" = rsvp_query with queryType: "pending"
 - "meal count", "food preferences", "veg non-veg count" = rsvp_query with queryType: "meals"
 
+INVENTORY ITEM DETECTION RULES:
+- "add to inventory", "new item in warehouse", "stock this item" = inventory_item
+- "we have 10 [item name] in warehouse" = inventory_item with quantity
+- When a photo is attached along with item name and quantity = inventory_item
+- Extract: inventoryItemName (the item name), inventoryItemQuantity (number), inventoryItemCategory (if mentioned, default "General"), inventoryItemLocation (if mentioned, default "Warehouse")
+- Examples: "Add 50 white chairs to inventory" = inventory_item with name="White Chairs", quantity=50
+- Examples: "New stock - 100 table covers" = inventory_item with name="Table Covers", quantity=100
+- If photo attached but no name/quantity, ask: "What is this item called and how many do we have?"
+
 REMINDER DETECTION RULES:
 - EXPLICIT: "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
 - EXPLICIT: "set a reminder for 5pm to call client" = reminder
@@ -509,7 +519,7 @@ REMINDER DETECTION RULES:
 
 RESPONSE FORMAT - Always respond with valid JSON:
 {
-  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "rsvp_query" | "reminder" | "greeting" | "confirmation" | "general",
+  "intent": "expense" | "leave" | "status" | "vendor_payment" | "income" | "delivery_challan" | "event_query" | "bank_query" | "team_query" | "vendor_query" | "financial_query" | "report_query" | "rsvp_query" | "reminder" | "inventory_item" | "greeting" | "confirmation" | "general",
   "extractedData": {
     "amount": number or null (ONLY if explicitly mentioned, never from address numbers),
     "purpose": string or null,
@@ -529,7 +539,11 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "bankName": string or null,
     "reminderDateTime": string or null (ISO format datetime for reminder, e.g., "2024-01-17T09:00:00"),
     "reminderMessage": string or null (clean task description, e.g., "call flower vendor"),
-    "reminderExplicitToday": boolean or null (true if user explicitly said "today" or current date)
+    "reminderExplicitToday": boolean or null (true if user explicitly said "today" or current date),
+    "inventoryItemName": string or null (name of the item to add to inventory),
+    "inventoryItemQuantity": number or null (quantity of items),
+    "inventoryItemCategory": string or null (category like "Furniture", "Decor", "Fabric", default "General"),
+    "inventoryItemLocation": string or null (warehouse location, default "Warehouse")
   },
   "needsMoreInfo": ["purpose", "amount", "dates", "reason", "vendorName", "confirmation", "reminderTime"] or [],
   "isComplete": boolean,
@@ -837,7 +851,7 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
 
 interface AIParseResult {
   intent: 'leave_request' | 'expense' | 'vendor_payment' | 'income' | 'qr_payment' | 'status_check' | 
-          'event_query' | 'bank_query' | 'team_query' | 'delivery_challan' | 'daybook_entry' |
+          'event_query' | 'bank_query' | 'team_query' | 'delivery_challan' | 'daybook_entry' | 'inventory_item' |
           'greeting' | 'confirmation' | 'correction' | 'cancellation' | 'help' | 'general_question' | 'unknown';
   slots: {
     leaveType?: 'casual' | 'sick' | 'vacation' | 'personal';
@@ -862,6 +876,11 @@ interface AIParseResult {
     daybookType?: 'income' | 'expense';
     daybookCategory?: string;
     daybookDescription?: string;
+    // Inventory item slots
+    inventoryItemName?: string;
+    inventoryItemQuantity?: number;
+    inventoryItemCategory?: string;
+    inventoryItemLocation?: string;
   };
   confidence: number;
   needsClarification: string[];
@@ -885,8 +904,11 @@ YOUR CAPABILITIES:
 6. DAYBOOK ENTRY - record income or expense entries
    - Need: type (income/expense), amount, description, category
    - Example: "add daybook entry - expense 5000 for petrol"
-7. STATUS CHECKS - pending requests, approvals, balances
-8. QUERIES - events, team, financial info, RSVP status
+7. INVENTORY ITEMS - add items to warehouse inventory (Superadmin and Praveen only)
+   - Need: item name, quantity, category (optional), location (optional)
+   - Example: "add 50 white chairs to inventory", "new stock - 100 table covers"
+8. STATUS CHECKS - pending requests, approvals, balances
+9. QUERIES - events, team, financial info, RSVP status
 
 CONVERSATION STYLE:
 - Be warm and friendly like a helpful colleague
@@ -926,7 +948,7 @@ const aiParseMessageFunction = {
       intent: {
         type: "string",
         enum: ["leave_request", "expense", "vendor_payment", "income", "qr_payment", "status_check", 
-               "event_query", "bank_query", "team_query", "delivery_challan", "daybook_entry",
+               "event_query", "bank_query", "team_query", "delivery_challan", "daybook_entry", "inventory_item",
                "greeting", "confirmation", "correction", "cancellation", "help", "general_question", "unknown"],
         description: "The primary intent of the user's message"
       },
@@ -957,7 +979,12 @@ const aiParseMessageFunction = {
           // Daybook slots
           daybookType: { type: "string", enum: ["income", "expense"], description: "Type of daybook entry" },
           daybookCategory: { type: "string", description: "Category for daybook entry" },
-          daybookDescription: { type: "string", description: "Description for daybook entry" }
+          daybookDescription: { type: "string", description: "Description for daybook entry" },
+          // Inventory item slots
+          inventoryItemName: { type: "string", description: "Name of the inventory item" },
+          inventoryItemQuantity: { type: "number", description: "Quantity of items to add" },
+          inventoryItemCategory: { type: "string", description: "Category like Furniture, Decor, Fabric, etc." },
+          inventoryItemLocation: { type: "string", description: "Warehouse location" }
         },
         description: "Extracted slot values from the message"
       },
