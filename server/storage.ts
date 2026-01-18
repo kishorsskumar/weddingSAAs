@@ -302,6 +302,12 @@ import {
   notificationLogs,
   type NotificationLog,
   type InsertNotificationLog,
+  eventProductionItems,
+  type EventProductionItem,
+  type InsertEventProductionItem,
+  automationLogs,
+  type AutomationLog,
+  type InsertAutomationLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -896,6 +902,19 @@ export interface IStorage {
   getEventsDueFor60DayReminder(): Promise<Event[]>;
   markEvent60DayReminderSent(eventId: string): Promise<void>;
   createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
+  
+  // Event Production Items
+  getEventProductionItemsByEventId(eventId: string): Promise<EventProductionItem[]>;
+  createEventProductionItem(item: InsertEventProductionItem): Promise<EventProductionItem>;
+  createEventProductionItems(items: InsertEventProductionItem[]): Promise<EventProductionItem[]>;
+  updateEventProductionItem(id: string, item: Partial<InsertEventProductionItem>): Promise<EventProductionItem | undefined>;
+  deleteEventProductionItem(id: string): Promise<void>;
+  deleteEventProductionItemsByEventId(eventId: string): Promise<void>;
+  lockEventProductionItems(eventId: string): Promise<void>;
+  
+  // Automation Logs
+  createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
+  getAutomationLogsByEventId(eventId: string): Promise<AutomationLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4929,6 +4948,55 @@ export class DatabaseStorage implements IStorage {
   async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
     const [newLog] = await db.insert(notificationLogs).values(log).returning();
     return newLog;
+  }
+  
+  // Event Production Items
+  async getEventProductionItemsByEventId(eventId: string): Promise<EventProductionItem[]> {
+    return await db.select().from(eventProductionItems).where(eq(eventProductionItems.eventId, eventId));
+  }
+  
+  async createEventProductionItem(item: InsertEventProductionItem): Promise<EventProductionItem> {
+    const [newItem] = await db.insert(eventProductionItems).values(item).returning();
+    return newItem;
+  }
+  
+  async createEventProductionItems(items: InsertEventProductionItem[]): Promise<EventProductionItem[]> {
+    if (items.length === 0) return [];
+    return await db.insert(eventProductionItems).values(items).returning();
+  }
+  
+  async updateEventProductionItem(id: string, item: Partial<InsertEventProductionItem>): Promise<EventProductionItem | undefined> {
+    const [updated] = await db.update(eventProductionItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(eventProductionItems.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteEventProductionItem(id: string): Promise<void> {
+    await db.delete(eventProductionItems).where(eq(eventProductionItems.id, id));
+  }
+  
+  async deleteEventProductionItemsByEventId(eventId: string): Promise<void> {
+    await db.delete(eventProductionItems).where(eq(eventProductionItems.eventId, eventId));
+  }
+  
+  async lockEventProductionItems(eventId: string): Promise<void> {
+    await db.update(eventProductionItems)
+      .set({ status: 'locked', updatedAt: new Date() })
+      .where(eq(eventProductionItems.eventId, eventId));
+  }
+  
+  // Automation Logs
+  async createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog> {
+    const [newLog] = await db.insert(automationLogs).values(log).returning();
+    return newLog;
+  }
+  
+  async getAutomationLogsByEventId(eventId: string): Promise<AutomationLog[]> {
+    return await db.select().from(automationLogs)
+      .where(eq(automationLogs.eventId, eventId))
+      .orderBy(desc(automationLogs.createdAt));
   }
 }
 
