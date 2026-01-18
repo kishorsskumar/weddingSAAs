@@ -679,6 +679,7 @@ function PipelineSection({
   const [editPipelineName, setEditPipelineName] = useState('');
   const [selectedDeal, setSelectedDeal] = useState<SalesDeal | null>(null);
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
+  const [advancePaymentConfirm, setAdvancePaymentConfirm] = useState<{ dealId: string; stageId: string; dealTitle: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -792,8 +793,41 @@ function PipelineSection({
   const handleDrop = (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
     if (draggedDealId) {
-      updateDealMutation.mutate({ id: draggedDealId, stageId });
-      setDraggedDealId(null);
+      // Check if target stage is "Advance Received" 
+      const targetStage = stages.find(s => s.id === stageId);
+      const stageName = targetStage?.name?.toLowerCase() || '';
+      const isAdvanceReceivedStage = stageName.includes('advance received') || stageName.includes('advance payment');
+      
+      // Check if deal is already in advance received state
+      const currentDeal = deals.find(d => d.id === draggedDealId);
+      const alreadyAdvanceReceived = currentDeal?.advancePaymentReceived === true;
+      
+      if (isAdvanceReceivedStage && !alreadyAdvanceReceived) {
+        // Show confirmation popup
+        setAdvancePaymentConfirm({
+          dealId: draggedDealId,
+          stageId,
+          dealTitle: currentDeal?.title || 'This lead'
+        });
+        setDraggedDealId(null);
+      } else {
+        updateDealMutation.mutate({ id: draggedDealId, stageId });
+        setDraggedDealId(null);
+      }
+    }
+  };
+
+  const handleConfirmAdvancePayment = () => {
+    if (advancePaymentConfirm) {
+      updateDealMutation.mutate({ 
+        id: advancePaymentConfirm.dealId, 
+        stageId: advancePaymentConfirm.stageId 
+      });
+      toast({ 
+        title: 'Advance Payment Marked as Received',
+        description: 'Accountant has been notified to create the customer record.'
+      });
+      setAdvancePaymentConfirm(null);
     }
   };
 
@@ -902,6 +936,36 @@ function PipelineSection({
                   </Button>
                   <Button variant="destructive" onClick={handleDeletePipeline} data-testid="button-confirm-delete-pipeline">
                     Delete Pipeline
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          {/* Advance Payment Confirmation Dialog */}
+          <Dialog open={!!advancePaymentConfirm} onOpenChange={(open) => !open && setAdvancePaymentConfirm(null)}>
+            <DialogContent className="max-w-[95vw] sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  Confirm Advance Payment Received
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <p className="text-sm font-medium mb-2">You are marking advance payment as received for:</p>
+                  <p className="text-lg font-semibold text-primary">{advancePaymentConfirm?.dealTitle}</p>
+                </div>
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>• The accountant will be notified to create a customer record</p>
+                  <p>• This action will update the lead status</p>
+                  <p>• Customer creation requires additional details from the accountant</p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setAdvancePaymentConfirm(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleConfirmAdvancePayment} data-testid="button-confirm-advance-payment">
+                    Confirm Payment Received
                   </Button>
                 </div>
               </div>

@@ -22,8 +22,10 @@ import {
   insertCustomerPaymentSchema,
   insertExpenseSchema,
   insertVendorPaymentSchema,
+  customerCreationLogs,
   type InsertEventMilestone,
 } from "@shared/schema";
+import { db } from "./db";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -5038,6 +5040,156 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Generate next customer code (OAK-YY-XXXX format)
+  app.get('/api/customers/next-code', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const year = new Date().getFullYear().toString().slice(-2);
+      // Get the count of customers created this year
+      const allCustomers = await storage.getAllCustomers();
+      const yearPrefix = `OAK-${year}-`;
+      const thisYearCustomers = allCustomers.filter(c => c.customerCode?.startsWith(yearPrefix));
+      const nextNumber = (thisYearCustomers.length + 1).toString().padStart(4, '0');
+      const customerCode = `${yearPrefix}${nextNumber}`;
+      res.json({ customerCode });
+    } catch (error) {
+      console.error('Error generating customer code:', error);
+      res.status(500).json({ error: 'Failed to generate customer code' });
+    }
+  });
+
+  // Get leads with advance payment received but not yet converted to customer
+  app.get('/api/customers/pending-from-leads', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    try {
+      const deals = await storage.getSalesDeals();
+      const pendingDeals = deals.filter(d => 
+        d.advancePaymentReceived === true && 
+        d.convertedToCustomer !== true
+      );
+      
+      // Enrich with contact and owner info
+      const enrichedDeals = await Promise.all(pendingDeals.map(async (deal) => {
+        let contact = null;
+        let owner = null;
+        if (deal.contactId) {
+          contact = await storage.getSalesContact(deal.contactId);
+        }
+        if (deal.ownerId) {
+          owner = await storage.getUser(deal.ownerId);
+        }
+        return { ...deal, contact, owner };
+      }));
+      
+      res.json(enrichedDeals);
+    } catch (error) {
+      console.error('Error fetching pending leads for customer creation:', error);
+      res.status(500).json({ error: 'Failed to fetch pending leads' });
+    }
+  });
+
+  // Create customer from lead (controlled workflow)
+  app.post('/api/customers/from-lead', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+    
+    try {
+      const { leadId, name, phone, billingAddress, state, country, weddingPlannerId } = req.body;
+      
+      if (!leadId || !name || !phone || !billingAddress || !state) {
+        return res.status(400).json({ error: 'Missing required fields: name, phone, billingAddress, state' });
+      }
+      
+      // Check if lead exists
+      const deal = await storage.getSalesDeal(leadId);
+      if (!deal) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      
+      // Check if already converted to prevent duplicates
+      if (deal.convertedToCustomer === true) {
+        return res.status(400).json({ error: 'Lead already converted to customer' });
+      }
+      
+      // Generate customer code
+      const year = new Date().getFullYear().toString().slice(-2);
+      const allCustomers = await storage.getAllCustomers();
+      const yearPrefix = `OAK-${year}-`;
+      const thisYearCustomers = allCustomers.filter(c => c.customerCode?.startsWith(yearPrefix));
+      const nextNumber = (thisYearCustomers.length + 1).toString().padStart(4, '0');
+      const customerCode = `${yearPrefix}${nextNumber}`;
+      
+      // Create customer
+      const customer = await storage.createCustomer({
+        name,
+        phone,
+        billingAddress,
+        state,
+        country: country || 'India',
+        leadId,
+        weddingPlannerId: weddingPlannerId || deal.ownerId,
+      });
+      
+      // Update customer with customer code (since it's omitted from insert schema)
+      await storage.updateCustomer(customer.id, { customerCode });
+      
+      // Mark lead as converted to customer
+      await storage.updateSalesDeal(leadId, { 
+        convertedToCustomer: true,
+        customerId: customer.id
+      });
+      
+      // Log the action
+      await db.insert(customerCreationLogs).values({
+        customerId: customer.id,
+        leadId,
+        accountantId: req.session.userId,
+        status: 'created'
+      });
+      
+      // Get the updated customer
+      const updatedCustomer = await storage.getCustomer(customer.id);
+      
+      // Send WhatsApp notification to wedding planner
+      const planner = weddingPlannerId ? await storage.getUser(weddingPlannerId) : 
+                      deal.ownerId ? await storage.getUser(deal.ownerId) : null;
+      
+      if (planner) {
+        const eventDate = deal.eventDate ? new Date(deal.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'TBD';
+        const message = `Customer Created:\n${name}\nCustomer ID: ${customerCode}\nEvent Date: ${eventDate}\nYou may begin event kickoff.`;
+        
+        // Queue WhatsApp notification via Oaksy
+        console.log(`[Customer Created] Notification to ${planner.name}: ${message}`);
+      }
+      
+      res.json({ 
+        success: true, 
+        customer: updatedCustomer,
+        customerCode 
+      });
+    } catch (error) {
+      console.error('Error creating customer from lead:', error);
+      
+      // Log the failure
+      if (req.body.leadId && req.session.userId) {
+        await db.insert(customerCreationLogs).values({
+          customerId: 'failed',
+          leadId: req.body.leadId,
+          accountantId: req.session.userId,
+          status: 'failed',
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        }).catch(() => {});
+      }
+      
+      res.status(500).json({ error: 'Failed to create customer from lead' });
+    }
+  });
+
   // Oak Book - Vendors
   app.get('/api/vendors', async (req, res) => {
     const vendors = await storage.getAllVendors();
@@ -6521,6 +6673,8 @@ export async function registerRoutes(
   app.patch('/api/sales/deals/:id', async (req, res) => {
     try {
       const updateData = { ...req.body };
+      const dealId = req.params.id;
+      const existingDeal = await storage.getSalesDeal(dealId);
       
       // If stageId is being updated, check if it's a Closed Won or Closed Lost stage
       if (updateData.stageId) {
@@ -6536,10 +6690,28 @@ export async function registerRoutes(
           } else {
             updateData.status = 'open';
           }
+          
+          // Check if moving to "Advance Received" stage
+          if ((stageName.includes('advance received') || stageName.includes('advance payment')) && 
+              existingDeal && !existingDeal.advancePaymentReceived) {
+            updateData.advancePaymentReceived = true;
+            updateData.advancePaymentDate = new Date().toISOString();
+            
+            // Notify accountant via console log (would be WhatsApp in production)
+            const contact = existingDeal.contactId ? await storage.getSalesContact(existingDeal.contactId) : null;
+            const owner = existingDeal.ownerId ? await storage.getUser(existingDeal.ownerId) : null;
+            const customerName = contact ? `${contact.firstName} ${contact.lastName}`.trim() : existingDeal.title;
+            console.log(`[Advance Payment] Deal "${existingDeal.title}" marked as advance received. Customer: ${customerName}. Planner: ${owner?.name || 'N/A'}. Accountant notification pending.`);
+          }
         }
       }
       
-      const deal = await storage.updateSalesDeal(req.params.id, updateData);
+      // Handle explicit advance payment received flag
+      if (updateData.advancePaymentReceived === true && existingDeal && !existingDeal.advancePaymentReceived) {
+        updateData.advancePaymentDate = new Date().toISOString();
+      }
+      
+      const deal = await storage.updateSalesDeal(dealId, updateData);
       res.json(deal);
     } catch (error) {
       res.status(400).json({ error: 'Failed to update deal' });

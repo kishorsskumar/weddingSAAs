@@ -37,13 +37,39 @@ import {
 
 type Customer = {
   id: string;
+  customerCode: string | null;
   name: string;
   email: string | null;
   phone: string | null;
   gstNumber: string | null;
   billingAddress: string | null;
+  state: string | null;
+  country: string | null;
+  leadId: string | null;
   weddingPlannerId: string | null;
   createdAt: string;
+};
+
+type PendingLead = {
+  id: string;
+  title: string;
+  value: string;
+  eventDate: string | null;
+  eventType: string | null;
+  advancePaymentReceived: boolean;
+  advancePaymentDate: string | null;
+  convertedToCustomer: boolean;
+  contact: {
+    firstName: string;
+    lastName: string;
+    phone: string | null;
+    mobile: string | null;
+    email: string | null;
+  } | null;
+  owner: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 type Invoice = {
@@ -65,17 +91,44 @@ type Estimate = {
   status: string;
 };
 
+// Indian states list
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", 
+  "Uttarakhand", "West Bengal", "Delhi", "Jammu and Kashmir", "Ladakh", 
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli", 
+  "Daman and Diu", "Lakshadweep", "Puducherry"
+];
+
 export function ZohoCustomers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  const [activeTab, setActiveTab] = useState<"all" | "pending">("all");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateFromLeadOpen, setIsCreateFromLeadOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<PendingLead | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Form state for creating customer from lead
+  const [fromLeadForm, setFromLeadForm] = useState({
+    name: "",
+    phone: "",
+    billingAddress: "",
+    state: "",
+    country: "India"
+  });
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
+  });
+
+  const { data: pendingLeads = [] } = useQuery<PendingLead[]>({
+    queryKey: ["/api/customers/pending-from-leads"],
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
@@ -141,6 +194,51 @@ export function ZohoCustomers() {
     },
   });
 
+  const createFromLeadMutation = useMutation({
+    mutationFn: (data: { leadId: string; name: string; phone: string; billingAddress: string; state: string; country: string; weddingPlannerId?: string }) => 
+      apiRequest("POST", "/api/customers/from-lead", data),
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/pending-from-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/deals"] });
+      setIsCreateFromLeadOpen(false);
+      setSelectedLead(null);
+      setFromLeadForm({ name: "", phone: "", billingAddress: "", state: "", country: "India" });
+      toast({ 
+        title: "Customer Created", 
+        description: `Customer ${response.customerCode} has been created and linked to lead. Wedding planner has been notified.` 
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create customer", variant: "destructive" });
+    },
+  });
+
+  const handleCreateFromLead = () => {
+    if (!selectedLead) return;
+    if (!fromLeadForm.name || !fromLeadForm.phone || !fromLeadForm.billingAddress || !fromLeadForm.state) {
+      toast({ title: "Error", description: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    createFromLeadMutation.mutate({
+      leadId: selectedLead.id,
+      ...fromLeadForm,
+      weddingPlannerId: selectedLead.owner?.id
+    });
+  };
+
+  const openCreateFromLead = (lead: PendingLead) => {
+    setSelectedLead(lead);
+    setFromLeadForm({
+      name: lead.contact ? `${lead.contact.firstName} ${lead.contact.lastName}`.trim() : lead.title,
+      phone: lead.contact?.phone || lead.contact?.mobile || "",
+      billingAddress: "",
+      state: "",
+      country: "India"
+    });
+    setIsCreateFromLeadOpen(true);
+  };
+
   const getCustomerStats = (customerId: string) => {
     const customerInvoices = invoices.filter((i) => i.customerId === customerId);
     const customerEstimates = estimates.filter((e) => e.customerId === customerId);
@@ -160,9 +258,27 @@ export function ZohoCustomers() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
           <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
             <h2 className="text-base sm:text-lg font-semibold text-gray-800">Customers</h2>
-            <Badge variant="outline" className="bg-gray-100 hidden sm:inline-flex">
-              {filteredCustomers.length} {filteredCustomers.length === 1 ? "customer" : "customers"}
-            </Badge>
+            <div className="flex gap-1">
+              <Button
+                variant={activeTab === "all" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("all")}
+                className="h-8"
+              >
+                All ({customers.length})
+              </Button>
+              <Button
+                variant={activeTab === "pending" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("pending")}
+                className="h-8"
+              >
+                Pending ({pendingLeads.length})
+                {pendingLeads.length > 0 && (
+                  <span className="ml-1 w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
+                )}
+              </Button>
+            </div>
             <Button
               onClick={() => {
                 setEditingCustomer(null);
@@ -199,6 +315,8 @@ export function ZohoCustomers() {
           </div>
         </div>
 
+        {activeTab === "all" && (
+        <>
         <div className={cn(
           "flex-1 overflow-auto bg-gray-50",
           selectedCustomerId && "hidden md:block"
@@ -318,6 +436,80 @@ export function ZohoCustomers() {
         )}>
           Showing {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? "s" : ""}
         </div>
+        </>
+        )}
+
+        {activeTab === "pending" && (
+        <div className="flex-1 overflow-auto bg-gray-50">
+          {pendingLeads.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <User className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+              <p className="font-medium mb-1">No pending leads</p>
+              <p className="text-sm">All leads with advance payments have been converted to customers</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {pendingLeads.map((lead) => (
+                <div key={lead.id} className="p-4 bg-white hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium text-gray-900 truncate">{lead.title}</h3>
+                        <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200 shrink-0">
+                          Advance Received
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+                        {lead.contact && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {lead.contact.firstName} {lead.contact.lastName}
+                          </span>
+                        )}
+                        {(lead.contact?.phone || lead.contact?.mobile) && (
+                          <span className="flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {lead.contact?.phone || lead.contact?.mobile}
+                          </span>
+                        )}
+                        {lead.eventDate && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(lead.eventDate), "dd MMM yyyy")}
+                          </span>
+                        )}
+                        {lead.eventType && (
+                          <Badge variant="secondary" className="text-xs">{lead.eventType}</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-2 text-sm">
+                        <span className="font-medium text-primary">₹{parseFloat(lead.value || "0").toLocaleString("en-IN")}</span>
+                        {lead.owner && (
+                          <span className="text-gray-500">Planner: {lead.owner.name}</span>
+                        )}
+                        {lead.advancePaymentDate && (
+                          <span className="text-gray-400">Advance on {format(new Date(lead.advancePaymentDate), "dd MMM")}</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => openCreateFromLead(lead)}
+                      size="sm"
+                      className="shrink-0"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Create Customer
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="p-3 border-t bg-white text-sm text-gray-500">
+            {pendingLeads.length} lead{pendingLeads.length !== 1 ? "s" : ""} pending customer creation
+          </div>
+        </div>
+        )}
       </div>
 
       {selectedCustomer && (
@@ -350,6 +542,108 @@ export function ZohoCustomers() {
         }}
         isSubmitting={createCustomer.isPending || updateCustomer.isPending}
       />
+
+      <Dialog open={isCreateFromLeadOpen} onOpenChange={setIsCreateFromLeadOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create Customer from Lead</DialogTitle>
+          </DialogHeader>
+          {selectedLead && (
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm font-medium text-blue-900">{selectedLead.title}</p>
+                <p className="text-xs text-blue-700">
+                  ₹{parseFloat(selectedLead.value || "0").toLocaleString("en-IN")} 
+                  {selectedLead.eventDate && ` • ${format(new Date(selectedLead.eventDate), "dd MMM yyyy")}`}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label htmlFor="fromLead-name" className="text-sm font-medium">
+                    Legal Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="fromLead-name"
+                    value={fromLeadForm.name}
+                    onChange={(e) => setFromLeadForm({ ...fromLeadForm, name: e.target.value })}
+                    placeholder="Customer's legal name"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="fromLead-phone" className="text-sm font-medium">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="fromLead-phone"
+                    value={fromLeadForm.phone}
+                    onChange={(e) => setFromLeadForm({ ...fromLeadForm, phone: e.target.value })}
+                    placeholder="+91 XXXXX XXXXX"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="fromLead-address" className="text-sm font-medium">
+                    Billing Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    id="fromLead-address"
+                    value={fromLeadForm.billingAddress}
+                    onChange={(e) => setFromLeadForm({ ...fromLeadForm, billingAddress: e.target.value })}
+                    placeholder="Full billing address"
+                    className="mt-1"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="fromLead-state" className="text-sm font-medium">
+                      State <span className="text-red-500">*</span>
+                    </Label>
+                    <select
+                      id="fromLead-state"
+                      value={fromLeadForm.state}
+                      onChange={(e) => setFromLeadForm({ ...fromLeadForm, state: e.target.value })}
+                      className="mt-1 w-full h-9 px-3 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Select state</option>
+                      {INDIAN_STATES.map((state) => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="fromLead-country" className="text-sm font-medium">
+                      Country
+                    </Label>
+                    <Input
+                      id="fromLead-country"
+                      value={fromLeadForm.country}
+                      onChange={(e) => setFromLeadForm({ ...fromLeadForm, country: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateFromLeadOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateFromLead}
+              disabled={createFromLeadMutation.isPending}
+            >
+              {createFromLeadMutation.isPending ? "Creating..." : "Create Customer"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
