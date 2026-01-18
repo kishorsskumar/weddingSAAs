@@ -3545,9 +3545,14 @@ export async function handleOaksyWhatsAppMessage(
       // DELIVERY CHALLAN EXECUTION HANDLER - Natural language DC creation
       // ============================================================================
       if (aiResult.intent === 'delivery_challan' || conversation.activeIntent === 'ai_delivery_challan') {
-        // Role check - only allowed submitters can create DCs (Wedding Planners, Accountants)
-        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
-          return `❌ Sorry ${employee.name}, delivery challan creation is only available for Wedding Planners and Accountants.\n\n_Contact Kishor for DC requests._ 🌳`;
+        // Role check - only authorized DC creators can create DCs
+        const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
+        const isAccountant = employee.designation?.toLowerCase().includes('accountant');
+        const isSuperadmin = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+        const isTestEmployee = employee.name.toLowerCase().includes('test');
+        
+        if (!isAuthorizedByPhone && !isAccountant && !isSuperadmin && !isTestEmployee) {
+          return `❌ Sorry ${employee.name}, delivery challan creation is only available for authorized staff.\n\n_Contact Kishor for DC requests._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
