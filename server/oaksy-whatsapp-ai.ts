@@ -1142,22 +1142,22 @@ If the user corrects something, update the slots and ask for confirmation again.
 
     // Fallback if function calling fails
     return {
-      intent: 'unknown',
+      intent: 'clarification_needed',
       slots: {},
       confidence: 0.3,
       needsClarification: [],
-      suggestedResponse: "I'm not quite sure what you need. Could you tell me more? For example:\n• Leave request\n• Expense submission\n• Check status",
+      suggestedResponse: "I'd love to help! Could you tell me more about what you need? 😊\n\nFor example:\n• \"I need 2 days leave\"\n• \"Submit expense\" or send a receipt\n• \"Remind me to call [name] tomorrow\"",
       readyToExecute: false,
       userConfirmed: false
     };
   } catch (error: any) {
     console.error('[AI Orchestrator] Error:', error.message);
     return {
-      intent: 'unknown',
+      intent: 'clarification_needed',
       slots: {},
       confidence: 0,
       needsClarification: [],
-      suggestedResponse: "I'm having trouble understanding. Could you please rephrase that?",
+      suggestedResponse: "I want to help! Could you rephrase that or tell me what you're trying to do? 😊",
       readyToExecute: false,
       userConfirmed: false
     };
@@ -4170,10 +4170,15 @@ export async function handleOaksyWhatsAppMessage(
         return aiResult.suggestedResponse;
       }
       
+      // Handle clarification_needed intent - ask user to clarify
+      if (aiResult.intent === 'clarification_needed') {
+        return aiResult.suggestedResponse || `I'd love to help! Could you tell me a bit more about what you need? 😊\n\nFor example:\n• "Apply for leave" or "I need 2 days off"\n• "Submit expense" or send me a receipt\n• "Remind me to call [name] tomorrow at 9am"`;
+      }
+      
       // For other AI intents with good confidence, return the suggested response
       if (aiResult.confidence > 0.5) {
         // Save context for multi-turn conversation
-        if (aiResult.intent !== 'general_question' && aiResult.intent !== 'unknown') {
+        if (aiResult.intent !== 'general_question' && aiResult.intent !== 'clarification_needed') {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: `ai_${aiResult.intent}`,
             intentContext: { ...context, ...aiResult.slots },
