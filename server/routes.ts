@@ -5801,6 +5801,183 @@ export async function registerRoutes(
     }
   });
 
+  // Push Estimate to Production - Extract line items and create production items
+  app.post('/api/estimates/:id/push-to-production', async (req, res) => {
+    try {
+      const userId = (req.session as any)?.userId;
+      const estimate = await storage.getEstimate(req.params.id);
+      
+      if (!estimate) {
+        return res.status(404).json({ error: 'Estimate not found' });
+      }
+      
+      if (!estimate.eventId) {
+        return res.status(400).json({ error: 'Estimate is not linked to an event. Please link the estimate to an event first.' });
+      }
+      
+      // Check if already pushed
+      const event = await storage.getEvent(estimate.eventId);
+      if (event?.productionContainerCreated) {
+        return res.status(400).json({ error: 'Production items have already been created for this event.' });
+      }
+      
+      // Extract non-heading line items
+      const lineItems = (estimate.lineItems || []) as Array<{
+        name: string;
+        description?: string;
+        quantity: number;
+        isHeading?: boolean;
+      }>;
+      
+      const productionItems = lineItems
+        .filter(item => !item.isHeading && item.name?.trim())
+        .map(item => ({
+          eventId: estimate.eventId!,
+          estimateId: estimate.id,
+          itemName: item.name,
+          quantity: item.quantity || 1,
+          specification: item.description || null,
+          fulfillmentType: null,
+          status: 'draft' as const,
+        }));
+      
+      if (productionItems.length === 0) {
+        return res.status(400).json({ error: 'No line items found in the estimate to push to production.' });
+      }
+      
+      // Create production items
+      const created = await storage.createEventProductionItems(productionItems);
+      
+      // Mark event as having production container
+      await storage.updateEvent(estimate.eventId, { productionContainerCreated: true } as any);
+      
+      // Log automation
+      await storage.createAutomationLog({
+        eventId: estimate.eventId,
+        actionType: 'push_production',
+        status: 'success',
+        metadata: { 
+          estimateId: estimate.id, 
+          estimateNumber: estimate.number,
+          itemCount: created.length,
+          eventTitle: event?.title 
+        },
+        userId: userId || null,
+      });
+      
+      console.log(`[Automation] Pushed ${created.length} items from estimate ${estimate.number} to production for event ${event?.title}`);
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully pushed ${created.length} items to production`,
+        itemCount: created.length,
+        items: created 
+      });
+    } catch (error) {
+      console.error('Push to production error:', error);
+      res.status(400).json({ error: 'Failed to push to production' });
+    }
+  });
+
+  // Event Production Items - Get by event
+  app.get('/api/events/:eventId/production-items', async (req, res) => {
+    try {
+      const items = await storage.getEventProductionItemsByEventId(req.params.eventId);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch production items' });
+    }
+  });
+
+  // Event Production Items - Update fulfillment type
+  app.patch('/api/production-items/:id', async (req, res) => {
+    try {
+      const item = await storage.updateEventProductionItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: 'Production item not found' });
+      }
+      res.json(item);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update production item' });
+    }
+  });
+
+  // Finalize Event Inventory - Lock all production items
+  app.post('/api/events/:eventId/finalize-inventory', async (req, res) => {
+    try {
+      const userId = (req.session as any)?.userId;
+      const eventId = req.params.eventId;
+      const event = await storage.getEvent(eventId);
+      
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      
+      if (event.inventoryFinalized) {
+        return res.status(400).json({ error: 'Inventory has already been finalized for this event.' });
+      }
+      
+      // Get production items
+      const items = await storage.getEventProductionItemsByEventId(eventId);
+      if (items.length === 0) {
+        return res.status(400).json({ error: 'No production items found. Please push to production first.' });
+      }
+      
+      // Check all items have fulfillment type assigned
+      const unassigned = items.filter(item => !item.fulfillmentType);
+      if (unassigned.length > 0) {
+        return res.status(400).json({ 
+          error: `${unassigned.length} items do not have a fulfillment type assigned. Please assign warehouse/purchase/rent to all items.`,
+          unassignedCount: unassigned.length
+        });
+      }
+      
+      // Lock all items
+      await storage.lockEventProductionItems(eventId);
+      
+      // Mark event as inventory finalized
+      await storage.updateEvent(eventId, { inventoryFinalized: true } as any);
+      
+      // Log automation
+      await storage.createAutomationLog({
+        eventId: eventId,
+        actionType: 'finalize_inventory',
+        status: 'success',
+        metadata: { 
+          itemCount: items.length,
+          eventTitle: event.title,
+          breakdown: {
+            warehouse: items.filter(i => i.fulfillmentType === 'warehouse').length,
+            purchase: items.filter(i => i.fulfillmentType === 'purchase').length,
+            rent: items.filter(i => i.fulfillmentType === 'rent').length,
+          }
+        },
+        userId: userId || null,
+      });
+      
+      console.log(`[Automation] Finalized inventory for event ${event.title} with ${items.length} items`);
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully finalized ${items.length} inventory items`,
+        itemCount: items.length
+      });
+    } catch (error) {
+      console.error('Finalize inventory error:', error);
+      res.status(400).json({ error: 'Failed to finalize inventory' });
+    }
+  });
+
+  // Automation Logs - Get by event
+  app.get('/api/events/:eventId/automation-logs', async (req, res) => {
+    try {
+      const logs = await storage.getAutomationLogsByEventId(req.params.eventId);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch automation logs' });
+    }
+  });
+
   // Oak Book - Register Event from Invoice/Payment
   app.post('/api/register-event-from-payment', async (req, res) => {
     try {
