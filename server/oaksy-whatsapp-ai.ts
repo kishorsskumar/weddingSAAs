@@ -5974,7 +5974,7 @@ Return "INVALID" if you cannot parse the input.`;
     employeeRole = 'manager';
   }
   
-  const aiAnalysis = await analyzeWithAI(
+  let aiAnalysis = await analyzeWithAI(
     messageText,
     context,
     history,
@@ -5982,6 +5982,30 @@ Return "INVALID" if you cannot parse the input.`;
     employeeRole,
     employee.name
   );
+
+  // FORCE REMINDER INTENT: If AI returned "general" but message clearly contains reminder keywords
+  // This is a safety net because the AI sometimes fails to detect reminder intent
+  const lowerMessage = messageText.toLowerCase();
+  const hasReminderKeywords = 
+    lowerMessage.includes('remind me') || 
+    lowerMessage.includes('reminder') || 
+    lowerMessage.includes('set a reminder') ||
+    lowerMessage.includes('create a reminder') ||
+    lowerMessage.includes('set reminder');
+  
+  if (hasReminderKeywords && aiAnalysis.intent !== 'reminder') {
+    console.log('[Oaksy] Forcing reminder intent - AI returned:', aiAnalysis.intent, 'but message contains reminder keywords');
+    aiAnalysis = {
+      ...aiAnalysis,
+      intent: 'reminder',
+      extractedData: {
+        ...aiAnalysis.extractedData,
+        // Try to extract the message - everything after "to" or task description
+        reminderMessage: aiAnalysis.extractedData.reminderMessage || 
+          messageText.replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '').replace(/\s*(at|after|in|on|today|tomorrow).*$/i, '').trim() || null,
+      }
+    };
+  }
 
   // Handle AI-detected vendor payment intent
   if (aiAnalysis.intent === 'vendor_payment') {
