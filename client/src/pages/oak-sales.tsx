@@ -302,7 +302,7 @@ export default function OakSales() {
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center">
+              <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
                 <Target className="w-4 h-4 text-white" />
               </div>
               <span className="font-semibold">Oak Sales</span>
@@ -472,8 +472,8 @@ function DashboardSection({
         <Card>
           <CardContent className="p-3 sm:pt-6 sm:p-6">
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="p-2 sm:p-3 bg-amber-100 rounded-lg">
-                <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-amber-600" />
+              <div className="p-2 sm:p-3 bg-primary/10 rounded-lg">
+                <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Won Value</p>
@@ -599,7 +599,7 @@ function DashboardSection({
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-amber-500 rounded-full transition-all"
+                        className="h-full bg-primary rounded-full transition-all"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -1270,7 +1270,7 @@ function DealDetailPanel({
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold">{deal.title}</h3>
-                <p className="text-2xl font-bold text-amber-600 mt-1">
+                <p className="text-2xl font-bold text-primary mt-1">
                   {formatCurrency(deal.value)}
                 </p>
               </div>
@@ -1542,8 +1542,8 @@ function ContactsSection({
             <Card key={contact.id} className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-                    <span className="text-amber-600 font-semibold">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <span className="text-primary font-semibold">
                       {contact.firstName[0]}{contact.lastName?.[0] || ''}
                     </span>
                   </div>
@@ -2336,7 +2336,7 @@ function ReportsSection({
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Revenue</p>
-            <p className="text-3xl font-bold text-amber-600">{formatCurrency(totalWonValue)}</p>
+            <p className="text-3xl font-bold text-primary">{formatCurrency(totalWonValue)}</p>
           </CardContent>
         </Card>
       </div>
@@ -2580,8 +2580,8 @@ function SettingsSection({
                   return (
                     <div key={planner.id} className="py-4 flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                          <span className="text-amber-600 font-semibold">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-primary font-semibold">
                             {planner.name[0]}
                           </span>
                         </div>
@@ -2593,7 +2593,7 @@ function SettingsSection({
                       <div className="text-right">
                         {plannerTarget ? (
                           <>
-                            <p className="font-semibold text-amber-600">
+                            <p className="font-semibold text-primary">
                               {formatCurrency(plannerTarget.targetAmount)}
                             </p>
                             {plannerTarget.targetDeals && (
