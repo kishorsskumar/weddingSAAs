@@ -613,12 +613,12 @@ export default function EventMilestones() {
     
     return (
       <motion.div 
-        className="bg-slate-900/50 rounded-xl border border-slate-700/50 p-4 mt-2"
+        className="bg-white rounded-xl border p-4 mt-2"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-semibold text-amber-400">
+          <h4 className="text-sm font-semibold text-primary">
             Phase {phase} - {phaseData.phaseName} Tasks
           </h4>
           {isAdmin && (
@@ -656,24 +656,24 @@ export default function EventMilestones() {
                 className={cn(
                   "flex items-center justify-between p-3 rounded-lg border transition-all",
                   milestone.status === 'completed' 
-                    ? "bg-green-900/20 border-green-700/30" 
+                    ? "bg-green-50 border-green-200" 
                     : isBefore(parseISO(milestone.date), startOfDay(new Date()))
-                    ? "bg-red-900/20 border-red-700/30"
-                    : "bg-slate-800/50 border-slate-700/30"
+                    ? "bg-red-50 border-red-200"
+                    : "bg-gray-50 border-gray-200"
                 )}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <motion.div 
                     className={cn(
                       "w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0",
-                      milestone.status === 'completed' ? "bg-green-500" : "bg-slate-700"
+                      milestone.status === 'completed' ? "bg-green-500" : "bg-gray-400"
                     )}
                     whileHover={{ scale: 1.1 }}
                   >
                     {milestone.status === 'completed' ? (
                       <CheckCircle2 className="w-4 h-4 text-white" />
                     ) : (
-                      <Clock className="w-3 h-3 text-slate-400" />
+                      <Clock className="w-3 h-3 text-white" />
                     )}
                   </motion.div>
                   <div className="min-w-0">
@@ -695,10 +695,10 @@ export default function EventMilestones() {
                   >
                     <SelectTrigger 
                       className={cn(
-                        "w-[110px] h-8 text-xs",
+                        "w-[110px] h-8 text-xs bg-white",
                         milestone.status === 'completed' 
-                          ? "bg-green-900/30 border-green-700 text-green-400" 
-                          : "bg-slate-800 border-slate-600"
+                          ? "border-green-300 text-green-700" 
+                          : "border-gray-300 text-gray-700"
                       )}
                       data-testid={`select-status-${milestone.id}`}
                     >
