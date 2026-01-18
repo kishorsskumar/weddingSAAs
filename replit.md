@@ -49,9 +49,9 @@ Preferred communication style: Simple, everyday language.
 - **Framework:** React with TypeScript, Vite for build/development.
 - **Routing:** React Router (wouter).
 - **Data Fetching:** TanStack Query for server state management.
-- **UI:** Radix UI primitives, shadcn/ui with Tailwind CSS (New York style), custom earthy color palette.
+- **UI:** Radix UI primitives, shadcn/ui with Tailwind CSS (New York style), Zoho-inspired clean professional theme.
 - **State Management:** React Context API for auth, TanStack Query for server state, React hooks for local state.
-- **Design System:** Component aliases, responsive design (mobile-first), Lucide React icons, Inter and Playfair Display fonts.
+- **Design System:** Clean white backgrounds, subtle gray borders, Oak Green primary color (HSL 135 35% 30%), Inter font for all text.
 
 ### Backend Architecture
 - **Server:** Express.js with TypeScript.
@@ -194,10 +194,51 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes Log
 
-**January 2026:**
+**January 18, 2026 - Major UI Redesign (BASELINE):**
+- **Theme Overhaul:** Adopted Zoho Books/Bigin-inspired clean professional design
+  - Pure white backgrounds (`--background: 0 0% 100%`)
+  - Oak Green primary color (`--primary: 135 35% 30%`)
+  - Inter sans-serif typography for all text (removed Playfair Display)
+  - Subtle gray borders (`--border: 220 13% 91%`)
+  - Smaller border radius (0.375rem) for cleaner look
+- **Oak Sales Redesign:** Zoho Bigin-style CRM interface
+  - Clean white sidebar with subtle borders
+  - Kanban pipeline with white cards and subtle shadows
+  - Responsive stage columns with visible horizontal scrollbar
+  - Auto-collapsing sidebar in Pipeline view
+- **Oak Book Updates:** 
+  - All buttons use primary color (Oak Green) instead of blue
+  - Text accents updated to primary color for consistency
+- **Event Database Redesign:**
+  - List-detail split view pattern (list on left, detail panel on right)
+  - Click any event to see full details in side panel
+  - Superadmin can edit all event fields directly in the panel
+  - All fields editable: title, customer, date, type, planner, venue, financials
+  - Responsive design with overlay panel on mobile
+
+**Earlier January 2026:**
 - Added mobile bottom navigation bar with 5 tabs
 - Implemented full-height views (100dvh) for native app feel
 - Fixed Oak Book invoice/estimate headers for mobile (New button visibility)
 - Added viewport-fit=cover for iOS safe areas
 - Added touch-friendly 44px tap targets
 - Responsive headers with flex-col/flex-row pattern
+
+## Design System Reference (BASELINE)
+
+### CSS Theme Tokens (Light Mode)
+```css
+--background: 0 0% 100%;           /* Pure white */
+--foreground: 140 20% 15%;         /* Dark forest green text */
+--primary: 135 35% 30%;            /* Oak Green - brand color */
+--primary-foreground: 40 20% 98%;  /* Light text on primary */
+--secondary: 220 14% 96%;          /* Light gray */
+--border: 220 13% 91%;             /* Light gray borders */
+--radius: 0.375rem;                /* Subtle rounded corners */
+```
+
+### Component Patterns
+- **Split View Pattern:** List on left, detail panel slides in from right
+- **Edit Mode Pattern:** Toggle between read-only display and editable inputs
+- **Zoho-style Headers:** Clean white with subtle bottom border
+- **Card Hover States:** Subtle shadow on hover, primary border when selected
