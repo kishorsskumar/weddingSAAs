@@ -1926,16 +1926,16 @@ async function handleInventoryItemCreation(
       currentState: 'idle',
     });
     
-    const photoNote = photoUrl ? '\n📸 Photo saved!' : '';
+    const photoNote = photoUrl ? ' Photo saved too!' : '';
     return {
       success: true,
-      message: `Done! ✅ Added *${itemName}* (${quantity} units) to the warehouse${photoNote ? ' with photo' : ''}.\n\nCategory: ${category} | Location: ${location}\n\n_All set!_ 🌳`
+      message: `Done! ${itemName} (${quantity} units) has been added to the warehouse.${photoNote}\n\nCategory: ${category} | Location: ${location}`
     };
   } catch (error: any) {
     console.error('[Inventory] Error creating item:', error.message);
     return {
       success: false,
-      message: `❌ Sorry, couldn't add the item to inventory. Error: ${error.message}`
+      message: `Hmm, something went wrong while adding that to inventory. Can you try again?`
     };
   }
 }
@@ -3922,7 +3922,7 @@ export async function handleOaksyWhatsAppMessage(
               currentState: 'awaiting_inventory_quantity',
               conversationHistory: history,
             });
-            return `Got it on the rate! 👍 But first, *how many* ${slots.inventoryItemName || 'items'} do we have?\n\nJust send me the number like: "20" 🌳`;
+            return `Got it on the rate! But first, how many ${slots.inventoryItemName || 'of these'} do we have? Just send me the number.`;
           }
         }
         
@@ -3969,10 +3969,10 @@ export async function handleOaksyWhatsAppMessage(
           
           const quantity = slots.inventoryItemQuantity;
           const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
-          const hasPhoto = slots.inventoryItemPhotoUrl ? ' with photo 📸' : '';
+          const hasPhoto = slots.inventoryItemPhotoUrl ? ' with photo' : '';
           
-          // Natural, conversational response
-          return `📦 Got it! Adding to inventory${hasPhoto}:\n\n*${slots.inventoryItemName}*${colour}\nQuantity: ${quantity} units\n\nLooks good? Just say *yes* to confirm! 🌳`;
+          // Natural, conversational response like ChatGPT
+          return `Perfect! Here's what I'm adding to inventory${hasPhoto}:\n\n${slots.inventoryItemName}${colour} - ${quantity} units\n\nDoes that look right? Just say yes to confirm, or let me know if anything needs changing.`;
         } else if (slots.inventoryItemName && !slots.inventoryItemQuantity) {
           // Have item name but need quantity
           await storage.updateWhatsappConversation(conversation.id, {
@@ -3983,9 +3983,8 @@ export async function handleOaksyWhatsAppMessage(
           });
           
           const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
-          const hasPhoto = slots.inventoryItemPhotoUrl ? ' 📸' : '';
           
-          return `📦 *${slots.inventoryItemName}*${colour}${hasPhoto}\n\n*How many* do we have? Just send the number! 🌳`;
+          return `Got it - ${slots.inventoryItemName}${colour}. How many do we have in stock?`;
         } else if (Object.keys(aiResult.slots).length > 0 || mediaUrl) {
           // Have some info but need more
           await storage.updateWhatsappConversation(conversation.id, {
@@ -3996,7 +3995,7 @@ export async function handleOaksyWhatsAppMessage(
           });
           
           if (!slots.inventoryItemName) {
-            return `Nice photo! 📸 What's this item called and how many do we have?\n\nJust tell me like: "50 white chairs" 🌳`;
+            return `Nice photo! What's this item called and how many do we have?`;
           }
         }
         
