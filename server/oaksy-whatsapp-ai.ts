@@ -913,7 +913,7 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
 interface AIParseResult {
   intent: 'leave_request' | 'expense' | 'vendor_payment' | 'income' | 'qr_payment' | 'status_check' | 
           'event_query' | 'bank_query' | 'team_query' | 'delivery_challan' | 'daybook_entry' | 'inventory_item' |
-          'greeting' | 'confirmation' | 'correction' | 'cancellation' | 'help' | 'general_question' | 'unknown';
+          'reminder' | 'greeting' | 'confirmation' | 'correction' | 'cancellation' | 'help' | 'clarification_needed' | 'general_question' | 'unknown';
   slots: {
     leaveType?: 'casual' | 'sick' | 'vacation' | 'personal';
     startDate?: string;
@@ -942,6 +942,10 @@ interface AIParseResult {
     inventoryItemQuantity?: number;
     inventoryItemCategory?: string;
     inventoryItemLocation?: string;
+    inventoryItemUnitCost?: number;
+    // Reminder slots
+    reminderMessage?: string;
+    reminderDateTime?: string;
   };
   confidence: number;
   needsClarification: string[];
@@ -953,6 +957,11 @@ interface AIParseResult {
 const AI_ORCHESTRATOR_PROMPT = `You are Oaksy AI, the intelligent WhatsApp assistant for Oakstreet Events. Your job is to understand what employees want to do and help them accomplish it naturally.
 
 ROLE: You're a friendly, smart assistant that understands natural language. You don't require specific formats - you figure out what people mean.
+
+CRITICAL: YOU CAN DO EVERYTHING
+- NEVER say "I can't do that" or "I'm not able to help with that"
+- If you're unsure, use intent="clarification_needed" and ASK what they meant
+- If something sounds like a task, try to help - don't reject
 
 YOUR CAPABILITIES:
 1. LEAVE REQUESTS - casual leave, sick leave, vacation, personal leave
@@ -970,13 +979,18 @@ YOUR CAPABILITIES:
    - Example: "add 50 white chairs to inventory", "new stock - 100 table covers"
 8. STATUS CHECKS - pending requests, approvals, balances
 9. QUERIES - events, team, financial info, RSVP status
+10. REMINDERS - set reminders for any task at any time/date
+    - "Remind me to call Square Meals on 27 Jan 26" = reminder
+    - "Remind me to check flowers tomorrow at 9am" = reminder
+    - ANY message with "remind me" or "reminder" = reminder intent
 
 CONVERSATION STYLE:
 - Be warm and friendly like a helpful colleague
 - Use simple language
 - ALWAYS confirm before taking action
 - Ask ONE clarifying question at a time if needed
-- Be smart about extracting dates - "tomorrow", "next Monday", "19th" should be understood
+- Be smart about extracting dates - "tomorrow", "next Monday", "19th", "27 Jan 26" should be understood
+- If unsure what they want, ask politely - NEVER reject or say you can't help
 
 DATE UNDERSTANDING (Today is ${new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}):
 - "tomorrow" = next day
@@ -1010,8 +1024,8 @@ const aiParseMessageFunction = {
         type: "string",
         enum: ["leave_request", "expense", "vendor_payment", "income", "qr_payment", "status_check", 
                "event_query", "bank_query", "team_query", "delivery_challan", "daybook_entry", "inventory_item",
-               "greeting", "confirmation", "correction", "cancellation", "help", "general_question", "unknown"],
-        description: "The primary intent of the user's message"
+               "reminder", "greeting", "confirmation", "correction", "cancellation", "help", "clarification_needed", "general_question"],
+        description: "The primary intent of the user's message. Use 'clarification_needed' when the request is unclear - never reject outright."
       },
       slots: {
         type: "object",
@@ -1046,7 +1060,10 @@ const aiParseMessageFunction = {
           inventoryItemQuantity: { type: "number", description: "Quantity of items to add" },
           inventoryItemCategory: { type: "string", description: "Category like Furniture, Decor, Fabric, etc." },
           inventoryItemLocation: { type: "string", description: "Warehouse location" },
-          inventoryItemUnitCost: { type: "number", description: "Unit rate/price per item in rupees" }
+          inventoryItemUnitCost: { type: "number", description: "Unit rate/price per item in rupees" },
+          // Reminder slots
+          reminderMessage: { type: "string", description: "The task/action to be reminded about, e.g., 'call flower vendor'" },
+          reminderDateTime: { type: "string", description: "ISO datetime when to send reminder, e.g., '2026-01-27T09:00:00'" }
         },
         description: "Extracted slot values from the message"
       },
