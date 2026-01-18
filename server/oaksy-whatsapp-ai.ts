@@ -4883,6 +4883,19 @@ export async function handleOaksyWhatsAppMessage(
   
   // Handle simplified QR payment flow states
   if (conversation.activeIntent === 'qr_payment') {
+    // EARLY EXIT: If authorized user sends inventory keywords, reset and let AI handle it
+    const lowerMsgForInventoryCheck = messageText.toLowerCase();
+    const hasInventoryKeywordsInQr = /inventory|warehouse|stock|create inventory|add item|new item|item\s*:/i.test(lowerMsgForInventoryCheck);
+    if (hasInventoryKeywordsInQr && isAuthorizedInventoryCreator(normalizedPhone)) {
+      console.log('[Oaksy] Inventory keywords detected in QR flow - resetting to let AI handle inventory');
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: null,
+        intentContext: {},
+        currentState: 'idle',
+        conversationHistory: [],
+      });
+      // Don't return - let it fall through to AI processing
+    } else {
     // Waiting for just purpose (amount already provided)
     if (conversation.currentState === 'awaiting_qr_purpose_only') {
       console.log(`[QR Purpose] Processing expense description: "${messageText}", amount: ${context.amount}, imageUrl: ${context.qrImageUrl}`);
@@ -5036,6 +5049,7 @@ export async function handleOaksyWhatsAppMessage(
       
       return `Let's start fresh! Please send your QR code again with the amount and purpose.\n\n_Example: Send QR image with "500 for taxi"_`;
     }
+    } // End of else block for non-inventory messages in QR flow
   }
 
   // Handle income submission flow states
