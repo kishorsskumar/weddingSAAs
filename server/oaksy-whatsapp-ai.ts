@@ -255,6 +255,8 @@ interface IntentContext {
   // AI Delivery challan fields (for ai_delivery_challan intent)
   dcItems?: string;
   dcDestination?: string;
+  dcAddress?: string;
+  dcAmount?: number;
   dcVehicle?: string;
   dcDriver?: string;
   // Daybook entry fields
@@ -1050,7 +1052,9 @@ const aiParseMessageFunction = {
           // Delivery challan slots
           dcItems: { type: "string", description: "Items being delivered (comma-separated or description)" },
           dcVehicle: { type: "string", description: "Vehicle number or description" },
-          dcDestination: { type: "string", description: "Delivery destination/venue" },
+          dcDestination: { type: "string", description: "Delivery destination/venue (recipient name or company)" },
+          dcAddress: { type: "string", description: "Full delivery address" },
+          dcAmount: { type: "number", description: "Total amount for the delivery challan" },
           dcDriver: { type: "string", description: "Driver name" },
           // Daybook slots
           daybookType: { type: "string", enum: ["income", "expense"], description: "Type of daybook entry" },
@@ -3650,16 +3654,16 @@ export async function handleOaksyWhatsAppMessage(
       }
       
       // ============================================================================
-      // DELIVERY CHALLAN EXECUTION HANDLER - Natural language DC creation
+      // DELIVERY CHALLAN EXECUTION HANDLER - Natural language DC creation with PDF
       // ============================================================================
       if (aiResult.intent === 'delivery_challan' || conversation.activeIntent === 'ai_delivery_challan') {
         // Role check - only authorized DC creators can create DCs
         const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
         const isAccountant = employee.designation?.toLowerCase().includes('accountant');
-        const isSuperadmin = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+        const isSuperadminUser = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
         const isTestEmployee = employee.name.toLowerCase().includes('test');
         
-        if (!isAuthorizedByPhone && !isAccountant && !isSuperadmin && !isTestEmployee) {
+        if (!isAuthorizedByPhone && !isAccountant && !isSuperadminUser && !isTestEmployee) {
           return `❌ Sorry ${employee.name}, delivery challan creation is only available for authorized staff.\n\n_Contact Kishor for DC requests._ 🌳`;
         }
         
@@ -3669,17 +3673,72 @@ export async function handleOaksyWhatsAppMessage(
         const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
         const isInAwaitingState = conversation.activeIntent === 'ai_delivery_challan' && 
                                    conversation.currentState === 'awaiting_confirmation';
-        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
-                              (isSimpleConfirm && isInAwaitingState && slots.dcItems && slots.dcDestination);
         
-        console.log('[AI DC] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        // For Superadmin or when all info is complete, auto-execute
+        const hasAllInfo = slots.dcItems && slots.dcDestination && slots.dcAmount;
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && hasAllInfo) ||
+                              (isSuperadminPhone(normalizedPhone) && hasAllInfo);
+        
+        console.log('[AI DC] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, hasAllInfo, slots });
         
         if (shouldExecute && slots.dcItems && slots.dcDestination) {
           try {
-            console.log('[AI DC] EXECUTING delivery challan creation...');
+            console.log('[AI DC] EXECUTING delivery challan creation with PDF...');
             
-            // Generate DC number
-            const dcNumber = `DC${Date.now().toString().slice(-6)}`;
+            const amount = slots.dcAmount || 0;
+            const deliverTo = slots.dcDestination;
+            const deliveryAddress = slots.dcAddress || slots.dcDestination;
+            const itemDescription = slots.dcItems;
+            const vehicleNumber = slots.dcVehicle || null;
+            
+            // Generate proper DC number
+            const challanNumber = await storage.generateDeliveryChallanNumber();
+            const challanDate = new Date().toISOString().split('T')[0];
+            
+            // Build items array
+            const items = [{
+              description: itemDescription,
+              hsnCode: '44219160',
+              quantity: 1,
+              unit: 'nos',
+              rate: amount,
+              amount: amount
+            }];
+            
+            // Calculate taxes
+            const cgstRate = 9;
+            const sgstRate = 9;
+            const subTotal = amount;
+            const cgstAmount = subTotal * cgstRate / 100;
+            const sgstAmount = subTotal * sgstRate / 100;
+            const totalBeforeRounding = subTotal + cgstAmount + sgstAmount;
+            const totalAmount = Math.round(totalBeforeRounding);
+            const rounding = totalAmount - totalBeforeRounding;
+            const totalInWords = `Indian Rupee ${numberToWords(totalAmount)} Only`;
+            const notes = `Created via Oaksy by ${employee.name}`;
+            
+            // Create DC in database
+            await storage.createDeliveryChallan({
+              challanNumber,
+              challanDate,
+              challanType: 'Job Work',
+              vehicleNumber,
+              deliverTo,
+              deliveryAddress,
+              placeOfSupply: 'Kerala (32)',
+              items,
+              subTotal: subTotal.toFixed(2),
+              cgstRate: cgstRate.toString(),
+              cgstAmount: cgstAmount.toFixed(2),
+              sgstRate: sgstRate.toString(),
+              sgstAmount: sgstAmount.toFixed(2),
+              rounding: rounding.toFixed(2),
+              totalAmount: totalAmount.toFixed(2),
+              totalInWords,
+              notes,
+              createdBy: employee.userId || null,
+            });
             
             // Reset conversation state
             await storage.updateWhatsappConversation(conversation.id, {
@@ -3689,25 +3748,83 @@ export async function handleOaksyWhatsAppMessage(
               conversationHistory: [],
             });
             
-            // Notify superadmin about new DC (DC doesn't need approval, just notification)
-            const notifyMsg = `📦 *Delivery Challan Created*\n\n👤 By: ${employee.name}\n📋 Items: ${slots.dcItems}\n📍 To: ${slots.dcDestination}\n${slots.dcVehicle ? `🚗 Vehicle: ${slots.dcVehicle}\n` : ''}${slots.dcDriver ? `👨‍✈️ Driver: ${slots.dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}`;
-            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
-            
-            return `✅ *Delivery Challan Created!*\n\n📦 Items: ${slots.dcItems}\n📍 Destination: ${slots.dcDestination}\n${slots.dcVehicle ? `🚗 Vehicle: ${slots.dcVehicle}\n` : ''}${slots.dcDriver ? `👨‍✈️ Driver: ${slots.dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}\n\n_Kishor has been notified_ 🌳`;
+            // Generate PDF and send via WhatsApp
+            try {
+              const { generateDeliveryChallanPdf } = await import('./document-service');
+              const { ObjectStorageService } = await import('./objectStorage');
+              const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
+              
+              const pdfBuffer = await generateDeliveryChallanPdf({
+                challanNumber,
+                challanDate,
+                challanType: 'Job Work',
+                vehicleNumber,
+                deliverTo,
+                deliveryAddress,
+                placeOfSupply: 'Kerala (32)',
+                items,
+                subTotal: subTotal.toFixed(2),
+                cgstRate: cgstRate.toString(),
+                cgstAmount: cgstAmount.toFixed(2),
+                sgstRate: sgstRate.toString(),
+                sgstAmount: sgstAmount.toFixed(2),
+                rounding: rounding.toFixed(2),
+                totalAmount: totalAmount.toFixed(2),
+                totalInWords,
+                notes,
+              });
+              
+              const objectStorage = new ObjectStorageService();
+              const filename = `delivery-challans/DC-${challanNumber}-${Date.now()}.pdf`;
+              const pdfUrl = await objectStorage.uploadPublicBuffer(pdfBuffer, filename, 'application/pdf');
+              
+              console.log('[AI DC] PDF generated and uploaded:', pdfUrl);
+              
+              // Send PDF via WhatsApp to the creator
+              const caption = `📋 *Delivery Challan ${challanNumber}*\n\n📍 To: ${deliverTo}\n💵 Total: ₹${totalAmount.toLocaleString('en-IN')}`;
+              await sendWhatsAppMediaMessage(normalizedPhone, pdfUrl, caption);
+              
+              // Notify superadmin
+              if (!isSuperadminPhone(normalizedPhone)) {
+                const notifyMsg = `📦 *DC Created*\n\n👤 By: ${employee.name}\n📋 ${challanNumber}\n📍 To: ${deliverTo}\n💵 ₹${totalAmount.toLocaleString('en-IN')}`;
+                await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+              }
+              
+              return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 To: ${deliverTo}\n📦 Items: ${itemDescription}\n💵 Total: ₹${totalAmount.toLocaleString('en-IN')}\n\n📄 _PDF sent!_`;
+            } catch (pdfError: any) {
+              console.error('[AI DC] PDF generation error:', pdfError.message);
+              return `✅ *DC Created!* ${challanNumber}\n\n📍 To: ${deliverTo}\n📦 ${itemDescription}\n💵 ₹${totalAmount.toLocaleString('en-IN')}\n\n_(PDF could not be sent)_`;
+            }
           } catch (execError) {
             console.error('[AI DC] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem creating the delivery challan. Please try again.`;
           }
         }
         
+        // Check what info is missing
+        if (!slots.dcAmount) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_delivery_challan',
+            intentContext: slots,
+            currentState: 'awaiting_dc_amount',
+            conversationHistory: history,
+          });
+          return `💰 What's the amount for this DC?`;
+        }
+        
         // Not confirmed yet - save context
-        if (slots.dcItems && slots.dcDestination && !aiResult.readyToExecute) {
+        if (slots.dcItems && slots.dcDestination && slots.dcAmount && !aiResult.readyToExecute) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'ai_delivery_challan',
             intentContext: slots,
             currentState: 'awaiting_confirmation',
             conversationHistory: history,
           });
+          
+          // For non-superadmin, ask for confirmation
+          if (!isSuperadminPhone(normalizedPhone)) {
+            return `📦 *DC Ready*\n\n📋 Items: ${slots.dcItems}\n📍 To: ${slots.dcDestination}\n💵 Amount: ₹${slots.dcAmount.toLocaleString('en-IN')}\n\n_Say "yes" to create DC and get PDF_`;
+          }
         } else if (Object.keys(aiResult.slots).length > 0) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'ai_delivery_challan',
