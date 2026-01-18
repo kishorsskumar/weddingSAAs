@@ -51,6 +51,7 @@ export type LeaveCategory = typeof leaveCategories.$inferSelect;
 
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventCode: text("event_code").unique(), // OAKS-E-YY-MM-XXX format, read-only after creation
   title: text("title").notNull(),
   date: date("date").notNull(),
   time: text("time"), // Event time e.g. "18:00"
@@ -179,7 +180,7 @@ export const eventMilestones = pgTable("event_milestones", {
 // Oak Book - Customers
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerCode: text("customer_code").unique(), // OAK-YY-XXXX format, read-only after creation
+  customerCode: text("customer_code").unique(), // OAKS-C-YY-XXXX format, read-only after creation
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -478,7 +479,7 @@ export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, eventCode: true });
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
 export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit({ id: true, createdAt: true });
