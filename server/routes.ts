@@ -8183,6 +8183,159 @@ export async function registerRoutes(
     }
   });
 
+  // Event Staff Assignments - Staff assigned to events via Event Hub
+  app.get('/api/event-staff-assignments', async (req, res) => {
+    try {
+      const eventId = req.query.eventId as string;
+      if (!eventId) {
+        return res.status(400).json({ error: 'eventId is required' });
+      }
+      const assignments = await storage.getEventStaffAssignments(eventId);
+      res.json(assignments);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch staff assignments' });
+    }
+  });
+
+  app.post('/api/event-staff-assignments', async (req, res) => {
+    try {
+      const userId = (req as any).session?.userId;
+      const { assignments } = req.body;
+      
+      if (!Array.isArray(assignments) || assignments.length === 0) {
+        return res.status(400).json({ error: 'assignments array is required' });
+      }
+      
+      // Get the event once
+      const eventId = assignments[0].eventId;
+      const event = await storage.getEvent(eventId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      
+      // Create all assignments
+      const assignmentsData = assignments.map((a: any) => ({
+        ...a,
+        assignedBy: userId || null
+      }));
+      const created = await storage.createEventStaffAssignments(assignmentsData);
+      
+      // Send WhatsApp notifications if configured
+      if (isWhatsAppConfigured()) {
+        const notificationResults: { staffId: string; status: string; error?: string }[] = [];
+        
+        for (const assignment of created) {
+          try {
+            // Get employee details
+            const employee = await storage.getEmployee(assignment.employeeId);
+            if (!employee || !employee.phone) {
+              notificationResults.push({ staffId: assignment.employeeId, status: 'skipped', error: 'No phone number' });
+              continue;
+            }
+            
+            // Format the message
+            const eventDate = event.date ? new Date(event.date).toLocaleDateString('en-IN', { 
+              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' 
+            }) : 'TBD';
+            
+            const staffMessage = `*Event Assignment Confirmed:*\n${event.title}\n\nDate: ${eventDate}\nVenue: ${event.venue || 'TBD'}\nRole: ${assignment.role}\nReporting Time: ${assignment.reportingTime || 'TBD'}\n\nPlease confirm availability and be on time.`;
+            
+            await sendWhatsAppMessage(employee.phone, staffMessage);
+            
+            // Mark as notified
+            await storage.markEventStaffAssignmentNotified(assignment.id);
+            
+            // Log notification
+            await storage.createAutomationLog({
+              eventId: eventId,
+              actionType: 'staff_assignment_notification',
+              status: 'success',
+              metadata: { 
+                staffId: assignment.employeeId,
+                staffName: employee.name,
+                staffPhone: employee.phone,
+                role: assignment.role
+              }
+            });
+            
+            notificationResults.push({ staffId: assignment.employeeId, status: 'sent' });
+            console.log(`[Automation] Sent staff assignment notification to ${employee.name} (${employee.phone})`);
+          } catch (notifError) {
+            console.error(`[Automation] Failed to send notification to staff ${assignment.employeeId}:`, notifError);
+            notificationResults.push({ staffId: assignment.employeeId, status: 'failed', error: String(notifError) });
+          }
+        }
+        
+        // Send summary to planner/supervisor
+        try {
+          const PLANNER_PHONES: Record<string, string> = {
+            'fida fathima': '+919895810975',
+            'fida': '+919895810975',
+            'femina km': '+917306687284',
+            'femina': '+917306687284',
+            'kishor': '+917902373354',
+          };
+          
+          const plannerName = event.planner?.toLowerCase() || '';
+          let plannerPhone = PLANNER_PHONES['kishor']; // Default
+          
+          for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
+            if (plannerName.includes(key)) {
+              plannerPhone = phone;
+              break;
+            }
+          }
+          
+          const supervisorMessage = `*Team Assigned Successfully:*\n${event.title}\n\nTotal Staff Assigned: ${created.length}\n\nAll assigned members have been notified.`;
+          await sendWhatsAppMessage(plannerPhone, supervisorMessage);
+          
+          // Log supervisor notification
+          await storage.createAutomationLog({
+            eventId: eventId,
+            actionType: 'staff_assignment_summary',
+            status: 'success',
+            metadata: { 
+              supervisorPhone: plannerPhone,
+              staffCount: created.length,
+              eventTitle: event.title
+            }
+          });
+          
+          console.log(`[Automation] Sent staff assignment summary to planner ${event.planner}`);
+        } catch (summaryError) {
+          console.error('[Automation] Failed to send summary to planner:', summaryError);
+        }
+      }
+      
+      res.json({ 
+        success: true, 
+        assignments: created,
+        message: `Successfully assigned ${created.length} staff members` 
+      });
+    } catch (error) {
+      console.error('Staff assignment error:', error);
+      res.status(400).json({ error: 'Failed to create staff assignments' });
+    }
+  });
+
+  app.patch('/api/event-staff-assignments/:id', async (req, res) => {
+    try {
+      const assignment = await storage.updateEventStaffAssignment(req.params.id, req.body);
+      res.json(assignment);
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to update staff assignment' });
+    }
+  });
+
+  app.delete('/api/event-staff-assignments/:id', async (req, res) => {
+    try {
+      await storage.deleteEventStaffAssignment(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(400).json({ error: 'Failed to delete staff assignment' });
+    }
+  });
+
   // Object Storage - Image Upload Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
