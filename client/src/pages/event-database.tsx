@@ -171,7 +171,7 @@ export default function EventDatabase() {
   };
 
   const handleExport = () => {
-    const headers = ['Wedding Planner', 'Client Name', 'Event ID', 'Date', 'Event Type', 'Venue', 'Sales Value', 'Payment Received', 'Balance', 'Total Cost', 'Profit', 'Profit %'];
+    const headers = ['Wedding Planner', 'Client Name', 'Event Code', 'Date', 'Event Type', 'Venue', 'Sales Value', 'Payment Received', 'Balance', 'Total Cost', 'Profit', 'Profit %'];
     
     const csvRows = filteredEvents.map(event => {
       const salesValue = Number(event.salesValue) || 0;
@@ -184,7 +184,7 @@ export default function EventDatabase() {
       return [
         event.planner,
         event.customer,
-        generateEventId(event),
+        event.eventCode || generateEventId(event),
         event.date,
         event.type,
         event.venue,
@@ -496,8 +496,17 @@ export default function EventDatabase() {
                   <Calendar className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs text-muted-foreground">Event ID</p>
-                  <p className="font-medium">{generateEventId(event)}</p>
+                  {event.eventCode ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">Event Code</p>
+                      <p className="font-medium font-mono text-primary">{event.eventCode}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground">Event ID</p>
+                      <p className="font-medium">{generateEventId(event)}</p>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -805,7 +814,11 @@ export default function EventDatabase() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-medium text-sm truncate">{event.customer}</h3>
-                          <span className="text-xs text-muted-foreground">{generateEventId(event)}</span>
+                          {event.eventCode ? (
+                            <span className="text-xs font-mono text-primary/70">{event.eventCode}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">{generateEventId(event)}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
