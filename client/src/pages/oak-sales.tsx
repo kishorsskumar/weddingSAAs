@@ -421,12 +421,31 @@ function DashboardSection({
   const pendingActivities = activities.filter(a => a.status === 'pending');
   const currentFY = getIndianFiscalYear();
 
-  const dealsByStage = stages.map(stage => ({
-    name: stage.name,
-    count: deals.filter(d => d.stageId === stage.id).length,
-    value: deals.filter(d => d.stageId === stage.id).reduce((sum, d) => sum + parseFloat(d.value || '0'), 0),
-    color: stage.color,
-  }));
+  const dealsByStage = useMemo(() => {
+    const stageMap = new Map<string, { name: string; count: number; value: number; color: string; order: number }>();
+    
+    stages.forEach(stage => {
+      const existing = stageMap.get(stage.name);
+      const stageDeals = deals.filter(d => d.stageId === stage.id);
+      const count = stageDeals.length;
+      const value = stageDeals.reduce((sum, d) => sum + parseFloat(d.value || '0'), 0);
+      
+      if (existing) {
+        existing.count += count;
+        existing.value += value;
+      } else {
+        stageMap.set(stage.name, {
+          name: stage.name,
+          count,
+          value,
+          color: stage.color,
+          order: stage.order
+        });
+      }
+    });
+    
+    return Array.from(stageMap.values()).sort((a, b) => a.order - b.order);
+  }, [stages, deals]);
 
   return (
     <div className="space-y-6">
