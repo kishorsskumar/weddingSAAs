@@ -6452,16 +6452,103 @@ Return "INVALID" if you cannot parse the input.`;
           extractedDateTime = now.toISOString();
         }
       }
+      
+      // Pattern: "on [date]" e.g., "on 27 Jan 26", "on January 27", "on 27/01/2026"
+      if (!extractedDateTime) {
+        const monthNames: { [key: string]: number } = {
+          'jan': 0, 'january': 0,
+          'feb': 1, 'february': 1,
+          'mar': 2, 'march': 2,
+          'apr': 3, 'april': 3,
+          'may': 4,
+          'jun': 5, 'june': 5,
+          'jul': 6, 'july': 6,
+          'aug': 7, 'august': 7,
+          'sep': 8, 'september': 8, 'sept': 8,
+          'oct': 9, 'october': 9,
+          'nov': 10, 'november': 10,
+          'dec': 11, 'december': 11
+        };
+        
+        // Pattern: "on 27 Jan 26" or "on 27 January 2026"
+        const dateMatch1 = messageText.match(/on\s+(\d{1,2})\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(?:'?(\d{2,4}))?/i);
+        if (dateMatch1) {
+          const day = parseInt(dateMatch1[1]);
+          const monthKey = dateMatch1[2].toLowerCase();
+          const month = monthNames[monthKey] ?? monthNames[monthKey.substring(0, 3)];
+          let year = dateMatch1[3] ? parseInt(dateMatch1[3]) : new Date().getFullYear();
+          
+          // Handle 2-digit year (26 -> 2026)
+          if (year < 100) year += 2000;
+          
+          const reminderDate = new Date(year, month, day, 9, 0, 0); // Default to 9 AM
+          extractedDateTime = reminderDate.toISOString();
+          console.log('[Oaksy] Extracted date from "on DD MMM YY" pattern:', extractedDateTime);
+        }
+        
+        // Pattern: "on January 27" or "on Jan 27, 2026"
+        if (!extractedDateTime) {
+          const dateMatch2 = messageText.match(/on\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:[,\s]+(?:'?(\d{2,4})))?/i);
+          if (dateMatch2) {
+            const monthKey = dateMatch2[1].toLowerCase();
+            const month = monthNames[monthKey] ?? monthNames[monthKey.substring(0, 3)];
+            const day = parseInt(dateMatch2[2]);
+            let year = dateMatch2[3] ? parseInt(dateMatch2[3]) : new Date().getFullYear();
+            
+            if (year < 100) year += 2000;
+            
+            const reminderDate = new Date(year, month, day, 9, 0, 0);
+            extractedDateTime = reminderDate.toISOString();
+            console.log('[Oaksy] Extracted date from "on MMM DD" pattern:', extractedDateTime);
+          }
+        }
+        
+        // Pattern: "on 27/01/2026" or "on 27-01-26"
+        if (!extractedDateTime) {
+          const dateMatch3 = messageText.match(/on\s+(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/i);
+          if (dateMatch3) {
+            const day = parseInt(dateMatch3[1]);
+            const month = parseInt(dateMatch3[2]) - 1; // 0-indexed
+            let year = parseInt(dateMatch3[3]);
+            
+            if (year < 100) year += 2000;
+            
+            const reminderDate = new Date(year, month, day, 9, 0, 0);
+            extractedDateTime = reminderDate.toISOString();
+            console.log('[Oaksy] Extracted date from "on DD/MM/YYYY" pattern:', extractedDateTime);
+          }
+        }
+        
+        // Pattern: "tomorrow" or "today"
+        if (!extractedDateTime) {
+          if (/\btomorrow\b/i.test(messageText)) {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0);
+            extractedDateTime = tomorrow.toISOString();
+          } else if (/\btoday\b/i.test(messageText)) {
+            const today = new Date();
+            today.setHours(17, 0, 0, 0); // Default to 5 PM for same-day
+            if (today <= new Date()) {
+              today.setHours(today.getHours() + 1);
+            }
+            extractedDateTime = today.toISOString();
+          }
+        }
+      }
     }
     
-    // Extract the reminder message - everything after "to" but before time patterns
+    // Extract the reminder message - everything after "to" but before time/date patterns
     let extractedMessage = aiAnalysis.extractedData.reminderMessage;
     if (!extractedMessage) {
       extractedMessage = messageText
         .replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '')
-        .replace(/\s*(at|after|in|on|today|tomorrow)\s+\d+.*/i, '') // Remove time part
-        .replace(/\s+after\s+\d+.*/i, '') // "after 5 minutes"
-        .replace(/\s+in\s+\d+.*/i, '') // "in 5 minutes"
+        .replace(/\s+on\s+\d{1,2}\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?).*/i, '') // "on 27 Jan 26"
+        .replace(/\s+on\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d+.*/i, '') // "on Jan 27"
+        .replace(/\s+on\s+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}.*/i, '') // "on 27/01/26"
+        .replace(/\s*(at|after|in)\s+\d+.*/i, '') // "at 3pm", "after 5 min", "in 2 hours"
+        .replace(/\s+today\b.*/i, '')
+        .replace(/\s+tomorrow\b.*/i, '')
         .trim();
       
       // If message is empty or too short, try a different approach
@@ -6469,6 +6556,7 @@ Return "INVALID" if you cannot parse the input.`;
         extractedMessage = messageText
           .replace(/^.*(remind me|set a reminder|can you remind me)(\s+to)?/i, '')
           .replace(/\s*(after|in)\s+\d+\s*(min(?:ute)?s?|hour?s?|hr?s?).*$/i, '')
+          .replace(/\s+on\s+\d{1,2}\s*\w+.*$/i, '') // Generic date pattern
           .trim() || undefined;
       }
     }
