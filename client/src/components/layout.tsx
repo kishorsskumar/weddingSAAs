@@ -69,10 +69,19 @@ const ALL_PAGES = [
     { id: "ops-transportation", label: "Event Transportation", path: "/oak-inventory?section=transportation", group: "Logistics" },
     { id: "ops-manpower", label: "Event Manpower", path: "/oak-inventory?section=manpower", group: "Workforce" },
   ] },
+  { id: "finance", label: "Finance", path: "/oak-book", subPages: [
+    { id: "finance-masters", label: "Masters", path: "/oak-book?section=customers", group: "Masters" },
+    { id: "finance-customers", label: "Customers", path: "/oak-book?section=customers", group: "Masters" },
+    { id: "finance-vendors", label: "Vendors", path: "/oak-book?section=vendors", group: "Masters" },
+    { id: "finance-estimates", label: "Estimates", path: "/oak-book?section=standard-estimates", group: "Sales" },
+    { id: "finance-invoices", label: "Invoices", path: "/oak-book?section=standard-invoices", group: "Sales" },
+    { id: "finance-payments", label: "Payments Received", path: "/oak-book?section=payments-received", group: "Sales" },
+    { id: "finance-reports", label: "Reports", path: "/oak-book?section=reports" },
+    { id: "finance-settings", label: "Settings", path: "/oak-book?section=settings" },
+  ] },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
-  { id: "oak-book", label: "Oak Book", path: "/oak-book" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
@@ -90,7 +99,15 @@ const ICONS: Record<string, any> = {
   "event-database": Database,
   "event-milestones": CheckSquare,
   daybook: BookOpen,
-  "oak-book": Receipt,
+  "finance": Receipt,
+  "finance-masters": Database,
+  "finance-customers": Users,
+  "finance-vendors": Users,
+  "finance-estimates": FileText,
+  "finance-invoices": Receipt,
+  "finance-payments": Receipt,
+  "finance-reports": LayoutDashboard,
+  "finance-settings": Settings,
   "sales": Target,
   "sales-leads": Users,
   "sales-pipeline": Target,
@@ -429,7 +446,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
@@ -472,8 +489,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // For collapsible menus (Sales, Event Hub, Operations), use button to toggle; for others use Link
-          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations';
+          // For collapsible menus (Sales, Event Hub, Operations, Finance), use button to toggle; for others use Link
+          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations' || item.id === 'finance';
           if (hasSubPages && isCollapsibleMenu) {
             return (
               <div key={item.id}>
