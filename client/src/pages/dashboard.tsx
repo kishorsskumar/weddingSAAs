@@ -284,17 +284,17 @@ export default function Dashboard() {
       </motion.div>
 
       <motion.div 
-        className={`grid gap-3 sm:gap-4 ${isSuperAdmin ? 'grid-cols-2 lg:grid-cols-5' : isWeddingPlanner ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}
+        className={`grid gap-3 sm:gap-4 ${isSuperAdmin ? 'grid-cols-2 lg:grid-cols-4' : isWeddingPlanner ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-2'}`}
         variants={containerVariants}
         initial="hidden"
         animate="show"
       >
-        {(isSuperAdmin || isWeddingPlanner) && (
+        {isWeddingPlanner && !isSuperAdmin && (
           <motion.div variants={itemVariants} whileHover={{ y: -4, transition: { duration: 0.2 } }}>
             <Card className="border-l-4 border-l-primary shadow-sm hover:shadow-md transition-shadow h-full">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-6 sm:pb-2">
                 <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  {isWeddingPlanner ? 'My Revenue (FY)' : 'Total Revenue (FY)'}
+                  My Revenue (FY)
                 </CardTitle>
                 <DollarSign className="h-4 w-4 text-primary hidden sm:block" />
               </CardHeader>
@@ -307,7 +307,7 @@ export default function Dashboard() {
                 >
                   ₹{(totalSales / 100000).toFixed(2)}L
                 </motion.div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">{isWeddingPlanner ? 'Your events total' : '+20.1% from last month'}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Your events total</p>
               </CardContent>
             </Card>
           </motion.div>
