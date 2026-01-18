@@ -299,6 +299,9 @@ import {
   oaksyReminders,
   type OaksyReminder,
   type InsertOaksyReminder,
+  notificationLogs,
+  type NotificationLog,
+  type InsertNotificationLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or } from "drizzle-orm";
@@ -888,6 +891,11 @@ export interface IStorage {
   getEmployeeReminders(employeeId: string): Promise<OaksyReminder[]>;
   markReminderAsSent(id: string): Promise<void>;
   cancelReminder(id: string): Promise<void>;
+
+  // Payment Milestone Reminders
+  getEventsDueFor60DayReminder(): Promise<Event[]>;
+  markEvent60DayReminderSent(eventId: string): Promise<void>;
+  createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4892,6 +4900,32 @@ export class DatabaseStorage implements IStorage {
     await db.update(oaksyReminders)
       .set({ status: 'cancelled' })
       .where(eq(oaksyReminders.id, id));
+  }
+
+  // Payment Milestone Reminders
+  async getEventsDueFor60DayReminder(): Promise<Event[]> {
+    const today = new Date();
+    const targetDate = new Date(today);
+    targetDate.setDate(targetDate.getDate() + 60);
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+    
+    return await db.select().from(events)
+      .where(and(
+        eq(events.date, targetDateStr),
+        eq(events.status, 'confirmed'),
+        eq(events.payment60DayReminderSent, false)
+      ));
+  }
+
+  async markEvent60DayReminderSent(eventId: string): Promise<void> {
+    await db.update(events)
+      .set({ payment60DayReminderSent: true })
+      .where(eq(events.id, eventId));
+  }
+
+  async createNotificationLog(log: InsertNotificationLog): Promise<NotificationLog> {
+    const [newLog] = await db.insert(notificationLogs).values(log).returning();
+    return newLog;
   }
 }
 
