@@ -1757,7 +1757,8 @@ function getLeadSubmitterName(phone: string): string {
 function getWeddingPlannerPhone(plannerName: string): string | null {
   const normalized = plannerName.toLowerCase().trim();
   for (const [key, phone] of Object.entries(WEDDING_PLANNER_PHONES)) {
-    if (normalized.includes(key)) {
+    // Check both directions: planner name matches key OR key contains planner name
+    if (normalized.includes(key) || key.includes(normalized)) {
       return phone;
     }
   }
