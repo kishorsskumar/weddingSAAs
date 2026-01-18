@@ -2910,6 +2910,11 @@ export async function handleOaksyWhatsAppMessage(
     const isInDcFlow = conversation.activeIntent === 'pending_delivery_challan';
     const looksLikeDc = /\bdc\b|delivery\s*challan|challan/i.test(messageText);
     
+    // Check for inventory-related messages (should go to AI, not greeting)
+    const isInInventoryFlow = conversation.activeIntent === 'ai_inventory_item';
+    const looksLikeInventory = /inventory|warehouse|stock|item|quantity|create inventory|add item|new item/i.test(messageText);
+    const hasPhotoWithQty = mediaUrl && /\d+/.test(messageText);
+    
     if (isInDcFlow || looksLikeDc) {
       // Get superadmin as employee for DC creation
       const superadminEmployee = await storage.getEmployeeByPhone(normalizedPhone);
@@ -2919,9 +2924,13 @@ export async function handleOaksyWhatsAppMessage(
       } else {
         return `❌ Could not find your employee record. Please ensure your phone is registered in the system.`;
       }
+    } else if (isInInventoryFlow || looksLikeInventory || hasPhotoWithQty) {
+      // Let inventory messages pass through to AI processing
+      // Don't return greeting - continue to employee section
+      console.log('[Oaksy] Superadmin inventory message detected, passing to AI...');
     } else {
-      // Default Kishor greeting - only show if NOT in DC flow and NOT starting DC
-      return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n• DC to [name] [amount] → Create Delivery Challan\n\n_Send lead info or ask anything!_ 🌳`;
+      // Default Kishor greeting - only show if NOT in DC/inventory flow
+      return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n• DC to [name] [amount] → Create Delivery Challan\n• Create Inventory + photo → Add to warehouse\n\n_Send lead info or ask anything!_ 🌳`;
     }
   }
   
@@ -6280,18 +6289,38 @@ Return "INVALID" if you cannot parse the input.`;
       let extractedName: string | null = null;
       let extractedQuantity: number | null = null;
       
-      // Try "50 chairs" pattern first
-      const qtyMatch = messageText.match(/(\d+)\s*(nos?|pieces?|pcs?|units?)?\s+([a-z\s]+)/i);
-      if (qtyMatch) {
-        extractedQuantity = parseInt(qtyMatch[1]);
-        extractedName = qtyMatch[3].trim();
-      } else {
-        // Try "chairs - 50" pattern
+      // Try structured format: "Item: X, Quantity: Y" or "Item : X, Quantity: Y"
+      const structuredItemMatch = messageText.match(/item\s*[:]\s*([^,\n]+)/i);
+      const structuredQtyMatch = messageText.match(/quantity\s*[:]\s*(\d+)/i);
+      
+      if (structuredItemMatch) {
+        extractedName = structuredItemMatch[1].trim();
+      }
+      if (structuredQtyMatch) {
+        extractedQuantity = parseInt(structuredQtyMatch[1]);
+      }
+      
+      // If structured format didn't work, try "50 chairs" pattern
+      if (!extractedName || !extractedQuantity) {
+        const qtyMatch = messageText.match(/(\d+)\s*(nos?|pieces?|pcs?|units?)?\s+([a-z\s]+)/i);
+        if (qtyMatch) {
+          if (!extractedQuantity) extractedQuantity = parseInt(qtyMatch[1]);
+          if (!extractedName) extractedName = qtyMatch[3].trim();
+        }
+      }
+      
+      // Try "chairs - 50" pattern
+      if (!extractedName || !extractedQuantity) {
         const itemMatch = messageText.match(/([a-z\s]+?)\s*[-–:]\s*(\d+)\s*(nos?|pieces?|pcs?|units?)?/i);
         if (itemMatch) {
-          extractedName = itemMatch[1].trim();
-          extractedQuantity = parseInt(itemMatch[2]);
+          if (!extractedName) extractedName = itemMatch[1].trim();
+          if (!extractedQuantity) extractedQuantity = parseInt(itemMatch[2]);
         }
+      }
+      
+      // Clean up extracted name - remove common prefixes
+      if (extractedName) {
+        extractedName = extractedName.replace(/^(create|add|new|inventory)\s*/i, '').trim();
       }
       
       aiAnalysis = {
