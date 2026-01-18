@@ -225,6 +225,12 @@ interface IntentContext {
   // Reminder fields
   reminderDateTime?: string;
   reminderMessage?: string;
+  // Inventory item fields
+  inventoryItemName?: string;
+  inventoryItemQuantity?: number;
+  inventoryItemCategory?: string;
+  inventoryItemPhotoUrl?: string;
+  inventoryItemLocation?: string;
 }
 
 interface ConversationMessage {
@@ -1731,6 +1737,13 @@ const AUTHORIZED_DC_CREATORS: Record<string, string> = {
   'test employee': '+917025063335',    // Test Employee
 };
 
+// Authorized Inventory creators (can add inventory items via WhatsApp)
+const AUTHORIZED_INVENTORY_CREATORS: Record<string, string> = {
+  'kishor': '+917902373354',           // Superadmin
+  'praveen': '+917736126539',          // Employee (Praveen P V)
+  'test employee': '+917025063335',    // Test Employee
+};
+
 async function getSuperadminPhone(): Promise<string> {
   return SUPERADMIN_WHATSAPP;
 }
@@ -1768,6 +1781,14 @@ function getWeddingPlannerPhone(plannerName: string): string | null {
 function isAuthorizedDcCreator(phone: string): boolean {
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
   return Object.values(AUTHORIZED_DC_CREATORS).some(authPhone => {
+    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
+    return normalizedPhone === normalizedAuthPhone;
+  });
+}
+
+function isAuthorizedInventoryCreator(phone: string): boolean {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  return Object.values(AUTHORIZED_INVENTORY_CREATORS).some(authPhone => {
     const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
     return normalizedPhone === normalizedAuthPhone;
   });
