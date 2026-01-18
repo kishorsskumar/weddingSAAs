@@ -1826,25 +1826,41 @@ async function downloadAndUploadInventoryPhoto(
   itemName: string
 ): Promise<string | null> {
   try {
+    // Skip if URL is already a signed GCS URL (already uploaded)
+    if (mediaUrl.includes('storage.googleapis.com') || mediaUrl.includes('storage.cloud.google.com')) {
+      console.log('[Inventory] Photo already uploaded, using existing URL');
+      return mediaUrl;
+    }
+    
     const { ObjectStorageService } = await import('./objectStorage');
     
-    const response = await fetch(mediaUrl, {
-      headers: {
-        'Authorization': `Basic ${Buffer.from(
-          `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
-        ).toString('base64')}`,
-      },
-    });
+    // Build headers for Twilio URLs
+    const headers: Record<string, string> = {};
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (mediaUrl.includes('twilio.com') && twilioAccountSid && twilioAuthToken) {
+      const auth = Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64');
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+    
+    console.log('[Inventory] Downloading image from:', mediaUrl.substring(0, 50) + '...');
+    const response = await fetch(mediaUrl, { headers });
     
     if (!response.ok) {
-      console.error('[Inventory] Failed to download image:', response.status);
+      console.error('[Inventory] Failed to download image:', response.status, response.statusText);
       return null;
     }
     
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     const buffer = Buffer.from(await response.arrayBuffer());
     
-    const sanitizedName = itemName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+    if (buffer.length === 0) {
+      console.error('[Inventory] Downloaded empty image buffer');
+      return null;
+    }
+    
+    const sanitizedName = itemName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').substring(0, 30);
     const extension = contentType.includes('png') ? 'png' : 
                      contentType.includes('gif') ? 'gif' : 
                      contentType.includes('webp') ? 'webp' : 'jpg';
@@ -1853,7 +1869,7 @@ async function downloadAndUploadInventoryPhoto(
     const objectStorage = new ObjectStorageService();
     const uploadedUrl = await objectStorage.uploadPublicBuffer(buffer, filename, contentType);
     
-    console.log('[Inventory] Photo uploaded successfully:', uploadedUrl);
+    console.log('[Inventory] Photo uploaded successfully:', filename);
     return uploadedUrl;
   } catch (error: any) {
     console.error('[Inventory] Error uploading photo:', error.message);
@@ -3850,6 +3866,84 @@ export async function handleOaksyWhatsAppMessage(
             currentState: 'gathering_info',
             conversationHistory: history,
           });
+        }
+        
+        return aiResult.suggestedResponse;
+      }
+      
+      // ============================================================================
+      // INVENTORY ITEM HANDLER - Add items to warehouse inventory via WhatsApp
+      // ============================================================================
+      if (aiResult.intent === 'inventory_item' || conversation.activeIntent === 'ai_inventory_item') {
+        // Role check - only authorized creators can add inventory items
+        if (!isAuthorizedInventoryCreator(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, inventory management is only available for authorized users.\n\n_Contact Kishor for inventory updates._ 🌳`;
+        }
+        
+        const slots = { ...context, ...aiResult.slots };
+        
+        // Store photo URL if media was attached
+        if (mediaUrl && !slots.inventoryItemPhotoUrl) {
+          slots.inventoryItemPhotoUrl = mediaUrl;
+        }
+        
+        const trimmedMessage = messageText.trim().toLowerCase();
+        const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
+        const isInAwaitingState = conversation.activeIntent === 'ai_inventory_item' && 
+                                   conversation.currentState === 'awaiting_confirmation';
+        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+                              (isSimpleConfirm && isInAwaitingState && slots.inventoryItemName);
+        
+        console.log('[AI Inventory] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        
+        if (shouldExecute && slots.inventoryItemName) {
+          try {
+            console.log('[AI Inventory] EXECUTING inventory item creation...');
+            
+            const result = await handleInventoryItemCreation(
+              slots as IntentContext,
+              mediaUrl,
+              fromNumber,
+              conversation
+            );
+            
+            if (result.success) {
+              return result.message;
+            } else {
+              return result.message;
+            }
+          } catch (execError: any) {
+            console.error('[AI Inventory] EXECUTION FAILED:', execError);
+            return `❌ Sorry, there was a problem adding the inventory item. Please try again.`;
+          }
+        }
+        
+        // Not confirmed yet - save context and ask for missing info
+        if (slots.inventoryItemName && !aiResult.readyToExecute) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_inventory_item',
+            intentContext: slots,
+            currentState: 'awaiting_confirmation',
+            conversationHistory: history,
+          });
+          
+          const quantity = slots.inventoryItemQuantity || 0;
+          const category = slots.inventoryItemCategory || 'General';
+          const hasPhoto = slots.inventoryItemPhotoUrl ? '✅ Photo attached' : '📷 No photo';
+          
+          return `📦 *Add Inventory Item?*\n\n🏷️ Name: ${slots.inventoryItemName}\n🔢 Quantity: ${quantity}\n📁 Category: ${category}\n${hasPhoto}\n\n_Reply "yes" to add or provide more details._ 🌳`;
+        } else if (Object.keys(aiResult.slots).length > 0 || mediaUrl) {
+          // Have some info but need more
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_inventory_item',
+            intentContext: slots,
+            currentState: 'gathering_info',
+            conversationHistory: history,
+          });
+          
+          if (!slots.inventoryItemName) {
+            return `📷 Got the photo! What's this item called and how many do we have?\n\n_Example: "50 white chairs"_ 🌳`;
+          }
         }
         
         return aiResult.suggestedResponse;
