@@ -2003,7 +2003,7 @@ export default function EmployeePortal() {
       </Dialog>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="flex flex-wrap gap-1">
+        <TabsList className="flex overflow-x-auto gap-1 h-auto flex-wrap md:flex-nowrap pb-2 md:pb-0">
           <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
             <User className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Overview</span>
