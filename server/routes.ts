@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { parseTransactionScreenshot } from "./transaction-scanner";
-import { sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
+import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { 
   insertUserSchema,
@@ -5867,6 +5867,17 @@ export async function registerRoutes(
       
       console.log(`[Automation] Pushed ${created.length} items from estimate ${estimate.number} to production for event ${event?.title}`);
       
+      // Send WhatsApp notification to warehouse (Kishor)
+      const KISHOR_PHONE = '+917902373354';
+      try {
+        const eventDate = event?.date ? new Date(event.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'TBD';
+        const warehouseMessage = `📦 *Production Request*\n\n*${event?.title}* has ${created.length} items pushed to production.\n\nEvent Date: ${eventDate}\nEstimate: ${estimate.number}\n\nPlease review and assign fulfillment types (warehouse/purchase/rent) for each item.`;
+        await sendWhatsAppMessage(KISHOR_PHONE, warehouseMessage);
+        console.log(`[Automation] Sent WhatsApp notification to warehouse for event ${event?.title}`);
+      } catch (waError) {
+        console.error('[Automation] Failed to send WhatsApp notification:', waError);
+      }
+      
       res.json({ 
         success: true, 
         message: `Successfully pushed ${created.length} items to production`,
@@ -5956,6 +5967,37 @@ export async function registerRoutes(
       });
       
       console.log(`[Automation] Finalized inventory for event ${event.title} with ${items.length} items`);
+      
+      // Send WhatsApp notification to wedding planner
+      const PLANNER_PHONES: Record<string, string> = {
+        'fida fathima': '+919895810975',
+        'fida': '+919895810975',
+        'femina km': '+917306687284',
+        'femina': '+917306687284',
+        'kishor': '+917902373354',
+      };
+      
+      try {
+        const plannerName = event.planner?.toLowerCase() || '';
+        let plannerPhone = PLANNER_PHONES['kishor']; // Default to Kishor
+        
+        for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
+          if (plannerName.includes(key)) {
+            plannerPhone = phone;
+            break;
+          }
+        }
+        
+        const warehouseBreakdown = items.filter(i => i.fulfillmentType === 'warehouse').length;
+        const purchaseBreakdown = items.filter(i => i.fulfillmentType === 'purchase').length;
+        const rentBreakdown = items.filter(i => i.fulfillmentType === 'rent').length;
+        
+        const plannerMessage = `✅ *Inventory Finalized*\n\n*${event.title}* inventory has been locked.\n\nTotal Items: ${items.length}\n• Warehouse: ${warehouseBreakdown}\n• Purchase: ${purchaseBreakdown}\n• Rent: ${rentBreakdown}\n\nProduction planning can now proceed.`;
+        await sendWhatsAppMessage(plannerPhone, plannerMessage);
+        console.log(`[Automation] Sent inventory finalization notification to planner ${event.planner}`);
+      } catch (waError) {
+        console.error('[Automation] Failed to send WhatsApp notification:', waError);
+      }
       
       res.json({ 
         success: true, 
