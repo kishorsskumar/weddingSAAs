@@ -62,11 +62,27 @@ export const events = pgTable("events", {
   salesValue: decimal("sales_value", { precision: 12, scale: 2 }).notNull().default('0'),
   paymentReceived: decimal("payment_received", { precision: 12, scale: 2 }).notNull().default('0'),
   cost: decimal("cost", { precision: 12, scale: 2 }).notNull().default('0'),
-  status: text("status").notNull().default('active'), // 'active' | 'completed'
+  status: text("status").notNull().default('active'), // 'active' | 'completed' | 'confirmed' | 'cancelled'
   googleCalendarEventId: text("google_calendar_event_id"), // Google Calendar sync
   outlookCalendarEventId: text("outlook_calendar_event_id"), // Outlook Calendar sync
+  payment60DayReminderSent: boolean("payment_60day_reminder_sent").default(false), // 60-day payment milestone reminder
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const notificationLogs = pgTable("notification_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id),
+  type: text("type").notNull(), // 'payment_60day' | 'payment_30day' | etc.
+  recipientPhone: text("recipient_phone").notNull(),
+  recipientName: text("recipient_name"),
+  message: text("message").notNull(),
+  status: text("status").notNull().default('sent'), // 'sent' | 'delivered' | 'failed'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationLogSchema = createInsertSchema(notificationLogs).omit({ id: true, createdAt: true });
+export type InsertNotificationLog = z.infer<typeof insertNotificationLogSchema>;
+export type NotificationLog = typeof notificationLogs.$inferSelect;
 
 export const meetings = pgTable("meetings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -479,7 +495,7 @@ export const leaveRequestsRelations = relations(leaveRequests, ({ one }) => ({
 // Insert Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({ id: true });
-export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, eventCode: true });
+export const insertEventSchema = createInsertSchema(events).omit({ id: true, createdAt: true, eventCode: true, payment60DayReminderSent: true });
 export const insertMeetingSchema = createInsertSchema(meetings).omit({ id: true, createdAt: true });
 export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true });
 export const insertDaybookEntrySchema = createInsertSchema(daybookEntries).omit({ id: true, createdAt: true });

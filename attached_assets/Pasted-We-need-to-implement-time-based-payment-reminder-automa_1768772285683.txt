@@ -1,0 +1,110 @@
+We need to implement time-based payment reminder automation and warehouse dispatch control.
+
+Important constraints:
+- Do NOT modify existing financial data.
+- Do NOT auto collect payments.
+- Only notifications and permission gating.
+
+--------------------------------
+SCHEDULED JOB
+--------------------------------
+
+Run daily at 08:00 AM.
+
+--------------------------------
+30-DAY SOFT REMINDER (Planner Only)
+--------------------------------
+
+Trigger:
+event_date = today + 30 days
+reminder_30day_sent = false
+status = Confirmed
+
+Action:
+Send WhatsApp via Oaksy AI to Assigned Wedding Planner:
+
+"Event Preparation Check-In:
+{{event_name}} is coming up next month.
+
+Please reconnect with client and align payment milestones."
+
+After sending:
+Set reminder_30day_sent = true
+
+--------------------------------
+14-DAY PAYMENT REMINDER (Planner Only)
+--------------------------------
+
+Trigger:
+event_date = today + 14 days
+reminder_14day_sent = false
+status = Confirmed
+
+Action:
+Send WhatsApp via Oaksy AI:
+
+"Payment Milestone Reminder:
+{{event_name}} is in 2 weeks.
+
+Please ensure second payment milestone (40%) is collected."
+
+After sending:
+Set reminder_14day_sent = true
+
+--------------------------------
+7-DAY ACCOUNTANT CLEARANCE REQUEST
+--------------------------------
+
+Trigger:
+event_date = today + 7 days
+payment_clearance_required = false
+
+Action:
+Send WhatsApp to Accountant:
+
+"Payment Clearance Required:
+{{event_name}}
+Please verify payment status and approve warehouse clearance."
+
+Set:
+payment_clearance_required = true
+
+--------------------------------
+ACCOUNTANT APPROVAL FLOW
+--------------------------------
+
+Add button in Finance UI:
+
+"Approve Warehouse Clearance"
+
+When clicked:
+
+Set:
+event.payment_cleared = true
+event.warehouse_allowed = true
+
+--------------------------------
+WAREHOUSE DISPATCH CONTROL
+--------------------------------
+
+Before allowing outbound delivery or inventory issue:
+
+Check:
+event.warehouse_allowed == true
+
+If false:
+Block action and show message:
+
+"Warehouse dispatch blocked. Awaiting finance clearance."
+
+--------------------------------
+LOGGING
+--------------------------------
+
+Log all notifications and approvals with:
+- event_id
+- type
+- timestamp
+- status
+
+Proceed safely.
