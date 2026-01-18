@@ -231,6 +231,9 @@ interface IntentContext {
   inventoryItemCategory?: string;
   inventoryItemPhotoUrl?: string;
   inventoryItemLocation?: string;
+  inventoryItemColour?: string;
+  // Reminder explicit today flag
+  reminderExplicitToday?: boolean;
 }
 
 interface ConversationMessage {
@@ -3930,10 +3933,18 @@ export async function handleOaksyWhatsAppMessage(
         const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
         const isInAwaitingState = conversation.activeIntent === 'ai_inventory_item' && 
                                    conversation.currentState === 'awaiting_confirmation';
-        const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
+        
+        // AUTO-EXECUTE for Superadmin: If we have both item name and quantity, execute immediately
+        // This provides a streamlined experience for authorized users
+        const hasAllRequiredData = slots.inventoryItemName && slots.inventoryItemQuantity && slots.inventoryItemQuantity > 0;
+        const isSuperadminPhone = normalizedPhone === '917902373354';
+        const shouldAutoExecute = hasAllRequiredData && isSuperadminPhone;
+        
+        const shouldExecute = shouldAutoExecute || 
+                              (aiResult.readyToExecute && aiResult.userConfirmed) || 
                               (isSimpleConfirm && isInAwaitingState && slots.inventoryItemName);
         
-        console.log('[AI Inventory] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, slots });
+        console.log('[AI Inventory] Check:', { shouldExecute, shouldAutoExecute, hasAllRequiredData, isSimpleConfirm, isInAwaitingState, slots });
         
         if (shouldExecute && slots.inventoryItemName) {
           try {
@@ -6323,7 +6334,7 @@ Return "INVALID" if you cannot parse the input.`;
         ...aiAnalysis.extractedData,
         // Try to extract the message - everything after "to" or task description
         reminderMessage: aiAnalysis.extractedData.reminderMessage || 
-          messageText.replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '').replace(/\s*(at|after|in|on|today|tomorrow).*$/i, '').trim() || null,
+          messageText.replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '').replace(/\s*(at|after|in|on|today|tomorrow).*$/i, '').trim() || undefined,
       }
     };
   }
@@ -6404,11 +6415,11 @@ Return "INVALID" if you cannot parse the input.`;
         intent: 'inventory_item',
         extractedData: {
           ...aiAnalysis.extractedData,
-          inventoryItemName: extractedName || aiAnalysis.extractedData.inventoryItemName || null,
-          inventoryItemQuantity: extractedQuantity || aiAnalysis.extractedData.inventoryItemQuantity || null,
+          inventoryItemName: extractedName || aiAnalysis.extractedData.inventoryItemName || undefined,
+          inventoryItemQuantity: extractedQuantity || aiAnalysis.extractedData.inventoryItemQuantity || undefined,
           inventoryItemCategory: aiAnalysis.extractedData.inventoryItemCategory || 'General',
           inventoryItemLocation: aiAnalysis.extractedData.inventoryItemLocation || 'Warehouse',
-          inventoryItemColour: extractedColour || aiAnalysis.extractedData.inventoryItemColour || null,
+          inventoryItemColour: extractedColour || aiAnalysis.extractedData.inventoryItemColour || undefined,
         }
       };
       
