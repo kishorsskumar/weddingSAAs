@@ -1821,6 +1821,103 @@ function isAuthorizedInventoryCreator(phone: string): boolean {
   });
 }
 
+async function downloadAndUploadInventoryPhoto(
+  mediaUrl: string,
+  itemName: string
+): Promise<string | null> {
+  try {
+    const { ObjectStorageService } = await import('./objectStorage');
+    
+    const response = await fetch(mediaUrl, {
+      headers: {
+        'Authorization': `Basic ${Buffer.from(
+          `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
+        ).toString('base64')}`,
+      },
+    });
+    
+    if (!response.ok) {
+      console.error('[Inventory] Failed to download image:', response.status);
+      return null;
+    }
+    
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    
+    const sanitizedName = itemName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+    const extension = contentType.includes('png') ? 'png' : 
+                     contentType.includes('gif') ? 'gif' : 
+                     contentType.includes('webp') ? 'webp' : 'jpg';
+    const filename = `inventory-photos/${sanitizedName}-${Date.now()}.${extension}`;
+    
+    const objectStorage = new ObjectStorageService();
+    const uploadedUrl = await objectStorage.uploadPublicBuffer(buffer, filename, contentType);
+    
+    console.log('[Inventory] Photo uploaded successfully:', uploadedUrl);
+    return uploadedUrl;
+  } catch (error: any) {
+    console.error('[Inventory] Error uploading photo:', error.message);
+    return null;
+  }
+}
+
+async function handleInventoryItemCreation(
+  context: IntentContext,
+  mediaUrl: string | undefined,
+  fromNumber: string,
+  conversation: any
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const itemName = context.inventoryItemName;
+    const quantity = context.inventoryItemQuantity || 0;
+    const category = context.inventoryItemCategory || 'General';
+    const location = context.inventoryItemLocation || 'Warehouse';
+    
+    if (!itemName) {
+      return { success: false, message: 'Missing item name' };
+    }
+    
+    let photoUrl: string | null = null;
+    if (mediaUrl || context.inventoryItemPhotoUrl) {
+      const photoSource = mediaUrl || context.inventoryItemPhotoUrl;
+      if (photoSource) {
+        photoUrl = await downloadAndUploadInventoryPhoto(photoSource, itemName);
+      }
+    }
+    
+    const inventoryItem = await storage.createInventoryItem({
+      name: itemName,
+      category: category,
+      stockQuantity: quantity,
+      location: location,
+      photos: photoUrl ? [photoUrl] : [],
+      isActive: true,
+      unitCost: '0',
+    });
+    
+    console.log('[Inventory] Item created:', inventoryItem.id, itemName, quantity);
+    
+    await storage.updateWhatsappConversation(conversation.id, {
+      activeIntent: null,
+      intentContext: {},
+      conversationHistory: [],
+      currentState: 'idle',
+    });
+    
+    const photoNote = photoUrl ? '\n📸 Photo saved!' : '';
+    return {
+      success: true,
+      message: `✅ *Inventory Item Added!*\n\n📦 *Name:* ${itemName}\n🔢 *Quantity:* ${quantity}\n📁 *Category:* ${category}\n📍 *Location:* ${location}${photoNote}\n\n_Item added to Oak Inventory!_ 🌳`
+    };
+  } catch (error: any) {
+    console.error('[Inventory] Error creating item:', error.message);
+    return {
+      success: false,
+      message: `❌ Sorry, couldn't add the item to inventory. Error: ${error.message}`
+    };
+  }
+}
+
 function generateUniqueApprovalCode(prefix: string): string {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 4).toUpperCase();
