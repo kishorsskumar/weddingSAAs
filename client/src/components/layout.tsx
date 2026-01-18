@@ -464,7 +464,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true, "people": true, "tools": true, "management-mis": true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
