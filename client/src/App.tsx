@@ -27,6 +27,7 @@ import OakCreative from "@/pages/oak-creative";
 import OakRSVP from "@/pages/oak-rsvp";
 import MonthlyPlan from "@/pages/monthly-plan";
 import WhatsappInbox from "@/pages/whatsapp-inbox";
+import ManagementMIS from "@/pages/management-mis";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -103,6 +104,9 @@ function AppRoutes() {
         </Route>
         <Route path="/oak-rsvp">
            <PrivateRoute component={OakRSVP} path="/oak-rsvp" />
+        </Route>
+        <Route path="/management-mis">
+           <PrivateRoute component={ManagementMIS} path="/management-mis" />
         </Route>
         <Route component={NotFound} />
       </Switch>

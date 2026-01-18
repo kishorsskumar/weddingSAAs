@@ -33,7 +33,8 @@ import {
   Home,
   FileText,
   Settings,
-  ChevronDown
+  ChevronDown,
+  DollarSign
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -91,7 +92,13 @@ const ALL_PAGES = [
     { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
     { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
   ] },
-  { id: "event-database", label: "Oak Event Database", path: "/database" },
+  { id: "management-mis", label: "Management MIS", path: "/management-mis", superadminOnly: true, subPages: [
+    { id: "mis-overview", label: "Overview Dashboard", path: "/management-mis" },
+    { id: "event-database", label: "Event Database", path: "/database", superadminOnly: true },
+    { id: "mis-financial", label: "Financial Summary", path: "/management-mis?tab=financial", superadminOnly: true },
+    { id: "mis-sales", label: "Sales Performance", path: "/management-mis?tab=sales", superadminOnly: true },
+    { id: "mis-operations", label: "Operations Snapshot", path: "/management-mis?tab=operations", superadminOnly: true },
+  ] },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
 
@@ -122,6 +129,11 @@ const ICONS: Record<string, any> = {
   "ops-items": Package,
   "ops-purchase-orders": ClipboardList,
   "ops-templates": ClipboardList,
+  "management-mis": LayoutDashboard,
+  "mis-overview": LayoutDashboard,
+  "mis-financial": DollarSign,
+  "mis-sales": Target,
+  "mis-operations": Package,
   "ops-event-inventory": Package,
   "ops-rentals": Package,
   "ops-production": ClipboardList,
@@ -452,12 +464,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true, "people": true, "tools": true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true, "operations": true, "finance": true, "people": true, "tools": true, "management-mis": true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
   const hasOwnSidebar = PAGES_WITH_OWN_SIDEBAR.includes(location);
-  const navItems = ALL_PAGES.filter((page) => allowedPages.includes(page.id));
+  const isSuperAdmin = user?.role === 'superadmin';
+  const navItems = ALL_PAGES.filter((page) => {
+    if ((page as any).superadminOnly && !isSuperAdmin) return false;
+    return allowedPages.includes(page.id);
+  });
 
   const toggleMenu = (menuId: string) => {
     setExpandedMenus(prev => ({ ...prev, [menuId]: !prev[menuId] }));
@@ -495,8 +511,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // For collapsible menus (Sales, Event Hub, Operations, Finance, People, Tools), use button to toggle; for others use Link
-          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations' || item.id === 'finance' || item.id === 'people' || item.id === 'tools';
+          // For collapsible menus (Sales, Event Hub, Operations, Finance, People, Tools, Management MIS), use button to toggle; for others use Link
+          const isCollapsibleMenu = item.id === 'sales' || item.id === 'event-hub' || item.id === 'operations' || item.id === 'finance' || item.id === 'people' || item.id === 'tools' || item.id === 'management-mis';
           if (hasSubPages && isCollapsibleMenu) {
             return (
               <div key={item.id}>
@@ -535,7 +551,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           const SubIcon = ICONS[subPage.id] || Calendar;
                           const isSubActive = currentFullUrl === subPage.path || 
                             (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
-                          const hasAccess = allowedPages.includes(subPage.id);
+                          const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
                           if (!hasAccess) return null;
                           
                           const showGroupHeader = subPage.group && subPage.group !== lastGroup;
@@ -598,7 +614,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const SubIcon = ICONS[subPage.id] || Calendar;
                 const isSubActive = currentFullUrl === subPage.path || 
                   (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
-                const hasAccess = allowedPages.includes(subPage.id);
+                const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
                 if (!hasAccess) return null;
                 return (
                   <Link key={subPage.id} href={subPage.path}>
