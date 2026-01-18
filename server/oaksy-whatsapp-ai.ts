@@ -1004,9 +1004,10 @@ AMOUNT UNDERSTANDING:
 - "Rs 5000", "₹5000", "5000/-" = 5000
 
 CONFIRMATION FLOW:
-- NEVER execute actions without confirmation
-- After understanding the request, summarize and ask "Should I send this for approval?"
-- Only set readyToExecute=true when user explicitly confirms (yes, ok, confirm, sure, go ahead, do it)
+- For SUPERADMIN (Kishor): Auto-execute without asking for confirmation. Set readyToExecute=true immediately when all required info is available.
+- For OTHER EMPLOYEES: Summarize the request and ask for confirmation before executing
+- Only set readyToExecute=true for non-superadmin when they explicitly confirm (yes, ok, confirm, sure, go ahead, do it)
+- REMINDERS for Superadmin: Auto-create immediately without asking "Should I set this?" - just create it and confirm it's done
 
 HANDLING CORRECTIONS:
 - If user says "no, 2 days" or "actually 3 days", understand they're correcting
@@ -1118,12 +1119,18 @@ If the user confirms, set readyToExecute=true and userConfirmed=true.
 If the user corrects something, update the slots and ask for confirmation again.`;
     }
 
+    // Determine if this is superadmin - if so, tell AI to auto-execute
+    const isSuperadmin = employeeRole === 'superadmin' || employeeName.toLowerCase().includes('kishor');
+    const roleInfo = isSuperadmin 
+      ? `\n\nUSER: ${employeeName} (SUPERADMIN - auto-execute all requests immediately, no confirmation needed)`
+      : `\n\nEmployee: ${employeeName} (${employeeRole})`;
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         { 
           role: "system", 
-          content: AI_ORCHESTRATOR_PROMPT + contextPrompt + `\n\nEmployee: ${employeeName} (${employeeRole})`
+          content: AI_ORCHESTRATOR_PROMPT + contextPrompt + roleInfo
         },
         ...historyContext,
         { role: "user", content: message }
@@ -4165,6 +4172,119 @@ export async function handleOaksyWhatsAppMessage(
           if (!slots.inventoryItemName) {
             return `Nice photo! What's this item called and how many do we have?`;
           }
+        }
+        
+        return aiResult.suggestedResponse;
+      }
+      
+      // ============================================================================
+      // REMINDER HANDLER - Set reminders via WhatsApp
+      // ============================================================================
+      if (aiResult.intent === 'reminder' || conversation.activeIntent === 'ai_reminder') {
+        const slots = { ...context, ...aiResult.slots };
+        
+        // Extract reminder data from slots
+        const reminderMessage = slots.reminderMessage || slots.message;
+        const reminderDateTime = slots.reminderDateTime || slots.dateTime;
+        
+        console.log('[AI Reminder] Intent detected. Message:', reminderMessage, 'DateTime:', reminderDateTime, 'Confirmed:', aiResult.userConfirmed);
+        
+        // Check for confirmation of existing reminder
+        const isConfirmation = aiResult.userConfirmed || 
+          /^(yes|y|ok|sure|confirm|correct|yep|yeah|do it|go ahead)$/i.test(messageText.trim());
+        
+        // If we have all info and user confirmed (or Superadmin auto-execute)
+        const shouldExecute = reminderMessage && reminderDateTime && 
+          (isConfirmation || isSuperadminPhone(normalizedPhone) || aiResult.readyToExecute);
+        
+        if (shouldExecute) {
+          try {
+            // Parse the datetime
+            let dueAt = parseReminderDateTime(reminderDateTime);
+            
+            if (!dueAt) {
+              return `⏰ I couldn't understand the time "${reminderDateTime}". Try:\n\n• "tomorrow at 9am"\n• "5pm today"\n• "in 2 hours"`;
+            }
+            
+            // Auto-adjust past times to tomorrow
+            dueAt = autoAdjustPastTimeToTomorrow(dueAt);
+            
+            // Create the reminder
+            await storage.createReminder({
+              employeeId: employee.id,
+              employeeName: employee.name,
+              employeePhone: employee.phone || normalizedPhone,
+              reminderMessage: reminderMessage,
+              dueAt: dueAt,
+              timezone: 'Asia/Kolkata',
+              status: 'pending',
+            });
+            
+            // Reset conversation
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: null,
+              intentContext: null,
+              currentState: 'idle',
+              conversationHistory: [],
+            });
+            
+            const timeStr = dueAt.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
+            const dateStr = dueAt.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+            
+            return `✅ *Reminder Set!*\n\n🔔 *What:* ${reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_I'll send you a WhatsApp message at that time!_ ⏰`;
+          } catch (err) {
+            console.error('[AI Reminder] Error creating reminder:', err);
+            return `❌ Sorry, I couldn't set that reminder. Please try again.\n\n_Example: "remind me tomorrow at 9am to call vendor"_`;
+          }
+        }
+        
+        // For Superadmin, auto-execute if we have all info (no confirmation needed)
+        if (isSuperadminPhone(normalizedPhone) && reminderMessage && reminderDateTime) {
+          // Already handled above with shouldExecute
+        }
+        
+        // Have all info but need confirmation (for non-superadmin)
+        if (reminderMessage && reminderDateTime && !isSuperadminPhone(normalizedPhone)) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_reminder',
+            intentContext: slots,
+            currentState: 'awaiting_reminder_confirmation',
+            conversationHistory: history,
+          });
+          
+          // Parse for display
+          const displayDate = parseReminderDateTime(reminderDateTime);
+          const timeStr = displayDate ? displayDate.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '';
+          const dateStr = displayDate ? displayDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : reminderDateTime;
+          
+          return `🔔 *Reminder Ready*\n\n📝 *What:* ${reminderMessage}\n📅 *When:* ${dateStr} at ${timeStr}\n\n_Say "yes" to confirm._`;
+        }
+        
+        // Need more info - save context
+        if (!reminderMessage && !reminderDateTime) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_reminder',
+            intentContext: slots,
+            currentState: 'awaiting_reminder_details',
+            conversationHistory: history,
+          });
+          return `🔔 What would you like me to remind you about, and when?\n\n_Example: "call caterer tomorrow at 9am"_`;
+        } else if (!reminderDateTime) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_reminder',
+            intentContext: { ...slots, reminderMessage },
+            currentState: 'awaiting_reminder_time',
+            conversationHistory: history,
+          });
+          return `⏰ Got it - "${reminderMessage}". When should I remind you?\n\n_Example: "tomorrow at 9am" or "in 2 hours"_`;
+        } else if (!reminderMessage) {
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_reminder',
+            intentContext: { ...slots, reminderDateTime },
+            currentState: 'awaiting_reminder_message',
+            conversationHistory: history,
+          });
+          return `📝 What should I remind you about?\n\n_Example: "call Square Meals" or "pay vendor"_`;
         }
         
         return aiResult.suggestedResponse;
