@@ -67,7 +67,8 @@ import {
   ArrowLeft,
   Home,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Database
 } from "lucide-react";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import {
@@ -100,7 +101,15 @@ type SidebarSection = {
 };
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
-  { id: "customers", label: "Customers", icon: Users },
+  { 
+    id: "masters", 
+    label: "Masters", 
+    icon: Database,
+    children: [
+      { id: "customers", label: "Customers" },
+      { id: "vendors", label: "Vendors" },
+    ]
+  },
   { 
     id: "sales", 
     label: "Sales", 
@@ -126,7 +135,6 @@ const SIDEBAR_SECTIONS: SidebarSection[] = [
       { id: "delivery-challans", label: "Delivery Challan" },
     ]
   },
-  { id: "vendors", label: "Vendors", icon: Building2 },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "settings", label: "Settings", icon: Settings },
 ];
@@ -281,7 +289,7 @@ export default function OakBook() {
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const [activeSection, setActiveSection] = useState("standard-estimates");
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["sales", "estimates"]);
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["masters", "sales", "estimates"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
