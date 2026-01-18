@@ -176,8 +176,6 @@ export default function OakSales() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'pipeline', label: 'Leads Pipeline', icon: Target },
     { id: 'contacts', label: 'Contacts', icon: Users },
-    { id: 'companies', label: 'Companies', icon: Building2 },
-    { id: 'activities', label: 'Activities', icon: CheckSquare },
     { id: 'pipeline-setup', label: 'Pipeline Setup', icon: Workflow },
     { id: 'automations', label: 'Automations', icon: Settings },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
@@ -346,20 +344,6 @@ export default function OakSales() {
                 companies={companies}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
-              />
-            )}
-            {activeSection === 'companies' && (
-              <CompaniesSection
-                companies={companies}
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-              />
-            )}
-            {activeSection === 'activities' && (
-              <ActivitiesSection
-                activities={activities}
-                deals={deals}
-                contacts={contacts}
               />
             )}
             {activeSection === 'pipeline-setup' && (
