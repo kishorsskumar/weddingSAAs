@@ -26,6 +26,8 @@ import {
   type InsertEventMilestone,
 } from "@shared/schema";
 import { db } from "./db";
+import { sql, eq, and, gte, like } from "drizzle-orm";
+import { customers, events } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -117,6 +119,71 @@ function generateMilestonesForEvent(eventId: string, eventDate: string, eventTim
     { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Feedback', date: addDays(dateObj, 8), status: 'pending' },
     { eventId, phase: 7, phaseName: 'Packup & Closure', name: 'Close the event', date: addDays(dateObj, 10), status: 'pending' },
   ];
+}
+
+// Generate unique customer code with transaction safety: OAKS-C-YY-XXXX
+async function generateCustomerCode(): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2); // Last 2 digits of year
+  const prefix = `OAKS-C-${year}-`;
+  
+  // Use transaction with FOR UPDATE to prevent race conditions
+  return await db.transaction(async (tx) => {
+    // Get highest sequence number for this year with row-level lock
+    const result = await tx
+      .select({ customerCode: customers.customerCode })
+      .from(customers)
+      .where(like(customers.customerCode, `${prefix}%`))
+      .for('update');
+    
+    // Find the highest sequence number
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.customerCode) {
+        const match = row.customerCode.match(/OAKS-C-\d{2}-(\d{4})$/);
+        if (match) {
+          const seq = parseInt(match[1], 10);
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
+    }
+    
+    const nextSeq = (maxSeq + 1).toString().padStart(4, '0');
+    return `${prefix}${nextSeq}`;
+  });
+}
+
+// Generate unique event code with transaction safety: OAKS-E-YY-MM-XXX
+async function generateEventCode(): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear().toString().slice(-2); // Last 2 digits of year
+  const month = (now.getMonth() + 1).toString().padStart(2, '0'); // 01-12
+  const prefix = `OAKS-E-${year}-${month}-`;
+  
+  // Use transaction with FOR UPDATE to prevent race conditions
+  return await db.transaction(async (tx) => {
+    // Get highest sequence number for this year-month with row-level lock
+    const result = await tx
+      .select({ eventCode: events.eventCode })
+      .from(events)
+      .where(like(events.eventCode, `${prefix}%`))
+      .for('update');
+    
+    // Find the highest sequence number
+    let maxSeq = 0;
+    for (const row of result) {
+      if (row.eventCode) {
+        const match = row.eventCode.match(/OAKS-E-\d{2}-\d{2}-(\d{3})$/);
+        if (match) {
+          const seq = parseInt(match[1], 10);
+          if (seq > maxSeq) maxSeq = seq;
+        }
+      }
+    }
+    
+    const nextSeq = (maxSeq + 1).toString().padStart(3, '0');
+    return `${prefix}${nextSeq}`;
+  });
 }
 
 interface ParsedScheduleItem {
@@ -1181,7 +1248,16 @@ export async function registerRoutes(
   app.post('/api/events', async (req, res) => {
     try {
       const data = insertEventSchema.parse(req.body);
-      const event = await storage.createEvent(data);
+      
+      // Auto-generate event code (OAKS-E-YY-MM-XXX format)
+      const eventCode = await generateEventCode();
+      
+      // Insert event with generated code
+      const [event] = await db.insert(events)
+        .values({ ...data, eventCode })
+        .returning();
+      
+      console.log(`Created event ${event.title} with code ${eventCode}`);
       
       // Auto-generate milestones for events from Jan 1, 2026 onwards
       const eventDate = new Date(event.date);
@@ -1200,13 +1276,16 @@ export async function registerRoutes(
       
       res.json(event);
     } catch (error) {
+      console.error('Error creating event:', error);
       res.status(400).json({ error: 'Invalid event data' });
     }
   });
 
   app.patch('/api/events/:id', async (req, res) => {
     try {
-      const event = await storage.updateEvent(req.params.id, req.body);
+      // Remove eventCode from update payload - codes are read-only
+      const { eventCode, ...updateData } = req.body;
+      const event = await storage.updateEvent(req.params.id, updateData);
       res.json(event);
     } catch (error) {
       res.status(400).json({ error: 'Failed to update event' });
@@ -5019,16 +5098,28 @@ export async function registerRoutes(
   app.post('/api/customers', async (req, res) => {
     try {
       const data = insertCustomerSchema.parse(req.body);
-      const customer = await storage.createCustomer(data);
+      
+      // Auto-generate customer code (OAKS-C-YY-XXXX format)
+      const customerCode = await generateCustomerCode();
+      
+      // Insert customer with generated code using transaction
+      const [customer] = await db.insert(customers)
+        .values({ ...data, customerCode })
+        .returning();
+      
+      console.log(`Created customer ${customer.name} with code ${customerCode}`);
       res.json(customer);
     } catch (error) {
+      console.error('Error creating customer:', error);
       res.status(400).json({ error: 'Invalid customer data' });
     }
   });
 
   app.patch('/api/customers/:id', async (req, res) => {
     try {
-      const customer = await storage.updateCustomer(req.params.id, req.body);
+      // Remove customerCode from update payload - codes are read-only
+      const { customerCode, ...updateData } = req.body;
+      const customer = await storage.updateCustomer(req.params.id, updateData);
       res.json(customer);
     } catch (error) {
       res.status(400).json({ error: 'Failed to update customer' });
@@ -5040,19 +5131,14 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // Generate next customer code (OAK-YY-XXXX format)
+  // Generate next customer code preview (OAKS-C-YY-XXXX format)
+  // Note: Actual code is auto-generated on customer creation
   app.get('/api/customers/next-code', async (req, res) => {
     if (!req.session.userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
     try {
-      const year = new Date().getFullYear().toString().slice(-2);
-      // Get the count of customers created this year
-      const allCustomers = await storage.getAllCustomers();
-      const yearPrefix = `OAK-${year}-`;
-      const thisYearCustomers = allCustomers.filter(c => c.customerCode?.startsWith(yearPrefix));
-      const nextNumber = (thisYearCustomers.length + 1).toString().padStart(4, '0');
-      const customerCode = `${yearPrefix}${nextNumber}`;
+      const customerCode = await generateCustomerCode();
       res.json({ customerCode });
     } catch (error) {
       console.error('Error generating customer code:', error);
