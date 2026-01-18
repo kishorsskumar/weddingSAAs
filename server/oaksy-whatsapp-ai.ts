@@ -6320,18 +6320,22 @@ Return "INVALID" if you cannot parse the input.`;
     employee.name
   );
 
-  // FORCE REMINDER INTENT: If AI returned "general" but message clearly contains reminder keywords
-  // This is a safety net because the AI sometimes fails to detect reminder intent
-  const lowerMsgForReminder = messageText.toLowerCase();
-  const hasReminderKeywords = 
-    lowerMsgForReminder.includes('remind me') || 
-    lowerMsgForReminder.includes('reminder') || 
-    lowerMsgForReminder.includes('set a reminder') ||
-    lowerMsgForReminder.includes('create a reminder') ||
-    lowerMsgForReminder.includes('set reminder');
+  // FORCE REMINDER INTENT: Only force when message is EXPLICITLY a reminder request
+  // Be conservative to avoid misclassifying other messages
+  const lowerMsgForReminder = messageText.toLowerCase().trim();
   
-  if (hasReminderKeywords && aiAnalysis.intent !== 'reminder') {
-    console.log('[Oaksy] Forcing reminder intent - AI returned:', aiAnalysis.intent, 'but message contains reminder keywords');
+  // Only force reminder if the message STARTS with or is primarily a reminder request
+  // Not just any message containing "remind" or "reminder" somewhere
+  const isExplicitReminderRequest = 
+    /^remind\s+me\s+/i.test(lowerMsgForReminder) ||           // "Remind me to..."
+    /^set\s+(a\s+)?reminder/i.test(lowerMsgForReminder) ||    // "Set a reminder..."
+    /^create\s+(a\s+)?reminder/i.test(lowerMsgForReminder) || // "Create a reminder..."
+    /^reminder\s*:/i.test(lowerMsgForReminder) ||             // "Reminder: ..."
+    /^please\s+remind\s+me/i.test(lowerMsgForReminder) ||     // "Please remind me..."
+    /^can\s+you\s+remind\s+me/i.test(lowerMsgForReminder);    // "Can you remind me..."
+  
+  if (isExplicitReminderRequest && aiAnalysis.intent !== 'reminder') {
+    console.log('[Oaksy] Forcing reminder intent - AI returned:', aiAnalysis.intent, 'but message is explicit reminder request');
     aiAnalysis = {
       ...aiAnalysis,
       intent: 'reminder',
@@ -6430,6 +6434,95 @@ Return "INVALID" if you cannot parse the input.`;
       
       console.log('[Oaksy] Final inventory extractedData:', aiAnalysis.extractedData);
     }
+  }
+
+  // Handle AI-detected inventory_item intent (for authorized creators)
+  if (aiAnalysis.intent === 'inventory_item' && isAuthorizedForInventory) {
+    const itemName = aiAnalysis.extractedData.inventoryItemName;
+    const quantity = aiAnalysis.extractedData.inventoryItemQuantity;
+    const category = aiAnalysis.extractedData.inventoryItemCategory || 'General';
+    const location = aiAnalysis.extractedData.inventoryItemLocation || 'Warehouse';
+    const colour = aiAnalysis.extractedData.inventoryItemColour;
+    
+    console.log('[Oaksy] Inventory intent handler - name:', itemName, 'qty:', quantity, 'colour:', colour);
+    
+    // If we have both name and quantity, execute immediately for Superadmin
+    const isSuperadminPhone = normalizedPhone === '917902373354' || normalizedPhone === '+917902373354';
+    const hasAllData = itemName && quantity && quantity > 0;
+    
+    if (hasAllData && isSuperadminPhone) {
+      // Auto-execute for Superadmin
+      try {
+        const result = await handleInventoryItemCreation(
+          {
+            inventoryItemName: itemName,
+            inventoryItemQuantity: quantity,
+            inventoryItemCategory: category,
+            inventoryItemLocation: location,
+            inventoryItemColour: colour,
+            inventoryItemPhotoUrl: mediaUrl,
+          } as IntentContext,
+          mediaUrl,
+          fromNumber,
+          conversation
+        );
+        return result.message;
+      } catch (error: any) {
+        console.error('[Oaksy] Inventory creation error:', error.message);
+        return `Hmm, something went wrong adding that to inventory. Can you try again?`;
+      }
+    } else if (hasAllData) {
+      // Non-superadmin with full data - save state and ask for confirmation
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'ai_inventory_item',
+        intentContext: {
+          inventoryItemName: itemName,
+          inventoryItemQuantity: quantity,
+          inventoryItemCategory: category,
+          inventoryItemLocation: location,
+          inventoryItemColour: colour,
+          inventoryItemPhotoUrl: mediaUrl,
+        },
+        currentState: 'awaiting_confirmation',
+        conversationHistory: history,
+      });
+      
+      const colourNote = colour ? ` (${colour})` : '';
+      const photoNote = mediaUrl ? ' with photo' : '';
+      return `Perfect! Here's what I'm adding to inventory${photoNote}:\n\n${itemName}${colourNote} - ${quantity} units\n\nDoes that look right? Just say yes to confirm.`;
+    } else if (itemName && !quantity) {
+      // Have item but need quantity
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'ai_inventory_item',
+        intentContext: {
+          inventoryItemName: itemName,
+          inventoryItemCategory: category,
+          inventoryItemLocation: location,
+          inventoryItemColour: colour,
+          inventoryItemPhotoUrl: mediaUrl,
+        },
+        currentState: 'awaiting_inventory_quantity',
+        conversationHistory: history,
+      });
+      
+      const colourNote = colour ? ` (${colour})` : '';
+      return `Got it - ${itemName}${colourNote}. How many do we have in stock?`;
+    } else if (!itemName && mediaUrl) {
+      // Have photo but need details
+      await storage.updateWhatsappConversation(conversation.id, {
+        activeIntent: 'ai_inventory_item',
+        intentContext: {
+          inventoryItemPhotoUrl: mediaUrl,
+        },
+        currentState: 'gathering_info',
+        conversationHistory: history,
+      });
+      
+      return `Nice photo! What's this item called and how many do we have?`;
+    }
+    
+    // Not enough info - return AI's suggested response
+    return aiAnalysis.message || `📦 I can add items to inventory! Just tell me the item name and quantity.\n\n_Example: "Add 50 chairs" or send a photo with "Item: Lamp, Quantity: 20"_`;
   }
 
   // Handle AI-detected vendor payment intent
