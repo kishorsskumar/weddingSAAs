@@ -309,21 +309,9 @@ export default function OakSales() {
             </div>
           </div>
         )}
-        <div className="p-4 sm:p-6">
-          {activeSection === 'dashboard' && (
-            <DashboardSection
-              deals={deals}
-              contacts={contacts}
-              companies={companies}
-              activities={activities}
-              stages={stages}
-              targets={targets}
-              users={users}
-              weddingPlanners={weddingPlanners}
-              isSuperAdmin={isSuperAdmin}
-            />
-          )}
-          {activeSection === 'pipeline' && (
+        {/* Pipeline section uses full height, others use padding */}
+        {activeSection === 'pipeline' ? (
+          <div className="h-full flex flex-col">
             <PipelineSection
               pipelines={filteredPipelines}
               stages={stages}
@@ -336,54 +324,70 @@ export default function OakSales() {
               setSearchQuery={setSearchQuery}
               isSuperAdmin={isSuperAdmin}
             />
-          )}
-          {activeSection === 'contacts' && (
-            <ContactsSection
-              contacts={filteredContacts}
-              companies={companies}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-            />
-          )}
-          {activeSection === 'companies' && (
-            <CompaniesSection
-              companies={companies}
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-            />
-          )}
-          {activeSection === 'activities' && (
-            <ActivitiesSection
-              activities={activities}
-              deals={deals}
-              contacts={contacts}
-            />
-          )}
-          {activeSection === 'pipeline-setup' && (
-            <PipelineSetupSection
-              pipelines={filteredPipelines}
-              stages={stages}
-            />
-          )}
-          {activeSection === 'automations' && (
-            <AutomationsSection automations={automations} />
-          )}
-          {activeSection === 'reports' && (
-            <ReportsSection
-              deals={deals}
-              stages={stages}
-              contacts={contacts}
-              activities={activities}
-            />
-          )}
-          {activeSection === 'settings' && (
-            <SettingsSection
-              targets={targets}
-              weddingPlanners={weddingPlanners}
-              isSuperAdmin={isSuperAdmin}
-            />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-6">
+            {activeSection === 'dashboard' && (
+              <DashboardSection
+                deals={deals}
+                contacts={contacts}
+                companies={companies}
+                activities={activities}
+                stages={stages}
+                targets={targets}
+                users={users}
+                weddingPlanners={weddingPlanners}
+                isSuperAdmin={isSuperAdmin}
+              />
+            )}
+            {activeSection === 'contacts' && (
+              <ContactsSection
+                contacts={filteredContacts}
+                companies={companies}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+              />
+            )}
+            {activeSection === 'companies' && (
+              <CompaniesSection
+                companies={companies}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+              />
+            )}
+            {activeSection === 'activities' && (
+              <ActivitiesSection
+                activities={activities}
+                deals={deals}
+                contacts={contacts}
+              />
+            )}
+            {activeSection === 'pipeline-setup' && (
+              <PipelineSetupSection
+                pipelines={filteredPipelines}
+                stages={stages}
+              />
+            )}
+            {activeSection === 'automations' && (
+              <AutomationsSection automations={automations} />
+            )}
+            {activeSection === 'reports' && (
+              <ReportsSection
+                deals={deals}
+                stages={stages}
+                contacts={contacts}
+                activities={activities}
+              />
+            )}
+            {activeSection === 'settings' && (
+              <SettingsSection
+                targets={targets}
+                weddingPlanners={weddingPlanners}
+                isSuperAdmin={isSuperAdmin}
+              />
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
@@ -781,8 +785,9 @@ function PipelineSection({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="flex flex-col h-full">
+      {/* Header - fixed height */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 sm:p-6 pb-2">
         <div className="flex items-center justify-between sm:block">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold">Leads Pipeline</h1>
@@ -988,8 +993,8 @@ function PipelineSection({
         </div>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-4">
+      {/* Search - fixed height */}
+      <div className="flex items-center gap-4 px-4 sm:px-6 py-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -1005,9 +1010,9 @@ function PipelineSection({
         </Button>
       </div>
 
-      {/* Kanban Board - with visible scrollbar */}
-      <div className="kanban-scroll pb-4">
-        <div className="flex gap-3 min-w-max pb-3">
+      {/* Kanban Board - fills remaining height with scrollbar at bottom */}
+      <div className="flex-1 kanban-scroll px-4 sm:px-6">
+        <div className="flex gap-3 min-w-max h-full pb-4">
           {pipelineStages.map(stage => {
             const stageDeals = filteredDeals.filter(d => d.stageId === stage.id);
             const stageValue = stageDeals.reduce((sum, d) => sum + parseFloat(d.value || '0'), 0);
