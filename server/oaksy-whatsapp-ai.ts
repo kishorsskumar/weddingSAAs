@@ -3902,6 +3902,30 @@ export async function handleOaksyWhatsAppMessage(
           slots.inventoryItemPhotoUrl = mediaUrl;
         }
         
+        // HANDLE FOLLOW-UP: When in gathering_info or awaiting_quantity state, try to extract quantity from reply
+        if (conversation.activeIntent === 'ai_inventory_item' && 
+            (conversation.currentState === 'gathering_info' || conversation.currentState === 'awaiting_inventory_quantity')) {
+          // Try to extract quantity from follow-up message (e.g., "20", "50 units", "100 nos")
+          const qtyFromReply = messageText.match(/^\s*(\d+)\s*(nos?|pieces?|pcs?|units?|per\s+unit)?\s*$/i);
+          if (qtyFromReply && !slots.inventoryItemQuantity) {
+            slots.inventoryItemQuantity = parseInt(qtyFromReply[1]);
+            console.log('[AI Inventory] Extracted quantity from follow-up:', slots.inventoryItemQuantity);
+          }
+          
+          // Also check if user is providing rate/price info (ignore it for now, focus on quantity)
+          const hasRateInfo = /per\s+unit|each|rate|cost|price|rupees|rs|₹/i.test(messageText);
+          if (hasRateInfo && !slots.inventoryItemQuantity) {
+            // User is providing rate but we need quantity - prompt for quantity instead
+            await storage.updateWhatsappConversation(conversation.id, {
+              activeIntent: 'ai_inventory_item',
+              intentContext: slots,
+              currentState: 'awaiting_inventory_quantity',
+              conversationHistory: history,
+            });
+            return `Got it on the rate! 👍 But first, *how many* ${slots.inventoryItemName || 'items'} do we have?\n\nJust send me the number like: "20" 🌳`;
+          }
+        }
+        
         const trimmedMessage = messageText.trim().toLowerCase();
         const isSimpleConfirm = /^(yes|ok|okay|confirm|sure|go ahead|do it|proceed|submit|haan|ha|ji)/i.test(trimmedMessage);
         const isInAwaitingState = conversation.activeIntent === 'ai_inventory_item' && 
@@ -3934,7 +3958,8 @@ export async function handleOaksyWhatsAppMessage(
         }
         
         // Not confirmed yet - save context and ask for missing info
-        if (slots.inventoryItemName && !aiResult.readyToExecute) {
+        if (slots.inventoryItemName && slots.inventoryItemQuantity && !aiResult.readyToExecute) {
+          // Have both name and quantity - ask for confirmation
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'ai_inventory_item',
             intentContext: slots,
@@ -3942,12 +3967,25 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: history,
           });
           
-          const quantity = slots.inventoryItemQuantity || 0;
-          const category = slots.inventoryItemCategory || 'General';
-          const hasPhoto = slots.inventoryItemPhotoUrl ? 'with photo 📸' : '';
+          const quantity = slots.inventoryItemQuantity;
+          const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
+          const hasPhoto = slots.inventoryItemPhotoUrl ? ' with photo 📸' : '';
           
           // Natural, conversational response
-          return `Got it! Adding *${slots.inventoryItemName}* (${quantity} units) to inventory ${hasPhoto}.\n\nLooks good? Just say *yes* to confirm, or tell me if anything needs to change! 🌳`;
+          return `📦 Got it! Adding to inventory${hasPhoto}:\n\n*${slots.inventoryItemName}*${colour}\nQuantity: ${quantity} units\n\nLooks good? Just say *yes* to confirm! 🌳`;
+        } else if (slots.inventoryItemName && !slots.inventoryItemQuantity) {
+          // Have item name but need quantity
+          await storage.updateWhatsappConversation(conversation.id, {
+            activeIntent: 'ai_inventory_item',
+            intentContext: slots,
+            currentState: 'awaiting_inventory_quantity',
+            conversationHistory: history,
+          });
+          
+          const colour = slots.inventoryItemColour ? ` (${slots.inventoryItemColour})` : '';
+          const hasPhoto = slots.inventoryItemPhotoUrl ? ' 📸' : '';
+          
+          return `📦 *${slots.inventoryItemName}*${colour}${hasPhoto}\n\n*How many* do we have? Just send the number! 🌳`;
         } else if (Object.keys(aiResult.slots).length > 0 || mediaUrl) {
           // Have some info but need more
           await storage.updateWhatsappConversation(conversation.id, {
@@ -6293,24 +6331,35 @@ Return "INVALID" if you cannot parse the input.`;
   const itemQuantityPattern = /([a-z\s]+)\s*[-–:]?\s*(\d+)\s*(nos?|pieces?|pcs?|units?)?/i;
   const hasQuantityAndItem = quantityItemPattern.test(messageText) || itemQuantityPattern.test(messageText);
   
-  if (isAuthorizedForInventory && aiAnalysis.intent !== 'inventory_item') {
+  // ALWAYS extract inventory data for authorized users - even when AI already detected inventory_item
+  // This ensures structured formats like "Item: X, Quantity: Y" are properly parsed
+  if (isAuthorizedForInventory) {
     // Force inventory intent if: has keywords OR (has photo AND has quantity+item pattern)
-    if (hasInventoryKeywords || (mediaUrl && hasQuantityAndItem)) {
-      console.log('[Oaksy] Forcing inventory_item intent - AI returned:', aiAnalysis.intent, '| hasKeywords:', hasInventoryKeywords, '| hasPhoto:', !!mediaUrl, '| hasQtyItem:', hasQuantityAndItem);
+    const shouldForceIntent = aiAnalysis.intent !== 'inventory_item' && (hasInventoryKeywords || (mediaUrl && hasQuantityAndItem));
+    const shouldEnhanceData = aiAnalysis.intent === 'inventory_item' || shouldForceIntent;
+    
+    if (shouldEnhanceData) {
+      console.log('[Oaksy] Inventory data extraction - forcing:', shouldForceIntent, '| enhancing:', aiAnalysis.intent === 'inventory_item', '| hasKeywords:', hasInventoryKeywords);
       
       // Try to extract item name and quantity from the message
       let extractedName: string | null = null;
       let extractedQuantity: number | null = null;
+      let extractedColour: string | null = null;
       
-      // Try structured format: "Item: X, Quantity: Y" or "Item : X, Quantity: Y"
+      // Try structured format: "Item: X, Quantity: Y, Colour: Z"
       const structuredItemMatch = messageText.match(/item\s*[:]\s*([^,\n]+)/i);
       const structuredQtyMatch = messageText.match(/quantity\s*[:]\s*(\d+)/i);
+      const structuredColourMatch = messageText.match(/colou?r\s*[:]\s*([^,\n]+)/i);
       
       if (structuredItemMatch) {
         extractedName = structuredItemMatch[1].trim();
       }
       if (structuredQtyMatch) {
         extractedQuantity = parseInt(structuredQtyMatch[1]);
+        console.log('[Oaksy] Extracted quantity from structured format:', extractedQuantity);
+      }
+      if (structuredColourMatch) {
+        extractedColour = structuredColourMatch[1].trim();
       }
       
       // If structured format didn't work, try "50 chairs" pattern
@@ -6336,6 +6385,7 @@ Return "INVALID" if you cannot parse the input.`;
         extractedName = extractedName.replace(/^(create|add|new|inventory)\s*/i, '').trim();
       }
       
+      // Merge with AI's extracted data - prefer deterministic parsing over AI
       aiAnalysis = {
         ...aiAnalysis,
         intent: 'inventory_item',
@@ -6345,8 +6395,11 @@ Return "INVALID" if you cannot parse the input.`;
           inventoryItemQuantity: extractedQuantity || aiAnalysis.extractedData.inventoryItemQuantity || null,
           inventoryItemCategory: aiAnalysis.extractedData.inventoryItemCategory || 'General',
           inventoryItemLocation: aiAnalysis.extractedData.inventoryItemLocation || 'Warehouse',
+          inventoryItemColour: extractedColour || aiAnalysis.extractedData.inventoryItemColour || null,
         }
       };
+      
+      console.log('[Oaksy] Final inventory extractedData:', aiAnalysis.extractedData);
     }
   }
 
