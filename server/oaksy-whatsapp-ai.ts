@@ -484,14 +484,20 @@ QUERY TYPE DETECTION:
 - "pending rsvps", "who hasn't responded", "rsvp follow-up" = rsvp_query with queryType: "pending"
 - "meal count", "food preferences", "veg non-veg count" = rsvp_query with queryType: "meals"
 
-INVENTORY ITEM DETECTION RULES:
-- "add to inventory", "new item in warehouse", "stock this item" = inventory_item
+INVENTORY ITEM DETECTION RULES (CRITICAL - For Superadmin and Praveen):
+- "add to inventory", "new item in warehouse", "stock this item", "add item" = inventory_item
 - "we have 10 [item name] in warehouse" = inventory_item with quantity
-- When a photo is attached along with item name and quantity = inventory_item
+- When a photo is attached with ANY number + item name = ALWAYS inventory_item
+- Pattern: "[number] [item name]" with photo = inventory_item (e.g. "50 chairs", "100 covers", "25 lights")
+- Pattern: "new [item]", "add [item]", "[item name] - [number]" = inventory_item
+- Keywords: "inventory", "warehouse", "stock", "item", "add item", "new stock"
 - Extract: inventoryItemName (the item name), inventoryItemQuantity (number), inventoryItemCategory (if mentioned, default "General"), inventoryItemLocation (if mentioned, default "Warehouse")
 - Examples: "Add 50 white chairs to inventory" = inventory_item with name="White Chairs", quantity=50
 - Examples: "New stock - 100 table covers" = inventory_item with name="Table Covers", quantity=100
-- If photo attached but no name/quantity, ask: "What is this item called and how many do we have?"
+- Examples: "50 chairs" (with photo) = inventory_item with name="Chairs", quantity=50
+- Examples: "white chairs 25 nos" = inventory_item with name="White Chairs", quantity=25
+- If photo attached but no name/quantity, ask: "Got the photo! What's this item called and how many do we have?"
+- IMPORTANT: For Superadmin/Praveen, prioritize inventory_item intent when photo + number + item word pattern detected
 
 REMINDER DETECTION RULES:
 - EXPLICIT: "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
@@ -1923,7 +1929,7 @@ async function handleInventoryItemCreation(
     const photoNote = photoUrl ? '\n📸 Photo saved!' : '';
     return {
       success: true,
-      message: `✅ *Inventory Item Added!*\n\n📦 *Name:* ${itemName}\n🔢 *Quantity:* ${quantity}\n📁 *Category:* ${category}\n📍 *Location:* ${location}${photoNote}\n\n_Item added to Oak Inventory!_ 🌳`
+      message: `Done! ✅ Added *${itemName}* (${quantity} units) to the warehouse${photoNote ? ' with photo' : ''}.\n\nCategory: ${category} | Location: ${location}\n\n_All set!_ 🌳`
     };
   } catch (error: any) {
     console.error('[Inventory] Error creating item:', error.message);
@@ -3929,9 +3935,10 @@ export async function handleOaksyWhatsAppMessage(
           
           const quantity = slots.inventoryItemQuantity || 0;
           const category = slots.inventoryItemCategory || 'General';
-          const hasPhoto = slots.inventoryItemPhotoUrl ? '✅ Photo attached' : '📷 No photo';
+          const hasPhoto = slots.inventoryItemPhotoUrl ? 'with photo 📸' : '';
           
-          return `📦 *Add Inventory Item?*\n\n🏷️ Name: ${slots.inventoryItemName}\n🔢 Quantity: ${quantity}\n📁 Category: ${category}\n${hasPhoto}\n\n_Reply "yes" to add or provide more details._ 🌳`;
+          // Natural, conversational response
+          return `Got it! Adding *${slots.inventoryItemName}* (${quantity} units) to inventory ${hasPhoto}.\n\nLooks good? Just say *yes* to confirm, or tell me if anything needs to change! 🌳`;
         } else if (Object.keys(aiResult.slots).length > 0 || mediaUrl) {
           // Have some info but need more
           await storage.updateWhatsappConversation(conversation.id, {
@@ -3942,7 +3949,7 @@ export async function handleOaksyWhatsAppMessage(
           });
           
           if (!slots.inventoryItemName) {
-            return `📷 Got the photo! What's this item called and how many do we have?\n\n_Example: "50 white chairs"_ 🌳`;
+            return `Nice photo! 📸 What's this item called and how many do we have?\n\nJust tell me like: "50 white chairs" 🌳`;
           }
         }
         
@@ -6246,6 +6253,59 @@ Return "INVALID" if you cannot parse the input.`;
           messageText.replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '').replace(/\s*(at|after|in|on|today|tomorrow).*$/i, '').trim() || null,
       }
     };
+  }
+
+  // FORCE INVENTORY INTENT: For Superadmin/Praveen when photo + quantity pattern detected
+  // This is a safety net because AI sometimes fails to detect inventory intent
+  const lowerMsgForInventory = messageText.toLowerCase();
+  const isAuthorizedForInventory = isAuthorizedInventoryCreator(normalizedPhone);
+  const hasInventoryKeywords = 
+    lowerMsgForInventory.includes('inventory') || 
+    lowerMsgForInventory.includes('warehouse') || 
+    lowerMsgForInventory.includes('stock') ||
+    lowerMsgForInventory.includes('add item') ||
+    lowerMsgForInventory.includes('new item');
+  
+  // Pattern: number + item name (e.g., "50 chairs", "100 covers", "25 nos lights")
+  const quantityItemPattern = /(\d+)\s*(nos?|pieces?|pcs?|units?)?\s*([a-z\s]+)/i;
+  const itemQuantityPattern = /([a-z\s]+)\s*[-–:]?\s*(\d+)\s*(nos?|pieces?|pcs?|units?)?/i;
+  const hasQuantityAndItem = quantityItemPattern.test(messageText) || itemQuantityPattern.test(messageText);
+  
+  if (isAuthorizedForInventory && aiAnalysis.intent !== 'inventory_item') {
+    // Force inventory intent if: has keywords OR (has photo AND has quantity+item pattern)
+    if (hasInventoryKeywords || (mediaUrl && hasQuantityAndItem)) {
+      console.log('[Oaksy] Forcing inventory_item intent - AI returned:', aiAnalysis.intent, '| hasKeywords:', hasInventoryKeywords, '| hasPhoto:', !!mediaUrl, '| hasQtyItem:', hasQuantityAndItem);
+      
+      // Try to extract item name and quantity from the message
+      let extractedName: string | null = null;
+      let extractedQuantity: number | null = null;
+      
+      // Try "50 chairs" pattern first
+      const qtyMatch = messageText.match(/(\d+)\s*(nos?|pieces?|pcs?|units?)?\s+([a-z\s]+)/i);
+      if (qtyMatch) {
+        extractedQuantity = parseInt(qtyMatch[1]);
+        extractedName = qtyMatch[3].trim();
+      } else {
+        // Try "chairs - 50" pattern
+        const itemMatch = messageText.match(/([a-z\s]+?)\s*[-–:]\s*(\d+)\s*(nos?|pieces?|pcs?|units?)?/i);
+        if (itemMatch) {
+          extractedName = itemMatch[1].trim();
+          extractedQuantity = parseInt(itemMatch[2]);
+        }
+      }
+      
+      aiAnalysis = {
+        ...aiAnalysis,
+        intent: 'inventory_item',
+        extractedData: {
+          ...aiAnalysis.extractedData,
+          inventoryItemName: extractedName || aiAnalysis.extractedData.inventoryItemName || null,
+          inventoryItemQuantity: extractedQuantity || aiAnalysis.extractedData.inventoryItemQuantity || null,
+          inventoryItemCategory: aiAnalysis.extractedData.inventoryItemCategory || 'General',
+          inventoryItemLocation: aiAnalysis.extractedData.inventoryItemLocation || 'Warehouse',
+        }
+      };
+    }
   }
 
   // Handle AI-detected vendor payment intent
