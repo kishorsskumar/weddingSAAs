@@ -117,6 +117,56 @@ function isAllowedExpenseSubmitter(phone: string): boolean {
   });
 }
 
+/**
+ * Transcribe a voice message using OpenAI Whisper API
+ */
+async function transcribeVoiceMessage(mediaUrl: string): Promise<string | null> {
+  try {
+    console.log('[Oaksy] Transcribing voice message from:', mediaUrl);
+    
+    // Download the audio file from Twilio with authentication
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!accountSid || !authToken) {
+      console.error('[Oaksy] Missing Twilio credentials for voice transcription');
+      return null;
+    }
+    
+    const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    
+    const audioResponse = await fetch(mediaUrl, {
+      headers: {
+        'Authorization': authHeader,
+      },
+    });
+    
+    if (!audioResponse.ok) {
+      console.error('[Oaksy] Failed to download voice message:', audioResponse.status);
+      return null;
+    }
+    
+    const audioBuffer = await audioResponse.arrayBuffer();
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/ogg' });
+    
+    // Create a File object for OpenAI
+    const audioFile = new File([audioBlob], 'voice_message.ogg', { type: 'audio/ogg' });
+    
+    // Use OpenAI Whisper to transcribe
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-1',
+      language: 'en', // Can be 'hi' for Hindi or auto-detect
+    });
+    
+    console.log('[Oaksy] Transcription result:', transcription.text);
+    return transcription.text?.trim() || null;
+  } catch (error: any) {
+    console.error('[Oaksy] Voice transcription error:', error.message);
+    return null;
+  }
+}
+
 // Helper to convert Twilio media URL to our proxy URL for public access
 function getPublicMediaUrl(twilioMediaUrl: string): string {
   if (!twilioMediaUrl || !twilioMediaUrl.includes('twilio.com')) {
@@ -2522,7 +2572,32 @@ export async function handleOaksyWhatsAppMessage(
   const conversation = await storage.getOrCreateWhatsappConversation(normalizedPhone);
   console.log('[Oaksy] Got conversation:', conversation.id);
   
-  const messageText = body.trim();
+  let messageText = body.trim();
+  
+  // VOICE MESSAGE HANDLING - Transcribe audio messages using OpenAI Whisper
+  const isVoiceMessage = mediaContentType && (
+    mediaContentType.includes('audio') || 
+    mediaContentType.includes('ogg') ||
+    mediaContentType.includes('mpeg') ||
+    mediaContentType.includes('opus')
+  );
+  
+  if (isVoiceMessage && mediaUrl) {
+    console.log('[Oaksy] Received voice message, attempting transcription...');
+    try {
+      const transcribedText = await transcribeVoiceMessage(mediaUrl);
+      if (transcribedText) {
+        messageText = transcribedText;
+        console.log('[Oaksy] Transcribed voice message:', messageText.substring(0, 100));
+      } else {
+        return `🎙️ I received your voice message but couldn't understand it clearly. Could you please type your message or try recording again?`;
+      }
+    } catch (transcribeError: any) {
+      console.error('[Oaksy] Voice transcription error:', transcribeError.message);
+      return `🎙️ I received your voice message but had trouble processing it. Could you please type your message instead?`;
+    }
+  }
+  
   const lowerMessage = messageText.toLowerCase();
   
   // GLOBAL STOP/CANCEL COMMAND - Allows users to exit any ongoing flow
