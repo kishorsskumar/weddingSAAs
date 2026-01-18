@@ -53,16 +53,16 @@ const ALL_PAGES = [
     { id: "sales-reports", label: "Reports", path: "/oak-sales?section=reports" },
     { id: "sales-settings", label: "Settings", path: "/oak-sales?section=settings" },
   ] },
-  { id: "event-calendar", label: "Oak Event Calendar", path: "/events", subPages: [
-    { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan" },
+  { id: "event-hub", label: "Event Hub", path: "/events", subPages: [
+    { id: "event-calendar", label: "Calendar", path: "/events" },
+    { id: "event-milestones", label: "Timeline", path: "/milestones" },
+    { id: "execution-plan", label: "Execution", path: "/execution-plan" },
   ] },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team" },
   { id: "event-database", label: "Oak Event Database", path: "/database" },
-  { id: "event-milestones", label: "Oak Event Milestones", path: "/milestones" },
   { id: "daybook", label: "Oak Daybook", path: "/daybook" },
   { id: "oak-book", label: "Oak Book", path: "/oak-book" },
   { id: "oak-inventory", label: "Oak Inventory", path: "/oak-inventory" },
-  { id: "execution-plan", label: "Execution Plan", path: "/execution-plan" },
   { id: "hr", label: "Oak HR", path: "/hr" },
   { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
@@ -74,8 +74,8 @@ const ALL_PAGES = [
 
 const ICONS: Record<string, any> = {
   dashboard: LayoutDashboard,
+  "event-hub": Calendar,
   "event-calendar": Calendar,
-  "monthly-plan": Calendar,
   "team-calendar": Users,
   "event-database": Database,
   "event-milestones": CheckSquare,
@@ -410,7 +410,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true });
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({ sales: true, "event-hub": true });
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
@@ -453,8 +453,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             return location === spPath || currentFullUrl === sp.path;
           }));
           
-          // For collapsible menus (like Sales), use button to toggle; for others use Link
-          if (hasSubPages && item.id === 'sales') {
+          // For collapsible menus (Sales and Event Hub), use button to toggle; for others use Link
+          if (hasSubPages && (item.id === 'sales' || item.id === 'event-hub')) {
             return (
               <div key={item.id}>
                 <button

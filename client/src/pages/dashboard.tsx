@@ -54,8 +54,8 @@ interface PendingMilestone extends EventMilestone {
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard, description: "Overview & stats" },
   { id: "sales", label: "Sales", path: "/oak-sales", icon: Target, description: "Leads, pipeline & CRM" },
+  { id: "event-hub", label: "Event Hub", path: "/events", icon: Calendar, description: "Calendar, timeline & execution" },
   { id: "event-calendar", label: "Oak Event Calendar", path: "/events", icon: Calendar, description: "Manage events" },
-  { id: "monthly-plan", label: "Monthly Plan", path: "/monthly-plan", icon: Calendar, description: "Production planning" },
   { id: "team-calendar", label: "Oak Team Calendar", path: "/team", icon: Users, description: "Team scheduling" },
   { id: "event-database", label: "Oak Event Database", path: "/database", icon: Database, description: "Event records" },
   { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
