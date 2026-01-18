@@ -77,7 +77,15 @@ const getIndianFiscalYear = (date: Date = new Date()): string => {
 export default function OakSales() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarManuallyToggled, setSidebarManuallyToggled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Auto-collapse sidebar when viewing Pipeline for more kanban space
+  useEffect(() => {
+    if (!sidebarManuallyToggled) {
+      setSidebarCollapsed(activeSection === 'pipeline');
+    }
+  }, [activeSection, sidebarManuallyToggled]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -266,7 +274,10 @@ export default function OakSales() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              onClick={() => {
+                setSidebarManuallyToggled(true);
+                setSidebarCollapsed(!sidebarCollapsed);
+              }}
               className="w-full justify-center"
             >
               <ChevronRight className={`w-4 h-4 transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
@@ -994,9 +1005,9 @@ function PipelineSection({
         </Button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
+      {/* Kanban Board - with visible scrollbar */}
+      <div className="kanban-scroll pb-4">
+        <div className="flex gap-3 min-w-max pb-3">
           {pipelineStages.map(stage => {
             const stageDeals = filteredDeals.filter(d => d.stageId === stage.id);
             const stageValue = stageDeals.reduce((sum, d) => sum + parseFloat(d.value || '0'), 0);
@@ -1004,7 +1015,7 @@ function PipelineSection({
             return (
               <div
                 key={stage.id}
-                className="w-72 flex-shrink-0"
+                className="w-56 lg:w-64 xl:w-72 flex-shrink-0"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage.id)}
               >
