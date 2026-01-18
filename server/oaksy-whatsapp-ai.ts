@@ -6336,14 +6336,92 @@ Return "INVALID" if you cannot parse the input.`;
   
   if (isExplicitReminderRequest && aiAnalysis.intent !== 'reminder') {
     console.log('[Oaksy] Forcing reminder intent - AI returned:', aiAnalysis.intent, 'but message is explicit reminder request');
+    
+    // Extract time patterns from the message
+    let extractedDateTime: string | undefined = aiAnalysis.extractedData.reminderDateTime;
+    
+    if (!extractedDateTime) {
+      // Pattern: "after X minutes/hours"
+      const afterMatch = messageText.match(/after\s+(\d+)\s*(min(?:ute)?s?|hour?s?|hr?s?)/i);
+      if (afterMatch) {
+        const num = parseInt(afterMatch[1]);
+        const unit = afterMatch[2].toLowerCase();
+        const now = new Date();
+        if (unit.startsWith('min')) {
+          now.setMinutes(now.getMinutes() + num);
+        } else {
+          now.setHours(now.getHours() + num);
+        }
+        extractedDateTime = now.toISOString();
+      }
+      
+      // Pattern: "in X minutes/hours"
+      if (!extractedDateTime) {
+        const inMatch = messageText.match(/in\s+(\d+)\s*(min(?:ute)?s?|hour?s?|hr?s?)/i);
+        if (inMatch) {
+          const num = parseInt(inMatch[1]);
+          const unit = inMatch[2].toLowerCase();
+          const now = new Date();
+          if (unit.startsWith('min')) {
+            now.setMinutes(now.getMinutes() + num);
+          } else {
+            now.setHours(now.getHours() + num);
+          }
+          extractedDateTime = now.toISOString();
+        }
+      }
+      
+      // Pattern: "at X:XX" or "at X am/pm"
+      if (!extractedDateTime) {
+        const atTimeMatch = messageText.match(/at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (atTimeMatch) {
+          let hours = parseInt(atTimeMatch[1]);
+          const minutes = atTimeMatch[2] ? parseInt(atTimeMatch[2]) : 0;
+          const ampm = atTimeMatch[3]?.toLowerCase();
+          
+          if (ampm === 'pm' && hours < 12) hours += 12;
+          if (ampm === 'am' && hours === 12) hours = 0;
+          
+          const now = new Date();
+          now.setHours(hours, minutes, 0, 0);
+          
+          // If time is in the past, assume tomorrow
+          if (now <= new Date()) {
+            now.setDate(now.getDate() + 1);
+          }
+          extractedDateTime = now.toISOString();
+        }
+      }
+    }
+    
+    // Extract the reminder message - everything after "to" but before time patterns
+    let extractedMessage = aiAnalysis.extractedData.reminderMessage;
+    if (!extractedMessage) {
+      extractedMessage = messageText
+        .replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '')
+        .replace(/\s*(at|after|in|on|today|tomorrow)\s+\d+.*/i, '') // Remove time part
+        .replace(/\s+after\s+\d+.*/i, '') // "after 5 minutes"
+        .replace(/\s+in\s+\d+.*/i, '') // "in 5 minutes"
+        .trim();
+      
+      // If message is empty or too short, try a different approach
+      if (!extractedMessage || extractedMessage.length < 3) {
+        extractedMessage = messageText
+          .replace(/^.*(remind me|set a reminder|can you remind me)(\s+to)?/i, '')
+          .replace(/\s*(after|in)\s+\d+\s*(min(?:ute)?s?|hour?s?|hr?s?).*$/i, '')
+          .trim() || undefined;
+      }
+    }
+    
+    console.log('[Oaksy] Force reminder - extracted message:', extractedMessage, '| dateTime:', extractedDateTime);
+    
     aiAnalysis = {
       ...aiAnalysis,
       intent: 'reminder',
       extractedData: {
         ...aiAnalysis.extractedData,
-        // Try to extract the message - everything after "to" or task description
-        reminderMessage: aiAnalysis.extractedData.reminderMessage || 
-          messageText.replace(/^.*(remind me|set a reminder|create a reminder|reminder)(\s+to)?/i, '').replace(/\s*(at|after|in|on|today|tomorrow).*$/i, '').trim() || undefined,
+        reminderMessage: extractedMessage || undefined,
+        reminderDateTime: extractedDateTime || undefined,
       }
     };
   }
