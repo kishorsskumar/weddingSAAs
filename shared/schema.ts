@@ -179,11 +179,15 @@ export const eventMilestones = pgTable("event_milestones", {
 // Oak Book - Customers
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerCode: text("customer_code").unique(), // OAK-YY-XXXX format, read-only after creation
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
   gstNumber: text("gst_number"),
   billingAddress: text("billing_address"),
+  state: text("state"),
+  country: text("country").default('India'),
+  leadId: varchar("lead_id"), // Reference to sales deal (lead)
   weddingPlannerId: varchar("wedding_planner_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -197,6 +201,17 @@ export const vendors = pgTable("vendors", {
   gstNumber: text("gst_number"),
   category: text("category"), // 'catering' | 'decoration' | 'photography' | 'venue' | 'other'
   billingAddress: text("billing_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Customer Creation Logs - tracks when accountant creates customer from lead
+export const customerCreationLogs = pgTable("customer_creation_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").notNull().references(() => customers.id),
+  leadId: varchar("lead_id").notNull(), // Reference to sales deal
+  accountantId: varchar("accountant_id").notNull().references(() => users.id),
+  status: text("status").notNull().default('created'), // 'created' | 'failed'
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -474,8 +489,9 @@ export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({
 export const insertEventMilestoneSchema = createInsertSchema(eventMilestones).omit({ id: true, createdAt: true });
 
 // Oak Book Insert Schemas
-export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true });
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true, customerCode: true });
 export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true, createdAt: true });
+export const insertCustomerCreationLogSchema = createInsertSchema(customerCreationLogs).omit({ id: true, createdAt: true });
 export const insertEstimateSchema = createInsertSchema(estimates).omit({ id: true, createdAt: true }).extend({
   lineItems: z.array(lineItemSchema).optional().default([]),
 });
@@ -645,6 +661,10 @@ export const salesDeals = pgTable("sales_deals", {
   eventType: text("event_type"), // 'wedding', 'corporate', 'birthday', 'other'
   eventDate: date("event_date"),
   venue: text("venue"),
+  advancePaymentReceived: boolean("advance_payment_received").default(false),
+  advancePaymentDate: timestamp("advance_payment_date"),
+  convertedToCustomer: boolean("converted_to_customer").default(false),
+  customerId: varchar("customer_id").references(() => customers.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -740,6 +760,9 @@ export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 
 export type Vendor = typeof vendors.$inferSelect;
 export type InsertVendor = z.infer<typeof insertVendorSchema>;
+
+export type CustomerCreationLog = typeof customerCreationLogs.$inferSelect;
+export type InsertCustomerCreationLog = z.infer<typeof insertCustomerCreationLogSchema>;
 
 export type Estimate = typeof estimates.$inferSelect;
 export type InsertEstimate = z.infer<typeof insertEstimateSchema>;
