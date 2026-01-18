@@ -195,6 +195,7 @@ import {
   type InsertLeaveBalanceAdjustment,
   eventTransportation,
   eventManpower,
+  eventStaffAssignments,
   quickEntries,
   oaksyConversations,
   oaksyMessages,
@@ -202,6 +203,8 @@ import {
   type InsertEventTransportation,
   type EventManpower,
   type InsertEventManpower,
+  type EventStaffAssignment,
+  type InsertEventStaffAssignment,
   type QuickEntry,
   type InsertQuickEntry,
   type OaksyConversation,
@@ -799,6 +802,16 @@ export interface IStorage {
   createEventManpower(data: InsertEventManpower): Promise<EventManpower>;
   updateEventManpower(id: string, data: Partial<InsertEventManpower>): Promise<EventManpower | undefined>;
   deleteEventManpower(id: string): Promise<void>;
+  
+  // Event Staff Assignments
+  getEventStaffAssignments(eventId: string): Promise<EventStaffAssignment[]>;
+  getEventStaffAssignment(id: string): Promise<EventStaffAssignment | undefined>;
+  getUnnotifiedEventStaffAssignments(): Promise<EventStaffAssignment[]>;
+  createEventStaffAssignment(data: InsertEventStaffAssignment): Promise<EventStaffAssignment>;
+  createEventStaffAssignments(data: InsertEventStaffAssignment[]): Promise<EventStaffAssignment[]>;
+  updateEventStaffAssignment(id: string, data: Partial<InsertEventStaffAssignment>): Promise<EventStaffAssignment | undefined>;
+  markEventStaffAssignmentNotified(id: string): Promise<EventStaffAssignment | undefined>;
+  deleteEventStaffAssignment(id: string): Promise<void>;
   
   // Quick Entries (AI-processed payment screenshots)
   getQuickEntriesByEmployee(employeeId: string): Promise<QuickEntry[]>;
@@ -3395,6 +3408,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventManpower(id: string): Promise<void> {
     await db.delete(eventManpower).where(eq(eventManpower.id, id));
+  }
+
+  // Event Staff Assignments
+  async getEventStaffAssignments(eventId: string): Promise<EventStaffAssignment[]> {
+    return await db.select().from(eventStaffAssignments)
+      .where(eq(eventStaffAssignments.eventId, eventId))
+      .orderBy(desc(eventStaffAssignments.createdAt));
+  }
+
+  async getEventStaffAssignment(id: string): Promise<EventStaffAssignment | undefined> {
+    const [assignment] = await db.select().from(eventStaffAssignments)
+      .where(eq(eventStaffAssignments.id, id));
+    return assignment;
+  }
+
+  async getUnnotifiedEventStaffAssignments(): Promise<EventStaffAssignment[]> {
+    return await db.select().from(eventStaffAssignments)
+      .where(eq(eventStaffAssignments.notificationSent, false));
+  }
+
+  async createEventStaffAssignment(data: InsertEventStaffAssignment): Promise<EventStaffAssignment> {
+    const [created] = await db.insert(eventStaffAssignments).values(data).returning();
+    return created;
+  }
+
+  async createEventStaffAssignments(data: InsertEventStaffAssignment[]): Promise<EventStaffAssignment[]> {
+    if (data.length === 0) return [];
+    return await db.insert(eventStaffAssignments).values(data).returning();
+  }
+
+  async updateEventStaffAssignment(id: string, data: Partial<InsertEventStaffAssignment>): Promise<EventStaffAssignment | undefined> {
+    const [updated] = await db.update(eventStaffAssignments)
+      .set(data)
+      .where(eq(eventStaffAssignments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async markEventStaffAssignmentNotified(id: string): Promise<EventStaffAssignment | undefined> {
+    const [updated] = await db.update(eventStaffAssignments)
+      .set({ notificationSent: true, notificationSentAt: new Date() })
+      .where(eq(eventStaffAssignments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEventStaffAssignment(id: string): Promise<void> {
+    await db.delete(eventStaffAssignments).where(eq(eventStaffAssignments.id, id));
   }
 
   // Quick Entries (AI-processed payment screenshots)

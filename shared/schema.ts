@@ -1374,6 +1374,24 @@ export const insertEventManpowerSchema = createInsertSchema(eventManpower).omit(
 export type InsertEventManpower = z.infer<typeof insertEventManpowerSchema>;
 export type EventManpower = typeof eventManpower.$inferSelect;
 
+// Event Staff Assignments - Staff assigned to events via Event Hub
+export const eventStaffAssignments = pgTable("event_staff_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),
+  role: text("role").notNull(),
+  reportingTime: text("reporting_time"),
+  notes: text("notes"),
+  notificationSent: boolean("notification_sent").default(false),
+  notificationSentAt: timestamp("notification_sent_at"),
+  assignedBy: varchar("assigned_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEventStaffAssignmentSchema = createInsertSchema(eventStaffAssignments).omit({ id: true, createdAt: true, notificationSent: true, notificationSentAt: true });
+export type InsertEventStaffAssignment = z.infer<typeof insertEventStaffAssignmentSchema>;
+export type EventStaffAssignment = typeof eventStaffAssignments.$inferSelect;
+
 // Quick Entries - AI-processed payment screenshots from employees
 export const quickEntries = pgTable("quick_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
