@@ -362,6 +362,7 @@ export default function OakSales() {
                 companies={companies}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                isSuperAdmin={isSuperAdmin}
               />
             )}
             {activeSection === 'pipeline-setup' && (
@@ -1471,13 +1472,16 @@ function ContactsSection({
   companies,
   searchQuery,
   setSearchQuery,
+  isSuperAdmin,
 }: {
   contacts: SalesContact[];
   companies: SalesCompany[];
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  isSuperAdmin: boolean;
 }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState<SalesContact | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -1490,6 +1494,27 @@ function ContactsSection({
       queryClient.invalidateQueries({ queryKey: ['/api/sales/contacts'] });
       setIsAddOpen(false);
       toast({ title: 'Contact created successfully' });
+    },
+  });
+
+  const updateContactMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return apiRequest('PATCH', `/api/sales/contacts/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/contacts'] });
+      setEditingContact(null);
+      toast({ title: 'Contact updated successfully' });
+    },
+  });
+
+  const deleteContactMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/sales/contacts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/contacts'] });
+      toast({ title: 'Contact deleted successfully' });
     },
   });
 
@@ -1513,8 +1538,34 @@ function ContactsSection({
       title: formData.get('title'),
       source: formData.get('source'),
       notes: formData.get('notes'),
-      ownerId: user?.id || null, // Assign current user as owner
+      ownerId: user?.id || null,
     });
+  };
+
+  const handleEditContact = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingContact) return;
+    const formData = new FormData(e.currentTarget);
+    updateContactMutation.mutate({
+      id: editingContact.id,
+      data: {
+        firstName: formData.get('firstName'),
+        lastName: formData.get('lastName'),
+        email: formData.get('email'),
+        phone: formData.get('phone'),
+        mobile: formData.get('mobile'),
+        companyId: formData.get('companyId') || null,
+        title: formData.get('title'),
+        source: formData.get('source'),
+        notes: formData.get('notes'),
+      },
+    });
+  };
+
+  const handleDeleteContact = (contact: SalesContact) => {
+    if (confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName || ''}?`)) {
+      deleteContactMutation.mutate(contact.id);
+    }
   };
 
   return (
@@ -1640,7 +1691,7 @@ function ContactsSection({
         {filteredContacts.map(contact => {
           const company = companies.find(c => c.id === contact.companyId);
           return (
-            <Card key={contact.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card key={contact.id} className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1665,6 +1716,16 @@ function ContactsSection({
                       <p className="text-sm text-muted-foreground">{contact.phone}</p>
                     )}
                   </div>
+                  {isSuperAdmin && (
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditingContact(contact)} title="Edit">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteContact(contact)} title="Delete">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1676,6 +1737,90 @@ function ContactsSection({
           </div>
         )}
       </div>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={!!editingContact} onOpenChange={(open) => !open && setEditingContact(null)}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Contact</DialogTitle>
+          </DialogHeader>
+          {editingContact && (
+            <form onSubmit={handleEditContact} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-firstName">First Name *</Label>
+                  <Input id="edit-firstName" name="firstName" defaultValue={editingContact.firstName} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-lastName">Last Name</Label>
+                  <Input id="edit-lastName" name="lastName" defaultValue={editingContact.lastName || ''} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input id="edit-email" name="email" type="email" defaultValue={editingContact.email || ''} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone</Label>
+                  <Input id="edit-phone" name="phone" defaultValue={editingContact.phone || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-mobile">Mobile</Label>
+                  <Input id="edit-mobile" name="mobile" defaultValue={editingContact.mobile || ''} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-companyId">Company</Label>
+                  <Select name="companyId" defaultValue={editingContact.companyId || ''}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-title">Job Title</Label>
+                  <Input id="edit-title" name="title" defaultValue={editingContact.title || ''} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-source">Source</Label>
+                <Select name="source" defaultValue={editingContact.source || ''}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Website">Website</SelectItem>
+                    <SelectItem value="Referral">Referral</SelectItem>
+                    <SelectItem value="Social Media">Social Media</SelectItem>
+                    <SelectItem value="Cold Call">Cold Call</SelectItem>
+                    <SelectItem value="Event">Event</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-notes">Notes</Label>
+                <Textarea id="edit-notes" name="notes" defaultValue={editingContact.notes || ''} />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditingContact(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateContactMutation.isPending}>
+                  {updateContactMutation.isPending ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
