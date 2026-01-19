@@ -28,6 +28,7 @@ import OakRSVP from "@/pages/oak-rsvp";
 import MonthlyPlan from "@/pages/monthly-plan";
 import WhatsappInbox from "@/pages/whatsapp-inbox";
 import ManagementMIS from "@/pages/management-mis";
+import DownloadPage from "@/pages/download";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -125,6 +126,9 @@ function App() {
             </Route>
             <Route path="/print/:type/:id">
               <PrintDocument />
+            </Route>
+            <Route path="/download">
+              <DownloadPage />
             </Route>
             <Route>
               <AppRoutes />
