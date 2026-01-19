@@ -7042,7 +7042,7 @@ export async function registerRoutes(
           if ((stageName.includes('advance received') || stageName.includes('advance payment')) && 
               existingDeal && !existingDeal.advancePaymentReceived) {
             updateData.advancePaymentReceived = true;
-            updateData.advancePaymentDate = new Date().toISOString();
+            updateData.advancePaymentDate = new Date();
             
             // Notify accountant via WhatsApp
             const contact = existingDeal.contactId ? await storage.getSalesContact(existingDeal.contactId) : null;
@@ -7083,7 +7083,7 @@ export async function registerRoutes(
       
       // Handle explicit advance payment received flag
       if (updateData.advancePaymentReceived === true && existingDeal && !existingDeal.advancePaymentReceived) {
-        updateData.advancePaymentDate = new Date().toISOString();
+        updateData.advancePaymentDate = new Date();
       }
       
       const deal = await storage.updateSalesDeal(dealId, updateData);
