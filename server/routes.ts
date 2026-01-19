@@ -7089,7 +7089,8 @@ export async function registerRoutes(
       const deal = await storage.updateSalesDeal(dealId, updateData);
       res.json(deal);
     } catch (error) {
-      res.status(400).json({ error: 'Failed to update deal' });
+      console.error('[Update Deal] Error updating deal:', error);
+      res.status(400).json({ error: 'Failed to update deal', details: String(error) });
     }
   });
 
