@@ -472,7 +472,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = user?.role === 'superadmin';
   const navItems = ALL_PAGES.filter((page) => {
     if ((page as any).superadminOnly && !isSuperAdmin) return false;
-    return allowedPages.includes(page.id);
+    // Show parent page if user has access to parent OR any of its subpages
+    if (allowedPages.includes(page.id)) return true;
+    const subPages = (page as any).subPages || [];
+    return subPages.some((sp: any) => allowedPages.includes(sp.id));
   });
 
   const toggleMenu = (menuId: string) => {
