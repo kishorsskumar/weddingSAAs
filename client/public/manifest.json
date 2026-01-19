@@ -9,15 +9,15 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/oak-street-pwa-icon.jpg",
+      "src": "/oakstreet-square-logo.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/oak-street-logo.png",
+      "src": "/oakstreet-square-logo.jpg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any"
     }
   ],
