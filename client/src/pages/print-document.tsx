@@ -303,8 +303,18 @@ const baseStyles = `
 `;
 
 function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
-  const lineItems: LineItem[] = estimate.lineItems || [];
+  const rawLineItems: LineItem[] = estimate.lineItems || [];
   const isTaxDocument = estimate.isTaxDocument === true;
+  
+  // Calculate serial numbers for non-heading items
+  let slNoCounter = 0;
+  const lineItems = rawLineItems.map(item => {
+    if (item.isHeading) {
+      return item;
+    }
+    slNoCounter++;
+    return { ...item, slNo: slNoCounter };
+  });
   
   // Use olive green for all documents
   const quoteStyles = baseStyles;
@@ -554,8 +564,18 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
 }
 
 function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
-  const lineItems: LineItem[] = invoice.lineItems || [];
+  const rawLineItems: LineItem[] = invoice.lineItems || [];
   const isTaxDocument = invoice.isTaxDocument === true;
+
+  // Calculate serial numbers for non-heading items
+  let slNoCounter = 0;
+  const lineItems = rawLineItems.map(item => {
+    if (item.isHeading) {
+      return item;
+    }
+    slNoCounter++;
+    return { ...item, slNo: slNoCounter };
+  });
 
   // Use olive green for all documents
   const invoiceStyles = baseStyles;
