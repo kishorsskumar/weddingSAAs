@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Monitor, Smartphone, Apple, Chrome, Download, CheckCircle2, ArrowRight } from "lucide-react";
-import logo from "@assets/Oakstreet_1765077046310.png";
+import logo from "@assets/OAK_1_1768844040105.jpg";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -46,14 +46,14 @@ export default function DownloadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#3d5c35] via-[#5B8C51] to-[#7fa875]">
+    <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8 md:py-16">
         <div className="text-center mb-12">
-          <img src={logo} alt="Oakstreet Events" className="h-20 md:h-28 mx-auto mb-6" />
-          <h1 className="text-3xl md:text-5xl font-bold text-white mb-4">
+          <img src={logo} alt="Oakstreet Events" className="h-24 md:h-32 mx-auto mb-6" />
+          <h1 className="text-3xl md:text-5xl font-bold text-[#5B8C51] mb-4">
             Oak Event Management
           </h1>
-          <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
+          <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
             Install the app on your device for quick access anytime
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function DownloadPage() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {deferredPrompt && (
-            <Card className="border-2 border-white/30 bg-white/95 shadow-xl hover:shadow-2xl transition-shadow">
+            <Card className="border-2 border-[#5B8C51]/20 bg-[#5B8C51]/5 shadow-xl hover:shadow-2xl transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-green-100 rounded-xl">
@@ -93,7 +93,7 @@ export default function DownloadPage() {
             </Card>
           )}
 
-          <Card className="border-2 border-white/30 bg-white/95 shadow-xl hover:shadow-2xl transition-shadow">
+          <Card className="border-2 border-gray-200 bg-gray-50 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-blue-100 rounded-xl">
@@ -123,7 +123,7 @@ export default function DownloadPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-white/30 bg-white/95 shadow-xl hover:shadow-2xl transition-shadow">
+          <Card className="border-2 border-gray-200 bg-gray-50 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-gray-100 rounded-xl">
@@ -157,7 +157,7 @@ export default function DownloadPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-white/30 bg-white/95 shadow-xl hover:shadow-2xl transition-shadow">
+          <Card className="border-2 border-gray-200 bg-gray-50 shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-green-100 rounded-xl">
@@ -193,11 +193,11 @@ export default function DownloadPage() {
         </div>
 
         <div className="text-center mt-12">
-          <p className="text-white/80 mb-4">Already have an account?</p>
+          <p className="text-gray-600 mb-4">Already have an account?</p>
           <Button 
             variant="outline" 
             size="lg"
-            className="bg-white/10 border-white/30 text-white hover:bg-white hover:text-[#5B8C51]"
+            className="border-[#5B8C51] text-[#5B8C51] hover:bg-[#5B8C51] hover:text-white"
             onClick={() => window.location.href = '/login'}
           >
             Go to Login
@@ -205,7 +205,7 @@ export default function DownloadPage() {
           </Button>
         </div>
 
-        <div className="text-center mt-16 text-white/60 text-sm">
+        <div className="text-center mt-16 text-gray-400 text-sm">
           <p>&copy; 2025 Oakstreet Events. All rights reserved.</p>
         </div>
       </div>
