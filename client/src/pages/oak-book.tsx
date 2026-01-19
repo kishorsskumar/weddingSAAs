@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/context/auth-context";
@@ -288,9 +288,30 @@ export default function OakBook() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [activeSection, setActiveSection] = useState("standard-estimates");
+  const searchString = useSearch();
+  
+  // Parse section from URL query parameter
+  const getInitialSection = () => {
+    const params = new URLSearchParams(searchString);
+    return params.get("section") || "standard-estimates";
+  };
+  
+  const [activeSection, setActiveSection] = useState(getInitialSection);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["masters", "sales", "estimates"]);
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Sync activeSection from URL when search string changes
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const sectionFromUrl = params.get("section");
+    if (sectionFromUrl && sectionFromUrl !== activeSection) {
+      setActiveSection(sectionFromUrl);
+      // Expand the parent menu if needed
+      if (sectionFromUrl === "customers" || sectionFromUrl === "vendors") {
+        setExpandedMenus(prev => prev.includes("masters") ? prev : [...prev, "masters"]);
+      }
+    }
+  }, [searchString]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState<"quote" | "invoice" | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
