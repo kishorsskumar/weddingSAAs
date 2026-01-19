@@ -98,7 +98,7 @@ export default function DownloadPage() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Desktop (Windows/Mac)</CardTitle>
-                  <CardDescription>Chrome, Edge, or Firefox</CardDescription>
+                  <CardDescription>Chrome or Edge (Recommended)</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -106,7 +106,7 @@ export default function DownloadPage() {
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome, Edge, or Firefox</span>
+                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome or Edge</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
@@ -162,7 +162,7 @@ export default function DownloadPage() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">Android</CardTitle>
-                  <CardDescription>Chrome or Firefox</CardDescription>
+                  <CardDescription>Chrome browser</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -170,7 +170,7 @@ export default function DownloadPage() {
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome or Firefox</span>
+                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
