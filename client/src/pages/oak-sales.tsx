@@ -144,6 +144,11 @@ export default function OakSales() {
   const isSuperAdmin = user?.role === 'superadmin' || user?.role === 'admin';
   const isWeddingPlanner = user?.role === 'wedding_planner';
   const weddingPlanners = users.filter(u => u.role === 'wedding_planner');
+
+  const handleDownloadPdf = (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader: boolean = false) => {
+    const url = `/print/${type}/${id}?download=true${hideHeader ? '&hideHeader=true' : ''}`;
+    window.open(url, '_blank');
+  };
   
   // Filter pipelines based on user role - wedding planners only see their own pipeline
   const filteredPipelines = useMemo(() => {
@@ -391,10 +396,10 @@ export default function OakSales() {
                     <TabsTrigger value="tax">Tax Estimates</TabsTrigger>
                   </TabsList>
                   <TabsContent value="standard" className="mt-4">
-                    <ZohoQuotes filterType="standard" />
+                    <ZohoQuotes filterType="standard" onDownloadPdf={handleDownloadPdf} />
                   </TabsContent>
                   <TabsContent value="tax" className="mt-4">
-                    <ZohoQuotes filterType="tax" />
+                    <ZohoQuotes filterType="tax" onDownloadPdf={handleDownloadPdf} />
                   </TabsContent>
                 </Tabs>
               </div>

@@ -353,6 +353,7 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
                 <th className="p-3 font-medium">CUSTOMER NAME</th>
                 <th className="p-3 font-medium text-right">AMOUNT</th>
                 <th className="p-3 font-medium">STATUS</th>
+                <th className="p-3 font-medium text-right">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -396,12 +397,37 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
                         {quote.status}
                       </span>
                     </td>
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-0.5">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingQuote(quote); setIsCreateModalOpen(true); }} title="Edit">
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
+                              <Download className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, false)}>
+                              With Header
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, true)}>
+                              Without Header
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(quote.id); }} title="Delete">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
               {filteredQuotes.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                  <td colSpan={8} className="p-8 text-center text-muted-foreground">
                     No quotes found
                   </td>
                 </tr>
