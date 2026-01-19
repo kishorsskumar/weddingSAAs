@@ -49,10 +49,7 @@ export default function DownloadPage() {
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8 md:py-16">
         <div className="text-center mb-12">
-          <img src={logo} alt="Oakstreet Events" className="h-24 md:h-32 mx-auto mb-6" />
-          <h1 className="text-3xl md:text-5xl font-bold text-[#5B8C51] mb-4">
-            Oak Event Management
-          </h1>
+          <img src={logo} alt="Oakstreet Events" className="h-24 md:h-32 mx-auto mb-8" />
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
             Install the app on your device for quick access anytime
           </p>
