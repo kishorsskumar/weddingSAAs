@@ -2433,6 +2433,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
       if (!res.ok) return [];
       return res.json();
     },
+    refetchInterval: 30000,
   });
 
   const { data: pendingAdvances = [] } = useQuery<any[]>({
@@ -2475,6 +2476,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
       toast({ title: 'Leave request approved' });
       setIsApprovalDialogOpen(false);
       setSelectedRequest(null);
@@ -2494,6 +2496,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/manager/pending-leaves'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leave-requests'] });
       toast({ title: 'Leave request rejected' });
       setIsApprovalDialogOpen(false);
       setSelectedRequest(null);
@@ -4022,6 +4025,7 @@ function LeaveTrackerSection({ employees }: { employees: Employee[] }) {
       if (!res.ok) throw new Error('Failed to fetch leave records');
       return res.json();
     },
+    refetchInterval: 30000,
   });
 
   const enrichedLeaves = useMemo(() => {
