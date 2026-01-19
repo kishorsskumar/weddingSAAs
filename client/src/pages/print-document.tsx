@@ -342,13 +342,6 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
-              {!isTaxDocument && (
-                <>
-                  <div>{companySettings?.phone || '7902373354'}</div>
-                  <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-                  <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
-                </>
-              )}
             </div>
           </div>
         )}
@@ -603,13 +596,6 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
-              {!isTaxDocument && (
-                <>
-                  <div>{companySettings?.phone || '7902373354'}</div>
-                  <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
-                  <div>{companySettings?.website || 'www.oakstreetevents.com'}</div>
-                </>
-              )}
             </div>
           </div>
         )}
@@ -874,8 +860,6 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
-              <div>{companySettings?.phone || '7902373354'}</div>
-              <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
             </div>
           </div>
         )}
@@ -1026,8 +1010,6 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
             {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
             ))}
-            <div>{companySettings?.phone || '7902373354'}</div>
-            <div>{companySettings?.email || 'oakstreetevents18@gmail.com'}</div>
           </div>
         </div>
         <div className="doc-type-box">
