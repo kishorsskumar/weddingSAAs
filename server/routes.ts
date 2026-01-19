@@ -7044,11 +7044,39 @@ export async function registerRoutes(
             updateData.advancePaymentReceived = true;
             updateData.advancePaymentDate = new Date().toISOString();
             
-            // Notify accountant via console log (would be WhatsApp in production)
+            // Notify accountant via WhatsApp
             const contact = existingDeal.contactId ? await storage.getSalesContact(existingDeal.contactId) : null;
             const owner = existingDeal.ownerId ? await storage.getUser(existingDeal.ownerId) : null;
             const customerName = contact ? `${contact.firstName} ${contact.lastName}`.trim() : existingDeal.title;
-            console.log(`[Advance Payment] Deal "${existingDeal.title}" marked as advance received. Customer: ${customerName}. Planner: ${owner?.name || 'N/A'}. Accountant notification pending.`);
+            const customerPhone = contact?.phone || contact?.mobile || 'Not provided';
+            const eventDate = existingDeal.eventDate || 'TBD';
+            const venue = existingDeal.venue || 'TBD';
+            const value = existingDeal.value ? `₹${parseFloat(existingDeal.value).toLocaleString('en-IN')}` : 'Not specified';
+            
+            console.log(`[Advance Payment] Deal "${existingDeal.title}" marked as advance received. Customer: ${customerName}. Planner: ${owner?.name || 'N/A'}. Sending WhatsApp to accountant...`);
+            
+            // Send WhatsApp notification to accountant (Sabitha)
+            try {
+              const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
+              if (isWhatsAppConfigured()) {
+                const accountantPhone = '+919895810975'; // Sabitha's number for accountant notifications
+                const message = `🎉 *Advance Payment Received*\n\n` +
+                  `A new customer has made an advance payment and needs to be created in the system.\n\n` +
+                  `📋 *Lead Details:*\n` +
+                  `• Customer: ${customerName}\n` +
+                  `• Phone: ${customerPhone}\n` +
+                  `• Event Date: ${eventDate}\n` +
+                  `• Venue: ${venue}\n` +
+                  `• Deal Value: ${value}\n` +
+                  `• Wedding Planner: ${owner?.name || 'N/A'}\n\n` +
+                  `Please create the customer record and invoice in Oak Book.`;
+                
+                await sendWhatsAppMessage(accountantPhone, message);
+                console.log(`[Advance Payment] WhatsApp notification sent to accountant for ${customerName}`);
+              }
+            } catch (whatsappError) {
+              console.error('[Advance Payment] Failed to send WhatsApp notification:', whatsappError);
+            }
           }
         }
       }
