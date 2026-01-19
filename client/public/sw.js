@@ -97,8 +97,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Don't cache anything else - let the browser handle it normally
-  // This prevents stale HTML/JS/CSS from being served
+  // Pass through to network for all other requests
+  // This is required for PWA installability in Chrome
+  event.respondWith(fetch(event.request));
 });
 
 async function handleSharedScreenshot(request) {
