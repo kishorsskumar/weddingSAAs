@@ -220,10 +220,16 @@ function formatCurrency(amount: string | number): string {
   }).format(num);
 }
 
+function parseLocalDate(dateStr: string): Date {
+  const dateOnly = dateStr.split('T')[0];
+  const [year, month, day] = dateOnly.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   try {
-    return format(parseISO(dateStr), 'dd MMM yyyy');
+    return format(parseLocalDate(dateStr), 'dd MMM yyyy');
   } catch {
     return dateStr;
   }
@@ -2307,7 +2313,7 @@ export default function EmployeePortal() {
                       <p className="text-center text-muted-foreground py-8">No leave requests found</p>
                     ) : (
                       leaveRequests.map((request) => {
-                        const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
+                        const days = differenceInDays(parseLocalDate(request.endDate), parseLocalDate(request.startDate)) + 1;
                         return (
                           <div key={request.id} className="py-3 space-y-2" data-testid={`card-leave-${request.id}`}>
                             <div className="flex items-center justify-between">
@@ -2367,7 +2373,7 @@ export default function EmployeePortal() {
                         </TableRow>
                       ) : (
                         leaveRequests.map((request) => {
-                          const days = differenceInDays(parseISO(request.endDate), parseISO(request.startDate)) + 1;
+                          const days = differenceInDays(parseLocalDate(request.endDate), parseLocalDate(request.startDate)) + 1;
                           return (
                             <TableRow key={request.id} data-testid={`row-leave-${request.id}`}>
                               <TableCell className="capitalize">{request.leaveType}</TableCell>

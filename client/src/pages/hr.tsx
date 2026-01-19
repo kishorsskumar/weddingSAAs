@@ -304,7 +304,11 @@ export default function HR() {
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
-      return format(parseISO(dateStr), 'dd/MM/yyyy');
+      // Handle date strings to avoid timezone shift - treat as local date
+      const dateOnly = dateStr.split('T')[0];
+      const [year, month, day] = dateOnly.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      return format(localDate, 'dd/MM/yyyy');
     } catch {
       return dateStr;
     }
@@ -2795,7 +2799,11 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return '-';
     try {
-      return format(parseISO(dateString), 'dd MMM yyyy');
+      // Handle date strings to avoid timezone shift - treat as local date
+      const dateOnly = dateString.split('T')[0];
+      const [year, month, day] = dateOnly.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      return format(localDate, 'dd MMM yyyy');
     } catch {
       return dateString;
     }
@@ -3706,7 +3714,11 @@ function ConsolidatedReportSection() {
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return '-';
     try {
-      return format(parseISO(dateStr), 'dd/MM/yyyy');
+      // Handle date strings to avoid timezone shift - treat as local date
+      const dateOnly = dateStr.split('T')[0];
+      const [year, month, day] = dateOnly.split('-').map(Number);
+      const localDate = new Date(year, month - 1, day);
+      return format(localDate, 'dd/MM/yyyy');
     } catch {
       return dateStr;
     }
@@ -4139,8 +4151,11 @@ function LeaveTrackerSection({ employees }: { employees: Employee[] }) {
   };
 
   const calculateDays = (start: string, end: string) => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
+    // Parse dates as local to avoid timezone shift
+    const [sy, sm, sd] = start.split('T')[0].split('-').map(Number);
+    const [ey, em, ed] = end.split('T')[0].split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
@@ -4412,8 +4427,14 @@ function LeaveTrackerSection({ employees }: { employees: Employee[] }) {
                     <TableRow key={leave.id} data-testid={`row-leave-${leave.id}`}>
                       <TableCell className="font-medium">{leave.employeeName}</TableCell>
                       <TableCell className="capitalize">{leave.leaveType?.replace('_', ' ') || 'Casual'}</TableCell>
-                      <TableCell>{format(parseISO(leave.startDate), 'dd MMM yyyy')}</TableCell>
-                      <TableCell>{format(parseISO(leave.endDate), 'dd MMM yyyy')}</TableCell>
+                      <TableCell>{(() => {
+                        const [y, m, d] = leave.startDate.split('T')[0].split('-').map(Number);
+                        return format(new Date(y, m - 1, d), 'dd MMM yyyy');
+                      })()}</TableCell>
+                      <TableCell>{(() => {
+                        const [y, m, d] = leave.endDate.split('T')[0].split('-').map(Number);
+                        return format(new Date(y, m - 1, d), 'dd MMM yyyy');
+                      })()}</TableCell>
                       <TableCell className="text-center font-medium">{calculateDays(leave.startDate, leave.endDate)}</TableCell>
                       <TableCell className="max-w-[150px] truncate">{leave.reason || '-'}</TableCell>
                       <TableCell>
