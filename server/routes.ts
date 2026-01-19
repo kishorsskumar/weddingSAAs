@@ -5516,7 +5516,19 @@ export async function registerRoutes(
 
   app.post('/api/customer-payments', async (req, res) => {
     try {
-      const data = insertCustomerPaymentSchema.parse(req.body);
+      // Clean up the data before validation
+      const cleanedData = {
+        ...req.body,
+        // Convert empty strings to null for optional fields
+        customerId: req.body.customerId || null,
+        invoiceId: req.body.invoiceId || null,
+        bankId: req.body.bankId || null,
+        eventId: req.body.eventId || null,
+        reference: req.body.reference || null,
+        notes: req.body.notes || null,
+      };
+      
+      const data = insertCustomerPaymentSchema.parse(cleanedData);
       let customerName = 'Customer';
       if (data.customerId) {
         const customer = await storage.getCustomer(data.customerId);
@@ -5524,9 +5536,14 @@ export async function registerRoutes(
       }
       const payment = await storage.createCustomerPaymentWithDaybook(data, customerName);
       res.json(payment);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Customer payment error:', error);
-      res.status(400).json({ error: 'Invalid payment data' });
+      if (error.name === 'ZodError') {
+        console.error('Validation errors:', JSON.stringify(error.errors, null, 2));
+        res.status(400).json({ error: 'Invalid payment data', details: error.errors });
+      } else {
+        res.status(400).json({ error: 'Invalid payment data', details: String(error) });
+      }
     }
   });
 
