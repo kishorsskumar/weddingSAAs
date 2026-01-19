@@ -1112,9 +1112,9 @@ function PipelineSection({
         </Button>
       </div>
 
-      {/* Kanban Board - fills remaining height with scrollbar at bottom */}
-      <div className="flex-1 kanban-scroll px-4 sm:px-6">
-        <div className="flex gap-3 min-w-max h-full pb-4">
+      {/* Kanban Board - compact view with sticky headers */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 sm:px-6">
+        <div className="flex gap-2 h-full pb-2">
           {pipelineStages.map(stage => {
             const stageDeals = filteredDeals.filter(d => d.stageId === stage.id);
             const stageValue = stageDeals.reduce((sum, d) => sum + parseFloat(d.value || '0'), 0);
@@ -1122,29 +1122,30 @@ function PipelineSection({
             return (
               <div
                 key={stage.id}
-                className="w-56 lg:w-64 xl:w-72 flex-shrink-0"
+                className="w-48 lg:w-56 flex-shrink-0 flex flex-col h-full"
                 onDragOver={handleDragOver}
                 onDrop={(e) => handleDrop(e, stage.id)}
               >
-                {/* Zoho Bigin-style stage column */}
-                <div className="bg-muted/30 rounded-md">
-                  <div className="flex items-center justify-between p-3 border-b border-border/50">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-2 h-2 rounded-full" 
-                        style={{ backgroundColor: stage.color || '#6B7280' }}
-                      />
-                      <h3 className="font-medium text-sm text-foreground">{stage.name}</h3>
-                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                        {stageDeals.length}
-                      </span>
-                    </div>
+                {/* Sticky stage header */}
+                <div className="bg-card rounded-t-md border border-b-0 sticky top-0 z-10">
+                  <div className="flex items-center gap-1.5 px-2 py-1.5">
+                    <div 
+                      className="w-2 h-2 rounded-full flex-shrink-0" 
+                      style={{ backgroundColor: stage.color || '#6B7280' }}
+                    />
+                    <h3 className="font-medium text-xs text-foreground truncate">{stage.name}</h3>
+                    <span className="text-[10px] text-muted-foreground bg-muted px-1 py-0.5 rounded ml-auto flex-shrink-0">
+                      {stageDeals.length}
+                    </span>
                   </div>
-                  <div className="p-2 text-xs text-muted-foreground border-b border-border/30">
+                  <div className="px-2 pb-1.5 text-[10px] text-muted-foreground">
                     {formatCurrency(stageValue)}
                   </div>
-                  
-                  <div className="p-2 space-y-2 min-h-[200px]">
+                </div>
+                
+                {/* Scrollable deals area */}
+                <div className="flex-1 bg-muted/20 border border-t-0 rounded-b-md overflow-y-auto min-h-0">
+                  <div className="p-1.5 space-y-1.5">
                     {stageDeals.map(deal => {
                       const contact = contacts.find(c => c.id === deal.contactId);
                       return (
@@ -1153,37 +1154,39 @@ function PipelineSection({
                           draggable
                           onDragStart={(e) => handleDragStart(e, deal.id)}
                           onClick={() => setSelectedDeal(deal)}
-                          className="bg-white p-3 rounded border border-border cursor-move hover:shadow-sm transition-shadow"
+                          className="bg-white px-2 py-1.5 rounded border border-border cursor-move hover:shadow-sm transition-shadow group"
                           data-testid={`deal-card-${deal.id}`}
                         >
-                          <div className="flex items-start justify-between mb-1.5">
-                            <GripVertical className="w-3 h-3 text-muted-foreground/50" />
-                            <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
-                              {deal.eventType || 'Event'}
-                            </span>
+                          <div className="flex items-center gap-1">
+                            <GripVertical className="w-3 h-3 text-muted-foreground/30 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <h4 className="font-medium text-xs text-foreground truncate flex-1">{deal.title}</h4>
                           </div>
-                          <h4 className="font-medium text-sm mb-1 text-foreground">{deal.title}</h4>
-                          <p className="text-primary font-semibold text-sm">
-                            {formatCurrency(deal.value)}
-                          </p>
+                          <div className="flex items-center justify-between mt-0.5">
+                            <p className="text-primary font-semibold text-xs">
+                              {formatCurrency(deal.value)}
+                            </p>
+                            {deal.eventType && (
+                              <span className="text-[9px] px-1 py-0.5 bg-muted rounded text-muted-foreground">
+                                {deal.eventType}
+                              </span>
+                            )}
+                          </div>
                           {contact && (
-                            <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5">
-                              <p className="text-xs text-muted-foreground">
-                                {contact.firstName} {contact.lastName}
-                              </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5 truncate flex items-center gap-1">
+                              {contact.firstName}
                               {contact.phone && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <Phone className="w-3 h-3" />
+                                <span className="flex items-center gap-0.5">
+                                  <Phone className="w-2.5 h-2.5" />
                                   {contact.phone}
-                                </p>
+                                </span>
                               )}
-                            </div>
+                            </p>
                           )}
                         </div>
                       );
                     })}
                     {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground text-xs">
+                      <div className="text-center py-4 text-muted-foreground text-[10px]">
                         No deals in this stage
                       </div>
                     )}
