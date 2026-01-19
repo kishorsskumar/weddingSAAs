@@ -9,16 +9,16 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/oakstreet-square-logo.jpg",
+      "src": "/oakstreet-icon-512.jpg",
       "sizes": "512x512",
       "type": "image/jpeg",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
-      "src": "/oakstreet-square-logo.jpg",
+      "src": "/oakstreet-icon-192.jpg",
       "sizes": "192x192",
       "type": "image/jpeg",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ],
   "share_target": {
