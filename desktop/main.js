@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const path = require('path');
 
 // Your published app URL
-const APP_URL = 'https://oak-event-management.replit.app';
+const APP_URL = 'https://www.oakstreetevent.com';
 
 let mainWindow;
 
@@ -32,7 +32,7 @@ function createWindow() {
 
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http') && !url.includes(APP_URL)) {
+    if (url.startsWith('http') && !url.includes('oakstreetevent.com')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
