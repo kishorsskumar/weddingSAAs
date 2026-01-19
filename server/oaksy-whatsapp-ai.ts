@@ -1132,7 +1132,7 @@ If the user corrects something, update the slots and ask for confirmation again.
       : `\n\nEmployee: ${employeeName} (${employeeRole})`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4o-mini",
       messages: [
         { 
           role: "system", 
