@@ -767,11 +767,22 @@ function PipelineSection({
 
   const updateDealMutation = useMutation({
     mutationFn: async ({ id, stageId }: { id: string; stageId: string }) => {
-      return apiRequest('PATCH', `/api/sales/deals/${id}`, { stageId });
+      const response = await fetch(`/api/sales/deals/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ stageId }),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to update deal: ${response.status}`);
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales/deals'] });
-      toast({ title: 'Deal moved successfully' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to move deal', description: String(error), variant: 'destructive' });
     },
   });
 
@@ -825,14 +836,20 @@ function PipelineSection({
 
   const handleConfirmAdvancePayment = () => {
     if (advancePaymentConfirm) {
-      updateDealMutation.mutate({ 
-        id: advancePaymentConfirm.dealId, 
-        stageId: advancePaymentConfirm.stageId 
-      });
-      toast({ 
-        title: 'Advance Payment Marked as Received',
-        description: 'Accountant has been notified to create the customer record.'
-      });
+      updateDealMutation.mutate(
+        { 
+          id: advancePaymentConfirm.dealId, 
+          stageId: advancePaymentConfirm.stageId 
+        },
+        {
+          onSuccess: () => {
+            toast({ 
+              title: 'Advance Payment Marked as Received',
+              description: 'Accountant has been notified to create the customer record.'
+            });
+          }
+        }
+      );
       setAdvancePaymentConfirm(null);
     }
   };
