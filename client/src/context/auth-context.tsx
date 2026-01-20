@@ -8,32 +8,44 @@ interface User {
   name: string;
   email: string;
   role: string;
-  avatar: string | null;
-  createdVia: string | null;
+  avatar?: string | null;
+  createdVia?: string | null;
+  companyId?: string | null;
+}
+
+interface Company {
+  id: string;
+  name: string;
 }
 
 interface AuthContextType {
   user: User | null;
+  company: Company | null;
+  token: string | null;
   allowedPages: string[];
   login: (email: string, password: string) => Promise<void>;
+  signup: (name: string, email: string, password: string, companyName: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const TOKEN_KEY = 'auth_token';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [allowedPages, setAllowedPages] = useState<string[]>([]);
   const [_, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(true);
 
-  // Clear all caches helper
   const clearAllCaches = async () => {
     try {
       queryClient.clear();
       queryClient.removeQueries();
-      localStorage.clear();
+      localStorage.removeItem(TOKEN_KEY);
       sessionStorage.clear();
       if ('caches' in window) {
         const cacheNames = await caches.keys();
@@ -44,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check if user is already logged in
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'include' })
       .then(res => {
@@ -54,12 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(data => {
         setUser(data.user);
         setAllowedPages(data.permissions);
+        if (data.company) setCompany(data.company);
         registerPushSubscription();
       })
       .catch(async () => {
-        // Not logged in - clear any stale cached data
         await clearAllCaches();
         setUser(null);
+        setCompany(null);
         setAllowedPages([]);
       })
       .finally(() => setIsLoading(false));
@@ -67,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Clear any cached data from previous user before login
     queryClient.clear();
     try {
       const response = await fetch('/api/auth/login', {
@@ -77,22 +88,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (!response.ok) {
-        throw new Error('Invalid credentials');
+        const data = await response.json();
+        throw new Error(data.error || 'Invalid credentials');
       }
 
       const data = await response.json();
       setUser(data.user);
       setAllowedPages(data.permissions);
+      
+      if (data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+      }
+      
+      if (data.company) setCompany(data.company);
+      
       registerPushSubscription();
       
-      // Route based on how user was created
       if (data.user.createdVia === 'employee_onboarding') {
         setLocation("/employee-portal");
       } else {
         setLocation("/");
       }
-    } catch (error) {
-      alert('Login failed. Please check your credentials.');
+    } catch (error: any) {
+      alert(error.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signup = async (name: string, email: string, password: string, companyName: string) => {
+    setIsLoading(true);
+    queryClient.clear();
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, companyName }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Signup failed');
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+      setAllowedPages(data.permissions);
+      
+      if (data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        setToken(data.token);
+      }
+      
+      if (data.company) setCompany(data.company);
+      
+      registerPushSubscription();
+      setLocation("/");
+    } catch (error: any) {
+      alert(error.message || 'Signup failed. Please try again.');
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -102,12 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     await clearAllCaches();
     setUser(null);
+    setCompany(null);
+    setToken(null);
     setAllowedPages([]);
     setLocation("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, allowedPages, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, company, token, allowedPages, login, signup, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

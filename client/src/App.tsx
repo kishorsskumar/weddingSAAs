@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 import Layout from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
 import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
 import EventCalendar from "@/pages/event-calendar";
 import TeamCalendar from "@/pages/team-calendar";
@@ -52,6 +53,7 @@ function AppRoutes() {
     <Layout>
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/signup" component={Signup} />
         <Route path="/">
           <PrivateRoute component={Dashboard} path="/" />
         </Route>

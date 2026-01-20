@@ -5,13 +5,15 @@ import { Label } from "@/components/ui/label";
 import { useLocation, Link } from "wouter";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Mail, Lock } from "lucide-react";
+import { Building2, Mail, Lock, User } from "lucide-react";
 
-export default function Login() {
-  const { login, user, isLoading } = useAuth();
+export default function Signup() {
+  const { signup, user, isLoading } = useAuth();
   const [_, setLocation] = useLocation();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,11 +24,17 @@ export default function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    
     setSubmitting(true);
     try {
-      await login(email, password);
+      await signup(name, email, password, companyName);
     } catch (err: any) {
-      setError(err.message || "Login failed");
+      setError(err.message || "Signup failed");
     } finally {
       setSubmitting(false);
     }
@@ -60,14 +68,20 @@ export default function Login() {
             <p className="text-sidebar-foreground/80 text-lg">Your complete event management platform</p>
           </motion.div>
           <motion.div 
-            className="relative z-10"
+            className="relative z-10 space-y-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6, duration: 0.4 }}
           >
-            <blockquote className="border-l-2 border-sidebar-primary pl-4 italic text-sidebar-foreground/70">
-              "Excellence is not a skill, it's an attitude."
-            </blockquote>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-lg">Why choose us?</h3>
+              <ul className="space-y-1 text-sidebar-foreground/80">
+                <li>• Comprehensive event management</li>
+                <li>• Team scheduling & coordination</li>
+                <li>• Financial tracking & invoicing</li>
+                <li>• Client communication tools</li>
+              </ul>
+            </div>
           </motion.div>
         </motion.div>
 
@@ -83,8 +97,8 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.4 }}
           >
-            <h2 className="text-2xl font-bold text-foreground mb-2">Welcome Back</h2>
-            <p className="text-muted-foreground">Sign in to your account</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Create Your Account</h2>
+            <p className="text-muted-foreground">Start managing your events today</p>
           </motion.div>
 
           {error && (
@@ -113,6 +127,29 @@ export default function Login() {
                 visible: { opacity: 1, y: 0 }
               }}
             >
+              <Label htmlFor="name">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  required
+                  data-testid="input-name"
+                  className="pl-10 transition-all duration-200 focus:scale-[1.01]"
+                />
+              </div>
+            </motion.div>
+
+            <motion.div 
+              className="space-y-2"
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                visible: { opacity: 1, y: 0 }
+              }}
+            >
               <Label htmlFor="email">Email</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -128,6 +165,7 @@ export default function Login() {
                 />
               </div>
             </motion.div>
+
             <motion.div 
               className="space-y-2"
               variants={{
@@ -143,13 +181,38 @@ export default function Login() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="Minimum 8 characters"
                   required
+                  minLength={8}
                   data-testid="input-password"
                   className="pl-10 transition-all duration-200 focus:scale-[1.01]"
                 />
               </div>
             </motion.div>
+
+            <motion.div 
+              className="space-y-2"
+              variants={{
+                hidden: { opacity: 0, y: 10 },
+                visible: { opacity: 1, y: 0 }
+              }}
+            >
+              <Label htmlFor="companyName">Company Name</Label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="companyName"
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Your Wedding Planning Company"
+                  required
+                  data-testid="input-company-name"
+                  className="pl-10 transition-all duration-200 focus:scale-[1.01]"
+                />
+              </div>
+            </motion.div>
+
             <motion.div
               variants={{
                 hidden: { opacity: 0, y: 10 },
@@ -160,7 +223,7 @@ export default function Login() {
                 type="submit" 
                 className="w-full h-12 text-base font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 disabled={submitting || isLoading}
-                data-testid="button-login"
+                data-testid="button-signup"
               >
                 {submitting ? (
                   <motion.div
@@ -169,10 +232,10 @@ export default function Login() {
                     animate={{ opacity: 1 }}
                   >
                     <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    Signing in...
+                    Creating account...
                   </motion.div>
                 ) : (
-                  "Sign In"
+                  "Create Account"
                 )}
               </Button>
             </motion.div>
@@ -184,9 +247,9 @@ export default function Login() {
             animate={{ opacity: 1 }}
             transition={{ delay: 1, duration: 0.4 }}
           >
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-primary hover:underline font-medium">
-              Sign up
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline font-medium">
+              Sign in
             </Link>
           </motion.p>
         </motion.div>
