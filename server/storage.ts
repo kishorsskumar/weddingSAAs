@@ -1102,35 +1102,60 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Events
-  async getAllEvents(): Promise<Event[]> {
+  async getAllEvents(companyId?: string): Promise<Event[]> {
+    if (companyId) {
+      return await db.select().from(events).where(eq(events.companyId, companyId)).orderBy(desc(events.date));
+    }
     return await db.select().from(events).orderBy(desc(events.date));
   }
 
-  async getEvent(id: string): Promise<Event | undefined> {
+  async getEventsByCompany(companyId: string): Promise<Event[]> {
+    return await db.select().from(events).where(eq(events.companyId, companyId)).orderBy(desc(events.date));
+  }
+
+  async getEvent(id: string, companyId?: string): Promise<Event | undefined> {
+    if (companyId) {
+      const [event] = await db.select().from(events).where(and(eq(events.id, id), eq(events.companyId, companyId)));
+      return event || undefined;
+    }
     const [event] = await db.select().from(events).where(eq(events.id, id));
     return event || undefined;
   }
 
-  async createEvent(insertEvent: InsertEvent): Promise<Event> {
+  async createEvent(insertEvent: InsertEvent & { companyId?: string }): Promise<Event> {
     const [event] = await db.insert(events).values(insertEvent).returning();
     return event;
   }
 
-  async updateEvent(id: string, updateData: Partial<InsertEvent>): Promise<Event | undefined> {
+  async updateEvent(id: string, updateData: Partial<InsertEvent>, companyId?: string): Promise<Event | undefined> {
+    if (companyId) {
+      const [event] = await db.update(events).set(updateData).where(and(eq(events.id, id), eq(events.companyId, companyId))).returning();
+      return event || undefined;
+    }
     const [event] = await db.update(events).set(updateData).where(eq(events.id, id)).returning();
     return event || undefined;
   }
 
-  async deleteEvent(id: string): Promise<void> {
+  async deleteEvent(id: string, companyId?: string): Promise<void> {
+    if (companyId) {
+      await db.delete(events).where(and(eq(events.id, id), eq(events.companyId, companyId)));
+      return;
+    }
     await db.delete(events).where(eq(events.id, id));
   }
 
   // Meetings
-  async getAllMeetings(): Promise<Meeting[]> {
+  async getAllMeetings(companyId?: string): Promise<Meeting[]> {
+    if (companyId) {
+      return await db.select().from(meetings).where(eq(meetings.companyId, companyId)).orderBy(desc(meetings.date));
+    }
     return await db.select().from(meetings).orderBy(desc(meetings.date));
   }
 
-  async getMeetingsByDate(date: string): Promise<Meeting[]> {
+  async getMeetingsByDate(date: string, companyId?: string): Promise<Meeting[]> {
+    if (companyId) {
+      return await db.select().from(meetings).where(and(eq(meetings.date, date), eq(meetings.companyId, companyId)));
+    }
     return await db.select().from(meetings).where(eq(meetings.date, date));
   }
 
@@ -1149,11 +1174,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Employees
-  async getAllEmployees(): Promise<Employee[]> {
+  async getAllEmployees(companyId?: string): Promise<Employee[]> {
+    if (companyId) {
+      return await db.select().from(employees).where(eq(employees.companyId, companyId));
+    }
     return await db.select().from(employees);
   }
 
-  async getEmployee(id: string): Promise<Employee | undefined> {
+  async getEmployee(id: string, companyId?: string): Promise<Employee | undefined> {
+    if (companyId) {
+      const [employee] = await db.select().from(employees).where(and(eq(employees.id, id), eq(employees.companyId, companyId)));
+      return employee || undefined;
+    }
     const [employee] = await db.select().from(employees).where(eq(employees.id, id));
     return employee || undefined;
   }
@@ -1428,11 +1460,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Banks
-  async getAllBanks(): Promise<Bank[]> {
+  async getAllBanks(companyId?: string): Promise<Bank[]> {
+    if (companyId) {
+      return await db.select().from(banks).where(eq(banks.companyId, companyId));
+    }
     return await db.select().from(banks);
   }
 
-  async getBank(id: string): Promise<Bank | undefined> {
+  async getBank(id: string, companyId?: string): Promise<Bank | undefined> {
+    if (companyId) {
+      const [bank] = await db.select().from(banks).where(and(eq(banks.id, id), eq(banks.companyId, companyId)));
+      return bank || undefined;
+    }
     const [bank] = await db.select().from(banks).where(eq(banks.id, id));
     return bank || undefined;
   }
@@ -1550,11 +1589,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Oak Book - Customers
-  async getAllCustomers(): Promise<Customer[]> {
+  async getAllCustomers(companyId?: string): Promise<Customer[]> {
+    if (companyId) {
+      return await db.select().from(customers).where(eq(customers.companyId, companyId)).orderBy(desc(customers.createdAt));
+    }
     return await db.select().from(customers).orderBy(desc(customers.createdAt));
   }
 
-  async getCustomer(id: string): Promise<Customer | undefined> {
+  async getCustomer(id: string, companyId?: string): Promise<Customer | undefined> {
+    if (companyId) {
+      const [customer] = await db.select().from(customers).where(and(eq(customers.id, id), eq(customers.companyId, companyId)));
+      return customer || undefined;
+    }
     const [customer] = await db.select().from(customers).where(eq(customers.id, id));
     return customer || undefined;
   }
@@ -1574,11 +1620,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Oak Book - Vendors
-  async getAllVendors(): Promise<Vendor[]> {
+  async getAllVendors(companyId?: string): Promise<Vendor[]> {
+    if (companyId) {
+      return await db.select().from(vendors).where(eq(vendors.companyId, companyId)).orderBy(desc(vendors.createdAt));
+    }
     return await db.select().from(vendors).orderBy(desc(vendors.createdAt));
   }
 
-  async getVendor(id: string): Promise<Vendor | undefined> {
+  async getVendor(id: string, companyId?: string): Promise<Vendor | undefined> {
+    if (companyId) {
+      const [vendor] = await db.select().from(vendors).where(and(eq(vendors.id, id), eq(vendors.companyId, companyId)));
+      return vendor || undefined;
+    }
     const [vendor] = await db.select().from(vendors).where(eq(vendors.id, id));
     return vendor || undefined;
   }

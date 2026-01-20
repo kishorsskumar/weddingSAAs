@@ -34,7 +34,8 @@ export const userPermissions = pgTable("user_permissions", {
 
 export const roles = pgTable("roles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
+  companyId: varchar("company_id").references(() => companies.id),
+  name: text("name").notNull(),
   label: text("label").notNull(),
   description: text("description"),
   isSystem: boolean("is_system").notNull().default(false),
@@ -48,7 +49,8 @@ export type Role = typeof roles.$inferSelect;
 // Leave Categories (Casual, Sick, etc.)
 export const leaveCategories = pgTable("leave_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
+  companyId: varchar("company_id").references(() => companies.id),
+  name: text("name").notNull(),
   description: text("description"),
   defaultAnnualAllowance: integer("default_annual_allowance").notNull().default(12),
   isSystem: boolean("is_system").notNull().default(false),
@@ -62,6 +64,7 @@ export type LeaveCategory = typeof leaveCategories.$inferSelect;
 
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   eventCode: text("event_code").unique(), // EVT-E-YY-MM-XXX format, read-only after creation
   title: text("title").notNull(),
   date: date("date").notNull(),
@@ -132,6 +135,7 @@ export type NotificationLog = typeof notificationLogs.$inferSelect;
 
 export const meetings = pgTable("meetings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   title: text("title").notNull(),
   date: date("date").notNull(),
   time: text("time").notNull(),
@@ -141,6 +145,7 @@ export const meetings = pgTable("meetings", {
 
 export const employees = pgTable("employees", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   employeeId: text("employee_id").notNull().unique(),
   userId: varchar("user_id").references(() => users.id),
@@ -172,6 +177,7 @@ export const employees = pgTable("employees", {
 
 export const daybookEntries = pgTable("daybook_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   date: date("date").notNull(),
   description: text("description"),
   type: text("type").notNull(), // 'income' | 'expense'
@@ -188,6 +194,7 @@ export const daybookEntries = pgTable("daybook_entries", {
 // Daybook Categories - Custom categories for income/expense
 export const daybookCategories = pgTable("daybook_categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   type: text("type").notNull(), // 'income' | 'expense'
   isSystem: boolean("is_system").notNull().default(false), // System categories can't be deleted
@@ -196,6 +203,7 @@ export const daybookCategories = pgTable("daybook_categories", {
 
 export const banks = pgTable("banks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).notNull().default('0'),
   balance: decimal("balance", { precision: 12, scale: 2 }).notNull().default('0'),
@@ -204,6 +212,7 @@ export const banks = pgTable("banks", {
 
 export const bankTransfers = pgTable("bank_transfers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   date: date("date").notNull(),
   fromBankId: varchar("from_bank_id").notNull(),
   toBankId: varchar("to_bank_id").notNull(),
@@ -242,6 +251,7 @@ export const eventMilestones = pgTable("event_milestones", {
 // Customers
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   customerCode: text("customer_code").unique(), // CUST-YY-XXXX format, read-only after creation
   name: text("name").notNull(),
   email: text("email"),
@@ -259,6 +269,7 @@ export const customers = pgTable("customers", {
 // Vendors
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -301,6 +312,7 @@ export type LineItem = z.infer<typeof lineItemSchema>;
 // Estimates
 export const estimates = pgTable("estimates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   number: text("number").notNull().unique(), // QT-000968 or EST-001
   customerId: varchar("customer_id").references(() => customers.id),
   eventId: varchar("event_id").references(() => events.id),
@@ -338,6 +350,7 @@ export const estimates = pgTable("estimates", {
 // Invoices
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   number: text("number").notNull().unique(), // INV-001
   customerId: varchar("customer_id").references(() => customers.id),
   eventId: varchar("event_id").references(() => events.id),
@@ -391,6 +404,7 @@ export const customerPayments = pgTable("customer_payments", {
 // Expenses
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   number: text("number").notNull().unique(), // EXP-001
   vendorId: varchar("vendor_id").references(() => vendors.id),
   eventId: varchar("event_id").references(() => events.id),
@@ -409,6 +423,7 @@ export const expenses = pgTable("expenses", {
 // Vendor Payments
 export const vendorPayments = pgTable("vendor_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   number: text("number").notNull().unique(), // VPY-001
   vendorId: varchar("vendor_id").references(() => vendors.id),
   expenseId: varchar("expense_id").references(() => expenses.id),
@@ -426,6 +441,7 @@ export const vendorPayments = pgTable("vendor_payments", {
 // Items/Products (reusable products/services)
 export const items = pgTable("items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   type: text("type").notNull().default('service'), // 'service' | 'product'
@@ -441,6 +457,7 @@ export const items = pgTable("items", {
 // Bills (from vendors)
 export const bills = pgTable("bills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   number: text("number").notNull().unique(), // BILL-001
   vendorId: varchar("vendor_id").references(() => vendors.id),
   vendorBillNumber: text("vendor_bill_number"), // Vendor's bill/invoice number
@@ -462,6 +479,7 @@ export const bills = pgTable("bills", {
 // Company Settings (for estimate/invoice header)
 export const companySettings = pgTable("company_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   companyName: text("company_name").notNull().default('Your Company Name'),
   address: text("address").default(''),
   phone: text("phone").default(''),
@@ -483,7 +501,8 @@ export const companySettings = pgTable("company_settings", {
 // Document Number Sequences (for auto-numbering)
 export const documentSequences = pgTable("document_sequences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  documentType: text("document_type").notNull().unique(), // 'estimate' | 'invoice' | 'receipt' | 'expense' | 'vendor_payment'
+  companyId: varchar("company_id").references(() => companies.id),
+  documentType: text("document_type").notNull(), // 'estimate' | 'invoice' | 'receipt' | 'expense' | 'vendor_payment'
   prefix: text("prefix").notNull(), // 'QT-', 'INV-', 'REC-', etc.
   nextNumber: integer("next_number").notNull().default(1),
   paddingLength: integer("padding_length").notNull().default(6), // For QT-000001
@@ -492,6 +511,7 @@ export const documentSequences = pgTable("document_sequences", {
 // Estimate Templates (for sample templates)
 export const estimateTemplates = pgTable("estimate_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   lineItems: jsonb("line_items").$type<LineItem[]>().notNull().default([]),
@@ -579,6 +599,7 @@ export const insertPortalLinkSchema = createInsertSchema(portalLinks).omit({ id:
 // Payroll Tables
 export const payrollRuns = pgTable("payroll_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   month: integer("month").notNull(), // 1-12
   year: integer("year").notNull(),
   status: text("status").notNull().default('draft'), // 'draft' | 'paid'
@@ -655,6 +676,7 @@ export const insertSalarySlipSchema = createInsertSchema(salarySlips).omit({ id:
 // Sales Pipelines (e.g., "Bookings FY26-27", "Wedding Planning")
 export const salesPipelines = pgTable("sales_pipelines", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   isDefault: boolean("is_default").default(false),
@@ -675,12 +697,13 @@ export const salesStages = pgTable("sales_stages", {
 // CRM Contacts
 export const salesContacts = pgTable("sales_contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   firstName: text("first_name").notNull(),
   lastName: text("last_name"),
   email: text("email"),
   phone: text("phone"),
   mobile: text("mobile"),
-  companyId: varchar("company_id"),
+  salesCompanyId: varchar("sales_company_id"),
   title: text("title"),
   source: text("source"), // "Website", "Referral", "Social Media", etc.
   notes: text("notes"),
@@ -691,6 +714,7 @@ export const salesContacts = pgTable("sales_contacts", {
 // CRM Companies/Accounts
 export const salesCompanies = pgTable("sales_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   industry: text("industry"),
   website: text("website"),
@@ -902,6 +926,7 @@ export type InsertSalesAutomation = z.infer<typeof insertSalesAutomationSchema>;
 // Inventory Items - Full inventory with photos, descriptions, costing
 export const inventoryItems = pgTable("inventory_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   category: text("category").notNull(),
@@ -975,6 +1000,7 @@ export type EventInventoryItem = typeof eventInventoryItems.$inferSelect;
 // Rental Records - Items from external rental shops
 export const rentalRecords = pgTable("rental_records", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   vendorId: varchar("vendor_id").references(() => vendors.id),
   eventId: varchar("event_id").references(() => events.id),
   rentalDate: date("rental_date").notNull(),
@@ -1012,6 +1038,7 @@ export type RentalItem = typeof rentalItems.$inferSelect;
 // Inventory Templates - Pre-defined bundles for event types
 export const inventoryTemplates = pgTable("inventory_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   eventType: text("event_type").notNull(), // e.g., 'Hindu Wedding Stage Décor'
   description: text("description"),
@@ -1307,6 +1334,7 @@ export type ExpenseReimbursement = typeof expenseReimbursements.$inferSelect;
 // Public Holidays (Managed by Superadmin)
 export const publicHolidays = pgTable("public_holidays", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   date: date("date").notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -1725,6 +1753,7 @@ export type ExecutionPlanPrint = typeof executionPlanPrints.$inferSelect;
 // Checklist Templates - Reusable templates for production checklists
 export const checklistTemplates = pgTable("checklist_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   category: text("category"), // Wedding, Corporate, Concert, etc.
@@ -1759,6 +1788,7 @@ export type ChecklistTemplateItem = typeof checklistTemplateItems.$inferSelect;
 // Creative - Presentations
 export const presentations = pgTable("presentations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   title: text("title").notNull(),
   clientName: text("client_name"),
   eventId: varchar("event_id").references(() => events.id),
@@ -1810,6 +1840,7 @@ export type SlideImage = typeof slideImages.$inferSelect;
 // Creative - Asset Library (reusable images for presentations)
 export const presentationAssets = pgTable("presentation_assets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   category: text("category").notNull(), // Welcome Board, Mandap, Entrance Arch, etc.
   subcategory: text("subcategory"), // Kerala Traditional, Royal, Modern, etc.
@@ -1830,6 +1861,7 @@ export type PresentationAsset = typeof presentationAssets.$inferSelect;
 // Notifications sent by superadmin
 export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
   title: text("title").notNull(),
   message: text("message").notNull(),
   type: text("type").notNull().default('info'), // info, warning, success, urgent

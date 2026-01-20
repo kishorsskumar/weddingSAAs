@@ -73,6 +73,32 @@ export function verifyJWT(req: Request, res: Response, next: NextFunction) {
 
 const PgSession = connectPgSimple(session);
 
+// Helper function to resolve companyId from JWT or session
+async function getCompanyIdFromRequest(req: Request): Promise<string | undefined> {
+  // Try JWT first (req.user from verifyJWT middleware)
+  if (req.user?.companyId) {
+    return req.user.companyId;
+  }
+  
+  // Fall back to session-based auth
+  if (req.session?.userId) {
+    const user = await storage.getUser(req.session.userId);
+    return user?.companyId;
+  }
+  
+  return undefined;
+}
+
+// Helper function to require companyId, returns null and sends 403 if missing
+async function requireCompanyId(req: Request, res: Response): Promise<string | null> {
+  const companyId = await getCompanyIdFromRequest(req);
+  if (!companyId) {
+    res.status(403).json({ error: 'Company context required' });
+    return null;
+  }
+  return companyId;
+}
+
 // Helper function to escape XML special characters for TwiML responses
 function escapeXml(text: string): string {
   return text
@@ -1410,7 +1436,8 @@ export async function registerRoutes(
 
   // Events
   app.get('/api/events', async (req, res) => {
-    const events = await storage.getAllEvents();
+    const companyId = await getCompanyIdFromRequest(req);
+    const events = await storage.getAllEvents(companyId);
     res.json(events);
   });
 
@@ -1418,12 +1445,16 @@ export async function registerRoutes(
     try {
       const data = insertEventSchema.parse(req.body);
       
+      // Get companyId from authenticated user
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      
       // Auto-generate event code (OAKS-E-YY-MM-XXX format)
       const eventCode = await generateEventCode();
       
-      // Insert event with generated code
+      // Insert event with generated code and companyId
       const [event] = await db.insert(events)
-        .values({ ...data, eventCode })
+        .values({ ...data, eventCode, companyId })
         .returning();
       
       console.log(`Created event ${event.title} with code ${eventCode}`);
@@ -1493,20 +1524,24 @@ export async function registerRoutes(
       const meetings = await storage.getMeetingsByDate(date as string);
       res.json(meetings);
     } else {
-      const meetings = await storage.getAllMeetings();
+      const companyId = await getCompanyIdFromRequest(req);
+      const meetings = await storage.getAllMeetings(companyId);
       res.json(meetings);
     }
   });
 
   app.get('/api/meetings/all', async (req, res) => {
-    const meetings = await storage.getAllMeetings();
+    const companyId = await getCompanyIdFromRequest(req);
+    const meetings = await storage.getAllMeetings(companyId);
     res.json(meetings);
   });
 
   app.post('/api/meetings', async (req, res) => {
     try {
       const data = insertMeetingSchema.parse(req.body);
-      const meeting = await storage.createMeeting(data);
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      const meeting = await storage.createMeeting({ ...data, companyId });
       res.json(meeting);
     } catch (error) {
       res.status(400).json({ error: 'Invalid meeting data' });
@@ -1529,14 +1564,17 @@ export async function registerRoutes(
 
   // Employees
   app.get('/api/employees', async (req, res) => {
-    const employees = await storage.getAllEmployees();
+    const companyId = await getCompanyIdFromRequest(req);
+    const employees = await storage.getAllEmployees(companyId);
     res.json(employees);
   });
 
   app.post('/api/employees', async (req, res) => {
     try {
       const data = insertEmployeeSchema.parse(req.body);
-      const employee = await storage.createEmployee(data);
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      const employee = await storage.createEmployee({ ...data, companyId });
       res.json(employee);
     } catch (error) {
       res.status(400).json({ error: 'Invalid employee data' });
@@ -1957,14 +1995,17 @@ export async function registerRoutes(
 
   // Banks
   app.get('/api/banks', async (req, res) => {
-    const banks = await storage.getAllBanks();
+    const companyId = await getCompanyIdFromRequest(req);
+    const banks = await storage.getAllBanks(companyId);
     res.json(banks);
   });
 
   app.post('/api/banks', async (req, res) => {
     try {
       const data = insertBankSchema.parse(req.body);
-      const bank = await storage.createBank(data);
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      const bank = await storage.createBank({ ...data, companyId });
       res.json(bank);
     } catch (error) {
       res.status(400).json({ error: 'Invalid bank data' });
@@ -5266,7 +5307,8 @@ export async function registerRoutes(
       return res.status(401).json({ error: 'Not authenticated' });
     }
     const user = await storage.getUser(req.session.userId);
-    let customers = await storage.getAllCustomers();
+    const companyId = user?.companyId;
+    let customers = await storage.getAllCustomers(companyId);
     
     // Wedding planners only see their own customers
     if (user?.role === 'wedding_planner') {
@@ -5288,12 +5330,15 @@ export async function registerRoutes(
     try {
       const data = insertCustomerSchema.parse(req.body);
       
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      
       // Auto-generate customer code (OAKS-C-YY-XXXX format)
       const customerCode = await generateCustomerCode();
       
-      // Insert customer with generated code using transaction
+      // Insert customer with generated code and companyId using transaction
       const [customer] = await db.insert(customers)
-        .values({ ...data, customerCode })
+        .values({ ...data, customerCode, companyId })
         .returning();
       
       console.log(`Created customer ${customer.name} with code ${customerCode}`);
@@ -5467,7 +5512,8 @@ export async function registerRoutes(
 
   // Oak Book - Vendors
   app.get('/api/vendors', async (req, res) => {
-    const vendors = await storage.getAllVendors();
+    const companyId = await getCompanyIdFromRequest(req);
+    const vendors = await storage.getAllVendors(companyId);
     res.json(vendors);
   });
 
@@ -5482,7 +5528,9 @@ export async function registerRoutes(
   app.post('/api/vendors', async (req, res) => {
     try {
       const data = insertVendorSchema.parse(req.body);
-      const vendor = await storage.createVendor(data);
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      const vendor = await storage.createVendor({ ...data, companyId });
       res.json(vendor);
     } catch (error) {
       res.status(400).json({ error: 'Invalid vendor data' });
