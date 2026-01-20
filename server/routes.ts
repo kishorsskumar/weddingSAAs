@@ -828,6 +828,25 @@ export async function registerRoutes(
       },
     })
   );
+  
+  // JWT to Session middleware - populate session from JWT if no session exists
+  // This ensures all existing routes work with JWT authentication
+  app.use((req, res, next) => {
+    if (!(req.session as any).userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        try {
+          const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+          (req.session as any).userId = decoded.userId;
+          req.user = decoded;
+        } catch (error) {
+          // Invalid token, continue without auth
+        }
+      }
+    }
+    next();
+  });
 
   // Health check endpoint for debugging
   app.get('/api/health', async (req, res) => {
@@ -1050,7 +1069,27 @@ export async function registerRoutes(
   });
 
   app.get('/api/auth/me', async (req, res) => {
-    const userId = (req.session as any).userId;
+    let userId: string | undefined;
+    let companyId: string | undefined;
+    
+    // Try JWT first, then fall back to session
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+        userId = decoded.userId;
+        companyId = decoded.companyId;
+      } catch (error) {
+        // Invalid token, try session
+      }
+    }
+    
+    // Fall back to session if no valid JWT
+    if (!userId) {
+      userId = (req.session as any).userId;
+    }
+    
     if (!userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
@@ -1058,6 +1097,12 @@ export async function registerRoutes(
     const user = await storage.getUser(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Get company if available
+    let company = null;
+    if (user.companyId) {
+      company = await storage.getCompany(user.companyId);
     }
 
     // Admin and superadmin get all pages automatically
@@ -1077,7 +1122,9 @@ export async function registerRoutes(
         role: user.role,
         avatar: user.avatar,
         createdVia: user.createdVia,
+        companyId: user.companyId,
       },
+      company: company ? { id: company.id, name: company.name } : null,
       permissions: permissionsList
     });
   });

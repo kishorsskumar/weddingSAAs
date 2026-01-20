@@ -57,7 +57,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    fetch('/api/auth/me', { credentials: 'include' })
+    const headers: HeadersInit = {};
+    const storedToken = localStorage.getItem(TOKEN_KEY);
+    if (storedToken) {
+      headers['Authorization'] = `Bearer ${storedToken}`;
+    }
+    
+    fetch('/api/auth/me', { 
+      credentials: 'include',
+      headers 
+    })
       .then(res => {
         if (res.ok) return res.json();
         throw new Error('Not authenticated');
