@@ -239,6 +239,7 @@ export const customers = pgTable("customers", {
   billingAddress: text("billing_address"),
   state: text("state"),
   country: text("country").default('India'),
+  company: text("company").default('oakstreet'), // 'oakstreet' or 'yepman' - determines branding and tax
   leadId: varchar("lead_id"), // Reference to sales deal (lead)
   weddingPlannerId: varchar("wedding_planner_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),

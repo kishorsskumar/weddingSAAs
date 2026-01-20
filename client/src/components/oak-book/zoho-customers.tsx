@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -45,6 +46,7 @@ type Customer = {
   billingAddress: string | null;
   state: string | null;
   country: string | null;
+  company: string | null;
   weddingPlannerId: string | null;
   createdAt: string;
 };
@@ -614,6 +616,7 @@ function CustomerFormModal({
     phone: "",
     gstNumber: "",
     billingAddress: "",
+    company: "oakstreet",
   });
 
   useEffect(() => {
@@ -623,6 +626,7 @@ function CustomerFormModal({
       phone: editingCustomer?.phone || "",
       gstNumber: editingCustomer?.gstNumber || "",
       billingAddress: editingCustomer?.billingAddress || "",
+      company: editingCustomer?.company || "oakstreet",
     });
   }, [editingCustomer]);
 
@@ -638,6 +642,27 @@ function CustomerFormModal({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div>
+            <Label>Company *</Label>
+            <Select
+              value={formData.company}
+              onValueChange={(value) => setFormData({ ...formData, company: value })}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="oakstreet">Oakstreet Events</SelectItem>
+                <SelectItem value="yepman">Yepman International</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              {formData.company === 'oakstreet' 
+                ? 'Documents will be without tax, with Oakstreet branding' 
+                : 'Documents will include GST, with Yepman branding'}
+            </p>
+          </div>
+
           <div>
             <Label>Customer Name *</Label>
             <Input
