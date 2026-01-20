@@ -3,8 +3,11 @@ import {
   userPermissions,
   roles,
   companies,
+  subscriptions,
   type Company,
   type InsertCompany,
+  type Subscription,
+  type InsertSubscription,
   events, 
   meetings, 
   employees, 
@@ -947,6 +950,59 @@ export class DatabaseStorage implements IStorage {
   async createCompany(company: InsertCompany): Promise<Company> {
     const [created] = await db.insert(companies).values(company).returning();
     return created;
+  }
+
+  // Subscriptions
+  async getSubscriptionByCompanyId(companyId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(eq(subscriptions.companyId, companyId))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    return subscription || undefined;
+  }
+
+  async getActiveSubscriptionByCompanyId(companyId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(and(
+        eq(subscriptions.companyId, companyId),
+        eq(subscriptions.status, 'active')
+      ))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    return subscription || undefined;
+  }
+
+  async getSubscriptionByRazorpayId(razorpaySubscriptionId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(eq(subscriptions.razorpaySubscriptionId, razorpaySubscriptionId));
+    return subscription || undefined;
+  }
+
+  async getSubscriptionByOrderId(razorpayOrderId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db.select().from(subscriptions)
+      .where(eq(subscriptions.razorpayOrderId, razorpayOrderId));
+    return subscription || undefined;
+  }
+
+  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
+    const [created] = await db.insert(subscriptions).values(subscription).returning();
+    return created;
+  }
+
+  async updateSubscription(id: string, updateData: Partial<InsertSubscription>): Promise<Subscription | undefined> {
+    const [updated] = await db.update(subscriptions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(subscriptions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async updateSubscriptionByRazorpayId(razorpaySubscriptionId: string, updateData: Partial<InsertSubscription>): Promise<Subscription | undefined> {
+    const [updated] = await db.update(subscriptions)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(subscriptions.razorpaySubscriptionId, razorpaySubscriptionId))
+      .returning();
+    return updated || undefined;
   }
 
   // Users

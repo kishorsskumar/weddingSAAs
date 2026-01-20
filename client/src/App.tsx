@@ -30,12 +30,25 @@ import MonthlyPlan from "@/pages/monthly-plan";
 import WhatsappInbox from "@/pages/whatsapp-inbox";
 import ManagementMIS from "@/pages/management-mis";
 import DownloadPage from "@/pages/download";
+import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-function PrivateRoute({ component: Component, path }: { component: any; path: string }) {
+interface BillingStatus {
+  subscription: { status: string } | null;
+  isActive: boolean;
+  razorpayConfigured: boolean;
+}
+
+function PrivateRoute({ component: Component, path, skipSubscriptionCheck = false }: { component: any; path: string; skipSubscriptionCheck?: boolean }) {
   const { user, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
+
+  const { data: billingStatus, isLoading: billingLoading } = useQuery<BillingStatus>({
+    queryKey: ["/api/billing/status"],
+    enabled: !!user && !skipSubscriptionCheck,
+  });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -43,7 +56,14 @@ function PrivateRoute({ component: Component, path }: { component: any; path: st
     }
   }, [user, isLoading, setLocation]);
 
-  if (isLoading || !user) return null; 
+  useEffect(() => {
+    if (!skipSubscriptionCheck && !billingLoading && billingStatus && !billingStatus.isActive && location !== "/billing") {
+      setLocation("/billing");
+    }
+  }, [billingStatus, billingLoading, skipSubscriptionCheck, setLocation, location]);
+
+  if (isLoading || !user) return null;
+  if (!skipSubscriptionCheck && billingLoading) return null;
 
   return <Component />;
 }
@@ -54,6 +74,9 @@ function AppRoutes() {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
+        <Route path="/billing">
+          <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
+        </Route>
         <Route path="/">
           <PrivateRoute component={Dashboard} path="/" />
         </Route>

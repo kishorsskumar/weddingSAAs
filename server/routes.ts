@@ -1,7 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
@@ -1431,6 +1433,228 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(400).json({ error: 'Failed to delete role' });
+    }
+  });
+
+  // ============ Billing / Subscription Routes ============
+  
+  // Server-side plan catalog with canonical pricing (prevents client-side tampering)
+  const PLAN_CATALOG: Record<string, { name: string; amount: number; duration: number }> = {
+    basic: { name: 'Basic', amount: 999, duration: 30 },
+    pro: { name: 'Pro', amount: 2499, duration: 30 },
+    enterprise: { name: 'Enterprise', amount: 4999, duration: 30 },
+  };
+  
+  // Get subscription status for current company
+  app.get('/api/billing/status', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      
+      const subscription = await storage.getSubscriptionByCompanyId(companyId);
+      const isConfigured = razorpayService.isRazorpayConfigured();
+      
+      res.json({
+        subscription: subscription || null,
+        isActive: subscription?.status === 'active',
+        razorpayConfigured: isConfigured,
+        razorpayKeyId: razorpayService.getRazorpayKeyId(),
+      });
+    } catch (error) {
+      console.error('Error getting billing status:', error);
+      res.status(500).json({ error: 'Failed to get billing status' });
+    }
+  });
+
+  // Create a new subscription order
+  app.post('/api/billing/create-order', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      
+      const { planName } = req.body;
+      
+      if (!razorpayService.isRazorpayConfigured()) {
+        return res.status(503).json({ error: 'Payment system not configured' });
+      }
+      
+      // Validate plan name and get server-side pricing (ignore client-provided amount)
+      const validPlanName = planName && PLAN_CATALOG[planName] ? planName : 'basic';
+      const plan = PLAN_CATALOG[validPlanName];
+      
+      // Create Razorpay order with server-side validated amount
+      const order = await razorpayService.createOrder({
+        amount: plan.amount,
+        currency: 'INR',
+        companyId,
+        planName: validPlanName,
+      });
+      
+      // Create pending subscription record with order_id for reconciliation
+      await storage.createSubscription({
+        companyId,
+        planName: validPlanName,
+        razorpayOrderId: order.id,
+        amountPaid: plan.amount,
+        status: 'pending',
+      });
+      
+      res.json({
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: razorpayService.getRazorpayKeyId(),
+      });
+    } catch (error) {
+      console.error('Error creating order:', error);
+      res.status(500).json({ error: 'Failed to create order' });
+    }
+  });
+
+  // Verify payment after Razorpay checkout
+  app.post('/api/billing/verify-payment', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+      
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      
+      // Verify signature
+      const isValid = razorpayService.verifyPaymentSignature({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      });
+      
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid payment signature' });
+      }
+      
+      // Find the pending subscription by order_id for reconciliation (prevents replay attacks)
+      const subscription = await storage.getSubscriptionByOrderId(razorpay_order_id);
+      if (!subscription) {
+        return res.status(400).json({ error: 'No pending subscription found for this order' });
+      }
+      
+      // Verify the subscription belongs to this company (prevents cross-company attacks)
+      if (subscription.companyId !== companyId) {
+        return res.status(403).json({ error: 'Order does not belong to this company' });
+      }
+      
+      // Verify the subscription is still pending (prevents double activation)
+      if (subscription.status !== 'pending') {
+        return res.status(400).json({ error: 'Subscription already processed' });
+      }
+      
+      // Get plan duration from catalog
+      const plan = PLAN_CATALOG[subscription.planName] || PLAN_CATALOG.basic;
+      
+      // Update subscription to active
+      await storage.updateSubscription(subscription.id, {
+        status: 'active',
+        razorpayPaymentId: razorpay_payment_id,
+        startDate: new Date(),
+        endDate: new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000),
+        lastPaymentDate: new Date(),
+      });
+      
+      res.json({ success: true, message: 'Payment verified successfully' });
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      res.status(500).json({ error: 'Failed to verify payment' });
+    }
+  });
+
+  // Razorpay webhook handler
+  app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+      // Require webhook secret to be configured - exit early if missing
+      if (!razorpayService.isWebhookSecretConfigured()) {
+        console.error('SECURITY: Webhook request rejected - RAZORPAY_WEBHOOK_SECRET not configured');
+        return res.status(503).json({ error: 'Webhook handler not configured' });
+      }
+      
+      const signature = req.headers['x-razorpay-signature'] as string;
+      const body = req.body.toString();
+      
+      // Verify webhook signature
+      const isValid = razorpayService.verifyWebhookSignature(body, signature);
+      if (!isValid) {
+        console.warn('Invalid Razorpay webhook signature');
+        return res.status(400).json({ error: 'Invalid signature' });
+      }
+      
+      const event = JSON.parse(body);
+      console.log('Razorpay webhook event:', event.event);
+      
+      // Handle different webhook events
+      switch (event.event) {
+        case 'payment.captured': {
+          // For one-time payments, use order_id to find subscription
+          const orderId = event.payload?.payment?.entity?.order_id;
+          const paymentId = event.payload?.payment?.entity?.id;
+          if (orderId) {
+            const subscription = await storage.getSubscriptionByOrderId(orderId);
+            if (subscription) {
+              // Get plan duration
+              const plan = PLAN_CATALOG[subscription.planName] || PLAN_CATALOG.basic;
+              await storage.updateSubscription(subscription.id, {
+                status: 'active',
+                razorpayPaymentId: paymentId,
+                startDate: new Date(),
+                endDate: new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000),
+                lastPaymentDate: new Date(),
+              });
+            }
+          }
+          break;
+        }
+        
+        case 'payment.failed': {
+          // For failed payments, use order_id to find subscription
+          const orderId = event.payload?.payment?.entity?.order_id;
+          if (orderId) {
+            const subscription = await storage.getSubscriptionByOrderId(orderId);
+            if (subscription) {
+              await storage.updateSubscription(subscription.id, {
+                status: 'failed',
+                failureReason: event.payload?.payment?.entity?.error_description,
+              });
+            }
+          }
+          break;
+        }
+        
+        case 'subscription.activated': {
+          // For recurring subscriptions (future use)
+          const subscriptionId = event.payload?.subscription?.entity?.id;
+          if (subscriptionId) {
+            await storage.updateSubscriptionByRazorpayId(subscriptionId, {
+              status: 'active',
+              lastPaymentDate: new Date(),
+            });
+          }
+          break;
+        }
+        
+        case 'subscription.cancelled':
+        case 'subscription.halted': {
+          const subscriptionId = event.payload?.subscription?.entity?.id;
+          if (subscriptionId) {
+            await storage.updateSubscriptionByRazorpayId(subscriptionId, {
+              status: 'cancelled',
+            });
+          }
+          break;
+        }
+      }
+      
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Webhook error:', error);
+      res.status(500).json({ error: 'Webhook processing failed' });
     }
   });
 
