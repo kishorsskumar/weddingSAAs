@@ -5368,7 +5368,22 @@ export async function registerRoutes(
   app.post('/api/estimates', async (req, res) => {
     try {
       const data = insertEstimateSchema.parse(req.body);
-      const estimate = await storage.createEstimate(data);
+      
+      // Auto-set isTaxDocument based on customer's company
+      let isTaxDocument = data.isTaxDocument;
+      if (isTaxDocument === undefined && data.customerId) {
+        const customer = await storage.getCustomer(data.customerId);
+        if (customer?.company === 'yepman') {
+          isTaxDocument = true;
+        } else {
+          isTaxDocument = false;
+        }
+      }
+      
+      const estimate = await storage.createEstimate({
+        ...data,
+        isTaxDocument: isTaxDocument ?? false,
+      });
       res.json(estimate);
     } catch (error) {
       console.error('Estimate creation error:', error);
@@ -5409,6 +5424,7 @@ export async function registerRoutes(
         balanceDue: estimate.total,
         notes: estimate.notes,
         terms: estimate.terms,
+        isTaxDocument: estimate.isTaxDocument ?? false,
       });
 
       await storage.updateEstimate(estimate.id, { status: 'converted' });
@@ -5458,9 +5474,22 @@ export async function registerRoutes(
   app.post('/api/invoices', async (req, res) => {
     try {
       const data = insertInvoiceSchema.parse(req.body);
+      
+      // Auto-set isTaxDocument based on customer's company
+      let isTaxDocument = data.isTaxDocument;
+      if (isTaxDocument === undefined && data.customerId) {
+        const customer = await storage.getCustomer(data.customerId);
+        if (customer?.company === 'yepman') {
+          isTaxDocument = true;
+        } else {
+          isTaxDocument = false;
+        }
+      }
+      
       const invoice = await storage.createInvoice({
         ...data,
         balanceDue: data.total,
+        isTaxDocument: isTaxDocument ?? false,
       });
       res.json(invoice);
     } catch (error) {
