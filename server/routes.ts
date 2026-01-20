@@ -1595,6 +1595,8 @@ export async function registerRoutes(
           // For one-time payments, use order_id to find subscription
           const orderId = event.payload?.payment?.entity?.order_id;
           const paymentId = event.payload?.payment?.entity?.id;
+          const amount = event.payload?.payment?.entity?.amount;
+          console.log(`[Webhook] payment.captured - Order: ${orderId}, Payment: ${paymentId}, Amount: ${amount}`);
           if (orderId) {
             const subscription = await storage.getSubscriptionByOrderId(orderId);
             if (subscription) {
@@ -1607,34 +1609,66 @@ export async function registerRoutes(
                 endDate: new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000),
                 lastPaymentDate: new Date(),
               });
+              console.log(`[Webhook] Subscription ${subscription.id} activated via payment.captured`);
+            } else {
+              console.warn(`[Webhook] No subscription found for order ${orderId}`);
             }
           }
           break;
         }
         
         case 'payment.failed': {
-          // For failed payments, use order_id to find subscription
+          // For failed payments, use order_id to find subscription - disables SaaS access
           const orderId = event.payload?.payment?.entity?.order_id;
+          const errorDesc = event.payload?.payment?.entity?.error_description;
+          console.log(`[Webhook] payment.failed - Order: ${orderId}, Error: ${errorDesc}`);
           if (orderId) {
             const subscription = await storage.getSubscriptionByOrderId(orderId);
             if (subscription) {
               await storage.updateSubscription(subscription.id, {
                 status: 'failed',
-                failureReason: event.payload?.payment?.entity?.error_description,
+                failureReason: errorDesc,
               });
+              console.log(`[Webhook] Subscription ${subscription.id} marked as failed - SaaS access disabled`);
             }
           }
           break;
         }
         
         case 'subscription.activated': {
-          // For recurring subscriptions (future use)
+          // For recurring subscriptions - activate and set start date
           const subscriptionId = event.payload?.subscription?.entity?.id;
+          const planId = event.payload?.subscription?.entity?.plan_id;
+          console.log(`[Webhook] subscription.activated - ID: ${subscriptionId}, Plan: ${planId}`);
+          if (subscriptionId) {
+            // Get subscription entity details
+            const subEntity = event.payload?.subscription?.entity;
+            const startDate = subEntity?.start_at ? new Date(subEntity.start_at * 1000) : new Date();
+            const endDate = subEntity?.end_at ? new Date(subEntity.end_at * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            
+            await storage.updateSubscriptionByRazorpayId(subscriptionId, {
+              status: 'active',
+              startDate,
+              endDate,
+              lastPaymentDate: new Date(),
+            });
+            console.log(`[Webhook] Subscription ${subscriptionId} activated successfully`);
+          }
+          break;
+        }
+        
+        case 'subscription.charged': {
+          // Log successful recurring payment
+          const subscriptionId = event.payload?.subscription?.entity?.id;
+          const paymentId = event.payload?.payment?.entity?.id;
+          const amount = event.payload?.payment?.entity?.amount;
+          console.log(`[Webhook] subscription.charged - ID: ${subscriptionId}, Payment: ${paymentId}, Amount: ${amount}`);
           if (subscriptionId) {
             await storage.updateSubscriptionByRazorpayId(subscriptionId, {
               status: 'active',
               lastPaymentDate: new Date(),
             });
+            console.log(`[Webhook] Recurring payment recorded for subscription ${subscriptionId}`);
           }
           break;
         }
@@ -1642,10 +1676,12 @@ export async function registerRoutes(
         case 'subscription.cancelled':
         case 'subscription.halted': {
           const subscriptionId = event.payload?.subscription?.entity?.id;
+          console.log(`[Webhook] ${event.event} - ID: ${subscriptionId}`);
           if (subscriptionId) {
             await storage.updateSubscriptionByRazorpayId(subscriptionId, {
               status: 'cancelled',
             });
+            console.log(`[Webhook] Subscription ${subscriptionId} cancelled/halted - SaaS access disabled`);
           }
           break;
         }
