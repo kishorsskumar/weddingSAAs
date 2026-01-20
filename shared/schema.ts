@@ -4,14 +4,25 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true });
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  role: text("role").notNull(), // 'admin' | 'manager' | 'employee'
+  role: text("role").notNull(), // 'superadmin' | 'admin' | 'manager' | 'employee' | 'staff'
+  companyId: varchar("company_id").references(() => companies.id),
   avatar: text("avatar"),
-  createdVia: text("created_via").default('admin_panel'), // 'admin_panel' | 'employee_onboarding'
+  createdVia: text("created_via").default('admin_panel'), // 'admin_panel' | 'employee_onboarding' | 'signup'
   createdAt: timestamp("created_at").defaultNow(),
 });
 

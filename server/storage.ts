@@ -2,6 +2,9 @@ import {
   users, 
   userPermissions,
   roles,
+  companies,
+  type Company,
+  type InsertCompany,
   events, 
   meetings, 
   employees, 
@@ -316,6 +319,10 @@ import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
 
 export interface IStorage {
+  // Companies
+  getCompany(id: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -931,6 +938,17 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Companies
+  async getCompany(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    return company || undefined;
+  }
+
+  async createCompany(company: InsertCompany): Promise<Company> {
+    const [created] = await db.insert(companies).values(company).returning();
+    return created;
+  }
+
   // Users
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));

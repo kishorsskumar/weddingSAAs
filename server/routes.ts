@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -23,16 +23,53 @@ import {
   insertExpenseSchema,
   insertVendorPaymentSchema,
   customerCreationLogs,
+  insertCompanySchema,
   type InsertEventMilestone,
 } from "@shared/schema";
 import { db } from "./db";
 import { sql, eq, and, gte, like } from "drizzle-orm";
 import { customers, events } from "@shared/schema";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+interface JWTPayload {
+  userId: string;
+  companyId: string;
+  email: string;
+  role: string;
+}
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JWTPayload;
+    }
+  }
+}
+
+export function verifyJWT(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+}
 
 const PgSession = connectPgSimple(session);
 
@@ -878,6 +915,77 @@ export async function registerRoutes(
   ];
 
   // Auth endpoints
+  
+  // JWT-based signup for new companies
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      const { name, email, password, companyName } = req.body;
+      
+      if (!name || !email || !password || !companyName) {
+        return res.status(400).json({ error: 'All fields are required' });
+      }
+      
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already registered' });
+      }
+      
+      // Create the company
+      const company = await storage.createCompany({ name: companyName });
+      
+      // Hash password and create user
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        name,
+        email,
+        password: hashedPassword,
+        role: 'admin',
+        companyId: company.id,
+        createdVia: 'signup',
+      });
+      
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          companyId: company.id,
+          email: user.email,
+          role: user.role,
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
+      // Also set session for backward compatibility
+      (req.session as any).userId = user.id;
+      
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          companyId: company.id,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+        },
+        permissions: ALL_PAGES,
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+      res.status(500).json({ error: 'Signup failed' });
+    }
+  });
+  
+  // Session-based login (existing)
   app.post('/api/auth/login', async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -896,9 +1004,22 @@ export async function registerRoutes(
         permissionsList = permissions.map(p => p.pageId);
       }
       
+      // Generate JWT token for new auth flow
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          companyId: user.companyId || '',
+          email: user.email,
+          role: user.role,
+        },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      
       (req.session as any).userId = user.id;
       
       res.json({ 
+        token,
         user: {
           id: user.id,
           name: user.name,
@@ -906,6 +1027,7 @@ export async function registerRoutes(
           role: user.role,
           avatar: user.avatar,
           createdVia: user.createdVia,
+          companyId: user.companyId,
         },
         permissions: permissionsList
       });
