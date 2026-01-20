@@ -34,7 +34,8 @@ import {
   FileText,
   Settings,
   ChevronDown,
-  DollarSign
+  DollarSign,
+  Building2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -699,7 +700,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavContent />
           </SheetContent>
         </Sheet>
-        <img src={logo} alt="Oakstreet Events" className="h-9 w-auto" />
+        <div className="flex items-center gap-2">
+          <Building2 className="h-6 w-6 text-primary" />
+          <span className="font-semibold text-lg">Wedding SaaS</span>
+        </div>
         <NotificationBell />
       </div>
 
