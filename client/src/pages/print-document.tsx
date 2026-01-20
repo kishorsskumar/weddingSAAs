@@ -841,7 +841,12 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
 }
 
 function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideHeader }: any) {
-  // Use olive green for all documents
+  // Determine if this is a tax document based on invoice or customer company
+  const isTaxDocument = invoice?.isTaxDocument === true || customer?.company === 'yepman';
+  const brandColor = isTaxDocument ? YEPMAN_BRAND_COLOR : '#6b9937';
+  const companyName = isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events');
+  const companyLogo = isTaxDocument ? yepmanLogo : logo;
+  
   const receiptStyles = baseStyles;
 
   return (
@@ -853,19 +858,20 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
         {!hideHeader && (
           <div className="company-info">
             <div className="company-logo">
-              <img src={logo} alt="Logo" />
+              <img src={companyLogo} alt="Logo" />
             </div>
-            <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+            <div className="company-name" style={{ color: brandColor }}>{companyName}</div>
             <div className="company-address">
               {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
+              {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
             </div>
           </div>
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: '#6b9937' }}>Payment Receipt</div>
+          <div className="doc-type" style={{ color: brandColor }}>Payment Receipt</div>
         </div>
       </div>
 
@@ -900,13 +906,13 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
       <div style={{ 
         margin: '20px 0', 
         padding: '25px', 
-        background: '#f0fdf4', 
-        border: '2px solid #6b9937', 
+        background: isTaxDocument ? '#fdf4f8' : '#f0fdf4', 
+        border: `2px solid ${brandColor}`, 
         borderRadius: '8px',
         textAlign: 'center'
       }}>
         <div style={{ fontSize: '11px', color: '#666', marginBottom: '8px' }}>Amount Received</div>
-        <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#6b9937' }}>
+        <div style={{ fontSize: '32px', fontWeight: 'bold', color: brandColor }}>
           ₹{formatIndianCurrency(parseFloat(payment.amount))}
         </div>
         <div style={{ fontSize: '11px', color: '#666', marginTop: '10px', fontStyle: 'italic' }}>

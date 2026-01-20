@@ -33,7 +33,8 @@ import {
   Banknote,
   Building2,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Download
 } from "lucide-react";
 
 type Payment = {
@@ -443,6 +444,17 @@ function PaymentDetailPanel({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      <div className="flex items-center gap-2 p-3 border-b bg-white">
+        <Button 
+          onClick={() => window.open(`/print/receipt/${payment.id}`, '_blank')}
+          size="sm" 
+          className="bg-primary hover:bg-primary/90"
+        >
+          <Download className="h-4 w-4 mr-1" />
+          Download Receipt
+        </Button>
       </div>
 
       <div className="p-4 bg-green-50 border-b border-green-100">
