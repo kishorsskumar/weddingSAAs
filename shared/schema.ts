@@ -51,7 +51,7 @@ export type LeaveCategory = typeof leaveCategories.$inferSelect;
 
 export const events = pgTable("events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  eventCode: text("event_code").unique(), // OAKS-E-YY-MM-XXX format, read-only after creation
+  eventCode: text("event_code").unique(), // EVT-E-YY-MM-XXX format, read-only after creation
   title: text("title").notNull(),
   date: date("date").notNull(),
   time: text("time"), // Event time e.g. "18:00"
@@ -228,10 +228,10 @@ export const eventMilestones = pgTable("event_milestones", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Customers
+// Customers
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  customerCode: text("customer_code").unique(), // OAKS-C-YY-XXXX format, read-only after creation
+  customerCode: text("customer_code").unique(), // CUST-YY-XXXX format, read-only after creation
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -239,13 +239,13 @@ export const customers = pgTable("customers", {
   billingAddress: text("billing_address"),
   state: text("state"),
   country: text("country").default('India'),
-  company: text("company").default('oakstreet'), // 'oakstreet' or 'yepman' - determines branding and tax
+  company: text("company").default('default'), // Company/brand for multi-brand support
   leadId: varchar("lead_id"), // Reference to sales deal (lead)
   weddingPlannerId: varchar("wedding_planner_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Vendors
+// Vendors
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -287,7 +287,7 @@ export const lineItemSchema = z.object({
 
 export type LineItem = z.infer<typeof lineItemSchema>;
 
-// Oak Book - Estimates
+// Estimates
 export const estimates = pgTable("estimates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // QT-000968 or EST-001
@@ -324,7 +324,7 @@ export const estimates = pgTable("estimates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Invoices
+// Invoices
 export const invoices = pgTable("invoices", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // INV-001
@@ -360,7 +360,7 @@ export const invoices = pgTable("invoices", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Customer Payments (Payment Receipts)
+// Customer Payments (Payment Receipts)
 export const customerPayments = pgTable("customer_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // REC-001
@@ -377,7 +377,7 @@ export const customerPayments = pgTable("customer_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Expenses
+// Expenses
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // EXP-001
@@ -395,7 +395,7 @@ export const expenses = pgTable("expenses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Vendor Payments
+// Vendor Payments
 export const vendorPayments = pgTable("vendor_payments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // VPY-001
@@ -412,7 +412,7 @@ export const vendorPayments = pgTable("vendor_payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Items/Products (reusable products/services)
+// Items/Products (reusable products/services)
 export const items = pgTable("items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -427,7 +427,7 @@ export const items = pgTable("items", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Bills (from vendors)
+// Bills (from vendors)
 export const bills = pgTable("bills", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   number: text("number").notNull().unique(), // BILL-001
@@ -448,28 +448,28 @@ export const bills = pgTable("bills", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Book - Company Settings (for estimate/invoice header)
+// Company Settings (for estimate/invoice header)
 export const companySettings = pgTable("company_settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyName: text("company_name").notNull().default('Oakstreet Events'),
-  address: text("address").default('2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia'),
-  phone: text("phone").default('7902373354'),
-  email: text("email").default('oakstreetevents18@gmail.com'),
-  website: text("website").default('www.oakstreetevents.com'),
+  companyName: text("company_name").notNull().default('Your Company Name'),
+  address: text("address").default(''),
+  phone: text("phone").default(''),
+  email: text("email").default(''),
+  website: text("website").default(''),
   logo: text("logo"),
   gstNumber: text("gst_number"),
-  placeOfSupply: text("place_of_supply").default('Kerala (32)'),
+  placeOfSupply: text("place_of_supply").default(''),
   panNumber: text("pan_number"),
   bankName: text("bank_name"),
   bankAccountNumber: text("bank_account_number"),
   bankIfscCode: text("bank_ifsc_code"),
   bankBranch: text("bank_branch"),
   defaultTerms: text("default_terms"),
-  defaultThankYouMessage: text("default_thank_you_message").default('Looking forward for your business.'),
+  defaultThankYouMessage: text("default_thank_you_message").default('Looking forward to your business.'),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Oak Book - Document Number Sequences (for auto-numbering)
+// Document Number Sequences (for auto-numbering)
 export const documentSequences = pgTable("document_sequences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   documentType: text("document_type").notNull().unique(), // 'estimate' | 'invoice' | 'receipt' | 'expense' | 'vendor_payment'
@@ -478,7 +478,7 @@ export const documentSequences = pgTable("document_sequences", {
   paddingLength: integer("padding_length").notNull().default(6), // For QT-000001
 });
 
-// Oak Book - Estimate Templates (for sample templates)
+// Estimate Templates (for sample templates)
 export const estimateTemplates = pgTable("estimate_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -490,7 +490,7 @@ export const estimateTemplates = pgTable("estimate_templates", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Oak Customer Portal - Shareable Links
+// Customer Portal - Shareable Links
 export const portalLinks = pgTable("portal_links", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   token: varchar("token").notNull().unique(), // Unique shareable token
@@ -541,7 +541,7 @@ export const insertBankTransferSchema = createInsertSchema(bankTransfers).omit({
 export const insertLeaveRequestSchema = createInsertSchema(leaveRequests).omit({ id: true, createdAt: true });
 export const insertEventMilestoneSchema = createInsertSchema(eventMilestones).omit({ id: true, createdAt: true });
 
-// Oak Book Insert Schemas
+// Insert Schemas
 export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true, customerCode: true });
 export const insertVendorSchema = createInsertSchema(vendors).omit({ id: true, createdAt: true });
 export const insertCustomerCreationLogSchema = createInsertSchema(customerCreationLogs).omit({ id: true, createdAt: true });
@@ -639,7 +639,7 @@ export const salarySlips = pgTable("salary_slips", {
 
 export const insertSalarySlipSchema = createInsertSchema(salarySlips).omit({ id: true, createdAt: true });
 
-// Oak Sales CRM
+// Sales CRM
 
 // Sales Pipelines (e.g., "Bookings FY26-27", "Wedding Planning")
 export const salesPipelines = pgTable("sales_pipelines", {
@@ -807,7 +807,7 @@ export type InsertLeaveRequest = z.infer<typeof insertLeaveRequestSchema>;
 export type EventMilestone = typeof eventMilestones.$inferSelect;
 export type InsertEventMilestone = z.infer<typeof insertEventMilestoneSchema>;
 
-// Oak Book Types
+// Types
 export type Customer = typeof customers.$inferSelect;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 
@@ -859,7 +859,7 @@ export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
 export type SalarySlip = typeof salarySlips.$inferSelect;
 export type InsertSalarySlip = z.infer<typeof insertSalarySlipSchema>;
 
-// Oak Sales Types
+// Sales Types
 export type SalesPipeline = typeof salesPipelines.$inferSelect;
 export type InsertSalesPipeline = z.infer<typeof insertSalesPipelineSchema>;
 
@@ -1424,7 +1424,7 @@ export const insertQuickEntrySchema = createInsertSchema(quickEntries).omit({ id
 export type InsertQuickEntry = z.infer<typeof insertQuickEntrySchema>;
 export type QuickEntry = typeof quickEntries.$inferSelect;
 
-// Oaksy AI Assistant - Chat conversations
+// AI Assistant - Chat conversations
 export const oaksyConversations = pgTable("oaksy_conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -1438,7 +1438,7 @@ export const insertOaksyConversationSchema = createInsertSchema(oaksyConversatio
 export type InsertOaksyConversation = z.infer<typeof insertOaksyConversationSchema>;
 export type OaksyConversation = typeof oaksyConversations.$inferSelect;
 
-// Oaksy AI Assistant - Chat messages
+// AI Assistant - Chat messages
 export const oaksyMessages = pgTable("oaksy_messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").notNull().references(() => oaksyConversations.id, { onDelete: 'cascade' }),
@@ -1745,7 +1745,7 @@ export const insertChecklistTemplateItemSchema = createInsertSchema(checklistTem
 export type InsertChecklistTemplateItem = z.infer<typeof insertChecklistTemplateItemSchema>;
 export type ChecklistTemplateItem = typeof checklistTemplateItems.$inferSelect;
 
-// Oak Creative - Presentations
+// Creative - Presentations
 export const presentations = pgTable("presentations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
@@ -1763,7 +1763,7 @@ export const insertPresentationSchema = createInsertSchema(presentations).omit({
 export type InsertPresentation = z.infer<typeof insertPresentationSchema>;
 export type Presentation = typeof presentations.$inferSelect;
 
-// Oak Creative - Presentation Slides
+// Creative - Presentation Slides
 export const presentationSlides = pgTable("presentation_slides", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   presentationId: varchar("presentation_id").notNull().references(() => presentations.id, { onDelete: 'cascade' }),
@@ -1781,7 +1781,7 @@ export const insertPresentationSlideSchema = createInsertSchema(presentationSlid
 export type InsertPresentationSlide = z.infer<typeof insertPresentationSlideSchema>;
 export type PresentationSlide = typeof presentationSlides.$inferSelect;
 
-// Oak Creative - Slide Images/Options
+// Creative - Slide Images/Options
 export const slideImages = pgTable("slide_images", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   slideId: varchar("slide_id").notNull().references(() => presentationSlides.id, { onDelete: 'cascade' }),
@@ -1796,7 +1796,7 @@ export const insertSlideImageSchema = createInsertSchema(slideImages).omit({ id:
 export type InsertSlideImage = z.infer<typeof insertSlideImageSchema>;
 export type SlideImage = typeof slideImages.$inferSelect;
 
-// Oak Creative - Asset Library (reusable images for presentations)
+// Creative - Asset Library (reusable images for presentations)
 export const presentationAssets = pgTable("presentation_assets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -2200,7 +2200,7 @@ export const insertRsvpMessageLogSchema = createInsertSchema(rsvpMessageLogs).om
 export type InsertRsvpMessageLog = z.infer<typeof insertRsvpMessageLogSchema>;
 export type RsvpMessageLog = typeof rsvpMessageLogs.$inferSelect;
 
-// Oaksy Reminders - Scheduled reminders set by employees via WhatsApp
+// Reminders - Scheduled reminders set by employees via WhatsApp
 export const oaksyReminders = pgTable("oaksy_reminders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   employeeId: varchar("employee_id").notNull().references(() => employees.id, { onDelete: 'cascade' }),

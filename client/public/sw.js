@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oak-street-quick-entry-v2';
+const CACHE_NAME = 'wedding-saas-quick-entry-v2';
 const CACHE_WHITELIST = [CACHE_NAME];
 
 self.addEventListener('install', (event) => {
@@ -6,11 +6,10 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Handle push notifications
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
-  let data = { title: 'Oakstreet Events', body: 'You have a new notification' };
+  let data = { title: 'Wedding SaaS Platform', body: 'You have a new notification' };
   
   try {
     if (event.data) {
@@ -22,8 +21,8 @@ self.addEventListener('push', (event) => {
   
   const options = {
     body: data.body || data.message,
-    icon: '/oak-street-pwa-icon.jpg',
-    badge: '/oak-street-logo.png',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     vibrate: [100, 50, 100],
     data: {
       url: data.actionUrl || data.url || '/',
@@ -40,7 +39,6 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.action);
   event.notification.close();
@@ -54,14 +52,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then(clientList => {
-        // Focus existing window if available
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             client.navigate(urlToOpen);
             return client.focus();
           }
         }
-        // Open new window if no existing window
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }
@@ -97,8 +93,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // Pass through to network for all other requests
-  // This is required for PWA installability in Chrome
   event.respondWith(fetch(event.request));
 });
 

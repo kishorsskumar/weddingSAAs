@@ -35,14 +35,17 @@ async function ensureDefaultSuperAdmin() {
     const hasSuperAdmin = users.some((u: { role: string }) => u.role === 'superadmin');
     
     if (!hasSuperAdmin) {
-      const hashedPassword = await bcrypt.hash('OakAdmin2024!', 10);
+      const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com';
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'ChangeMe123!';
+      const defaultName = process.env.DEFAULT_ADMIN_NAME || 'Super Admin';
+      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
       await storage.createUser({
-        name: 'Super Admin',
-        email: 'admin@oakstreetevent.com',
+        name: defaultName,
+        email: defaultEmail,
         password: hashedPassword,
         role: 'superadmin',
       });
-      console.log('Created default Super Admin user (admin@oakstreetevent.com)');
+      console.log(`Created default Super Admin user (${defaultEmail})`);
       console.log('IMPORTANT: Please change the default password immediately after first login!');
     }
   } catch (error) {
@@ -70,12 +73,12 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Redirect non-www to www (always, for custom domain)
+// Redirect non-www to www (for custom domain if configured)
 app.use((req, res, next) => {
   const host = (req.hostname || req.headers.host || "").split(':')[0];
-  // Redirect non-www to www for custom domain
-  if (host === "oakstreetevent.com") {
-    return res.redirect(301, `https://www.oakstreetevent.com${req.originalUrl}`);
+  const customDomain = process.env.CUSTOM_DOMAIN;
+  if (customDomain && host === customDomain) {
+    return res.redirect(301, `https://www.${customDomain}${req.originalUrl}`);
   }
   next();
 });

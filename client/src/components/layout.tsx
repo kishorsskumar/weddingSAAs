@@ -43,7 +43,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow, format } from "date-fns";
-import logo from "@assets/oakstreet_white_1764858814551.png";
 
 const ALL_PAGES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -88,9 +87,9 @@ const ALL_PAGES = [
   ] },
   { id: "tools", label: "Tools", path: "/whatsapp-inbox", subPages: [
     { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
-    { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp" },
-    { id: "oaksy", label: "Oaksy AI", path: "/oaksy" },
-    { id: "oak-creative", label: "Oak Creative", path: "/oak-creative" },
+    { id: "oak-rsvp", label: "RSVP Manager", path: "/oak-rsvp" },
+    { id: "oaksy", label: "AI Assistant", path: "/oaksy" },
+    { id: "oak-creative", label: "Creative Studio", path: "/oak-creative" },
   ] },
   { id: "management-mis", label: "Management MIS", path: "/management-mis", superadminOnly: true, subPages: [
     { id: "mis-overview", label: "Overview Dashboard", path: "/management-mis" },
@@ -488,10 +487,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">O</span>
+            <span className="text-primary-foreground font-bold text-lg">W</span>
           </div>
           <div>
-            <h1 className="font-semibold text-base text-sidebar-foreground">Oakstreet Events</h1>
+            <h1 className="font-semibold text-base text-sidebar-foreground">Wedding SaaS</h1>
             <p className="text-xs text-sidebar-foreground/60">Event Management</p>
           </div>
         </div>

@@ -1,16 +1,16 @@
-# Oak Event Management System
+# Wedding SaaS Platform
 
 ## Overview
 
-Oak Event Management is a comprehensive full-stack web application for event planning and business management. It provides event calendar management, team scheduling, financial tracking, HR management, and administrative controls. The system aims to be an all-in-one platform for event-based businesses, featuring role-based access control and integration with AI and communication tools. Its business vision is to streamline operations for event-based companies, enhance efficiency, and provide a competitive edge in the market through advanced technological solutions.
+Wedding SaaS Platform is a comprehensive full-stack web application for event planning and business management. It provides event calendar management, team scheduling, financial tracking, HR management, and administrative controls. The system is designed to be a white-label platform that can be customized for any wedding or event management business through environment variables.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-**Company Branding:**
-- Company name is "Oakstreet Events" (one word, not "Oak Street Events")
-- All documents, reports, and UI elements should use "Oakstreet Events"
+**SaaS Configuration:**
+- All company branding is configured via environment variables (see Configuration section below)
+- The platform supports customizable document prefixes, company details, and branding
 
 **Important Development Rules:**
 - When creating new pages, ALWAYS add them to:
@@ -38,6 +38,43 @@ Preferred communication style: Simple, everyday language.
 - Dialogs should be full-height sheets on mobile
 - Always test on mobile viewport (375px width) before completing UI work
 
+## Configuration (Environment Variables)
+
+### Company Branding
+- `COMPANY_NAME` - Your company name (default: "Wedding SaaS Platform")
+- `COMPANY_SHORT_NAME` - Short name for mobile/icons (default: "WeddingSaaS")
+- `COMPANY_EMAIL` - Contact email
+- `COMPANY_PHONE` - Contact phone
+- `COMPANY_WEBSITE` - Company website URL
+- `COMPANY_ADDRESS` - Full business address
+
+### Default Admin Account
+- `DEFAULT_ADMIN_EMAIL` - Initial admin email (default: "admin@example.com")
+- `DEFAULT_ADMIN_PASSWORD` - Initial admin password (default: "ChangeMe123!")
+- `DEFAULT_ADMIN_NAME` - Initial admin name (default: "Super Admin")
+
+### Document Prefixes
+- `DOC_PREFIX_EVENT` - Event code prefix (default: "EVT")
+- `DOC_PREFIX_CUSTOMER` - Customer code prefix (default: "CUST")
+- `DOC_PREFIX_ESTIMATE` - Estimate prefix (default: "EST")
+- `DOC_PREFIX_INVOICE` - Invoice prefix (default: "INV")
+
+### Theme
+- `THEME_PRIMARY_COLOR` - Primary color in HSL format (default: "135 35% 30%")
+- `THEME_PRIMARY_HEX` - Primary color in hex (default: "#5B8C51")
+
+### Features (Optional)
+- `FEATURE_WHATSAPP` - Enable WhatsApp integration (true/false)
+- `FEATURE_AI_ASSISTANT` - Enable AI assistant (true/false)
+- `FEATURE_GOOGLE_CALENDAR` - Enable Google Calendar sync (true/false)
+- `FEATURE_RSVP` - Enable RSVP system (true/false)
+
+### Regional Settings
+- `CURRENCY` - Currency code (default: "INR")
+- `CURRENCY_SYMBOL` - Currency symbol (default: "₹")
+- `DEFAULT_COUNTRY` - Default country (default: "India")
+- `TIMEZONE` - Timezone (default: "Asia/Kolkata")
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -45,7 +82,7 @@ Preferred communication style: Simple, everyday language.
 - **Routing:** React Router (wouter).
 - **Data Fetching:** TanStack Query.
 - **UI:** Radix UI primitives, shadcn/ui with Tailwind CSS (New York style), Zoho-inspired clean professional theme.
-  - **Design System:** Clean white backgrounds, subtle gray borders, Oak Green primary color (HSL 135 35% 30%), Inter font.
+  - **Design System:** Clean white backgrounds, subtle gray borders, configurable primary color, Inter font.
 - **State Management:** React Context API for auth, TanStack Query for server state, React hooks for local state.
 
 ### Backend Architecture
@@ -56,25 +93,26 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Storage
 - **Database:** PostgreSQL with Drizzle ORM.
-- **Schema:** Users (roles, permissions), Events (financial tracking), Meetings, Employees, Daybook, Banks, Leave Requests, Sessions, Oaksy conversations/messages, WhatsApp conversations/approvals/inbound messages, QR payment requests, Monthly Production Plan, Event Guests, RSVP Responses.
+- **Schema:** Users (roles, permissions), Events (financial tracking), Meetings, Employees, Daybook, Banks, Leave Requests, Sessions, AI conversations/messages, WhatsApp conversations/approvals/inbound messages, QR payment requests, Monthly Production Plan, Event Guests, RSVP Responses.
 - **Validation:** Drizzle-zod integration for schema validation.
 
 ### Key Features
-- **Oaksy AI Assistant:** Intelligent, flexible companion using OpenAI GPT-4o, role-aware responses, natural language understanding, flexible amount parsing, security by not sharing sensitive data with non-superadmins.
+- **AI Assistant:** Intelligent, flexible companion using OpenAI GPT-4o, role-aware responses, natural language understanding, flexible amount parsing, security by not sharing sensitive data with non-superadmins.
 - **Two-Way WhatsApp Communication:** For employee requests (expenses/leave), Superadmin approval, lead submission with AI extraction, and outreach.
 - **QR Payment Request System:** Employee QR submission, Superadmin approval/payment, event assignment, automatic daybook recording.
 - **Income Submission System:** Employee submits payment screenshots, Superadmin approval with event assignment, automatic daybook recording.
 - **Monthly Production Plan:** Macro-level scheduling with inline editing, auto-sync from events, PDF export.
-- **Leave Tracker (Oak HR):** Comprehensive leave monitoring, statistics, manual entry, status management.
-- **Oak RSVP:** Guest management, RSVP tracking, logistics tracking, dashboard analytics, follow-up management, bulk import, WhatsApp integration, and outreach system with message templates and history.
+- **Leave Tracker:** Comprehensive leave monitoring, statistics, manual entry, status management.
+- **RSVP System:** Guest management, RSVP tracking, logistics tracking, dashboard analytics, follow-up management, bulk import, WhatsApp integration, and outreach system with message templates and history.
 - **Calendar Integration:** Google Calendar (active, two-way sync).
 - **Automation:** Estimate-to-Production automation including timeline creation, push to production, and inventory finalization, with logging and WhatsApp notifications.
 - **Event Staff Assignment Automation:** WhatsApp notifications sent to staff when assigned to events, with supervisor summary messages and duplicate prevention via `notificationSent` flag.
 
 ### Critical Files & Components
 - **`client/src/components/layout.tsx`**: Main layout, sidebar navigation, mobile bottom nav.
-- **Oak Book Financial Module**: `client/src/components/oak-book/zoho-quotes.tsx` (Estimates/Quotes), `client/src/components/oak-book/zoho-invoices.tsx` (Invoices), `client/src/pages/print-document.tsx` (PDF generation).
+- **Financial Module**: `client/src/components/oak-book/zoho-quotes.tsx` (Estimates/Quotes), `client/src/components/oak-book/zoho-invoices.tsx` (Invoices), `client/src/pages/print-document.tsx` (PDF generation).
 - **`client/src/index.css`**: Global styles with mobile-first utilities.
+- **`shared/config.ts`**: SaaS configuration with environment variables.
 
 ## External Dependencies
 
