@@ -319,8 +319,27 @@ export function ZohoDeliveryChallans() {
           onClose={() => setSelectedChallanId(null)}
           onDelete={() => deleteChallan.mutate(selectedChallan.id)}
           onUpdateStatus={(status) => updateStatus.mutate({ id: selectedChallan.id, status })}
+          onEdit={() => {
+            setEditingChallan(selectedChallan);
+            setIsCreateModalOpen(true);
+          }}
+          onNew={() => {
+            setEditingChallan(null);
+            setIsCreateModalOpen(true);
+          }}
         />
       )}
+
+      <ChallanFormModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        editingChallan={editingChallan}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/delivery-challans"] });
+          setIsCreateModalOpen(false);
+          setEditingChallan(null);
+        }}
+      />
     </div>
   );
 }
@@ -330,11 +349,15 @@ function ChallanDetailPanel({
   onClose,
   onDelete,
   onUpdateStatus,
+  onEdit,
+  onNew,
 }: {
   challan: DeliveryChallan;
   onClose: () => void;
   onDelete: () => void;
   onUpdateStatus: (status: string) => void;
+  onEdit: () => void;
+  onNew: () => void;
 }) {
   const statusInfo = CHALLAN_STATUSES.find((s) => s.value === challan.status) || CHALLAN_STATUSES[0];
 
@@ -370,7 +393,15 @@ function ChallanDetailPanel({
         </DropdownMenu>
       </div>
 
-      <div className="flex items-center gap-2 p-3 border-b bg-white">
+      <div className="flex items-center gap-2 p-3 border-b bg-white flex-wrap">
+        <Button onClick={onNew} size="sm" className="bg-primary hover:bg-primary/90">
+          <Plus className="h-4 w-4 mr-1" />
+          New
+        </Button>
+        <Button onClick={onEdit} variant="outline" size="sm">
+          <Edit className="h-4 w-4 mr-1" />
+          Edit
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">
@@ -390,9 +421,9 @@ function ChallanDetailPanel({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => window.open(`/print/delivery-challan/${challan.id}`, '_blank')}>
           <Download className="h-4 w-4 mr-1" />
-          Download PDF
+          PDF
         </Button>
       </div>
 
@@ -512,5 +543,325 @@ function ChallanDetailPanel({
         </div>
       </ScrollArea>
     </div>
+  );
+}
+
+function ChallanFormModal({
+  open,
+  onOpenChange,
+  editingChallan,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingChallan: DeliveryChallan | null;
+  onSuccess: () => void;
+}) {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    challanNumber: "",
+    challanDate: format(new Date(), "yyyy-MM-dd"),
+    challanType: "Supply",
+    vehicleNumber: "",
+    deliverTo: "",
+    deliveryAddress: "",
+    placeOfSupply: "Kerala",
+    items: [{ description: "", quantity: "1", unit: "Nos", rate: "0", amount: "0" }],
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (open) {
+      if (editingChallan) {
+        setFormData({
+          challanNumber: editingChallan.challanNumber,
+          challanDate: editingChallan.challanDate,
+          challanType: editingChallan.challanType,
+          vehicleNumber: editingChallan.vehicleNumber || "",
+          deliverTo: editingChallan.deliverTo || "",
+          deliveryAddress: editingChallan.deliveryAddress || "",
+          placeOfSupply: editingChallan.placeOfSupply || "Kerala",
+          items: editingChallan.items?.length > 0 ? editingChallan.items : [{ description: "", quantity: "1", unit: "Nos", rate: "0", amount: "0" }],
+          notes: editingChallan.notes || "",
+        });
+      } else {
+        apiRequest("GET", "/api/delivery-challans/next-number").then((res: any) => {
+          setFormData(prev => ({
+            ...prev,
+            challanNumber: res.number || `DC-${Date.now()}`,
+            challanDate: format(new Date(), "yyyy-MM-dd"),
+            challanType: "Supply",
+            vehicleNumber: "",
+            deliverTo: "",
+            deliveryAddress: "",
+            placeOfSupply: "Kerala",
+            items: [{ description: "", quantity: "1", unit: "Nos", rate: "0", amount: "0" }],
+            notes: "",
+          }));
+        }).catch(() => {
+          setFormData(prev => ({
+            ...prev,
+            challanNumber: `DC-${Date.now()}`,
+          }));
+        });
+      }
+    }
+  }, [open, editingChallan]);
+
+  const updateItem = (index: number, field: string, value: string) => {
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    if (field === "quantity" || field === "rate") {
+      const qty = parseFloat(newItems[index].quantity) || 0;
+      const rate = parseFloat(newItems[index].rate) || 0;
+      newItems[index].amount = (qty * rate).toFixed(2);
+    }
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const addItem = () => {
+    setFormData({
+      ...formData,
+      items: [...formData.items, { description: "", quantity: "1", unit: "Nos", rate: "0", amount: "0" }],
+    });
+  };
+
+  const removeItem = (index: number) => {
+    if (formData.items.length > 1) {
+      setFormData({
+        ...formData,
+        items: formData.items.filter((_, i) => i !== index),
+      });
+    }
+  };
+
+  const calculateTotals = () => {
+    const subTotal = formData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const cgstRate = 9;
+    const sgstRate = 9;
+    const cgstAmount = subTotal * (cgstRate / 100);
+    const sgstAmount = subTotal * (sgstRate / 100);
+    const totalAmount = subTotal + cgstAmount + sgstAmount;
+    return { subTotal, cgstRate, cgstAmount, sgstRate, sgstAmount, totalAmount };
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.challanNumber || !formData.challanDate) {
+      toast({ title: "Error", description: "Please fill in required fields", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const totals = calculateTotals();
+      const payload = {
+        challanNumber: formData.challanNumber,
+        challanDate: formData.challanDate,
+        challanType: formData.challanType,
+        vehicleNumber: formData.vehicleNumber || null,
+        deliverTo: formData.deliverTo || null,
+        deliveryAddress: formData.deliveryAddress || null,
+        placeOfSupply: formData.placeOfSupply || null,
+        items: formData.items,
+        subTotal: totals.subTotal.toFixed(2),
+        cgstRate: totals.cgstRate.toString(),
+        cgstAmount: totals.cgstAmount.toFixed(2),
+        sgstRate: totals.sgstRate.toString(),
+        sgstAmount: totals.sgstAmount.toFixed(2),
+        rounding: "0.00",
+        totalAmount: totals.totalAmount.toFixed(2),
+        notes: formData.notes || null,
+        status: "draft",
+      };
+
+      if (editingChallan) {
+        await apiRequest("PATCH", `/api/delivery-challans/${editingChallan.id}`, payload);
+        toast({ title: "Success", description: "Delivery challan updated successfully" });
+      } else {
+        await apiRequest("POST", "/api/delivery-challans", payload);
+        toast({ title: "Success", description: "Delivery challan created successfully" });
+      }
+      onSuccess();
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to save challan", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const totals = calculateTotals();
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{editingChallan ? "Edit Delivery Challan" : "New Delivery Challan"}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label>Challan Number *</Label>
+              <Input
+                value={formData.challanNumber}
+                onChange={(e) => setFormData({ ...formData, challanNumber: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Challan Date *</Label>
+              <Input
+                type="date"
+                value={formData.challanDate}
+                onChange={(e) => setFormData({ ...formData, challanDate: e.target.value })}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Challan Type</Label>
+              <Select value={formData.challanType} onValueChange={(value) => setFormData({ ...formData, challanType: value })}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CHALLAN_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Deliver To</Label>
+              <Input
+                value={formData.deliverTo}
+                onChange={(e) => setFormData({ ...formData, deliverTo: e.target.value })}
+                placeholder="Recipient name"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Vehicle Number</Label>
+              <Input
+                value={formData.vehicleNumber}
+                onChange={(e) => setFormData({ ...formData, vehicleNumber: e.target.value })}
+                placeholder="e.g., KL 07 AB 1234"
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Delivery Address</Label>
+            <Textarea
+              value={formData.deliveryAddress}
+              onChange={(e) => setFormData({ ...formData, deliveryAddress: e.target.value })}
+              placeholder="Full delivery address"
+              className="mt-1"
+              rows={2}
+            />
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label>Items</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addItem}>
+                <Plus className="h-4 w-4 mr-1" /> Add Item
+              </Button>
+            </div>
+            <div className="border rounded-lg divide-y">
+              {formData.items.map((item, index) => (
+                <div key={index} className="p-3 grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-12 sm:col-span-4">
+                    <Input
+                      placeholder="Description"
+                      value={item.description}
+                      onChange={(e) => updateItem(index, "description", e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3 sm:col-span-2">
+                    <Input
+                      type="number"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3 sm:col-span-2">
+                    <Input
+                      placeholder="Unit"
+                      value={item.unit}
+                      onChange={(e) => updateItem(index, "unit", e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-3 sm:col-span-2">
+                    <Input
+                      type="number"
+                      placeholder="Rate"
+                      value={item.rate}
+                      onChange={(e) => updateItem(index, "rate", e.target.value)}
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1 text-right text-sm font-medium">
+                    ₹{parseFloat(item.amount || "0").toLocaleString("en-IN")}
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      disabled={formData.items.length === 1}
+                    >
+                      <X className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Subtotal</span>
+              <span>₹{totals.subTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>CGST (9%)</span>
+              <span>₹{totals.cgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>SGST (9%)</span>
+              <span>₹{totals.sgstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between font-bold pt-2 border-t">
+              <span>Total</span>
+              <span>₹{totals.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <Textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional notes"
+              className="mt-1"
+              rows={2}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary/90">
+            {isSubmitting ? "Saving..." : editingChallan ? "Update" : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
