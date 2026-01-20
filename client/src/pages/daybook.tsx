@@ -48,6 +48,7 @@ export default function Daybook() {
   const [customStartDate, setCustomStartDate] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2115,47 +2116,90 @@ export default function Daybook() {
                     Income Categories
                   </h3>
                   <div className="space-y-2">
-                    {incomeCategories.map((cat) => (
-                      <div key={cat.id} className="flex items-center justify-between p-3 rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900">
-                        {editingCategory?.id === cat.id ? (
-                          <EditCategoryInline 
-                            category={cat} 
-                            onClose={() => setEditingCategory(null)} 
-                          />
-                        ) : (
-                          <>
-                            <span className="text-sm">{cat.name}</span>
-                            {isAdmin && !cat.isSystem && (
-                              <div className="flex gap-1">
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-7 w-7"
-                                  onClick={() => setEditingCategory(cat)}
-                                  data-testid={`button-edit-category-${cat.id}`}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
-                                  }}
-                                  data-testid={`button-delete-category-${cat.id}`}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
+                    {incomeCategories.map((cat) => {
+                      const categoryTransactions = periodEntries.filter(e => e.type === 'income' && e.category === cat.name);
+                      const categoryTotal = categoryTransactions.reduce((sum, e) => sum + Number(e.amount), 0);
+                      const isExpanded = expandedCategory === `income-${cat.id}`;
+                      
+                      return (
+                        <div key={cat.id} className="rounded-md border border-green-200 dark:border-green-900 overflow-hidden">
+                          <div 
+                            className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 cursor-pointer hover:bg-green-100 dark:hover:bg-green-950/50 transition-colors"
+                            onClick={() => setExpandedCategory(isExpanded ? null : `income-${cat.id}`)}
+                          >
+                            {editingCategory?.id === cat.id ? (
+                              <EditCategoryInline 
+                                category={cat} 
+                                onClose={() => setEditingCategory(null)} 
+                              />
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+                                  <span className="text-sm font-medium">{cat.name}</span>
+                                  {categoryTransactions.length > 0 && (
+                                    <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
+                                      {categoryTransactions.length}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {categoryTotal > 0 && (
+                                    <span className="text-sm font-mono text-green-700">₹{categoryTotal.toLocaleString()}</span>
+                                  )}
+                                  {isAdmin && !cat.isSystem && (
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7"
+                                        onClick={() => setEditingCategory(cat)}
+                                        data-testid={`button-edit-category-${cat.id}`}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
+                                        }}
+                                        data-testid={`button-delete-category-${cat.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {cat.isSystem && (
+                                    <span className="text-xs text-muted-foreground">System</span>
+                                  )}
+                                </div>
+                              </>
                             )}
-                            {cat.isSystem && (
-                              <span className="text-xs text-muted-foreground">System</span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                          </div>
+                          {isExpanded && (
+                            <div className="border-t border-green-200 dark:border-green-900 bg-white dark:bg-gray-950">
+                              {categoryTransactions.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">No transactions in this period</p>
+                              ) : (
+                                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                  {categoryTransactions.map((entry) => (
+                                    <div key={entry.id} className="px-4 py-2 flex items-center justify-between text-sm hover:bg-gray-50 dark:hover:bg-gray-900">
+                                      <div className="flex-1">
+                                        <p className="font-medium truncate">{entry.description || 'No description'}</p>
+                                        <p className="text-xs text-muted-foreground">{format(parseISO(entry.date), 'dd MMM yyyy')}</p>
+                                      </div>
+                                      <span className="font-mono text-green-600">₹{Number(entry.amount).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {incomeCategories.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">No income categories</p>
                     )}
@@ -2168,47 +2212,90 @@ export default function Daybook() {
                     Expense Categories
                   </h3>
                   <div className="space-y-2">
-                    {expenseCategories.map((cat) => (
-                      <div key={cat.id} className="flex items-center justify-between p-3 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
-                        {editingCategory?.id === cat.id ? (
-                          <EditCategoryInline 
-                            category={cat} 
-                            onClose={() => setEditingCategory(null)} 
-                          />
-                        ) : (
-                          <>
-                            <span className="text-sm">{cat.name}</span>
-                            {isAdmin && !cat.isSystem && (
-                              <div className="flex gap-1">
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-7 w-7"
-                                  onClick={() => setEditingCategory(cat)}
-                                  data-testid={`button-edit-category-${cat.id}`}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-7 w-7 text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
-                                  }}
-                                  data-testid={`button-delete-category-${cat.id}`}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
+                    {expenseCategories.map((cat) => {
+                      const categoryTransactions = periodEntries.filter(e => e.type === 'expense' && e.category === cat.name);
+                      const categoryTotal = categoryTransactions.reduce((sum, e) => sum + Number(e.amount), 0);
+                      const isExpanded = expandedCategory === `expense-${cat.id}`;
+                      
+                      return (
+                        <div key={cat.id} className="rounded-md border border-red-200 dark:border-red-900 overflow-hidden">
+                          <div 
+                            className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-950/30 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+                            onClick={() => setExpandedCategory(isExpanded ? null : `expense-${cat.id}`)}
+                          >
+                            {editingCategory?.id === cat.id ? (
+                              <EditCategoryInline 
+                                category={cat} 
+                                onClose={() => setEditingCategory(null)} 
+                              />
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+                                  <span className="text-sm font-medium">{cat.name}</span>
+                                  {categoryTransactions.length > 0 && (
+                                    <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full">
+                                      {categoryTransactions.length}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {categoryTotal > 0 && (
+                                    <span className="text-sm font-mono text-red-700">₹{categoryTotal.toLocaleString()}</span>
+                                  )}
+                                  {isAdmin && !cat.isSystem && (
+                                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7"
+                                        onClick={() => setEditingCategory(cat)}
+                                        data-testid={`button-edit-category-${cat.id}`}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                      <Button 
+                                        size="icon" 
+                                        variant="ghost" 
+                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                        onClick={() => {
+                                          if (confirm(`Delete category "${cat.name}"?`)) deleteCategoryMutation.mutate(cat.id);
+                                        }}
+                                        data-testid={`button-delete-category-${cat.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {cat.isSystem && (
+                                    <span className="text-xs text-muted-foreground">System</span>
+                                  )}
+                                </div>
+                              </>
                             )}
-                            {cat.isSystem && (
-                              <span className="text-xs text-muted-foreground">System</span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ))}
+                          </div>
+                          {isExpanded && (
+                            <div className="border-t border-red-200 dark:border-red-900 bg-white dark:bg-gray-950">
+                              {categoryTransactions.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">No transactions in this period</p>
+                              ) : (
+                                <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                                  {categoryTransactions.map((entry) => (
+                                    <div key={entry.id} className="px-4 py-2 flex items-center justify-between text-sm hover:bg-gray-50 dark:hover:bg-gray-900">
+                                      <div className="flex-1">
+                                        <p className="font-medium truncate">{entry.description || 'No description'}</p>
+                                        <p className="text-xs text-muted-foreground">{format(parseISO(entry.date), 'dd MMM yyyy')}</p>
+                                      </div>
+                                      <span className="font-mono text-red-600">₹{Number(entry.amount).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                     {expenseCategories.length === 0 && (
                       <p className="text-sm text-muted-foreground text-center py-4">No expense categories</p>
                     )}
