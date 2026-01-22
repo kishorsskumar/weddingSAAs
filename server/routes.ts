@@ -7,6 +7,7 @@ import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
+import { createGitHubRepo, listUserRepos } from "./github-export";
 import { 
   insertUserSchema,
   insertRoleSchema,
@@ -10945,6 +10946,31 @@ Respond with a JSON array only, no markdown formatting.`;
       });
     } catch (error: any) {
       console.error('[Monthly Plan] Send WhatsApp error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GitHub Export API
+  app.post("/api/github/create-repo", verifyJWT, async (req, res) => {
+    try {
+      const { repoName, isPrivate = true } = req.body;
+      if (!repoName) {
+        return res.status(400).json({ error: 'Repository name is required' });
+      }
+      const result = await createGitHubRepo(repoName, isPrivate);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[GitHub] Create repo error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/github/repos", verifyJWT, async (req, res) => {
+    try {
+      const repos = await listUserRepos();
+      res.json({ repos });
+    } catch (error: any) {
+      console.error('[GitHub] List repos error:', error);
       res.status(500).json({ error: error.message });
     }
   });
