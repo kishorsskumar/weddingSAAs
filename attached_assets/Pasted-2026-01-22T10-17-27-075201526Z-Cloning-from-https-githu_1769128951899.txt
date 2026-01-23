@@ -1,0 +1,116 @@
+2026-01-22T10:17:27.075201526Z ==> Cloning from https://github.com/kishorsskumar/weddingSAAs
+2026-01-22T10:17:31.714049344Z ==> Checking out commit 3b7748cc67a6684d99faa4f89947b43af69dc215 in branch main
+2026-01-22T10:17:37.057034001Z ==> Installing Python version 3.13.4...
+2026-01-22T10:17:56.408977943Z ==> Using Python version 3.13.4 (default)
+2026-01-22T10:17:56.457356865Z ==> Docs on specifying a Python version: https://render.com/docs/python-version
+2026-01-22T10:18:02.432486839Z ==> Using Poetry version 2.1.3 (default)
+2026-01-22T10:18:02.523741109Z ==> Docs on specifying a Poetry version: https://render.com/docs/poetry-version
+2026-01-22T10:18:02.656758051Z ==> Using uv version 0.7.12 (default)
+2026-01-22T10:18:02.656767941Z ==> Docs on specifying a uv version: https://render.com/docs/uv-version
+2026-01-22T10:18:02.657110816Z ==> Installing uv version 0.7.12...
+2026-01-22T10:18:03.474929515Z ==> Running build command 'npm install --include=dev && npm run build'...
+2026-01-22T10:18:03.705352729Z ==> Using Node.js version 22.22.0 (default)
+2026-01-22T10:18:03.75695066Z ==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+2026-01-22T10:18:50.169694481Z 
+2026-01-22T10:18:50.169727152Z added 723 packages, and audited 724 packages in 43s
+2026-01-22T10:18:50.169857023Z 
+2026-01-22T10:18:50.169897764Z 67 packages are looking for funding
+2026-01-22T10:18:50.169905834Z   run `npm fund` for details
+2026-01-22T10:18:50.222845125Z 
+2026-01-22T10:18:50.222892115Z 14 vulnerabilities (2 low, 5 moderate, 5 high, 2 critical)
+2026-01-22T10:18:50.222910946Z 
+2026-01-22T10:18:50.222918596Z To address issues that do not require attention, run:
+2026-01-22T10:18:50.222925486Z   npm audit fix
+2026-01-22T10:18:50.222932296Z 
+2026-01-22T10:18:50.222939066Z To address all issues possible (including breaking changes), run:
+2026-01-22T10:18:50.222946276Z   npm audit fix --force
+2026-01-22T10:18:50.222980667Z 
+2026-01-22T10:18:50.222986757Z Some issues need review, and may require choosing
+2026-01-22T10:18:50.222991317Z a different dependency.
+2026-01-22T10:18:50.222995017Z 
+2026-01-22T10:18:50.222999467Z Run `npm audit` for details.
+2026-01-22T10:18:50.642181016Z 
+2026-01-22T10:18:50.642214227Z > rest-express@1.0.0 build
+2026-01-22T10:18:50.642218757Z > node script/build.mjs
+2026-01-22T10:18:50.642221817Z 
+2026-01-22T10:18:50.91022038Z building client...
+2026-01-22T10:18:51.246104679Z vite v7.1.12 building for production...
+2026-01-22T10:18:51.371124369Z transforming...
+2026-01-22T10:19:10.026941846Z ✓ 3914 modules transformed.
+2026-01-22T10:19:11.210661916Z rendering chunks...
+2026-01-22T10:19:12.997379705Z [plugin vite:reporter] 
+2026-01-22T10:19:12.997480027Z (!) /opt/render/project/src/node_modules/html2canvas/dist/html2canvas.esm.js is dynamically imported by /opt/render/project/src/client/src/pages/execution-plan.tsx, /opt/render/project/src/node_modules/jspdf/dist/jspdf.es.min.js but also statically imported by /opt/render/project/src/client/src/pages/customer-portal.tsx, /opt/render/project/src/client/src/pages/oak-book.tsx, dynamic import will not move module into another chunk.
+2026-01-22T10:19:12.997494147Z 
+2026-01-22T10:19:12.997920043Z [plugin vite:reporter] 
+2026-01-22T10:19:12.997944434Z (!) /opt/render/project/src/node_modules/jspdf/dist/jspdf.es.min.js is dynamically imported by /opt/render/project/src/client/src/pages/employee-portal.tsx, /opt/render/project/src/client/src/pages/execution-plan.tsx, /opt/render/project/src/client/src/pages/hr.tsx, /opt/render/project/src/client/src/pages/oak-inventory.tsx, /opt/render/project/src/client/src/pages/oak-inventory.tsx, /opt/render/project/src/client/src/pages/oak-inventory.tsx, /opt/render/project/src/client/src/pages/oak-inventory.tsx but also statically imported by /opt/render/project/src/client/src/components/UserGuides.tsx, /opt/render/project/src/client/src/pages/customer-portal.tsx, /opt/render/project/src/client/src/pages/monthly-plan.tsx, /opt/render/project/src/client/src/pages/oak-book.tsx, dynamic import will not move module into another chunk.
+2026-01-22T10:19:12.997953204Z 
+2026-01-22T10:19:13.047705916Z [meta-images] no Replit deployment domain found, skipping meta tag updates
+2026-01-22T10:19:13.121018905Z computing gzip size...
+2026-01-22T10:19:13.223913741Z ../dist/public/index.html                                             2.79 kB │ gzip:   1.09 kB
+2026-01-22T10:19:13.223951301Z ../dist/public/assets/Yepman_1767319118647-CyqzJaXv.png              13.67 kB
+2026-01-22T10:19:13.224068903Z ../dist/public/assets/oakstreet_white_1764858814551-BJOca2o6.png     15.92 kB
+2026-01-22T10:19:13.224077013Z ../dist/public/assets/OAK_1_1766646679471-DWlvFKzh.jpg               94.94 kB
+2026-01-22T10:19:13.224103714Z ../dist/public/assets/Oakstreet_1765077046310-F3AdYD6o.png          129.72 kB
+2026-01-22T10:19:13.224223035Z ../dist/public/assets/index-DIIIK9lD.css                            177.49 kB │ gzip:  27.64 kB
+2026-01-22T10:19:13.224236386Z ../dist/public/assets/__vite-browser-external-BIHI7g3E.js             0.03 kB │ gzip:   0.05 kB
+2026-01-22T10:19:13.224293687Z ../dist/public/assets/purify.es-B6FQ9oRL.js                          22.57 kB │ gzip:   8.74 kB
+2026-01-22T10:19:13.224356237Z ../dist/public/assets/index.es-DfQafGtu.js                          159.35 kB │ gzip:  53.40 kB
+2026-01-22T10:19:13.224433029Z ../dist/public/assets/pptxgen.es-Dx1o5pNS.js                        372.67 kB │ gzip: 126.64 kB
+2026-01-22T10:19:13.224447569Z ../dist/public/assets/xlsx-DGuHH-KN.js                              429.49 kB │ gzip: 143.07 kB
+2026-01-22T10:19:13.22452689Z ../dist/public/assets/index-UKmHNCjM.js                           2,683.29 kB │ gzip: 661.40 kB
+2026-01-22T10:19:13.224597341Z 
+2026-01-22T10:19:13.224603011Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-01-22T10:19:13.224606861Z - Using dynamic import() to code-split the application
+2026-01-22T10:19:13.224610431Z - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+2026-01-22T10:19:13.224613631Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+2026-01-22T10:19:13.225053758Z ✓ built in 21.92s
+2026-01-22T10:19:13.225307702Z building server...
+2026-01-22T10:19:14.272502877Z 
+2026-01-22T10:19:14.272531438Z   dist/index.cjs  3.0mb ⚠️
+2026-01-22T10:19:14.272535438Z 
+2026-01-22T10:19:14.272539278Z ⚡ Done in 1045ms
+2026-01-22T10:19:16.582190674Z ==> Uploading build...
+2026-01-22T10:19:46.652235021Z ==> Uploaded in 16.0s. Compression took 14.1s
+2026-01-22T10:19:46.906089159Z ==> Build successful 🎉
+2026-01-22T10:19:51.330145272Z ==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
+2026-01-22T10:19:51.496728626Z ==> Deploying...
+2026-01-22T10:20:31.213942977Z ==> Running 'node dist/index.js'
+2026-01-22T10:20:31.245234364Z node:internal/modules/cjs/loader:1386
+2026-01-22T10:20:31.245260394Z   throw err;
+2026-01-22T10:20:31.245263664Z   ^
+2026-01-22T10:20:31.245265984Z 
+2026-01-22T10:20:31.245269404Z Error: Cannot find module '/opt/render/project/src/dist/index.js'
+2026-01-22T10:20:31.245272155Z     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+2026-01-22T10:20:31.245274415Z     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+2026-01-22T10:20:31.245277315Z     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+2026-01-22T10:20:31.245280455Z     at Function._load (node:internal/modules/cjs/loader:1192:37)
+2026-01-22T10:20:31.245283305Z     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+2026-01-22T10:20:31.245285965Z     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+2026-01-22T10:20:31.245289725Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+2026-01-22T10:20:31.245296825Z     at node:internal/main/run_main_module:36:49 {
+2026-01-22T10:20:31.245299155Z   code: 'MODULE_NOT_FOUND',
+2026-01-22T10:20:31.245301825Z   requireStack: []
+2026-01-22T10:20:31.245303565Z }
+2026-01-22T10:20:31.245305135Z 
+2026-01-22T10:20:31.245306865Z Node.js v22.22.0
+2026-01-22T10:20:47.94604114Z ==> Exited with status 1
+2026-01-22T10:20:48.112458123Z ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+2026-01-22T10:20:49.319503185Z ==> Running 'node dist/index.js'
+2026-01-22T10:20:49.397375924Z node:internal/modules/cjs/loader:1386
+2026-01-22T10:20:49.397400595Z   throw err;
+2026-01-22T10:20:49.397404995Z   ^
+2026-01-22T10:20:49.397408465Z 
+2026-01-22T10:20:49.397412525Z Error: Cannot find module '/opt/render/project/src/dist/index.js'
+2026-01-22T10:20:49.397416395Z     at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+2026-01-22T10:20:49.397420085Z     at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+2026-01-22T10:20:49.397423976Z     at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+2026-01-22T10:20:49.397427925Z     at Function._load (node:internal/modules/cjs/loader:1192:37)
+2026-01-22T10:20:49.397431116Z     at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+2026-01-22T10:20:49.397434676Z     at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+2026-01-22T10:20:49.397439586Z     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+2026-01-22T10:20:49.397443496Z     at node:internal/main/run_main_module:36:49 {
+2026-01-22T10:20:49.397446206Z   code: 'MODULE_NOT_FOUND',
+2026-01-22T10:20:49.397448986Z   requireStack: []
+2026-01-22T10:20:49.397451186Z }
+2026-01-22T10:20:49.397453166Z 
+2026-01-22T10:20:49.397455166Z Node.js v22.22.0
