@@ -16,17 +16,18 @@ const plans = [
     monthlyPrice: 499,
     yearlyPrice: 4999,
     icon: Package,
-    recommended: true,
+    recommended: false,
+    badge: null,
     features: [
       "Up to 100 Wedding Projects",
       "Up to 1,000 Monthly Enquiries",
       "5 Team Members",
-      "Unlimited Client Records",
-      "Business Dashboard",
-      "Automated Email Notifications",
-      "Task & Team Alerts"
+      "Client Notes & Requirement Tracker",
+      "Wedding Timeline Planner",
+      "Task & Team Alerts",
+      "Business Dashboard"
     ],
-    cta: "Get Started"
+    cta: "Activate Starter Suite"
   },
   {
     code: "growth",
@@ -35,16 +36,18 @@ const plans = [
     monthlyPrice: 999,
     yearlyPrice: 9999,
     icon: Rocket,
-    recommended: false,
+    recommended: true,
+    badge: "Best Value",
     features: [
       "Up to 500 Wedding Projects",
       "Up to 5,000 Monthly Enquiries",
       "15 Team Members",
-      "WhatsApp Automation",
-      "Advanced Reports",
+      "Smart Lead Assignment System",
+      "Advanced Business Reports",
+      "Custom Branding (Logo on documents)",
       "Priority Support"
     ],
-    cta: "Choose Growth"
+    cta: "Upgrade to Growth"
   },
   {
     code: "agency",
@@ -54,15 +57,17 @@ const plans = [
     yearlyPrice: 19999,
     icon: Building2,
     recommended: false,
+    badge: null,
     features: [
       "Unlimited Weddings",
       "Unlimited Leads",
       "Unlimited Team Members",
+      "WhatsApp Automation & Notifications",
       "Unlimited Storage",
       "API Access",
       "Dedicated Support"
     ],
-    cta: "Choose Agency"
+    cta: "Go Agency Pro"
   }
 ];
 
@@ -70,13 +75,16 @@ const comparisonFeatures = [
   { name: "Wedding Projects", starter: "100", growth: "500", agency: "Unlimited" },
   { name: "Monthly Enquiries", starter: "1,000", growth: "5,000", agency: "Unlimited" },
   { name: "Team Members", starter: "5", growth: "15", agency: "Unlimited" },
-  { name: "Client Records", starter: "Unlimited", growth: "Unlimited", agency: "Unlimited" },
+  { name: "Client Notes & Tracker", starter: true, growth: true, agency: true },
+  { name: "Timeline Planner", starter: true, growth: true, agency: true },
+  { name: "Task & Team Alerts", starter: true, growth: true, agency: true },
   { name: "Business Dashboard", starter: true, growth: true, agency: true },
-  { name: "Email Notifications", starter: true, growth: true, agency: true },
-  { name: "Task Alerts", starter: true, growth: true, agency: true },
-  { name: "WhatsApp Automation", starter: false, growth: true, agency: true },
+  { name: "Smart Lead Assignment", starter: false, growth: true, agency: true },
   { name: "Advanced Reports", starter: false, growth: true, agency: true },
+  { name: "Custom Branding", starter: false, growth: true, agency: true },
   { name: "Priority Support", starter: false, growth: true, agency: true },
+  { name: "WhatsApp Automation", starter: false, growth: false, agency: true },
+  { name: "Unlimited Storage", starter: false, growth: false, agency: true },
   { name: "API Access", starter: false, growth: false, agency: true },
   { name: "Dedicated Support", starter: false, growth: false, agency: true },
 ];
@@ -219,12 +227,19 @@ export default function PricingPage() {
                 data-testid={`plan-card-${plan.code}`}
               >
                 {plan.recommended && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
-                    <Crown className="h-4 w-4" />
-                    Recommended
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                    <div className="bg-primary text-white text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
+                      <Crown className="h-4 w-4" />
+                      Recommended
+                    </div>
+                    {plan.badge && (
+                      <div className="bg-amber-500 text-white text-sm font-medium px-3 py-1 rounded-full">
+                        {plan.badge}
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="text-center mb-6">
+                <div className={`text-center ${plan.recommended ? 'mt-4' : ''} mb-6`}>
                   <div className={`w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center ${
                     plan.recommended ? 'bg-primary/10' : 'bg-gray-100'
                   }`}>
