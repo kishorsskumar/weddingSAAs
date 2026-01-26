@@ -118,10 +118,10 @@ export default function PricingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-              Modular Pricing
+              Simple, Flexible Pricing
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Start with the Core Platform, then add only the modules you need. Pay for what you use.
+              Start with everything you need, then grow with add-ons as your business expands. Only pay for what you use.
             </p>
           </div>
 
