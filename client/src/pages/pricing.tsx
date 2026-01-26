@@ -5,16 +5,80 @@ import { PublicLayout } from "@/components/public-layout";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Crown, Package, Users, DollarSign, Zap, Bot, ArrowRight } from "lucide-react";
+import { Check, Crown, Package, Users, DollarSign, Zap, Bot, ArrowRight, Rocket, Building2, ChevronDown, ChevronUp } from "lucide-react";
 import { motion } from "framer-motion";
 
-const coreFeatures = [
-  "One Login — Full Business Control",
-  "Manage Every Wedding in One Place",
-  "Never Lose Client Details Again",
-  "Instant Team Task Notifications",
-  "Automatic Client Email Updates",
-  "Live Business Performance Overview"
+const plans = [
+  {
+    code: "starter",
+    name: "Business Starter Suite",
+    subtitle: "Everything you need to run weddings professionally",
+    monthlyPrice: 499,
+    yearlyPrice: 4999,
+    icon: Package,
+    recommended: true,
+    features: [
+      "Up to 100 Wedding Projects",
+      "Up to 1,000 Monthly Enquiries",
+      "5 Team Members",
+      "Unlimited Client Records",
+      "Business Dashboard",
+      "Automated Email Notifications",
+      "Task & Team Alerts"
+    ],
+    cta: "Activate Business Starter Suite"
+  },
+  {
+    code: "growth",
+    name: "Growth Suite",
+    subtitle: "Built for growing wedding businesses",
+    monthlyPrice: 999,
+    yearlyPrice: 9999,
+    icon: Rocket,
+    recommended: false,
+    features: [
+      "Up to 500 Wedding Projects",
+      "Up to 5,000 Monthly Enquiries",
+      "15 Team Members",
+      "WhatsApp Automation",
+      "Advanced Reports",
+      "Priority Support"
+    ],
+    cta: "Upgrade to Growth Suite"
+  },
+  {
+    code: "agency",
+    name: "Agency Pro",
+    subtitle: "For high-volume event companies",
+    monthlyPrice: 1999,
+    yearlyPrice: 19999,
+    icon: Building2,
+    recommended: false,
+    features: [
+      "Unlimited Weddings",
+      "Unlimited Leads",
+      "Unlimited Team Members",
+      "Unlimited Storage",
+      "API Access",
+      "Dedicated Support"
+    ],
+    cta: "Go Agency Pro"
+  }
+];
+
+const comparisonFeatures = [
+  { name: "Wedding Projects", starter: "100", growth: "500", agency: "Unlimited" },
+  { name: "Monthly Enquiries", starter: "1,000", growth: "5,000", agency: "Unlimited" },
+  { name: "Team Members", starter: "5", growth: "15", agency: "Unlimited" },
+  { name: "Client Records", starter: "Unlimited", growth: "Unlimited", agency: "Unlimited" },
+  { name: "Business Dashboard", starter: true, growth: true, agency: true },
+  { name: "Email Notifications", starter: true, growth: true, agency: true },
+  { name: "Task Alerts", starter: true, growth: true, agency: true },
+  { name: "WhatsApp Automation", starter: false, growth: true, agency: true },
+  { name: "Advanced Reports", starter: false, growth: true, agency: true },
+  { name: "Priority Support", starter: false, growth: true, agency: true },
+  { name: "API Access", starter: false, growth: false, agency: true },
+  { name: "Dedicated Support", starter: false, growth: false, agency: true },
 ];
 
 const modules = [
@@ -105,6 +169,7 @@ const modules = [
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [showComparison, setShowComparison] = useState(false);
 
   useEffect(() => {
     document.title = "Pricing | AtBott Wedding SaaS";
@@ -121,7 +186,7 @@ export default function PricingPage() {
               Simple, Flexible Pricing
             </h1>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Start with everything you need, then grow with add-ons as your business expands. Only pay for what you use.
+              Choose the plan that fits your business. Upgrade anytime as you grow.
             </p>
           </div>
 
@@ -133,6 +198,7 @@ export default function PricingPage() {
               id="billing-toggle"
               checked={billingCycle === 'yearly'}
               onCheckedChange={(checked) => setBillingCycle(checked ? 'yearly' : 'monthly')}
+              data-testid="billing-toggle"
             />
             <Label htmlFor="billing-toggle" className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>
               Yearly
@@ -140,59 +206,135 @@ export default function PricingPage() {
             </Label>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mb-16"
-          >
-            <div className="relative bg-white rounded-2xl p-8 border-2 border-primary shadow-xl max-w-3xl mx-auto">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
-                <Crown className="h-4 w-4" />
-                Recommended to Start
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
-                    <Package className="h-6 w-6 text-primary" />
-                    Business Starter Suite
-                  </h2>
-                  <p className="text-gray-600 mb-4">
-                    Everything you need to run weddings professionally
-                  </p>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {coreFeatures.map((feature) => (
-                      <div key={feature} className="flex items-center gap-2 text-sm text-gray-700">
-                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                        {feature}
-                      </div>
-                    ))}
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {plans.map((plan, index) => (
+              <motion.div
+                key={plan.code}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className={`relative bg-white rounded-2xl p-6 border-2 ${
+                  plan.recommended ? 'border-primary shadow-xl' : 'border-gray-200 shadow-sm'
+                }`}
+                data-testid={`plan-card-${plan.code}`}
+              >
+                {plan.recommended && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
+                    <Crown className="h-4 w-4" />
+                    Recommended
                   </div>
+                )}
+                <div className="text-center mb-6">
+                  <div className={`w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center ${
+                    plan.recommended ? 'bg-primary/10' : 'bg-gray-100'
+                  }`}>
+                    <plan.icon className={`h-6 w-6 ${plan.recommended ? 'text-primary' : 'text-gray-600'}`} />
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-1">{plan.name}</h2>
+                  <p className="text-sm text-gray-500">{plan.subtitle}</p>
                 </div>
-                <div className="text-center md:text-right">
+                
+                <div className="text-center mb-6">
                   <div className="text-4xl font-bold text-gray-900">
-                    {formatPrice(billingCycle === 'yearly' ? 4999 : 499)}
+                    {formatPrice(billingCycle === 'yearly' ? plan.yearlyPrice : plan.monthlyPrice)}
                   </div>
-                  <div className="text-gray-500 mb-4">
+                  <div className="text-gray-500">
                     /{billingCycle === 'yearly' ? 'year' : 'month'}
                   </div>
-                  <Link href="/signup">
-                    <Button size="lg" className="w-full md:w-auto">
-                      Activate Business Starter Suite
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </Link>
                 </div>
+
+                <ul className="space-y-3 mb-6">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2 text-sm text-gray-700">
+                      <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <Link href="/signup">
+                  <Button 
+                    size="lg" 
+                    className={`w-full ${plan.recommended ? '' : 'bg-gray-900 hover:bg-gray-800'}`}
+                    variant={plan.recommended ? 'default' : 'secondary'}
+                    data-testid={`cta-${plan.code}`}
+                  >
+                    {plan.cta}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center mb-16">
+            <Button
+              variant="outline"
+              onClick={() => setShowComparison(!showComparison)}
+              className="gap-2"
+              data-testid="compare-plans-btn"
+            >
+              {showComparison ? 'Hide' : 'Compare'} Plans
+              {showComparison ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+
+          {showComparison && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mb-16 overflow-hidden"
+            >
+              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-x-auto">
+                <table className="w-full" data-testid="comparison-table">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left p-4 font-semibold text-gray-900">Feature</th>
+                      <th className="text-center p-4 font-semibold text-gray-900">Starter</th>
+                      <th className="text-center p-4 font-semibold text-primary bg-primary/5">Growth</th>
+                      <th className="text-center p-4 font-semibold text-gray-900">Agency Pro</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisonFeatures.map((feature, index) => (
+                      <tr key={feature.name} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                        <td className="p-4 text-gray-700">{feature.name}</td>
+                        <td className="p-4 text-center">
+                          {typeof feature.starter === 'boolean' ? (
+                            feature.starter ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                          ) : (
+                            <span className="font-medium">{feature.starter}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center bg-primary/5">
+                          {typeof feature.growth === 'boolean' ? (
+                            feature.growth ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                          ) : (
+                            <span className="font-medium">{feature.growth}</span>
+                          )}
+                        </td>
+                        <td className="p-4 text-center">
+                          {typeof feature.agency === 'boolean' ? (
+                            feature.agency ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                          ) : (
+                            <span className="font-medium">{feature.agency}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          )}
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-4">
               Add-on Modules
             </h2>
             <p className="text-center text-gray-600 mb-8">
-              Enhance your platform with specialized modules
+              Enhance your platform with specialized modules — works with any plan
             </p>
           </div>
 
@@ -204,6 +346,7 @@ export default function PricingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                data-testid={`module-card-${module.code}`}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -263,7 +406,7 @@ export default function PricingPage() {
                 Pay only for what you need. Add or remove modules anytime.
               </p>
               <Link href="/signup">
-                <Button size="lg">
+                <Button size="lg" data-testid="get-started-btn">
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
