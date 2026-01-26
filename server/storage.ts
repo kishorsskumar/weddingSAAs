@@ -317,6 +317,24 @@ import {
   automationLogs,
   type AutomationLog,
   type InsertAutomationLog,
+  saasModules,
+  companyModuleSubscriptions,
+  aiAssistantSettings,
+  aiUsage,
+  billingEvents,
+  inAppNotifications,
+  type SaasModule,
+  type InsertSaasModule,
+  type CompanyModuleSubscription,
+  type InsertCompanyModuleSubscription,
+  type AiAssistantSettings,
+  type InsertAiAssistantSettings,
+  type AiUsage,
+  type InsertAiUsage,
+  type BillingEvent,
+  type InsertBillingEvent,
+  type InAppNotification,
+  type InsertInAppNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -938,6 +956,38 @@ export interface IStorage {
   // Automation Logs
   createAutomationLog(log: InsertAutomationLog): Promise<AutomationLog>;
   getAutomationLogsByEventId(eventId: string): Promise<AutomationLog[]>;
+  
+  // SaaS Modules
+  getAllSaasModules(): Promise<SaasModule[]>;
+  getSaasModuleByCode(code: string): Promise<SaasModule | undefined>;
+  
+  // Company Module Subscriptions
+  getCompanyModuleSubscriptions(companyId: string): Promise<CompanyModuleSubscription[]>;
+  getActiveCompanyModuleSubscription(companyId: string, moduleCode: string): Promise<CompanyModuleSubscription | undefined>;
+  hasActiveModuleSubscription(companyId: string, moduleCode: string): Promise<boolean>;
+  createCompanyModuleSubscription(sub: InsertCompanyModuleSubscription): Promise<CompanyModuleSubscription>;
+  updateCompanyModuleSubscription(id: string, sub: Partial<InsertCompanyModuleSubscription>): Promise<CompanyModuleSubscription | undefined>;
+  cancelCompanyModuleSubscription(companyId: string, moduleCode: string): Promise<void>;
+  
+  // AI Settings
+  getAiAssistantSettings(companyId: string): Promise<AiAssistantSettings | undefined>;
+  createAiAssistantSettings(settings: InsertAiAssistantSettings): Promise<AiAssistantSettings>;
+  updateAiAssistantSettings(id: string, settings: Partial<InsertAiAssistantSettings>): Promise<AiAssistantSettings | undefined>;
+  
+  // AI Usage
+  getAiUsageForMonth(companyId: string, month: number, year: number): Promise<AiUsage | undefined>;
+  recordAiUsage(companyId: string, tokensUsed: number): Promise<AiUsage>;
+  
+  // Billing Events
+  getBillingEventByRazorpayId(razorpayEventId: string): Promise<BillingEvent | undefined>;
+  createBillingEvent(event: InsertBillingEvent): Promise<BillingEvent>;
+  
+  // In-App Notifications
+  getInAppNotifications(companyId: string, limit?: number): Promise<InAppNotification[]>;
+  getUnreadInAppNotificationCount(companyId: string): Promise<number>;
+  createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification>;
+  markInAppNotificationAsRead(id: string): Promise<void>;
+  markAllInAppNotificationsAsRead(companyId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5185,6 +5235,168 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(automationLogs)
       .where(eq(automationLogs.eventId, eventId))
       .orderBy(desc(automationLogs.createdAt));
+  }
+  
+  // SaaS Modules
+  async getAllSaasModules(): Promise<SaasModule[]> {
+    return await db.select().from(saasModules).orderBy(saasModules.sortOrder);
+  }
+  
+  async getSaasModuleByCode(code: string): Promise<SaasModule | undefined> {
+    const [module] = await db.select().from(saasModules).where(eq(saasModules.code, code));
+    return module || undefined;
+  }
+  
+  // Company Module Subscriptions
+  async getCompanyModuleSubscriptions(companyId: string): Promise<CompanyModuleSubscription[]> {
+    return await db.select().from(companyModuleSubscriptions)
+      .where(eq(companyModuleSubscriptions.companyId, companyId));
+  }
+  
+  async getActiveCompanyModuleSubscription(companyId: string, moduleCode: string): Promise<CompanyModuleSubscription | undefined> {
+    const [sub] = await db.select().from(companyModuleSubscriptions)
+      .where(and(
+        eq(companyModuleSubscriptions.companyId, companyId),
+        eq(companyModuleSubscriptions.moduleCode, moduleCode),
+        eq(companyModuleSubscriptions.status, 'active')
+      ));
+    return sub || undefined;
+  }
+  
+  async hasActiveModuleSubscription(companyId: string, moduleCode: string): Promise<boolean> {
+    const sub = await this.getActiveCompanyModuleSubscription(companyId, moduleCode);
+    return !!sub;
+  }
+  
+  async createCompanyModuleSubscription(sub: InsertCompanyModuleSubscription): Promise<CompanyModuleSubscription> {
+    const [newSub] = await db.insert(companyModuleSubscriptions).values(sub).returning();
+    return newSub;
+  }
+  
+  async updateCompanyModuleSubscription(id: string, sub: Partial<InsertCompanyModuleSubscription>): Promise<CompanyModuleSubscription | undefined> {
+    const [updated] = await db.update(companyModuleSubscriptions)
+      .set({ ...sub, updatedAt: new Date() })
+      .where(eq(companyModuleSubscriptions.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async cancelCompanyModuleSubscription(companyId: string, moduleCode: string): Promise<void> {
+    await db.update(companyModuleSubscriptions)
+      .set({ status: 'cancelled', updatedAt: new Date() })
+      .where(and(
+        eq(companyModuleSubscriptions.companyId, companyId),
+        eq(companyModuleSubscriptions.moduleCode, moduleCode)
+      ));
+  }
+  
+  // AI Settings
+  async getAiAssistantSettings(companyId: string): Promise<AiAssistantSettings | undefined> {
+    const [settings] = await db.select().from(aiAssistantSettings)
+      .where(eq(aiAssistantSettings.companyId, companyId));
+    return settings || undefined;
+  }
+  
+  async createAiAssistantSettings(settings: InsertAiAssistantSettings): Promise<AiAssistantSettings> {
+    const [newSettings] = await db.insert(aiAssistantSettings).values(settings).returning();
+    return newSettings;
+  }
+  
+  async updateAiAssistantSettings(id: string, settings: Partial<InsertAiAssistantSettings>): Promise<AiAssistantSettings | undefined> {
+    const [updated] = await db.update(aiAssistantSettings)
+      .set({ ...settings, updatedAt: new Date() })
+      .where(eq(aiAssistantSettings.id, id))
+      .returning();
+    return updated;
+  }
+  
+  // AI Usage
+  async getAiUsageForMonth(companyId: string, month: number, year: number): Promise<AiUsage | undefined> {
+    const [usage] = await db.select().from(aiUsage)
+      .where(and(
+        eq(aiUsage.companyId, companyId),
+        eq(aiUsage.month, month),
+        eq(aiUsage.year, year)
+      ));
+    return usage || undefined;
+  }
+  
+  async recordAiUsage(companyId: string, tokensUsed: number): Promise<AiUsage> {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    
+    const existing = await this.getAiUsageForMonth(companyId, month, year);
+    
+    if (existing) {
+      const [updated] = await db.update(aiUsage)
+        .set({ 
+          tokensUsed: existing.tokensUsed + tokensUsed,
+          lastUsedAt: now 
+        })
+        .where(eq(aiUsage.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [newUsage] = await db.insert(aiUsage).values({
+        companyId,
+        month,
+        year,
+        tokensUsed,
+        lastUsedAt: now
+      }).returning();
+      return newUsage;
+    }
+  }
+  
+  // Billing Events
+  async getBillingEventByRazorpayId(razorpayEventId: string): Promise<BillingEvent | undefined> {
+    const [event] = await db.select().from(billingEvents)
+      .where(eq(billingEvents.razorpayEventId, razorpayEventId));
+    return event || undefined;
+  }
+  
+  async createBillingEvent(event: InsertBillingEvent): Promise<BillingEvent> {
+    const [newEvent] = await db.insert(billingEvents).values(event).returning();
+    return newEvent;
+  }
+  
+  // In-App Notifications
+  async getInAppNotifications(companyId: string, limit: number = 50): Promise<InAppNotification[]> {
+    return await db.select().from(inAppNotifications)
+      .where(eq(inAppNotifications.companyId, companyId))
+      .orderBy(desc(inAppNotifications.createdAt))
+      .limit(limit);
+  }
+  
+  async getUnreadInAppNotificationCount(companyId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(inAppNotifications)
+      .where(and(
+        eq(inAppNotifications.companyId, companyId),
+        isNull(inAppNotifications.readAt)
+      ));
+    return result[0]?.count || 0;
+  }
+  
+  async createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification> {
+    const [newNotification] = await db.insert(inAppNotifications).values(notification).returning();
+    return newNotification;
+  }
+  
+  async markInAppNotificationAsRead(id: string): Promise<void> {
+    await db.update(inAppNotifications)
+      .set({ readAt: new Date() })
+      .where(eq(inAppNotifications.id, id));
+  }
+  
+  async markAllInAppNotificationsAsRead(companyId: string): Promise<void> {
+    await db.update(inAppNotifications)
+      .set({ readAt: new Date() })
+      .where(and(
+        eq(inAppNotifications.companyId, companyId),
+        isNull(inAppNotifications.readAt)
+      ));
   }
 }
 
