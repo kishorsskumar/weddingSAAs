@@ -1589,6 +1589,52 @@ export async function registerRoutes(
       
       const event = JSON.parse(body);
       console.log('Razorpay webhook event:', event.event);
+
+      // Idempotency check - store event to prevent duplicate processing
+      const eventId = event.payload?.payment?.entity?.id || event.payload?.subscription?.entity?.id || `${event.event}_${Date.now()}`;
+      const [existingEvent] = await db.select().from(billingEvents)
+        .where(eq(billingEvents.razorpayEventId, eventId));
+      
+      if (existingEvent?.status === 'processed') {
+        console.log(`[Webhook] Event ${eventId} already processed, skipping`);
+        return res.json({ received: true, duplicate: true });
+      }
+
+      // Log event for audit
+      const [billingEvent] = await db.insert(billingEvents).values({
+        razorpayEventId: eventId,
+        eventType: event.event,
+        payload: event.payload,
+        status: 'pending',
+      }).onConflictDoNothing().returning();
+
+      // Helper to update module subscription by razorpay subscription ID
+      async function updateModuleSubscriptionByRazorpayId(razorpaySubId: string, updates: Partial<typeof companyModuleSubscriptions.$inferInsert>) {
+        const [moduleSub] = await db.select().from(companyModuleSubscriptions)
+          .where(eq(companyModuleSubscriptions.razorpaySubscriptionId, razorpaySubId));
+        if (moduleSub) {
+          await db.update(companyModuleSubscriptions)
+            .set({ ...updates, updatedAt: new Date() })
+            .where(eq(companyModuleSubscriptions.id, moduleSub.id));
+          
+          // Create notification if status changed
+          if (updates.status && updates.status !== moduleSub.status) {
+            const notifTitle = updates.status === 'active' ? 'Module Activated' :
+                              updates.status === 'cancelled' ? 'Module Cancelled' :
+                              updates.status === 'paused' ? 'Module Paused' : 'Module Status Updated';
+            await db.insert(inAppNotifications).values({
+              companyId: moduleSub.companyId,
+              title: notifTitle,
+              message: `Your ${moduleSub.moduleCode.toUpperCase()} module is now ${updates.status}.`,
+              type: updates.status === 'active' ? 'success' : 'warning',
+              category: 'billing',
+              actionUrl: '/billing',
+            });
+          }
+          return moduleSub;
+        }
+        return null;
+      }
       
       // Handle different webhook events
       switch (event.event) {
@@ -1647,12 +1693,23 @@ export async function registerRoutes(
             const startDate = subEntity?.start_at ? new Date(subEntity.start_at * 1000) : new Date();
             const endDate = subEntity?.end_at ? new Date(subEntity.end_at * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             
+            // Update legacy subscription
             await storage.updateSubscriptionByRazorpayId(subscriptionId, {
               status: 'active',
               startDate,
               endDate,
               lastPaymentDate: new Date(),
             });
+            
+            // Also update module subscription if exists
+            await updateModuleSubscriptionByRazorpayId(subscriptionId, {
+              status: 'active',
+              startDate,
+              endDate,
+              nextBillingDate: endDate,
+              lastPaymentDate: new Date(),
+            });
+            
             console.log(`[Webhook] Subscription ${subscriptionId} activated successfully`);
           }
           break;
@@ -1665,10 +1722,23 @@ export async function registerRoutes(
           const amount = event.payload?.payment?.entity?.amount;
           console.log(`[Webhook] subscription.charged - ID: ${subscriptionId}, Payment: ${paymentId}, Amount: ${amount}`);
           if (subscriptionId) {
+            // Update legacy subscription
             await storage.updateSubscriptionByRazorpayId(subscriptionId, {
               status: 'active',
               lastPaymentDate: new Date(),
             });
+            
+            // Also update module subscription - extend end date
+            const subEntity = event.payload?.subscription?.entity;
+            const currentPeriodEnd = subEntity?.current_end ? new Date(subEntity.current_end * 1000) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            await updateModuleSubscriptionByRazorpayId(subscriptionId, {
+              status: 'active',
+              endDate: currentPeriodEnd,
+              nextBillingDate: currentPeriodEnd,
+              lastPaymentDate: new Date(),
+              amountPaid: amount,
+            });
+            
             console.log(`[Webhook] Recurring payment recorded for subscription ${subscriptionId}`);
           }
           break;
@@ -1679,13 +1749,51 @@ export async function registerRoutes(
           const subscriptionId = event.payload?.subscription?.entity?.id;
           console.log(`[Webhook] ${event.event} - ID: ${subscriptionId}`);
           if (subscriptionId) {
+            // Update legacy subscription
             await storage.updateSubscriptionByRazorpayId(subscriptionId, {
               status: 'cancelled',
             });
+            
+            // Also update module subscription
+            await updateModuleSubscriptionByRazorpayId(subscriptionId, {
+              status: 'cancelled',
+            });
+            
             console.log(`[Webhook] Subscription ${subscriptionId} cancelled/halted - SaaS access disabled`);
           }
           break;
         }
+        
+        case 'subscription.paused': {
+          const subscriptionId = event.payload?.subscription?.entity?.id;
+          console.log(`[Webhook] subscription.paused - ID: ${subscriptionId}`);
+          if (subscriptionId) {
+            await updateModuleSubscriptionByRazorpayId(subscriptionId, {
+              status: 'paused',
+            });
+            console.log(`[Webhook] Subscription ${subscriptionId} paused`);
+          }
+          break;
+        }
+        
+        case 'subscription.resumed': {
+          const subscriptionId = event.payload?.subscription?.entity?.id;
+          console.log(`[Webhook] subscription.resumed - ID: ${subscriptionId}`);
+          if (subscriptionId) {
+            await updateModuleSubscriptionByRazorpayId(subscriptionId, {
+              status: 'active',
+            });
+            console.log(`[Webhook] Subscription ${subscriptionId} resumed`);
+          }
+          break;
+        }
+      }
+      
+      // Mark event as processed
+      if (billingEvent) {
+        await db.update(billingEvents)
+          .set({ status: 'processed', processedAt: new Date() })
+          .where(eq(billingEvents.id, billingEvent.id));
       }
       
       res.json({ received: true });
