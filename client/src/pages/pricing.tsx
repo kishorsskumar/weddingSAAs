@@ -232,11 +232,6 @@ export default function PricingPage() {
                       <Crown className="h-4 w-4" />
                       Recommended
                     </div>
-                    {plan.badge && (
-                      <div className="bg-amber-500 text-white text-sm font-medium px-3 py-1 rounded-full">
-                        {plan.badge}
-                      </div>
-                    )}
                   </div>
                 )}
                 <div className={`text-center ${plan.recommended ? 'mt-4' : ''} mb-6`}>
