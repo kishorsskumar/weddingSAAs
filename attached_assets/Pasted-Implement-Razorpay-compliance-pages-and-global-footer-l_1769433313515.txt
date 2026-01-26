@@ -1,0 +1,175 @@
+Implement Razorpay compliance pages and global footer links for SaaS platform.
+
+TASK 1 — Create Public Routes (No Auth Required)
+
+Using wouter router, create the following public routes:
+
+/privacy-policy  
+/terms  
+/refund-policy  
+/contact  
+
+These pages must be accessible without login and must NOT require authentication middleware.
+
+---
+
+TASK 2 — Create Reusable Public Layout
+
+Create a reusable component named:
+
+PublicPageLayout
+
+Layout requirements:
+
+- Centered container
+- Max width: 800px
+- Padding: 24px+
+- Clean typography
+- Mobile responsive
+- White background
+- Consistent spacing
+- Page title (h1)
+- Content section
+- Footer margin spacing
+
+All compliance pages must use this layout.
+
+---
+
+TASK 3 — Page Content
+
+### Privacy Policy Page (/privacy-policy)
+
+Include sections:
+
+Title: Privacy Policy
+
+Sections:
+- Information we collect
+- Account data and usage data
+- Payment processing handled via Razorpay
+- Cookies and session tracking
+- Data security practices
+- User rights
+- Contact email: sales@atbott.co
+- Company name: Atbott Solutions
+
+---
+
+### Terms & Conditions Page (/terms)
+
+Include:
+
+Title: Terms and Conditions
+
+Sections:
+- SaaS usage rules
+- Account responsibility
+- Subscription billing terms
+- Service availability disclaimer
+- Intellectual property
+- Termination rights
+- Governing law: India
+- Company name: Atbott Solutions
+
+---
+
+### Refund Policy Page (/refund-policy)
+
+Include:
+
+Title: Refund Policy
+
+Sections:
+
+- This is a digital SaaS product
+- No refunds after subscription activation
+- Refunds only for duplicate payments or technical billing errors within 48 hours
+- Refund requests via email: sales@atbott.co
+- Processing time: 7 business days
+
+---
+
+### Contact Us Page (/contact)
+
+Title: Contact Us
+
+Display the following exactly:
+
+Company Name:
+Atbott Solutions
+
+Office Address:
+Atbott Solutions  
+69/1854 A1, InnerSpace,  
+SRM Road, Kaloor,  
+Kochi, Kerala – 682018  
+India  
+
+Phone:
++91 8089191221  
+(make clickable tel: link)
+
+Email:
+sales@atbott.co  
+(make clickable mailto link)
+
+Business Type:
+SaaS Platform Provider for Wedding Planning Businesses
+
+---
+
+TASK 4 — Global Footer
+
+Add a footer component that appears on:
+
+- Landing page  
+- Pricing page  
+- Signup page  
+- Login page  
+- Public marketing pages  
+
+Footer must contain clickable links:
+
+Privacy Policy  
+Terms  
+Refund Policy  
+Contact  
+
+Footer style:
+
+- Small text
+- Center aligned
+- Muted color
+- Responsive
+- Appears at bottom of page
+
+---
+
+TASK 5 — SEO Optimization
+
+For all public pages:
+
+- Use proper <title> meta tags
+- Use <h1> heading
+- Add meta description tags
+- Use clean URLs
+
+---
+
+TASK 6 — Do Not Break Existing Auth Flow
+
+Ensure:
+
+- Login system unchanged
+- Signup system unchanged
+- Payment logic untouched
+- Routing preserved
+
+Only add public pages + footer links.
+
+---
+
+TASK 7 — Export Ready For Production
+
+Ensure all pages build correctly with Vite and Render deployment compatibility.
