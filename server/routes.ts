@@ -10975,5 +10975,55 @@ Respond with a JSON array only, no markdown formatting.`;
     }
   });
 
+  // Simple rate limiting for public chat API
+  const chatRateLimit = new Map<string, { count: number; resetTime: number }>();
+  const CHAT_RATE_LIMIT = 10; // max 10 requests
+  const CHAT_RATE_WINDOW = 60000; // per minute
+
+  // Public Chat API for landing page chatbot
+  app.post("/api/chat", async (req, res) => {
+    try {
+      // Rate limiting by IP
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      const rateData = chatRateLimit.get(clientIp);
+      
+      if (rateData) {
+        if (now > rateData.resetTime) {
+          chatRateLimit.set(clientIp, { count: 1, resetTime: now + CHAT_RATE_WINDOW });
+        } else if (rateData.count >= CHAT_RATE_LIMIT) {
+          return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+        } else {
+          rateData.count++;
+        }
+      } else {
+        chatRateLimit.set(clientIp, { count: 1, resetTime: now + CHAT_RATE_WINDOW });
+      }
+
+      // Cleanup old entries periodically
+      if (chatRateLimit.size > 1000) {
+        for (const [ip, data] of chatRateLimit) {
+          if (now > data.resetTime) chatRateLimit.delete(ip);
+        }
+      }
+
+      const { message } = req.body;
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+      if (message.length > 1000) {
+        return res.status(400).json({ error: 'Message too long' });
+      }
+
+      const { getChatResponse } = await import("./public-chatbot");
+      const response = await getChatResponse(message);
+      res.json({ response });
+    } catch (error: any) {
+      console.error('[Chat] Error:', error);
+      res.status(500).json({ error: 'Failed to process chat request' });
+    }
+  });
+
   return httpServer;
 }

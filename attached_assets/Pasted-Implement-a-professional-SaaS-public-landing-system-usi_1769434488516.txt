@@ -1,0 +1,262 @@
+Implement a professional SaaS public landing system using the attached AtBott logo.
+
+Brand Name: AtBott Wedding SaaS
+Logo: Use provided AtBott logo image
+Theme: Clean, modern SaaS UI (similar to Zoho, ClickUp, Honeybook)
+
+--------------------------------------------------
+TASK 1 — Top Navigation Bar (NO Legal Links)
+--------------------------------------------------
+
+Create a responsive sticky navigation bar for all public pages:
+
+Show navbar on:
+- Home (/)
+- Login (/login)
+- Signup (/signup)
+- Pricing (/pricing)
+
+DO NOT show Privacy, Terms, Refund links in top navbar.
+
+Navbar Layout:
+
+Left:
+- AtBott Logo
+- Text: "AtBott Wedding SaaS"
+
+Center Menu:
+- Home
+- Features
+- Pricing
+- Contact
+
+Right Side Buttons:
+- Login (outlined button)
+- Get Started (primary CTA button → Signup)
+
+Behavior:
+- Sticky on scroll
+- Mobile hamburger menu
+- Active route highlighting
+- Smooth scroll transitions
+
+--------------------------------------------------
+TASK 2 — Home Page Design (Landing Page)
+--------------------------------------------------
+
+Route: /
+
+Design a premium SaaS landing page:
+
+---------------------------------
+Hero Section
+---------------------------------
+
+Left Content:
+
+Headline:
+"Manage Your Wedding Business Smarter With AtBott"
+
+Subheading:
+"All-in-one platform to manage clients, events, vendors, payments and automation from one dashboard."
+
+Buttons:
+- Start Free Trial (Signup)
+- View Pricing
+
+Right Content:
+
+- SaaS dashboard illustration placeholder
+- Soft gradient background
+- Subtle animation
+
+---------------------------------
+Features Section
+---------------------------------
+
+Create responsive card grid:
+
+Feature Cards:
+
+1) Client CRM Management
+2) Wedding Event Planning Workflow
+3) Vendor & Inventory Control
+4) Automated Reminder System
+5) Subscription & Payment Management
+6) Business Analytics Dashboard
+
+Each card:
+- Icon
+- Title
+- Short description
+- Hover animation
+
+---------------------------------
+How It Works Section
+---------------------------------
+
+3 Steps layout:
+
+1) Create Account
+2) Add Clients & Events
+3) Automate Your Operations
+
+---------------------------------
+Benefits Section
+---------------------------------
+
+Bullet style benefits:
+
+- Save operational time
+- Increase profitability
+- Reduce manual errors
+- Centralize business data
+- Cloud access anywhere
+
+---------------------------------
+Call To Action Section
+---------------------------------
+
+Centered CTA banner:
+
+"Start Managing Weddings Like A Professional Agency"
+
+Button:
+Get Started Free
+
+--------------------------------------------------
+TASK 3 — Footer Section (Legal + Compliance)
+--------------------------------------------------
+
+Footer should appear on ALL public pages.
+
+Footer content:
+
+Left:
+AtBott Solutions © 2026
+
+Right Links:
+Privacy Policy
+Terms & Conditions
+Refund Policy
+Contact
+
+Footer Styling:
+- Dark background
+- Light text
+- Professional SaaS style
+
+--------------------------------------------------
+TASK 4 — Legal Pages Navigation Fix
+--------------------------------------------------
+
+Add "← Back to Home" button at top of:
+
+- Privacy Policy
+- Terms & Conditions
+- Refund Policy
+- Contact Page
+
+Button navigates to "/"
+
+--------------------------------------------------
+TASK 5 — Contact Page Content (Business Info)
+--------------------------------------------------
+
+Contact page must display:
+
+Company Name:
+Atbott Solutions
+
+Address:
+69/1854 A1,
+InnerSpace,
+SRM Road,
+Kaloor,
+Kochi,
+Kerala – 682018
+
+Phone:
+8089191221
+
+Email:
+sales@atbott.co
+
+Also include:
+- Simple contact form
+- Google map placeholder block
+
+--------------------------------------------------
+TASK 6 — Website AI Chatbot Integration
+--------------------------------------------------
+
+Add floating AI chatbot widget on bottom-right corner.
+
+Bot Name:
+AtBott Assistant
+
+UI Requirements:
+- Floating chat icon
+- Expandable chat window
+- Close button
+- Message bubbles
+- Typing animation
+- Mobile responsive
+
+--------------------------------------------------
+TASK 7 — Chatbot Backend Integration (OpenAI)
+--------------------------------------------------
+
+Backend:
+
+Create endpoint:
+
+POST /api/chat
+
+Use environment variable:
+
+OPENAI_API_KEY
+
+System Prompt:
+
+"You are AtBott Wedding SaaS Assistant. You help users understand platform features, pricing, onboarding, usage guidance, and business automation. Do not answer unrelated questions. Maintain professional SaaS support tone."
+
+Frontend:
+
+- Send user messages to backend
+- Render AI responses
+- Handle loading states
+- Error fallback message
+
+--------------------------------------------------
+TASK 8 — SEO & Performance
+--------------------------------------------------
+
+Add:
+
+- Meta title: AtBott Wedding SaaS
+- Meta description for homepage
+- Lazy load images
+- Optimize animations
+- Lighthouse friendly structure
+
+--------------------------------------------------
+TASK 9 — Production Safety
+--------------------------------------------------
+
+Rules:
+
+- Do not expose OpenAI key in frontend
+- Backend proxy only
+- Use environment variables
+- Compatible with Render deployment
+- No breaking changes to auth/payment flow
+
+--------------------------------------------------
+FINAL REQUIREMENTS:
+
+- Home page must be default route "/"
+- Navbar must NOT contain legal links
+- Footer must contain legal links
+- Chatbot must load on homepage
+- All links must route correctly

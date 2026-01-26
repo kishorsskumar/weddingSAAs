@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Building2, Mail, Lock } from "lucide-react";
 import { GlobalFooter } from "@/components/global-footer";
+import { PublicNavbar } from "@/components/public-navbar";
+import atbottLogo from "@/assets/atbott-logo.jpg";
 
 export default function Login() {
   const { login, user, isLoading } = useAuth();
@@ -17,7 +19,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) setLocation("/");
+    if (user) setLocation("/dashboard");
   }, [user, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,6 +37,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
+      <PublicNavbar />
       <div className="flex-1 flex items-center justify-center p-4">
       <motion.div 
         className="w-full max-w-5xl grid md:grid-cols-2 gap-0 shadow-2xl rounded-3xl overflow-hidden bg-card border border-border/50"
@@ -56,8 +59,8 @@ export default function Login() {
             transition={{ delay: 0.4, duration: 0.4 }}
           >
             <div className="flex items-center gap-3 mb-4">
-              <Building2 className="h-12 w-12" />
-              <h1 className="text-3xl font-bold">Wedding SaaS</h1>
+              <img src={atbottLogo} alt="AtBott" className="h-12 w-12 rounded-lg object-cover" />
+              <h1 className="text-3xl font-bold">AtBott Wedding SaaS</h1>
             </div>
             <p className="text-sidebar-foreground/80 text-lg">Your complete event management platform</p>
           </motion.div>

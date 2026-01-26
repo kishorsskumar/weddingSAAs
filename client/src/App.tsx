@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/auth-context";
 import Layout from "@/components/layout";
 import { motion, AnimatePresence } from "framer-motion";
+import Home from "@/pages/home";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
@@ -36,6 +37,8 @@ import PrivacyPolicy from "@/pages/privacy-policy";
 import Terms from "@/pages/terms";
 import RefundPolicy from "@/pages/refund-policy";
 import Contact from "@/pages/contact";
+import Pricing from "@/pages/pricing";
+import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -76,17 +79,8 @@ function AppRoutes() {
   return (
     <Layout>
       <Switch>
-        <Route path="/login" component={Login} />
-        <Route path="/signup" component={Signup} />
-        <Route path="/privacy-policy" component={PrivacyPolicy} />
-        <Route path="/terms" component={Terms} />
-        <Route path="/refund-policy" component={RefundPolicy} />
-        <Route path="/contact" component={Contact} />
-        <Route path="/billing">
-          <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
-        </Route>
-        <Route path="/">
-          <PrivateRoute component={Dashboard} path="/" />
+        <Route path="/dashboard">
+          <PrivateRoute component={Dashboard} path="/dashboard" />
         </Route>
         <Route path="/events">
           <PrivateRoute component={EventCalendar} path="/events" />
@@ -142,9 +136,36 @@ function AppRoutes() {
         <Route path="/management-mis">
            <PrivateRoute component={ManagementMIS} path="/management-mis" />
         </Route>
+        <Route path="/billing">
+          <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>
+  );
+}
+
+function PublicPages() {
+  const [location] = useLocation();
+  const showChatbot = ['/', '/pricing'].includes(location);
+
+  return (
+    <>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/login" component={Login} />
+        <Route path="/signup" component={Signup} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/refund-policy" component={RefundPolicy} />
+        <Route path="/contact" component={Contact} />
+        <Route>
+          <AppRoutes />
+        </Route>
+      </Switch>
+      {showChatbot && <AIChatbot />}
+    </>
   );
 }
 
@@ -164,7 +185,7 @@ function App() {
               <DownloadPage />
             </Route>
             <Route>
-              <AppRoutes />
+              <PublicPages />
             </Route>
           </Switch>
           <Toaster />
