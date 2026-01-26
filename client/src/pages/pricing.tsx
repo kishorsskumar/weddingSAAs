@@ -256,7 +256,6 @@ export default function PricingPage() {
                   <Button 
                     size="lg" 
                     className="w-full text-sm"
-                    variant={plan.recommended ? 'default' : 'outline'}
                     data-testid={`cta-${plan.code}`}
                   >
                     {plan.cta}
