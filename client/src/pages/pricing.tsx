@@ -26,7 +26,7 @@ const plans = [
       "Automated Email Notifications",
       "Task & Team Alerts"
     ],
-    cta: "Activate Business Starter Suite"
+    cta: "Get Started"
   },
   {
     code: "growth",
@@ -44,7 +44,7 @@ const plans = [
       "Advanced Reports",
       "Priority Support"
     ],
-    cta: "Upgrade to Growth Suite"
+    cta: "Choose Growth"
   },
   {
     code: "agency",
@@ -62,7 +62,7 @@ const plans = [
       "API Access",
       "Dedicated Support"
     ],
-    cta: "Go Agency Pro"
+    cta: "Choose Agency"
   }
 ];
 
@@ -255,12 +255,12 @@ export default function PricingPage() {
                 <Link href="/signup">
                   <Button 
                     size="lg" 
-                    className={`w-full ${plan.recommended ? '' : 'bg-gray-900 hover:bg-gray-800'}`}
-                    variant={plan.recommended ? 'default' : 'secondary'}
+                    className="w-full text-sm"
+                    variant={plan.recommended ? 'default' : 'outline'}
                     data-testid={`cta-${plan.code}`}
                   >
                     {plan.cta}
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="ml-2 h-4 w-4 flex-shrink-0" />
                   </Button>
                 </Link>
               </motion.div>
