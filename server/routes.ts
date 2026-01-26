@@ -4019,6 +4019,73 @@ export async function registerRoutes(
     }
   });
 
+  // Admin Routes - SaaS Revenue Dashboard
+  app.get('/api/admin/saas-revenue', async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+      const user = await storage.getUser(req.session.userId);
+      if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+        return res.status(403).json({ error: 'Admin access required' });
+      }
+
+      // Get all active subscriptions
+      const subscriptions = await db.select().from(companyModuleSubscriptions)
+        .where(eq(companyModuleSubscriptions.status, 'active'));
+
+      // Calculate MRR and breakdown
+      const moduleBreakdown: Record<string, { count: number; mrr: number }> = {};
+      let totalMrr = 0;
+      let activeCore = 0;
+
+      for (const sub of subscriptions) {
+        const module = await db.select().from(saasModules)
+          .where(eq(saasModules.id, sub.moduleId))
+          .then(rows => rows[0]);
+
+        if (module) {
+          const monthlyAmount = sub.billingCycle === 'yearly' 
+            ? Math.round(module.yearlyPrice / 12) 
+            : module.monthlyPrice;
+
+          if (!moduleBreakdown[sub.moduleCode]) {
+            moduleBreakdown[sub.moduleCode] = { count: 0, mrr: 0 };
+          }
+          moduleBreakdown[sub.moduleCode].count++;
+          moduleBreakdown[sub.moduleCode].mrr += monthlyAmount;
+          totalMrr += monthlyAmount;
+
+          if (sub.moduleCode === 'core') {
+            activeCore++;
+          }
+        }
+      }
+
+      // Get recent billing events
+      const recentEvents = await db.select().from(billingEvents)
+        .orderBy(desc(billingEvents.createdAt))
+        .limit(20);
+
+      res.json({
+        totalMrr,
+        totalSubscriptions: subscriptions.length,
+        activeCore,
+        moduleBreakdown,
+        recentEvents: recentEvents.map(e => ({
+          id: e.id,
+          type: e.eventType,
+          amount: e.amount || 0,
+          moduleCode: e.moduleCode || 'unknown',
+          createdAt: e.createdAt?.toISOString() || new Date().toISOString(),
+        })),
+      });
+    } catch (error) {
+      console.error('Error fetching SaaS revenue:', error);
+      res.status(500).json({ error: 'Failed to fetch revenue data' });
+    }
+  });
+
   // Admin Routes - Manage Employee Increments
   app.get('/api/admin/employee-increments/:employeeId', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);

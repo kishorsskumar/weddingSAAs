@@ -165,6 +165,131 @@ type BroadcastNotification = {
   createdAt: string;
 };
 
+interface RevenueStats {
+  totalMrr: number;
+  totalSubscriptions: number;
+  activeCore: number;
+  moduleBreakdown: Record<string, { count: number; mrr: number }>;
+  recentEvents: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    moduleCode: string;
+    createdAt: string;
+  }>;
+}
+
+function SaasRevenueTab() {
+  const { data: stats, isLoading } = useQuery<RevenueStats>({
+    queryKey: ['/api/admin/saas-revenue'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/saas-revenue', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch revenue stats');
+      return res.json();
+    },
+  });
+
+  const formatCurrency = (amount: number) => `₹${(amount / 100).toLocaleString('en-IN')}`;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="saas-revenue-tab">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card data-testid="card-mrr">
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-green-600" data-testid="text-mrr">
+              {formatCurrency(stats?.totalMrr || 0)}
+            </div>
+            <p className="text-sm text-muted-foreground">Monthly Recurring Revenue</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-subscriptions">
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold" data-testid="text-subscriptions">{stats?.totalSubscriptions || 0}</div>
+            <p className="text-sm text-muted-foreground">Active Subscriptions</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-core-users">
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold" data-testid="text-core-users">{stats?.activeCore || 0}</div>
+            <p className="text-sm text-muted-foreground">Core Platform Users</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-active-addons">
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold" data-testid="text-addon-count">
+              {stats?.moduleBreakdown 
+                ? Object.keys(stats.moduleBreakdown).filter(k => k !== 'core').length 
+                : 0}
+            </div>
+            <p className="text-sm text-muted-foreground">Active Add-on Modules</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Module Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats?.moduleBreakdown ? (
+            <div className="space-y-3">
+              {Object.entries(stats.moduleBreakdown).map(([code, data]) => (
+                <div key={code} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <span className="font-medium capitalize">{code.replace('_', ' ')}</span>
+                    <Badge variant="secondary" className="ml-2">{data.count} subscribers</Badge>
+                  </div>
+                  <div className="text-green-600 font-medium">{formatCurrency(data.mrr)}/mo</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No active subscriptions yet</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Billing Events</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {stats?.recentEvents && stats.recentEvents.length > 0 ? (
+            <div className="space-y-2">
+              {stats.recentEvents.map((event) => (
+                <div key={event.id} className="flex items-center justify-between p-2 border-b last:border-0">
+                  <div>
+                    <span className="font-medium">{event.type}</span>
+                    <span className="text-sm text-muted-foreground ml-2">
+                      ({event.moduleCode})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-green-600">{formatCurrency(event.amount)}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(event.createdAt), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No billing events recorded</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function NotificationsTab() {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
@@ -1669,6 +1794,7 @@ export default function Admin() {
             {isSuperAdmin && <TabsTrigger value="messaging" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-messaging">Messaging</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="templates" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-templates">Templates</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="notifications" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-notifications">Notifications</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="saas-revenue" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-saas-revenue">Revenue</TabsTrigger>}
           </TabsList>
         </div>
 
@@ -2697,6 +2823,12 @@ export default function Admin() {
         {isSuperAdmin && (
           <TabsContent value="notifications" className="mt-4">
             <NotificationsTab />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="saas-revenue" className="mt-4">
+            <SaasRevenueTab />
           </TabsContent>
         )}
       </Tabs>
