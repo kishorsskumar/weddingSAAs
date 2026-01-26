@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Building2, Mail, Lock, User } from "lucide-react";
 import { GlobalFooter } from "@/components/global-footer";
 import { PublicNavbar } from "@/components/public-navbar";
-import atbottLogo from "@/assets/atbott-logo.jpg";
+import atbottLogo from "@/assets/atbott-logo.png";
 
 export default function Signup() {
   const { signup, user, isLoading } = useAuth();
@@ -66,9 +66,8 @@ export default function Signup() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.4 }}
           >
-            <div className="flex items-center gap-3 mb-4">
-              <img src={atbottLogo} alt="AtBott" className="h-12 w-12 rounded-lg object-cover" />
-              <h1 className="text-3xl font-bold">AtBott Wedding SaaS</h1>
+            <div className="flex items-center mb-4">
+              <img src={atbottLogo} alt="AtBott" className="h-14 object-contain" />
             </div>
             <p className="text-sidebar-foreground/80 text-lg">Your complete event management platform</p>
           </motion.div>

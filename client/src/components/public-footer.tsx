@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import atbottLogo from "@/assets/atbott-logo.jpg";
+import atbottLogo from "@/assets/atbott-logo.png";
 
 export function PublicFooter() {
   const currentYear = new Date().getFullYear();
@@ -9,9 +9,8 @@ export function PublicFooter() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <img src={atbottLogo} alt="AtBott" className="h-10 w-10 rounded-lg object-cover" />
-              <span className="font-semibold text-lg text-white">AtBott Wedding SaaS</span>
+            <div className="flex items-center mb-4">
+              <img src={atbottLogo} alt="AtBott" className="h-10 object-contain brightness-0 invert" />
             </div>
             <p className="text-sm text-gray-400 max-w-md">
               All-in-one platform to manage clients, events, vendors, payments and automation 

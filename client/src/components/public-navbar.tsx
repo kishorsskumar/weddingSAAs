@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import atbottLogo from "@/assets/atbott-logo.jpg";
+import atbottLogo from "@/assets/atbott-logo.png";
 
 export function PublicNavbar() {
   const [location] = useLocation();
@@ -34,11 +34,8 @@ export function PublicNavbar() {
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3">
-            <img src={atbottLogo} alt="AtBott" className="h-10 w-10 rounded-lg object-cover" />
-            <span className="font-semibold text-lg text-gray-900 hidden sm:block">
-              AtBott Wedding SaaS
-            </span>
+          <Link href="/" className="flex items-center">
+            <img src={atbottLogo} alt="AtBott" className="h-10 object-contain" />
           </Link>
 
           <div className="hidden md:flex items-center gap-8">

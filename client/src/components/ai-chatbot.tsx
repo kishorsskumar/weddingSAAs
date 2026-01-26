@@ -3,7 +3,7 @@ import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import atbottLogo from "@/assets/atbott-logo.jpg";
+import atbottLogo from "@/assets/atbott-logo.png";
 
 interface Message {
   id: string;
