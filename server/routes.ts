@@ -1097,6 +1097,27 @@ export async function registerRoutes(
     });
   });
 
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      
+      console.log(`[Password Reset] Request received for ${email}, user found: ${!!user}`);
+
+      res.json({ 
+        message: 'If an account exists with this email, a reset link will be sent.' 
+      });
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      res.status(500).json({ error: 'Failed to process request' });
+    }
+  });
+
   app.get('/api/auth/me', async (req, res) => {
     let userId: string | undefined;
     let companyId: string | undefined;

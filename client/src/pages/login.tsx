@@ -87,8 +87,8 @@ export default function Login() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5, duration: 0.4 }}
           >
-            <h2 className="text-2xl font-bold text-foreground mb-2">Welcome Back</h2>
-            <p className="text-muted-foreground">Sign in to your account</p>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Login to your Dashboard</h2>
+            <p className="text-muted-foreground">Access your workspace and manage your wedding business efficiently.</p>
           </motion.div>
 
           {error && (
@@ -152,6 +152,15 @@ export default function Login() {
                   data-testid="input-password"
                   className="pl-10 transition-all duration-200 focus:scale-[1.01]"
                 />
+              </div>
+              <div className="text-right">
+                <Link 
+                  href="/forgot-password" 
+                  className="text-xs text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  data-testid="link-forgot-password"
+                >
+                  Forgot Password?
+                </Link>
               </div>
             </motion.div>
             <motion.div
