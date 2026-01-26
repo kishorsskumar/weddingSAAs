@@ -6,6 +6,7 @@ import { useLocation, Link } from "wouter";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Building2, Mail, Lock } from "lucide-react";
+import { GlobalFooter } from "@/components/global-footer";
 
 export default function Login() {
   const { login, user, isLoading } = useAuth();
@@ -33,7 +34,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+    <div className="min-h-screen flex flex-col bg-muted/30">
+      <div className="flex-1 flex items-center justify-center p-4">
       <motion.div 
         className="w-full max-w-5xl grid md:grid-cols-2 gap-0 shadow-2xl rounded-3xl overflow-hidden bg-card border border-border/50"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -191,6 +193,8 @@ export default function Login() {
           </motion.p>
         </motion.div>
       </motion.div>
+      </div>
+      <GlobalFooter />
     </div>
   );
 }

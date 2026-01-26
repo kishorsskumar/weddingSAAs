@@ -32,6 +32,10 @@ import ManagementMIS from "@/pages/management-mis";
 import DownloadPage from "@/pages/download";
 import Billing from "@/pages/billing";
 import NotFound from "@/pages/not-found";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import Terms from "@/pages/terms";
+import RefundPolicy from "@/pages/refund-policy";
+import Contact from "@/pages/contact";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -74,6 +78,10 @@ function AppRoutes() {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/signup" component={Signup} />
+        <Route path="/privacy-policy" component={PrivacyPolicy} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/refund-policy" component={RefundPolicy} />
+        <Route path="/contact" component={Contact} />
         <Route path="/billing">
           <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
         </Route>
