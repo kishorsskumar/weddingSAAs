@@ -168,3 +168,160 @@ export async function cancelSubscription(subscriptionId: string): Promise<any> {
   const rp = getRazorpayInstance();
   return await rp.subscriptions.cancel(subscriptionId);
 }
+
+// ============================================
+// MODULAR SUBSCRIPTION SYSTEM
+// ============================================
+
+interface CreatePlanParams {
+  name: string;
+  description?: string;
+  amount: number; // in paise
+  currency?: string;
+  period: 'monthly' | 'yearly';
+  interval: number;
+}
+
+interface PlanResponse {
+  id: string;
+  entity: string;
+  interval: number;
+  period: string;
+  item: {
+    id: string;
+    name: string;
+    amount: number;
+  };
+}
+
+export async function createPlan(params: CreatePlanParams): Promise<PlanResponse> {
+  const rp = getRazorpayInstance();
+  
+  const plan = await rp.plans.create({
+    period: params.period,
+    interval: params.interval,
+    item: {
+      name: params.name,
+      description: params.description || '',
+      amount: params.amount,
+      currency: params.currency || 'INR',
+    },
+  });
+  
+  return plan as PlanResponse;
+}
+
+export async function getPlan(planId: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.plans.fetch(planId);
+}
+
+export async function getAllPlans(): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.plans.all();
+}
+
+interface CreateModuleSubscriptionParams {
+  planId: string;
+  customerId?: string;
+  customerEmail: string;
+  customerName: string;
+  customerPhone?: string;
+  companyId: string;
+  moduleCode: string;
+  totalCount?: number; // Number of billing cycles
+  startAt?: number; // Unix timestamp for delayed start
+}
+
+export async function createModuleSubscription(params: CreateModuleSubscriptionParams): Promise<SubscriptionResponse> {
+  const rp = getRazorpayInstance();
+  
+  let customerId = params.customerId;
+  
+  // Create customer if not exists
+  if (!customerId) {
+    try {
+      const customer = await rp.customers.create({
+        name: params.customerName,
+        email: params.customerEmail,
+        contact: params.customerPhone || '',
+        notes: {
+          company_id: params.companyId,
+        },
+      });
+      customerId = customer.id;
+    } catch (error: any) {
+      // Customer might already exist, try to fetch by email
+      console.log('Customer creation failed, might already exist:', error.message);
+    }
+  }
+  
+  const subscriptionParams: any = {
+    plan_id: params.planId,
+    total_count: params.totalCount || 120, // Default 10 years
+    quantity: 1,
+    customer_notify: 1,
+    notes: {
+      company_id: params.companyId,
+      module_code: params.moduleCode,
+      customer_email: params.customerEmail,
+      customer_name: params.customerName,
+    },
+  };
+  
+  if (customerId) {
+    subscriptionParams.customer_id = customerId;
+  }
+  
+  if (params.startAt) {
+    subscriptionParams.start_at = params.startAt;
+  }
+  
+  const subscription = await rp.subscriptions.create(subscriptionParams);
+  
+  return {
+    id: subscription.id,
+    short_url: subscription.short_url,
+    status: subscription.status,
+    customer_id: subscription.customer_id || customerId,
+  };
+}
+
+export async function pauseSubscription(subscriptionId: string, pauseAt?: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.subscriptions.pause(subscriptionId, { pause_at: pauseAt || 'now' });
+}
+
+export async function resumeSubscription(subscriptionId: string, resumeAt?: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.subscriptions.resume(subscriptionId, { resume_at: resumeAt || 'now' });
+}
+
+export async function updateSubscription(subscriptionId: string, params: any): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.subscriptions.update(subscriptionId, params);
+}
+
+export async function getSubscriptionInvoices(subscriptionId: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.invoices.all({ subscription_id: subscriptionId });
+}
+
+export async function getPendingUpdate(subscriptionId: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.subscriptions.pendingUpdate(subscriptionId);
+}
+
+export async function cancelPendingUpdate(subscriptionId: string): Promise<any> {
+  const rp = getRazorpayInstance();
+  return await rp.subscriptions.cancelScheduledChanges(subscriptionId);
+}
+
+// Calculate amount with any discounts for yearly plans
+export function calculatePlanAmount(monthlyPrice: number, billingCycle: 'monthly' | 'yearly'): number {
+  if (billingCycle === 'yearly') {
+    // Yearly price is already 2 months discount (10 months price)
+    return monthlyPrice * 10;
+  }
+  return monthlyPrice;
+}

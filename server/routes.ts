@@ -30,8 +30,8 @@ import {
   type InsertEventMilestone,
 } from "@shared/schema";
 import { db } from "./db";
-import { sql, eq, and, gte, like } from "drizzle-orm";
-import { customers, events } from "@shared/schema";
+import { sql, eq, and, gte, like, or, desc } from "drizzle-orm";
+import { customers, events, saasModules, companyModuleSubscriptions, aiAssistantSettings, aiUsage, inAppNotifications, billingEvents } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import session from "express-session";
@@ -1692,6 +1692,531 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Webhook error:', error);
       res.status(500).json({ error: 'Webhook processing failed' });
+    }
+  });
+
+  // ============ Modular Subscription System Routes ============
+
+  // Get all available modules with pricing
+  app.get('/api/modules', async (req, res) => {
+    try {
+      const modules = await db.select().from(saasModules).where(eq(saasModules.isActive, true)).orderBy(saasModules.sortOrder);
+      res.json(modules);
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+      res.status(500).json({ error: 'Failed to fetch modules' });
+    }
+  });
+
+  // Get company's active module subscriptions
+  app.get('/api/modules/subscriptions', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const subscriptions = await db.select({
+        subscription: companyModuleSubscriptions,
+        module: saasModules,
+      })
+        .from(companyModuleSubscriptions)
+        .innerJoin(saasModules, eq(companyModuleSubscriptions.moduleId, saasModules.id))
+        .where(eq(companyModuleSubscriptions.companyId, companyId));
+
+      // Check if core platform is active
+      const coreSubscription = subscriptions.find(s => s.module.code === 'core' && s.subscription.status === 'active');
+      const hasActiveCore = !!coreSubscription;
+
+      res.json({
+        subscriptions: subscriptions.map(s => ({
+          ...s.subscription,
+          module: s.module,
+        })),
+        hasActiveCore,
+        activatedModules: subscriptions
+          .filter(s => s.subscription.status === 'active')
+          .map(s => s.module.code),
+      });
+    } catch (error) {
+      console.error('Error fetching module subscriptions:', error);
+      res.status(500).json({ error: 'Failed to fetch subscriptions' });
+    }
+  });
+
+  // Create subscription for a module
+  app.post('/api/modules/subscribe', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+
+      const { moduleCode, billingCycle } = req.body;
+
+      if (!moduleCode || !['monthly', 'yearly'].includes(billingCycle)) {
+        return res.status(400).json({ error: 'Invalid module code or billing cycle' });
+      }
+
+      if (!razorpayService.isRazorpayConfigured()) {
+        return res.status(503).json({ error: 'Payment system not configured' });
+      }
+
+      // Get the module
+      const [module] = await db.select().from(saasModules).where(eq(saasModules.code, moduleCode));
+      if (!module) {
+        return res.status(404).json({ error: 'Module not found' });
+      }
+
+      // Check if user already has active subscription for this module
+      const [existingSub] = await db.select().from(companyModuleSubscriptions)
+        .where(and(
+          eq(companyModuleSubscriptions.companyId, companyId),
+          eq(companyModuleSubscriptions.moduleCode, moduleCode),
+          eq(companyModuleSubscriptions.status, 'active')
+        ));
+
+      if (existingSub) {
+        return res.status(400).json({ error: 'Already subscribed to this module' });
+      }
+
+      // If subscribing to a non-core module, check if core is active
+      if (!module.isCore) {
+        const [coreSub] = await db.select().from(companyModuleSubscriptions)
+          .where(and(
+            eq(companyModuleSubscriptions.companyId, companyId),
+            eq(companyModuleSubscriptions.moduleCode, 'core'),
+            eq(companyModuleSubscriptions.status, 'active')
+          ));
+
+        if (!coreSub) {
+          return res.status(400).json({ 
+            error: 'Core Platform subscription required',
+            requiresCore: true,
+          });
+        }
+      }
+
+      // Get the user for customer details
+      const user = await storage.getUserFromSession(req);
+      if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      // Get the appropriate Razorpay plan ID
+      const planId = billingCycle === 'yearly' ? module.razorpayYearlyPlanId : module.razorpayMonthlyPlanId;
+      const amount = billingCycle === 'yearly' ? module.yearlyPrice : module.monthlyPrice;
+
+      if (!planId) {
+        // Create one-time order if no recurring plan configured
+        const order = await razorpayService.createOrder({
+          amount: amount / 100, // Convert paise to rupees for createOrder
+          currency: 'INR',
+          companyId,
+          planName: moduleCode,
+        });
+
+        // Create pending subscription record
+        await db.insert(companyModuleSubscriptions).values({
+          companyId,
+          moduleId: module.id,
+          moduleCode: module.code,
+          billingCycle,
+          status: 'pending',
+          amountPaid: amount,
+        });
+
+        return res.json({
+          type: 'order',
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          keyId: razorpayService.getRazorpayKeyId(),
+          moduleCode,
+          moduleName: module.name,
+        });
+      }
+
+      // Create recurring subscription
+      const subscription = await razorpayService.createModuleSubscription({
+        planId,
+        customerEmail: user.email,
+        customerName: user.name,
+        companyId,
+        moduleCode,
+      });
+
+      // Create subscription record
+      await db.insert(companyModuleSubscriptions).values({
+        companyId,
+        moduleId: module.id,
+        moduleCode: module.code,
+        razorpaySubscriptionId: subscription.id,
+        razorpayCustomerId: subscription.customer_id,
+        billingCycle,
+        status: 'pending',
+        amountPaid: amount,
+      });
+
+      res.json({
+        type: 'subscription',
+        subscriptionId: subscription.id,
+        shortUrl: subscription.short_url,
+        keyId: razorpayService.getRazorpayKeyId(),
+        moduleCode,
+        moduleName: module.name,
+      });
+    } catch (error) {
+      console.error('Error creating module subscription:', error);
+      res.status(500).json({ error: 'Failed to create subscription' });
+    }
+  });
+
+  // Verify module subscription payment
+  app.post('/api/modules/verify-payment', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature, moduleCode } = req.body;
+
+      // Verify signature
+      const isValid = razorpayService.verifyPaymentSignature({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      });
+
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid payment signature' });
+      }
+
+      // Find the pending subscription
+      const [subscription] = await db.select().from(companyModuleSubscriptions)
+        .where(and(
+          eq(companyModuleSubscriptions.companyId, companyId),
+          eq(companyModuleSubscriptions.moduleCode, moduleCode),
+          eq(companyModuleSubscriptions.status, 'pending')
+        ));
+
+      if (!subscription) {
+        return res.status(400).json({ error: 'No pending subscription found' });
+      }
+
+      // Calculate end date based on billing cycle
+      const durationDays = subscription.billingCycle === 'yearly' ? 365 : 30;
+
+      // Update subscription to active
+      await db.update(companyModuleSubscriptions)
+        .set({
+          status: 'active',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
+          nextBillingDate: new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000),
+          lastPaymentDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(companyModuleSubscriptions.id, subscription.id));
+
+      // Create in-app notification
+      await db.insert(inAppNotifications).values({
+        companyId,
+        title: 'Module Activated',
+        message: `Your ${moduleCode.toUpperCase()} module subscription is now active.`,
+        type: 'success',
+        category: 'billing',
+        actionUrl: '/billing',
+      });
+
+      res.json({ success: true, message: 'Module activated successfully' });
+    } catch (error) {
+      console.error('Error verifying module payment:', error);
+      res.status(500).json({ error: 'Failed to verify payment' });
+    }
+  });
+
+  // Cancel module subscription
+  app.post('/api/modules/cancel', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+
+      const { moduleCode } = req.body;
+
+      const [subscription] = await db.select().from(companyModuleSubscriptions)
+        .where(and(
+          eq(companyModuleSubscriptions.companyId, companyId),
+          eq(companyModuleSubscriptions.moduleCode, moduleCode),
+          eq(companyModuleSubscriptions.status, 'active')
+        ));
+
+      if (!subscription) {
+        return res.status(404).json({ error: 'Active subscription not found' });
+      }
+
+      // If canceling core, also cancel all other modules
+      if (moduleCode === 'core') {
+        await db.update(companyModuleSubscriptions)
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(and(
+            eq(companyModuleSubscriptions.companyId, companyId),
+            eq(companyModuleSubscriptions.status, 'active')
+          ));
+      } else {
+        await db.update(companyModuleSubscriptions)
+          .set({ status: 'cancelled', updatedAt: new Date() })
+          .where(eq(companyModuleSubscriptions.id, subscription.id));
+      }
+
+      // Cancel in Razorpay if recurring
+      if (subscription.razorpaySubscriptionId) {
+        try {
+          await razorpayService.cancelSubscription(subscription.razorpaySubscriptionId);
+        } catch (error) {
+          console.error('Error canceling Razorpay subscription:', error);
+        }
+      }
+
+      // Create notification
+      await db.insert(inAppNotifications).values({
+        companyId,
+        title: 'Subscription Cancelled',
+        message: moduleCode === 'core' 
+          ? 'Your Core Platform and all modules have been cancelled.'
+          : `Your ${moduleCode.toUpperCase()} module subscription has been cancelled.`,
+        type: 'warning',
+        category: 'billing',
+        actionUrl: '/billing',
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error canceling subscription:', error);
+      res.status(500).json({ error: 'Failed to cancel subscription' });
+    }
+  });
+
+  // Check module access (used by middleware)
+  app.get('/api/modules/check-access/:moduleCode', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.json({ hasAccess: false, reason: 'not_authenticated' });
+      }
+
+      const moduleCode = req.params.moduleCode;
+
+      // Check core first
+      const [coreSub] = await db.select().from(companyModuleSubscriptions)
+        .where(and(
+          eq(companyModuleSubscriptions.companyId, companyId),
+          eq(companyModuleSubscriptions.moduleCode, 'core'),
+          eq(companyModuleSubscriptions.status, 'active')
+        ));
+
+      if (!coreSub) {
+        return res.json({ hasAccess: false, reason: 'no_core_subscription' });
+      }
+
+      // If checking core, and core is active, return true
+      if (moduleCode === 'core') {
+        return res.json({ hasAccess: true });
+      }
+
+      // Check specific module
+      const [moduleSub] = await db.select().from(companyModuleSubscriptions)
+        .where(and(
+          eq(companyModuleSubscriptions.companyId, companyId),
+          eq(companyModuleSubscriptions.moduleCode, moduleCode),
+          eq(companyModuleSubscriptions.status, 'active')
+        ));
+
+      res.json({ 
+        hasAccess: !!moduleSub,
+        reason: moduleSub ? undefined : 'module_not_subscribed',
+      });
+    } catch (error) {
+      console.error('Error checking module access:', error);
+      res.json({ hasAccess: false, reason: 'error' });
+    }
+  });
+
+  // Get in-app notifications
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      const user = await storage.getUserFromSession(req);
+      
+      if (!companyId || !user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const notifications = await db.select().from(inAppNotifications)
+        .where(or(
+          eq(inAppNotifications.companyId, companyId),
+          eq(inAppNotifications.userId, user.id)
+        ))
+        .orderBy(desc(inAppNotifications.createdAt))
+        .limit(50);
+
+      const unreadCount = notifications.filter(n => !n.isRead).length;
+
+      res.json({ notifications, unreadCount });
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  // Mark notification as read
+  app.post('/api/notifications/:id/read', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      await db.update(inAppNotifications)
+        .set({ isRead: true })
+        .where(and(
+          eq(inAppNotifications.id, req.params.id),
+          eq(inAppNotifications.companyId, companyId)
+        ));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking notification read:', error);
+      res.status(500).json({ error: 'Failed to update notification' });
+    }
+  });
+
+  // Mark all notifications as read
+  app.post('/api/notifications/read-all', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      await db.update(inAppNotifications)
+        .set({ isRead: true })
+        .where(eq(inAppNotifications.companyId, companyId));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking notifications read:', error);
+      res.status(500).json({ error: 'Failed to update notifications' });
+    }
+  });
+
+  // AI Usage tracking endpoints
+  app.get('/api/ai/usage', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const monthYear = new Date().toISOString().slice(0, 7); // '2024-01'
+      
+      let [usage] = await db.select().from(aiUsage)
+        .where(and(
+          eq(aiUsage.companyId, companyId),
+          eq(aiUsage.monthYear, monthYear)
+        ));
+
+      if (!usage) {
+        // Create initial usage record
+        const [newUsage] = await db.insert(aiUsage).values({
+          companyId,
+          monthYear,
+          monthlyLimitTokens: 50000, // Default Starter tier
+          usedTokens: 0,
+          requestCount: 0,
+        }).returning();
+        usage = newUsage;
+      }
+
+      res.json({
+        ...usage,
+        remainingTokens: usage.monthlyLimitTokens - usage.usedTokens,
+        percentUsed: Math.round((usage.usedTokens / usage.monthlyLimitTokens) * 100),
+      });
+    } catch (error) {
+      console.error('Error fetching AI usage:', error);
+      res.status(500).json({ error: 'Failed to fetch usage' });
+    }
+  });
+
+  // AI Assistant settings
+  app.get('/api/ai/settings', async (req, res) => {
+    try {
+      const companyId = await getCompanyIdFromRequest(req);
+      if (!companyId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      let [settings] = await db.select().from(aiAssistantSettings)
+        .where(eq(aiAssistantSettings.companyId, companyId));
+
+      if (!settings) {
+        // Create default settings
+        const [newSettings] = await db.insert(aiAssistantSettings).values({
+          companyId,
+          assistantName: 'Wedding AI',
+          welcomeMessage: 'Hello! How can I help with your wedding planning today?',
+          isEnabled: true,
+        }).returning();
+        settings = newSettings;
+      }
+
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching AI settings:', error);
+      res.status(500).json({ error: 'Failed to fetch settings' });
+    }
+  });
+
+  // Update AI Assistant settings
+  app.put('/api/ai/settings', async (req, res) => {
+    try {
+      const companyId = await requireCompanyId(req, res);
+      if (!companyId) return;
+
+      const { assistantName, welcomeMessage, systemPromptAddition, avatarUrl, primaryColor, isEnabled } = req.body;
+
+      const [existing] = await db.select().from(aiAssistantSettings)
+        .where(eq(aiAssistantSettings.companyId, companyId));
+
+      if (existing) {
+        await db.update(aiAssistantSettings)
+          .set({
+            assistantName: assistantName || existing.assistantName,
+            welcomeMessage: welcomeMessage !== undefined ? welcomeMessage : existing.welcomeMessage,
+            systemPromptAddition: systemPromptAddition !== undefined ? systemPromptAddition : existing.systemPromptAddition,
+            avatarUrl: avatarUrl !== undefined ? avatarUrl : existing.avatarUrl,
+            primaryColor: primaryColor !== undefined ? primaryColor : existing.primaryColor,
+            isEnabled: isEnabled !== undefined ? isEnabled : existing.isEnabled,
+            updatedAt: new Date(),
+          })
+          .where(eq(aiAssistantSettings.companyId, companyId));
+      } else {
+        await db.insert(aiAssistantSettings).values({
+          companyId,
+          assistantName: assistantName || 'Wedding AI',
+          welcomeMessage,
+          systemPromptAddition,
+          avatarUrl,
+          primaryColor,
+          isEnabled: isEnabled ?? true,
+        });
+      }
+
+      const [settings] = await db.select().from(aiAssistantSettings)
+        .where(eq(aiAssistantSettings.companyId, companyId));
+
+      res.json(settings);
+    } catch (error) {
+      console.error('Error updating AI settings:', error);
+      res.status(500).json({ error: 'Failed to update settings' });
     }
   });
 
