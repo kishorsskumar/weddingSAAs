@@ -1,10 +1,43 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcryptjs";
 import { startReminderScheduler } from "./reminder-scheduler";
+
+// CORS configuration for production and development
+const allowedOrigins = [
+  'https://app.atbottsolutions.com',
+  'https://weddingsaas.onrender.com',
+  'http://localhost:5000',
+  'http://localhost:3000',
+  'http://0.0.0.0:5000',
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) {
+      return callback(null, true);
+    }
+    // Allow Render preview URLs
+    if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    // Allow explicitly listed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400, // 24 hours
+};
 
 const DEFAULT_ROLES = [
   { name: 'superadmin', label: 'Super Admin', description: 'Full system access with role management', isSystem: true },
@@ -55,6 +88,9 @@ async function ensureDefaultSuperAdmin() {
 
 const app = express();
 const httpServer = createServer(app);
+
+// Enable CORS
+app.use(cors(corsOptions));
 
 declare module "http" {
   interface IncomingMessage {
