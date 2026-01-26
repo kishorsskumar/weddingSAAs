@@ -16,14 +16,24 @@ const allowedOrigins = [
   'http://0.0.0.0:5000',
 ];
 
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 const corsOptions: cors.CorsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, curl, etc.)
     if (!origin) {
       return callback(null, true);
     }
+    // In development, allow all origins
+    if (isDevelopment) {
+      return callback(null, true);
+    }
     // Allow Render preview URLs
     if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    // Allow Replit development URLs
+    if (origin.includes('.replit.dev') || origin.includes('.replit.app') || origin.includes('.repl.co')) {
       return callback(null, true);
     }
     // Allow explicitly listed origins
