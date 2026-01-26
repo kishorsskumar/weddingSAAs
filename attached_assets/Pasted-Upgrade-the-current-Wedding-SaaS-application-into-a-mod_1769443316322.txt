@@ -1,0 +1,249 @@
+Upgrade the current Wedding SaaS application into a modular subscription-based SaaS platform using Razorpay subscriptions, internal notifications and email alerts only.
+
+DO NOT implement WhatsApp, SMS or third-party messaging APIs.
+
+-------------------------------------------------
+
+1) CORE PLATFORM STRUCTURE
+
+Create a mandatory base subscription called "Core Platform".
+
+Core Platform includes:
+- Authentication system
+- Dashboard
+- Event management
+- Client management
+- Internal notification system
+- Email notification system
+- Role permissions
+
+Prevent any add-on module activation unless Core Platform subscription is active.
+
+-------------------------------------------------
+
+2) MODULE-BASED BILLING SYSTEM
+
+Create independent paid modules:
+
+RSVP Module:
+- Guest list
+- RSVP public links
+- Email invite system
+- Auto email reminders
+- Guest response tracking
+- QR code check-in
+
+CRM Module:
+- Lead tracking
+- Follow-up scheduler
+- Deal stages
+
+Vendor Module:
+- Vendor database
+- Event assignment
+
+Payments Module:
+- Budget tracking
+- Razorpay transaction viewer
+- Invoice export
+
+Automation Module:
+- Timeline automation
+- Internal dashboard reminders
+- Email trigger engine
+
+AI Assistant Module (White Label):
+- Natural language query support
+- Report generation
+- Planning assistance
+- Dashboard insights
+
+-------------------------------------------------
+
+3) RAZORPAY SUBSCRIPTION PLANS
+
+Create recurring subscription plans:
+
+Core Platform:
+Monthly ₹499
+Yearly ₹4,999
+
+Modules:
+
+RSVP:
+₹399/month
+₹3,999/year
+
+CRM:
+₹299/month
+₹2,999/year
+
+Vendor:
+₹249/month
+₹2,499/year
+
+Payments:
+₹299/month
+₹2,999/year
+
+Automation:
+₹199/month
+₹1,999/year
+
+AI Assistant:
+₹499/month
+₹4,999/year
+
+Use Razorpay Subscription APIs.
+
+Store subscription data:
+- user_id
+- module_name
+- plan_type
+- status
+- razorpay_subscription_id
+- next_billing_date
+
+-------------------------------------------------
+
+4) FEATURE ACCESS CONTROL
+
+Implement middleware-based access gating:
+
+If module inactive:
+- Hide UI
+- Block APIs
+- Show upgrade CTA
+
+If Core inactive:
+- Redirect to billing page
+
+-------------------------------------------------
+
+5) WHITE LABEL AI ASSISTANT
+
+Allow customers to set custom assistant name:
+
+Example:
+"MyPlanner AI"
+"EventBot"
+"BrideGenie"
+
+Store in database.
+
+AI System Prompt:
+
+"You are {{assistant_name}}, the official assistant for {{company_name}} Wedding SaaS. Only respond to queries related to the user's wedding business and dashboard data."
+
+Do NOT allow generic ChatGPT usage.
+
+-------------------------------------------------
+
+6) AI USAGE LIMIT CONTROL
+
+Monthly token caps:
+
+Starter: 50k tokens
+Pro: 150k tokens
+Enterprise: 400k tokens
+
+Block when exceeded with UI alert.
+
+Auto-reset monthly.
+
+-------------------------------------------------
+
+7) INTERNAL NOTIFICATION SYSTEM
+
+Create notification engine:
+
+Trigger notifications for:
+
+- Event deadlines
+- Payment due reminders
+- RSVP milestones
+- Subscription renewal alerts
+
+Notification channels:
+
+- In-app notification bell
+- Email alerts
+
+No WhatsApp
+No SMS
+
+-------------------------------------------------
+
+8) BILLING DASHBOARD UI
+
+Create billing page:
+
+Display:
+
+- Active subscriptions
+- Active modules
+- Next payment date
+- Upgrade/downgrade buttons
+- Cancel subscription
+- Invoice downloads
+
+Allow module add/remove in real-time.
+
+-------------------------------------------------
+
+9) PAYMENT FAILURE HANDLING
+
+On Razorpay webhook failure:
+
+- Pause premium modules
+- Show alert banner
+- Send email reminder
+
+-------------------------------------------------
+
+10) ADMIN PANEL
+
+Admin dashboard:
+
+- View revenue
+- Active users
+- Subscriptions
+- Suspend users
+- Reset AI usage
+- Enable/disable modules manually
+
+-------------------------------------------------
+
+11) SECURITY
+
+- Use environment variables
+- Secure Razorpay webhooks
+- Never expose secret keys
+- Validate subscription status on every request
+
+-------------------------------------------------
+
+12) UI REQUIREMENTS
+
+Pricing Page:
+
+- Monthly/yearly toggle
+- Module cards
+- Upgrade CTA
+
+Chatbot:
+
+- Floating bottom-right widget
+- White-label assistant name
+- Typing animation
+- Session memory
+
+-------------------------------------------------
+
+OUTPUT:
+
+Implement production-ready modular SaaS billing architecture with Razorpay, internal notifications, white-label AI assistant, usage limits, billing UI, admin controls.
+
+Do not integrate WhatsApp or SMS features.
+
+Preserve existing authentication and dashboard functionality.

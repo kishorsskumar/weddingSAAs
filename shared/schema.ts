@@ -2284,3 +2284,147 @@ export const oaksyReminders = pgTable("oaksy_reminders", {
 export const insertOaksyReminderSchema = createInsertSchema(oaksyReminders).omit({ id: true, createdAt: true });
 export type InsertOaksyReminder = z.infer<typeof insertOaksyReminderSchema>;
 export type OaksyReminder = typeof oaksyReminders.$inferSelect;
+
+// ============================================
+// MODULAR SAAS SUBSCRIPTION SYSTEM
+// ============================================
+
+// Module catalog - defines available modules
+export const saasModules = pgTable("saas_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // 'core', 'rsvp', 'crm', 'vendor', 'payments', 'automation', 'ai_assistant'
+  name: text("name").notNull(),
+  description: text("description"),
+  monthlyPrice: integer("monthly_price").notNull(), // in paise (e.g., 49900 = ₹499)
+  yearlyPrice: integer("yearly_price").notNull(), // in paise
+  razorpayMonthlyPlanId: text("razorpay_monthly_plan_id"), // Razorpay plan ID for monthly
+  razorpayYearlyPlanId: text("razorpay_yearly_plan_id"), // Razorpay plan ID for yearly
+  features: jsonb("features").$type<string[]>(), // List of feature descriptions
+  isCore: boolean("is_core").notNull().default(false), // Core platform is mandatory
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSaasModuleSchema = createInsertSchema(saasModules).omit({ id: true, createdAt: true });
+export type InsertSaasModule = z.infer<typeof insertSaasModuleSchema>;
+export type SaasModule = typeof saasModules.$inferSelect;
+
+// Company module subscriptions - tracks which modules each company has
+export const companyModuleSubscriptions = pgTable("company_module_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  moduleId: varchar("module_id").notNull().references(() => saasModules.id),
+  moduleCode: text("module_code").notNull(), // Denormalized for quick checks
+  razorpaySubscriptionId: text("razorpay_subscription_id"),
+  razorpayCustomerId: text("razorpay_customer_id"),
+  billingCycle: text("billing_cycle").notNull().default('monthly'), // 'monthly' | 'yearly'
+  status: text("status").notNull().default('pending'), // 'pending', 'active', 'paused', 'cancelled', 'expired'
+  amountPaid: integer("amount_paid"), // Last paid amount in paise
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  nextBillingDate: timestamp("next_billing_date"),
+  lastPaymentDate: timestamp("last_payment_date"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCompanyModuleSubscriptionSchema = createInsertSchema(companyModuleSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCompanyModuleSubscription = z.infer<typeof insertCompanyModuleSubscriptionSchema>;
+export type CompanyModuleSubscription = typeof companyModuleSubscriptions.$inferSelect;
+
+// AI Assistant settings - white-label configuration per company
+export const aiAssistantSettings = pgTable("ai_assistant_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().unique().references(() => companies.id, { onDelete: 'cascade' }),
+  assistantName: text("assistant_name").notNull().default('AI Assistant'),
+  welcomeMessage: text("welcome_message"),
+  systemPromptAddition: text("system_prompt_addition"), // Additional context for the AI
+  avatarUrl: text("avatar_url"),
+  primaryColor: text("primary_color"), // Custom color for chat widget
+  isEnabled: boolean("is_enabled").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiAssistantSettingsSchema = createInsertSchema(aiAssistantSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAiAssistantSettings = z.infer<typeof insertAiAssistantSettingsSchema>;
+export type AiAssistantSettings = typeof aiAssistantSettings.$inferSelect;
+
+// AI Usage tracking - monthly token limits per company
+export const aiUsage = pgTable("ai_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  monthYear: text("month_year").notNull(), // Format: '2024-01' for easy reset
+  monthlyLimitTokens: integer("monthly_limit_tokens").notNull().default(50000), // Token limit based on plan
+  usedTokens: integer("used_tokens").notNull().default(0),
+  requestCount: integer("request_count").notNull().default(0),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiUsageSchema = createInsertSchema(aiUsage).omit({ id: true, createdAt: true });
+export type InsertAiUsage = z.infer<typeof insertAiUsageSchema>;
+export type AiUsage = typeof aiUsage.$inferSelect;
+
+// Billing events - webhook event log for audit
+export const billingEvents = pgTable("billing_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  razorpayEventId: text("razorpay_event_id").unique(), // For idempotency
+  eventType: text("event_type").notNull(), // 'subscription.activated', 'subscription.charged', 'payment.failed', etc.
+  companyId: varchar("company_id").references(() => companies.id),
+  subscriptionId: varchar("subscription_id").references(() => companyModuleSubscriptions.id),
+  payload: jsonb("payload").$type<Record<string, any>>(),
+  processedAt: timestamp("processed_at"),
+  status: text("status").notNull().default('pending'), // 'pending', 'processed', 'failed'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBillingEventSchema = createInsertSchema(billingEvents).omit({ id: true, createdAt: true });
+export type InsertBillingEvent = z.infer<typeof insertBillingEventSchema>;
+export type BillingEvent = typeof billingEvents.$inferSelect;
+
+// Internal notifications - in-app notification system
+export const inAppNotifications = pgTable("in_app_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default('info'), // 'info', 'warning', 'error', 'success', 'billing'
+  category: text("category"), // 'billing', 'event', 'rsvp', 'payment', 'system'
+  actionUrl: text("action_url"), // Link to relevant page
+  isRead: boolean("is_read").notNull().default(false),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInAppNotificationSchema = createInsertSchema(inAppNotifications).omit({ id: true, createdAt: true });
+export type InsertInAppNotification = z.infer<typeof insertInAppNotificationSchema>;
+export type InAppNotification = typeof inAppNotifications.$inferSelect;
+
+// Email notification queue - for sending scheduled emails
+export const emailNotificationQueue = pgTable("email_notification_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  userId: varchar("user_id").references(() => users.id),
+  toEmail: text("to_email").notNull(),
+  toName: text("to_name"),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content").notNull(),
+  textContent: text("text_content"),
+  templateType: text("template_type"), // 'billing_reminder', 'payment_failed', 'subscription_activated', etc.
+  status: text("status").notNull().default('pending'), // 'pending', 'sent', 'failed'
+  scheduledFor: timestamp("scheduled_for"),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmailNotificationQueueSchema = createInsertSchema(emailNotificationQueue).omit({ id: true, createdAt: true });
+export type InsertEmailNotificationQueue = z.infer<typeof insertEmailNotificationQueueSchema>;
+export type EmailNotificationQueue = typeof emailNotificationQueue.$inferSelect;
