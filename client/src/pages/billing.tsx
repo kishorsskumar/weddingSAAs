@@ -5,9 +5,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, CreditCard, CheckCircle, AlertCircle, Crown, Package, Zap, Users, Calendar, DollarSign, Bot, Settings, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AiSettingsPanel } from "@/components/ai-settings";
 
 declare global {
   interface Window {
@@ -231,15 +233,31 @@ export default function BillingPage() {
   const addonModules = modules?.filter(m => !m.isCore) || [];
   const activeSubscriptions = subscriptionData?.subscriptions.filter(s => s.status === 'active') || [];
 
+  const hasAiSubscription = subscriptionData?.activatedModules.includes('ai_assistant');
+
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4" data-testid="billing-page">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing & Subscriptions</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing & Settings</h1>
           <p className="text-gray-600">
-            Manage your platform subscriptions and add-on modules.
+            Manage your platform subscriptions, modules, and AI settings.
           </p>
         </div>
+
+        <Tabs defaultValue="subscriptions" className="space-y-6">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
+            <TabsTrigger value="subscriptions" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Subscriptions
+            </TabsTrigger>
+            <TabsTrigger value="ai-settings" className="flex items-center gap-2" disabled={!hasAiSubscription}>
+              <Bot className="h-4 w-4" />
+              AI Settings
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="subscriptions" className="space-y-6">
 
         {activeSubscriptions.length > 0 && (
           <Card className="mb-8 border-primary/20 bg-primary/5">
@@ -468,6 +486,33 @@ export default function BillingPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+          </TabsContent>
+
+          <TabsContent value="ai-settings">
+            {hasAiSubscription ? (
+              <AiSettingsPanel />
+            ) : (
+              <Card className="border-yellow-200 bg-yellow-50">
+                <CardContent className="py-8 text-center">
+                  <Bot className="h-12 w-12 mx-auto text-yellow-600 mb-4" />
+                  <h3 className="text-lg font-semibold text-yellow-800 mb-2">
+                    AI Assistant Not Subscribed
+                  </h3>
+                  <p className="text-yellow-700 mb-4">
+                    Subscribe to the AI Assistant module to customize your white-label AI.
+                  </p>
+                  <Button onClick={() => {
+                    const el = document.querySelector('[data-testid="module-card-ai_assistant"]');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  }}>
+                    View AI Module
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
