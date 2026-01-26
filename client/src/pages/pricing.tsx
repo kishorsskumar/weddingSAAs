@@ -9,13 +9,12 @@ import { Check, Crown, Package, Users, DollarSign, Zap, Bot, ArrowRight } from "
 import { motion } from "framer-motion";
 
 const coreFeatures = [
-  "Authentication & User Management",
-  "Dashboard & Analytics",
-  "Event Management",
-  "Client Database",
-  "Internal Notifications",
-  "Email Alerts",
-  "Role-based Permissions"
+  "One Login — Full Business Control",
+  "Manage Every Wedding in One Place",
+  "Never Lose Client Details Again",
+  "Instant Team Task Notifications",
+  "Automatic Client Email Updates",
+  "Live Business Performance Overview"
 ];
 
 const modules = [
@@ -150,18 +149,18 @@ export default function PricingPage() {
             <div className="relative bg-white rounded-2xl p-8 border-2 border-primary shadow-xl max-w-3xl mx-auto">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-sm font-medium px-4 py-1 rounded-full flex items-center gap-1">
                 <Crown className="h-4 w-4" />
-                Required
+                Recommended to Start
               </div>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
                     <Package className="h-6 w-6 text-primary" />
-                    Core Platform
+                    Business Starter Suite
                   </h2>
                   <p className="text-gray-600 mb-4">
-                    The essential foundation for your wedding business
+                    Everything you need to run weddings professionally
                   </p>
-                  <div className="grid sm:grid-cols-2 gap-2">
+                  <div className="grid sm:grid-cols-2 gap-3">
                     {coreFeatures.map((feature) => (
                       <div key={feature} className="flex items-center gap-2 text-sm text-gray-700">
                         <Check className="h-4 w-4 text-primary flex-shrink-0" />
@@ -179,7 +178,7 @@ export default function PricingPage() {
                   </div>
                   <Link href="/signup">
                     <Button size="lg" className="w-full md:w-auto">
-                      Start Free Trial
+                      Activate Business Starter Suite
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
@@ -242,7 +241,7 @@ export default function PricingPage() {
               </h3>
               <div className="flex flex-wrap justify-center gap-4 mb-6">
                 <div className="bg-white rounded-lg px-4 py-2 border shadow-sm">
-                  <span className="font-medium">Core</span>
+                  <span className="font-medium">Starter Suite</span>
                   <span className="text-gray-500 ml-2">₹499</span>
                 </div>
                 <span className="text-gray-400 self-center">+</span>
