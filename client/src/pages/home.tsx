@@ -108,28 +108,19 @@ export default function HomePage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="relative hidden lg:block"
+              className="relative mt-12 lg:mt-0"
             >
-              <div className="relative bg-white rounded-2xl shadow-2xl p-6 border border-gray-100">
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                </div>
-                <div className="space-y-4">
-                  <div className="h-8 bg-gray-100 rounded-lg w-3/4"></div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="h-24 bg-primary/10 rounded-lg"></div>
-                    <div className="h-24 bg-blue-50 rounded-lg"></div>
-                    <div className="h-24 bg-green-50 rounded-lg"></div>
-                  </div>
-                  <div className="h-32 bg-gray-50 rounded-lg"></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="h-20 bg-gray-100 rounded-lg"></div>
-                    <div className="h-20 bg-gray-100 rounded-lg"></div>
-                  </div>
-                </div>
-              </div>
+              <motion.div
+                animate={{ y: [-6, 6, -6] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
+              >
+                <img 
+                  src="/assets/hero-dashboard.png" 
+                  alt="AtBott Wedding SaaS Dashboard"
+                  className="w-full max-w-full h-auto rounded-2xl shadow-2xl border border-gray-200"
+                />
+              </motion.div>
               <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-primary/20 rounded-full blur-2xl"></div>
               <div className="absolute -top-4 -left-4 w-32 h-32 bg-blue-200/30 rounded-full blur-2xl"></div>
             </motion.div>
