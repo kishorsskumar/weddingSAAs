@@ -355,6 +355,18 @@ export default function KnotVitePlanPDF() {
               </ul>
             </div>
           </div>
+
+          <div className="mt-4 p-4 bg-amber-50 border-l-4 border-amber-500 rounded">
+            <h4 className="font-semibold text-amber-800">Important UX Principle</h4>
+            <p className="text-sm text-gray-700 mt-1">
+              Free users who hit plan limits retain <strong>read access</strong> to all existing RSVP data. 
+              Only <strong>new submissions</strong> are blocked until upgrade. Users never lose access to their data.
+            </p>
+            <div className="mt-2 text-xs text-gray-600">
+              <span className="text-green-600">✓ View/Export/Edit existing data</span> | 
+              <span className="text-red-600 ml-2">✗ New submissions blocked</span>
+            </div>
+          </div>
         </section>
 
         <section className="mb-8 print-break">

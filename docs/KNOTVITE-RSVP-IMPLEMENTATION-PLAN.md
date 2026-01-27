@@ -511,6 +511,18 @@ client/src/components/knotvite/
 
 ### Feature Gating Implementation
 
+**Important UX Principle:** Free users who hit plan limits must retain **read access** to all their existing RSVP data. Only **new submissions** should be blocked until upgrade. This ensures users never lose access to their data.
+
+#### Gating Rules:
+| Action | Over Limit Behavior |
+|--------|---------------------|
+| View existing submissions | ✅ Always allowed |
+| Export existing data | ✅ Always allowed |
+| Edit existing submissions | ✅ Always allowed |
+| New RSVP submissions | ❌ Blocked with upgrade prompt |
+| Create new events | ❌ Blocked with upgrade prompt |
+| Add new custom fields | ❌ Blocked with upgrade prompt |
+
 ```typescript
 // Middleware check
 const checkKnotvitePlan = async (req, res, next) => {
@@ -523,11 +535,31 @@ const checkKnotvitePlan = async (req, res, next) => {
   next();
 };
 
-// Usage in routes
-app.post('/api/knotvite/import/upload', 
+// Block NEW submissions only - existing data always accessible
+const checkSubmissionLimit = async (req, res, next) => {
+  if (req.knotvitePlan === 'free') {
+    const currentCount = await getSubmissionCount(req.params.eventId);
+    if (currentCount >= req.knotviteLimits.maxGuests) {
+      return res.status(403).json({
+        error: 'Guest limit reached',
+        message: 'Upgrade to Pro for unlimited guests',
+        upgradeUrl: '/billing'
+      });
+    }
+  }
+  next();
+};
+
+// Usage in routes - READ operations never blocked
+app.get('/api/knotvite/events/:eventId/submissions', 
   checkKnotvitePlan,
-  requirePlan('pro'),
-  handleImport
+  listSubmissions // Always allowed
+);
+
+app.post('/api/knotvite/public/submit/:eventId', 
+  checkKnotvitePlan,
+  checkSubmissionLimit, // Only blocks NEW submissions
+  handleSubmission
 );
 ```
 
