@@ -146,10 +146,10 @@ function AppRoutes() {
           <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
         </Route>
         <Route path="/knotvite/forms">
-          <PrivateRoute component={KnotViteForms} path="/knotvite/forms" />
+          <PrivateRoute component={KnotViteForms} path="/knotvite/forms" skipSubscriptionCheck={true} />
         </Route>
         <Route path="/knotvite/submissions">
-          <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" />
+          <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" skipSubscriptionCheck={true} />
         </Route>
         <Route component={NotFound} />
       </Switch>
