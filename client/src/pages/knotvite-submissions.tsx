@@ -16,15 +16,18 @@ interface RsvpSubmission {
   id: string;
   eventId: string;
   templateId: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
+  companyId: string;
+  guestId?: string | null;
+  guestName: string;
+  guestEmail?: string | null;
+  guestPhone?: string | null;
   attending: string;
-  guestCount: number;
-  dietaryPreferences?: string | null;
-  message?: string | null;
+  partySize: number;
   responses?: Record<string, unknown> | null;
+  source: string;
+  ipAddress?: string | null;
   submittedAt: string;
+  updatedAt: string;
 }
 
 interface Event {
@@ -96,9 +99,9 @@ export default function KnotViteSubmissions() {
   const filteredSubmissions = useMemo(() => {
     return submissions.filter(s => {
       const matchesSearch = !searchTerm || 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.phone?.includes(searchTerm);
+        s.guestName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.guestEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.guestPhone?.includes(searchTerm);
       const matchesFilter = attendingFilter === 'all' || s.attending === attendingFilter;
       return matchesSearch && matchesFilter;
     });
@@ -107,21 +110,20 @@ export default function KnotViteSubmissions() {
   const totalGuests = useMemo(() => {
     return submissions
       .filter(s => s.attending === 'yes')
-      .reduce((sum, s) => sum + (s.guestCount || 1), 0);
+      .reduce((sum, s) => sum + (s.partySize || 1), 0);
   }, [submissions]);
 
   const exportToCsv = () => {
     if (!filteredSubmissions.length) return;
     
-    const headers = ['Name', 'Email', 'Phone', 'Attending', 'Guests', 'Dietary', 'Message', 'Submitted'];
+    const headers = ['Name', 'Email', 'Phone', 'Attending', 'Guests', 'Source', 'Submitted'];
     const rows = filteredSubmissions.map(s => [
-      s.name,
-      s.email || '',
-      s.phone || '',
+      s.guestName,
+      s.guestEmail || '',
+      s.guestPhone || '',
       s.attending,
-      String(s.guestCount || 1),
-      s.dietaryPreferences || '',
-      s.message || '',
+      String(s.partySize || 1),
+      s.source,
       format(new Date(s.submittedAt), 'yyyy-MM-dd HH:mm'),
     ]);
     
@@ -259,7 +261,7 @@ export default function KnotViteSubmissions() {
                         <TableHead className="hidden sm:table-cell">Contact</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="hidden md:table-cell">Guests</TableHead>
-                        <TableHead className="hidden lg:table-cell">Message</TableHead>
+                        <TableHead className="hidden lg:table-cell">Source</TableHead>
                         <TableHead className="hidden md:table-cell">Submitted</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
@@ -268,23 +270,16 @@ export default function KnotViteSubmissions() {
                       {filteredSubmissions.map((sub, index) => (
                         <TableRow key={sub.id} data-testid={`submission-row-${index}`}>
                           <TableCell>
-                            <div className="font-medium">{sub.name}</div>
-                            {sub.dietaryPreferences && (
-                              <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                                🍽 {sub.dietaryPreferences}
-                              </div>
-                            )}
+                            <div className="font-medium">{sub.guestName}</div>
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">
-                            <div className="text-sm">{sub.email || '-'}</div>
-                            <div className="text-xs text-muted-foreground">{sub.phone || ''}</div>
+                            <div className="text-sm">{sub.guestEmail || '-'}</div>
+                            <div className="text-xs text-muted-foreground">{sub.guestPhone || ''}</div>
                           </TableCell>
                           <TableCell>{getAttendingBadge(sub.attending)}</TableCell>
-                          <TableCell className="hidden md:table-cell">{sub.guestCount || 1}</TableCell>
+                          <TableCell className="hidden md:table-cell">{sub.partySize || 1}</TableCell>
                           <TableCell className="hidden lg:table-cell">
-                            <span className="truncate max-w-[200px] block text-sm text-muted-foreground">
-                              {sub.message || '-'}
-                            </span>
+                            <Badge variant="outline" className="text-xs">{sub.source}</Badge>
                           </TableCell>
                           <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                             {format(new Date(sub.submittedAt), 'MMM d, h:mm a')}

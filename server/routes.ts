@@ -12063,13 +12063,13 @@ Respond with a JSON array only, no markdown formatting.`;
     }
   });
 
-  // Public RSVP Form - Get template by slug (no auth required)
-  app.get("/api/public/rsvp/:slug", async (req, res) => {
+  // Public RSVP Form - Get template by ID (no auth required)
+  app.get("/api/public/rsvp/:id", async (req, res) => {
     try {
       const templates = await db.select().from(rsvpFormTemplates)
         .where(and(
-          eq(rsvpFormTemplates.slug, req.params.slug),
-          eq(rsvpFormTemplates.isPublished, true)
+          eq(rsvpFormTemplates.id, req.params.id),
+          eq(rsvpFormTemplates.status, 'published')
         ));
       
       if (templates.length === 0) {
@@ -12084,23 +12084,19 @@ Respond with a JSON array only, no markdown formatting.`;
         template: {
           id: template.id,
           name: template.name,
-          description: template.description,
-          headerImage: template.headerImage,
-          logoUrl: template.logoUrl,
-          primaryColor: template.primaryColor,
-          backgroundColor: template.backgroundColor,
-          fontFamily: template.fontFamily,
-          successMessage: template.successMessage,
+          welcomeMessage: template.welcomeMessage,
+          confirmationMessage: template.confirmationMessage,
+          requireEmail: template.requireEmail,
+          requirePhone: template.requirePhone,
         },
         fields: fields.map(f => ({
           id: f.id,
-          type: f.type,
+          fieldKey: f.fieldKey,
+          fieldType: f.fieldType,
           label: f.label,
           placeholder: f.placeholder,
-          helpText: f.helpText,
           required: f.required,
           options: f.options,
-          validation: f.validation,
         })),
         event: event ? {
           name: event.name,
@@ -12115,12 +12111,12 @@ Respond with a JSON array only, no markdown formatting.`;
   });
 
   // Public RSVP Form - Submit (no auth required)
-  app.post("/api/public/rsvp/:slug/submit", async (req, res) => {
+  app.post("/api/public/rsvp/:id/submit", async (req, res) => {
     try {
       const templates = await db.select().from(rsvpFormTemplates)
         .where(and(
-          eq(rsvpFormTemplates.slug, req.params.slug),
-          eq(rsvpFormTemplates.isPublished, true)
+          eq(rsvpFormTemplates.id, req.params.id),
+          eq(rsvpFormTemplates.status, 'published')
         ));
       
       if (templates.length === 0) {
@@ -12133,32 +12129,25 @@ Respond with a JSON array only, no markdown formatting.`;
         return res.status(400).json({ error: 'Form not linked to an event' });
       }
       
-      const { name, email, phone, attending, guestCount, dietaryPreferences, message, responses } = req.body;
+      const { guestName, guestEmail, guestPhone, attending, partySize, responses } = req.body;
       
       const submission = await storage.createRsvpSubmission({
         eventId: template.eventId,
         templateId: template.id,
-        name,
-        email,
-        phone,
+        companyId: template.companyId,
+        guestName,
+        guestEmail,
+        guestPhone,
         attending: attending || 'pending',
-        guestCount: guestCount || 1,
-        dietaryPreferences,
-        message,
+        partySize: partySize || 1,
         responses: responses || {},
-        source: 'form',
+        source: 'web',
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-      });
-      
-      // Update submission count
-      await storage.updateRsvpFormTemplate(template.id, {
-        submissionCount: (template.submissionCount || 0) + 1,
       });
       
       res.status(201).json({
         success: true,
-        message: template.successMessage || 'Thank you for your RSVP!',
+        message: template.confirmationMessage || 'Thank you for your RSVP!',
         submissionId: submission.id,
       });
     } catch (error: any) {

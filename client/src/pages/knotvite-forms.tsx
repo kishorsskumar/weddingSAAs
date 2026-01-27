@@ -22,10 +22,13 @@ interface RsvpFormTemplate {
   companyId: string;
   eventId?: string | null;
   name: string;
-  slug: string;
-  description?: string | null;
-  isPublished: boolean;
-  submissionCount?: number;
+  status: string;
+  welcomeMessage?: string | null;
+  confirmationMessage?: string | null;
+  deadline?: string | null;
+  requireEmail: boolean;
+  requirePhone: boolean;
+  brandingEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,13 +36,15 @@ interface RsvpFormTemplate {
 interface RsvpFormField {
   id: string;
   templateId: string;
-  type: string;
+  fieldKey: string;
+  fieldType: string;
   label: string;
   placeholder?: string | null;
-  helpText?: string | null;
+  defaultValue?: string | null;
   required: boolean;
-  options?: string[] | null;
+  options?: { value: string; label: string }[] | null;
   order: number;
+  isSystemField: boolean;
 }
 
 interface Event {
@@ -50,16 +55,12 @@ interface Event {
 
 const FIELD_TYPES = [
   { value: 'text', label: 'Text Input' },
-  { value: 'email', label: 'Email' },
-  { value: 'phone', label: 'Phone Number' },
-  { value: 'number', label: 'Number' },
   { value: 'textarea', label: 'Multi-line Text' },
-  { value: 'select', label: 'Dropdown' },
-  { value: 'radio', label: 'Radio Buttons' },
-  { value: 'checkbox', label: 'Checkboxes' },
+  { value: 'dropdown', label: 'Dropdown' },
+  { value: 'toggle', label: 'Yes/No Toggle' },
+  { value: 'multiselect', label: 'Multi-select' },
+  { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date Picker' },
-  { value: 'heading', label: 'Section Heading' },
-  { value: 'divider', label: 'Divider Line' },
 ];
 
 export default function KnotViteForms() {
@@ -199,14 +200,13 @@ export default function KnotViteForms() {
   const handleCreateTemplate = (formData: FormData) => {
     const name = formData.get('name') as string;
     const eventId = formData.get('eventId') as string;
-    const description = formData.get('description') as string;
+    const welcomeMessage = formData.get('description') as string;
     
     createTemplateMutation.mutate({
       name,
-      slug: generateSlug(name),
       eventId: eventId || null,
-      description: description || null,
-      isPublished: false,
+      welcomeMessage: welcomeMessage || null,
+      status: 'draft',
     });
   };
 
@@ -224,22 +224,22 @@ export default function KnotViteForms() {
             <p className="text-muted-foreground text-sm">Add and manage form fields</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={selectedTemplate.isPublished ? "default" : "secondary"}>
-              {selectedTemplate.isPublished ? "Published" : "Draft"}
+            <Badge variant={selectedTemplate.status === 'published' ? "default" : "secondary"}>
+              {selectedTemplate.status === 'published' ? "Published" : "Draft"}
             </Badge>
             <Button 
-              variant={selectedTemplate.isPublished ? "outline" : "default"}
+              variant={selectedTemplate.status === 'published' ? "outline" : "default"}
               onClick={() => updateTemplateMutation.mutate({
                 id: selectedTemplate.id,
-                data: { isPublished: !selectedTemplate.isPublished }
+                data: { status: selectedTemplate.status === 'published' ? 'draft' : 'published' }
               })}
               data-testid="toggle-publish-btn"
             >
-              {selectedTemplate.isPublished ? "Unpublish" : "Publish Form"}
+              {selectedTemplate.status === 'published' ? "Unpublish" : "Publish Form"}
             </Button>
-            {selectedTemplate.isPublished && (
+            {selectedTemplate.status === 'published' && (
               <Button variant="outline" asChild data-testid="preview-form-btn">
-                <a href={`/rsvp/${selectedTemplate.slug}`} target="_blank" rel="noopener noreferrer">
+                <a href={`/rsvp/${selectedTemplate.id}`} target="_blank" rel="noopener noreferrer">
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
                 </a>
@@ -276,7 +276,7 @@ export default function KnotViteForms() {
                             {field.required && <Badge variant="outline" className="text-xs">Required</Badge>}
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            {FIELD_TYPES.find(t => t.value === field.type)?.label || field.type}
+                            {FIELD_TYPES.find(t => t.value === field.fieldType)?.label || field.fieldType}
                           </p>
                         </div>
                         <Button
@@ -332,7 +332,7 @@ export default function KnotViteForms() {
                     data-testid="field-placeholder-input"
                   />
                 </div>
-                {['select', 'radio', 'checkbox'].includes(newField.type) && (
+                {['dropdown', 'multiselect'].includes(newField.type) && (
                   <div>
                     <Label>Options (comma-separated)</Label>
                     <Input
@@ -358,11 +358,12 @@ export default function KnotViteForms() {
                     createFieldMutation.mutate({
                       templateId: showFieldEditor,
                       data: {
-                        type: newField.type,
+                        fieldKey: newField.label.toLowerCase().replace(/\s+/g, '_'),
+                        fieldType: newField.type,
                         label: newField.label,
                         placeholder: newField.placeholder || null,
                         required: newField.required,
-                        options: newField.options ? newField.options.split(',').map(o => o.trim()) : null,
+                        options: newField.options ? newField.options.split(',').map(o => ({ value: o.trim().toLowerCase(), label: o.trim() })) : null,
                       },
                     });
                   }}
@@ -383,7 +384,7 @@ export default function KnotViteForms() {
                 <div className="flex items-center gap-2">
                   <Input
                     readOnly
-                    value={`${window.location.origin}/rsvp/${selectedTemplate.slug}`}
+                    value={`${window.location.origin}/rsvp/${selectedTemplate.id}`}
                     className="text-xs"
                     data-testid="form-link-input"
                   />
@@ -391,7 +392,7 @@ export default function KnotViteForms() {
                     variant="outline"
                     size="icon"
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/rsvp/${selectedTemplate.slug}`);
+                      navigator.clipboard.writeText(`${window.location.origin}/rsvp/${selectedTemplate.id}`);
                       toast({ title: "Copied!", description: "Link copied to clipboard" });
                     }}
                     data-testid="copy-link-btn"
@@ -517,9 +518,9 @@ export default function KnotViteForms() {
                         <Settings2 className="h-4 w-4 mr-2" />
                         Settings
                       </DropdownMenuItem>
-                      {template.isPublished && (
+                      {template.status === 'published' && (
                         <DropdownMenuItem asChild>
-                          <a href={`/rsvp/${template.slug}`} target="_blank" rel="noopener noreferrer">
+                          <a href={`/rsvp/${template.id}`} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="h-4 w-4 mr-2" />
                             Preview
                           </a>
@@ -542,12 +543,8 @@ export default function KnotViteForms() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    <span>{template.submissionCount || 0} responses</span>
-                  </div>
-                  <Badge variant={template.isPublished ? "default" : "secondary"} className="text-xs">
-                    {template.isPublished ? "Published" : "Draft"}
+                  <Badge variant={template.status === 'published' ? "default" : "secondary"} className="text-xs">
+                    {template.status === 'published' ? "Published" : "Draft"}
                   </Badge>
                 </div>
               </CardContent>

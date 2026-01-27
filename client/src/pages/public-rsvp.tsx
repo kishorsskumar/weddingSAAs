@@ -17,23 +17,19 @@ interface PublicForm {
   template: {
     id: string;
     name: string;
-    description?: string | null;
-    headerImage?: string | null;
-    logoUrl?: string | null;
-    primaryColor?: string | null;
-    backgroundColor?: string | null;
-    fontFamily?: string | null;
-    successMessage?: string | null;
+    welcomeMessage?: string | null;
+    confirmationMessage?: string | null;
+    requireEmail: boolean;
+    requirePhone: boolean;
   };
   fields: {
     id: string;
-    type: string;
+    fieldKey: string;
+    fieldType: string;
     label: string;
     placeholder?: string | null;
-    helpText?: string | null;
     required: boolean;
-    options?: string[] | null;
-    validation?: Record<string, unknown> | null;
+    options?: { value: string; label: string }[] | null;
   }[];
   event?: {
     name: string;
@@ -43,16 +39,16 @@ interface PublicForm {
 }
 
 export default function PublicRsvpForm() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug: formId } = useParams<{ slug: string }>();
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [checkboxData, setCheckboxData] = useState<Record<string, string[]>>({});
   const [submitted, setSubmitted] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const { data: form, isLoading, error } = useQuery<PublicForm>({
-    queryKey: ['/api/public/rsvp', slug],
+    queryKey: ['/api/public/rsvp', formId],
     queryFn: async () => {
-      const res = await fetch(`/api/public/rsvp/${slug}`);
+      const res = await fetch(`/api/public/rsvp/${formId}`);
       if (!res.ok) {
         if (res.status === 404) throw new Error('Form not found');
         throw new Error('Failed to load form');
@@ -63,7 +59,7 @@ export default function PublicRsvpForm() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
-      const res = await fetch(`/api/public/rsvp/${slug}/submit`, {
+      const res = await fetch(`/api/public/rsvp/${formId}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -94,31 +90,27 @@ export default function PublicRsvpForm() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const name = formData.name || '';
-    const email = formData.email || '';
-    const phone = formData.phone || '';
+    const guestName = formData.guestName || '';
+    const guestEmail = formData.guestEmail || '';
+    const guestPhone = formData.guestPhone || '';
     const attending = formData.attending || 'pending';
-    const guestCount = parseInt(formData.guestCount || '1', 10);
-    const dietaryPreferences = formData.dietaryPreferences || '';
-    const message = formData.message || '';
+    const partySize = parseInt(formData.partySize || '1', 10);
 
     const responses: Record<string, unknown> = {};
     form?.fields.forEach(field => {
-      if (field.type === 'checkbox') {
-        responses[field.id] = checkboxData[field.id] || [];
+      if (field.fieldType === 'multiselect') {
+        responses[field.fieldKey] = checkboxData[field.id] || [];
       } else {
-        responses[field.id] = formData[field.id] || '';
+        responses[field.fieldKey] = formData[field.id] || '';
       }
     });
 
     submitMutation.mutate({
-      name,
-      email,
-      phone,
+      guestName,
+      guestEmail,
+      guestPhone,
       attending,
-      guestCount,
-      dietaryPreferences,
-      message,
+      partySize,
       responses,
     });
   };
@@ -175,9 +167,6 @@ export default function PublicRsvpForm() {
 
         <Card className="shadow-xl" data-testid="rsvp-form-card">
           <CardHeader className="text-center pb-2">
-            {form.template.logoUrl && (
-              <img src={form.template.logoUrl} alt="" className="h-16 mx-auto mb-4" />
-            )}
             <div className="flex justify-center mb-2">
               <Heart className="h-6 w-6" style={{ color: primaryColor }} />
             </div>
@@ -196,44 +185,46 @@ export default function PublicRsvpForm() {
                 )}
               </div>
             )}
-            {form.template.description && (
-              <CardDescription className="mt-3">{form.template.description}</CardDescription>
+            {form.template.welcomeMessage && (
+              <CardDescription className="mt-3">{form.template.welcomeMessage}</CardDescription>
             )}
           </CardHeader>
 
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-5 pt-4">
               <div>
-                <Label htmlFor="name">Your Name *</Label>
+                <Label htmlFor="guestName">Your Name *</Label>
                 <Input
-                  id="name"
+                  id="guestName"
                   required
-                  value={formData.name || ''}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  value={formData.guestName || ''}
+                  onChange={(e) => handleInputChange('guestName', e.target.value)}
                   placeholder="Full name"
                   data-testid="input-name"
                 />
               </div>
 
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="guestEmail">Email{form.template.requireEmail ? ' *' : ''}</Label>
                 <Input
-                  id="email"
+                  id="guestEmail"
                   type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  required={form.template.requireEmail}
+                  value={formData.guestEmail || ''}
+                  onChange={(e) => handleInputChange('guestEmail', e.target.value)}
                   placeholder="your@email.com"
                   data-testid="input-email"
                 />
               </div>
 
               <div>
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="guestPhone">Phone{form.template.requirePhone ? ' *' : ''}</Label>
                 <Input
-                  id="phone"
+                  id="guestPhone"
                   type="tel"
-                  value={formData.phone || ''}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  required={form.template.requirePhone}
+                  value={formData.guestPhone || ''}
+                  onChange={(e) => handleInputChange('guestPhone', e.target.value)}
                   placeholder="+91 9876543210"
                   data-testid="input-phone"
                 />
@@ -264,10 +255,10 @@ export default function PublicRsvpForm() {
 
               {formData.attending === 'yes' && (
                 <div>
-                  <Label htmlFor="guestCount">Number of Guests (including you)</Label>
+                  <Label htmlFor="partySize">Number of Guests (including you)</Label>
                   <Select
-                    value={formData.guestCount || '1'}
-                    onValueChange={(v) => handleInputChange('guestCount', v)}
+                    value={formData.partySize || '1'}
+                    onValueChange={(v) => handleInputChange('partySize', v)}
                   >
                     <SelectTrigger data-testid="select-guest-count">
                       <SelectValue />
@@ -290,7 +281,7 @@ export default function PublicRsvpForm() {
                     <p className="text-xs text-muted-foreground mb-1">{field.helpText}</p>
                   )}
 
-                  {field.type === 'text' && (
+                  {field.fieldType === 'text' && (
                     <Input
                       id={field.id}
                       required={field.required}
@@ -300,7 +291,7 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'email' && (
+                  {field.fieldType === 'email' && (
                     <Input
                       id={field.id}
                       type="email"
@@ -311,7 +302,7 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'phone' && (
+                  {field.fieldType === 'phone' && (
                     <Input
                       id={field.id}
                       type="tel"
@@ -322,7 +313,7 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'number' && (
+                  {field.fieldType === 'number' && (
                     <Input
                       id={field.id}
                       type="number"
@@ -333,7 +324,7 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'textarea' && (
+                  {field.fieldType === 'textarea' && (
                     <Textarea
                       id={field.id}
                       required={field.required}
@@ -343,7 +334,7 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'select' && field.options && (
+                  {field.fieldType === 'select' && field.options && (
                     <Select
                       value={formData[field.id] || ''}
                       onValueChange={(v) => handleInputChange(field.id, v)}
@@ -359,7 +350,7 @@ export default function PublicRsvpForm() {
                     </Select>
                   )}
 
-                  {field.type === 'radio' && field.options && (
+                  {field.fieldType === 'radio' && field.options && (
                     <RadioGroup
                       value={formData[field.id] || ''}
                       onValueChange={(v) => handleInputChange(field.id, v)}
@@ -374,7 +365,7 @@ export default function PublicRsvpForm() {
                     </RadioGroup>
                   )}
 
-                  {field.type === 'checkbox' && field.options && (
+                  {field.fieldType === 'checkbox' && field.options && (
                     <div className="flex flex-wrap gap-4 mt-2">
                       {field.options.map(opt => (
                         <div key={opt} className="flex items-center space-x-2">
@@ -389,7 +380,7 @@ export default function PublicRsvpForm() {
                     </div>
                   )}
 
-                  {field.type === 'date' && (
+                  {field.fieldType === 'date' && (
                     <Input
                       id={field.id}
                       type="date"
@@ -399,11 +390,11 @@ export default function PublicRsvpForm() {
                     />
                   )}
 
-                  {field.type === 'heading' && (
+                  {field.fieldType === 'heading' && (
                     <h3 className="text-lg font-semibold mt-4">{field.label}</h3>
                   )}
 
-                  {field.type === 'divider' && (
+                  {field.fieldType === 'divider' && (
                     <hr className="my-4 border-t" />
                   )}
                 </div>
