@@ -49,6 +49,7 @@ integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0", 
 PRIVATE_OBJECT_DIR = "/replit-objstore-a1e1bcaa-925d-42a7-b663-86cb2a1ee7fe/.private"
 PUBLIC_OBJECT_SEARCH_PATHS = "/replit-objstore-a1e1bcaa-925d-42a7-b663-86cb2a1ee7fe/public"
 JWT_SECRET = "wedding-saas-jwt-secret-change-in-production"
+DEMO_MODE = "true"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-a1e1bcaa-925d-42a7-b663-86cb2a1ee7fe"

@@ -1943,6 +1943,9 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'Not authenticated' });
       }
 
+      // Demo mode - bypass subscription checks for testing
+      const isDemoMode = process.env.DEMO_MODE === 'true';
+
       const subscriptions = await db.select({
         subscription: companyModuleSubscriptions,
         module: saasModules,
@@ -1951,9 +1954,12 @@ export async function registerRoutes(
         .innerJoin(saasModules, eq(companyModuleSubscriptions.moduleId, saasModules.id))
         .where(eq(companyModuleSubscriptions.companyId, companyId));
 
-      // Check if core platform is active
+      // Check if core platform is active (or demo mode)
       const coreSubscription = subscriptions.find(s => s.module.code === 'core' && s.subscription.status === 'active');
-      const hasActiveCore = !!coreSubscription;
+      const hasActiveCore = isDemoMode || !!coreSubscription;
+
+      // In demo mode, return all modules as activated
+      const allModuleCodes = ['core', 'rsvp', 'crm', 'vendor', 'payments', 'automation', 'ai_assistant'];
 
       res.json({
         subscriptions: subscriptions.map(s => ({
@@ -1961,9 +1967,9 @@ export async function registerRoutes(
           module: s.module,
         })),
         hasActiveCore,
-        activatedModules: subscriptions
-          .filter(s => s.subscription.status === 'active')
-          .map(s => s.module.code),
+        activatedModules: isDemoMode 
+          ? allModuleCodes 
+          : subscriptions.filter(s => s.subscription.status === 'active').map(s => s.module.code),
       });
     } catch (error) {
       console.error('Error fetching module subscriptions:', error);
