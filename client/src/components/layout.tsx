@@ -602,12 +602,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           // Regular menu items (with or without subpages)
           const parentHref = hasSubPages ? item.path : item.path;
           
+          const handleNavClick = (path: string) => {
+            setIsMobileOpen(false);
+            // Use both navigate and window.location for maximum compatibility
+            navigate(path);
+            // Force navigation if wouter doesn't pick it up
+            setTimeout(() => {
+              if (window.location.pathname !== path.split('?')[0]) {
+                window.location.href = path;
+              }
+            }, 50);
+          };
+          
           return (
             <div key={item.id}>
               <div 
-                onClick={() => {
-                  navigate(parentHref);
-                  setIsMobileOpen(false);
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleNavClick(parentHref);
                 }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors cursor-pointer",
@@ -629,9 +642,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 return (
                   <div 
                     key={subPage.id} 
-                    onClick={() => {
-                      navigate(subPage.path);
-                      setIsMobileOpen(false);
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleNavClick(subPage.path);
                     }}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors cursor-pointer",
