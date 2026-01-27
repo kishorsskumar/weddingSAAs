@@ -2430,3 +2430,93 @@ export const emailNotificationQueue = pgTable("email_notification_queue", {
 export const insertEmailNotificationQueueSchema = createInsertSchema(emailNotificationQueue).omit({ id: true, createdAt: true });
 export type InsertEmailNotificationQueue = z.infer<typeof insertEmailNotificationQueueSchema>;
 export type EmailNotificationQueue = typeof emailNotificationQueue.$inferSelect;
+
+// ============================================
+// KNOTVITE RSVP MODULE
+// ============================================
+
+// RSVP Form Templates - form configuration per event
+export const rsvpFormTemplates = pgTable("rsvp_form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").references(() => events.id, { onDelete: 'cascade' }),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  status: text("status").notNull().default('draft'), // 'draft', 'published', 'closed'
+  welcomeMessage: text("welcome_message"),
+  confirmationMessage: text("confirmation_message"),
+  deadline: timestamp("deadline"),
+  requireEmail: boolean("require_email").notNull().default(true),
+  requirePhone: boolean("require_phone").notNull().default(false),
+  brandingEnabled: boolean("branding_enabled").notNull().default(true), // Show "Powered by KnotVite"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRsvpFormTemplateSchema = createInsertSchema(rsvpFormTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRsvpFormTemplate = z.infer<typeof insertRsvpFormTemplateSchema>;
+export type RsvpFormTemplate = typeof rsvpFormTemplates.$inferSelect;
+
+// RSVP Form Fields - custom field definitions for forms
+export const rsvpFormFields = pgTable("rsvp_form_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id").notNull().references(() => rsvpFormTemplates.id, { onDelete: 'cascade' }),
+  fieldKey: text("field_key").notNull(), // Unique identifier within template
+  label: text("label").notNull(),
+  fieldType: text("field_type").notNull(), // 'text', 'dropdown', 'toggle', 'multiselect', 'number', 'date', 'textarea'
+  required: boolean("required").notNull().default(false),
+  placeholder: text("placeholder"),
+  defaultValue: text("default_value"),
+  options: jsonb("options").$type<{ value: string; label: string }[]>(), // For dropdown/multiselect
+  order: integer("order").notNull().default(0),
+  isSystemField: boolean("is_system_field").notNull().default(false), // Built-in fields like name, email
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertRsvpFormFieldSchema = createInsertSchema(rsvpFormFields).omit({ id: true, createdAt: true });
+export type InsertRsvpFormField = z.infer<typeof insertRsvpFormFieldSchema>;
+export type RsvpFormField = typeof rsvpFormFields.$inferSelect;
+
+// RSVP Submissions - guest responses
+export const rsvpSubmissions = pgTable("rsvp_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  templateId: varchar("template_id").notNull().references(() => rsvpFormTemplates.id, { onDelete: 'cascade' }),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  guestId: varchar("guest_id").references(() => eventGuests.id), // Optional link to existing guest
+  guestName: text("guest_name").notNull(),
+  guestEmail: text("guest_email"),
+  guestPhone: text("guest_phone"),
+  attending: text("attending").notNull().default('pending'), // 'yes', 'no', 'maybe', 'pending'
+  partySize: integer("party_size").notNull().default(1),
+  responses: jsonb("responses").$type<Record<string, any>>().notNull().default({}), // {fieldKey: value}
+  source: text("source").notNull().default('web'), // 'web', 'import', 'manual'
+  ipAddress: text("ip_address"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRsvpSubmissionSchema = createInsertSchema(rsvpSubmissions).omit({ id: true, submittedAt: true, updatedAt: true });
+export type InsertRsvpSubmission = z.infer<typeof insertRsvpSubmissionSchema>;
+export type RsvpSubmission = typeof rsvpSubmissions.$inferSelect;
+
+// RSVP Bulk Imports - track import jobs (Premium)
+export const rsvpBulkImports = pgTable("rsvp_bulk_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url"),
+  status: text("status").notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  totalRows: integer("total_rows").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  errorReport: jsonb("error_report").$type<{ row: number; field: string; error: string }[]>(),
+  columnMapping: jsonb("column_mapping").$type<Record<string, string>>(), // {csvColumn: fieldKey}
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertRsvpBulkImportSchema = createInsertSchema(rsvpBulkImports).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertRsvpBulkImport = z.infer<typeof insertRsvpBulkImportSchema>;
+export type RsvpBulkImport = typeof rsvpBulkImports.$inferSelect;
