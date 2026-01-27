@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>KnotVite RSVP Implementation Plan</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">KnotVite RSVP Implementation Plan</h1>
+</header>
+<h1 id="knotvite-rsvp-saas-implementation-plan">KnotVite RSVP SaaS
+Implementation Plan</h1>
+<p><strong>Product:</strong> KnotVite — Powered by AtBott<br />
+<strong>Base Route:</strong> <code>/knotvite</code><br />
+<strong>Status:</strong> Planning Phase<br />
+<strong>Last Updated:</strong> January 2026</p>
+<hr />
+<h2 id="executive-summary">Executive Summary</h2>
+<p>KnotVite is a comprehensive RSVP SaaS module that enables wedding
+planners and event organizers to create custom RSVP forms, manage guest
+responses, generate reports, and communicate with guests. The system
+integrates with the existing AtBott Wedding SaaS platform’s billing and
+authentication infrastructure.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents</h2>
+<ol type="1">
+<li><a href="#architecture-overview">Architecture Overview</a></li>
+<li><a href="#database-schema">Database Schema</a></li>
+<li><a href="#implementation-phases">Implementation Phases</a></li>
+<li><a href="#api-endpoints">API Endpoints</a></li>
+<li><a href="#frontend-components">Frontend Components</a></li>
+<li><a href="#security--performance">Security &amp; Performance</a></li>
+<li><a href="#pricing--feature-gating">Pricing &amp; Feature
+Gating</a></li>
+<li><a href="#file-structure">File Structure</a></li>
+<li><a href="#dependencies">Dependencies</a></li>
+<li><a href="#timeline-estimate">Timeline Estimate</a></li>
+</ol>
+<hr />
+<h2 id="architecture-overview">Architecture Overview</h2>
+<h3 id="system-components">System Components</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        KnotVite RSVP SaaS                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Form      │  │   Public    │  │  Reporting  │              │
+│  │   Builder   │  │   RSVP      │  │   Engine    │              │
+│  │   (Admin)   │  │   Forms     │  │             │              │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘              │
+│         │                │                │                     │
+│  ┌──────┴────────────────┴────────────────┴──────┐              │
+│  │              API Layer (Express.js)           │              │
+│  └──────────────────────┬────────────────────────┘              │
+│                         │                                       │
+│  ┌──────────────────────┴────────────────────────┐              │
+│  │           Storage Layer (Drizzle ORM)         │              │
+│  └──────────────────────┬────────────────────────┘              │
+│                         │                                       │
+│  ┌──────────────────────┴────────────────────────┐              │
+│  │              PostgreSQL Database              │              │
+│  └───────────────────────────────────────────────┘              │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  Razorpay   │  │  WhatsApp   │  │   Email     │              │
+│  │  Billing    │  │  (Premium)  │  │  (Resend)   │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘</code></pre>
+<h3 id="multi-tenancy-model">Multi-Tenancy Model</h3>
+<ul>
+<li>Each <strong>Company</strong> (subscriber) can have multiple
+<strong>Events</strong></li>
+<li>Each <strong>Event</strong> can have one <strong>RSVP Form
+Template</strong></li>
+<li>Form templates contain <strong>Custom Fields</strong> defined by the
+organizer</li>
+<li>Guest <strong>Submissions</strong> are linked to events and contain
+field responses</li>
+</ul>
+<hr />
+<h2 id="database-schema">Database Schema</h2>
+<h3 id="new-tables-required">New Tables Required</h3>
+<h4 id="rsvp_form_templates">1. rsvp_form_templates</h4>
+<p>Stores form configurations for each event.</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> rsvpFormTemplates <span class="op">=</span> <span class="fu">pgTable</span>(<span class="st">&quot;rsvp_form_templates&quot;</span><span class="op">,</span> {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="fu">serial</span>(<span class="st">&quot;id&quot;</span>)<span class="op">.</span><span class="fu">primaryKey</span>()<span class="op">,</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>  eventId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;event_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> events<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>  companyId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;company_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> companies<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>  name<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;name&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;status&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="st">&quot;draft&quot;</span>)<span class="op">,</span> <span class="co">// draft, published, closed</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  welcomeMessage<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;welcome_message&quot;</span>)<span class="op">,</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  confirmationMessage<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;confirmation_message&quot;</span>)<span class="op">,</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>  deadline<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;deadline&quot;</span>)<span class="op">,</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>  requireEmail<span class="op">:</span> <span class="dt">boolean</span>(<span class="st">&quot;require_email&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="kw">true</span>)<span class="op">,</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>  requirePhone<span class="op">:</span> <span class="dt">boolean</span>(<span class="st">&quot;require_phone&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="kw">false</span>)<span class="op">,</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>  createdAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;created_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>  updatedAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;updated_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h4 id="rsvp_form_fields">2. rsvp_form_fields</h4>
+<p>Custom field definitions for each form template.</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> rsvpFormFields <span class="op">=</span> <span class="fu">pgTable</span>(<span class="st">&quot;rsvp_form_fields&quot;</span><span class="op">,</span> {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="fu">serial</span>(<span class="st">&quot;id&quot;</span>)<span class="op">.</span><span class="fu">primaryKey</span>()<span class="op">,</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  templateId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;template_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> rsvpFormTemplates<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  fieldKey<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;field_key&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span> <span class="co">// unique identifier</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  label<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;label&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  fieldType<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;field_type&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span> <span class="co">// text, dropdown, toggle, multiselect, number, date</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  required<span class="op">:</span> <span class="dt">boolean</span>(<span class="st">&quot;required&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="kw">false</span>)<span class="op">,</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  placeholder<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;placeholder&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  defaultValue<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;default_value&quot;</span>)<span class="op">,</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  options<span class="op">:</span> <span class="fu">jsonb</span>(<span class="st">&quot;options&quot;</span>)<span class="op">,</span> <span class="co">// for dropdown/multiselect: [{value, label}]</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  order<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;order&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="dv">0</span>)<span class="op">,</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  isSystemField<span class="op">:</span> <span class="dt">boolean</span>(<span class="st">&quot;is_system_field&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="kw">false</span>)<span class="op">,</span></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  createdAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;created_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h4 id="rsvp_submissions">3. rsvp_submissions</h4>
+<p>Guest RSVP responses.</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> rsvpSubmissions <span class="op">=</span> <span class="fu">pgTable</span>(<span class="st">&quot;rsvp_submissions&quot;</span><span class="op">,</span> {</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="fu">serial</span>(<span class="st">&quot;id&quot;</span>)<span class="op">.</span><span class="fu">primaryKey</span>()<span class="op">,</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  eventId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;event_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> events<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  templateId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;template_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> rsvpFormTemplates<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  guestId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;guest_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> eventGuests<span class="op">.</span><span class="at">id</span>)<span class="op">,</span> <span class="co">// optional link</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  guestName<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;guest_name&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  guestEmail<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;guest_email&quot;</span>)<span class="op">,</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  guestPhone<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;guest_phone&quot;</span>)<span class="op">,</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>  attending<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;attending&quot;</span>)<span class="op">,</span> <span class="co">// yes, no, maybe</span></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>  partySize<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;party_size&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="dv">1</span>)<span class="op">,</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  responses<span class="op">:</span> <span class="fu">jsonb</span>(<span class="st">&quot;responses&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span> <span class="co">// {fieldKey: value, ...}</span></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  source<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;source&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="st">&quot;web&quot;</span>)<span class="op">,</span> <span class="co">// web, import, manual</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  ipAddress<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;ip_address&quot;</span>)<span class="op">,</span></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>  submittedAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;submitted_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>  updatedAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;updated_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h4 id="rsvp_bulk_imports">4. rsvp_bulk_imports</h4>
+<p>Track bulk import jobs.</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> rsvpBulkImports <span class="op">=</span> <span class="fu">pgTable</span>(<span class="st">&quot;rsvp_bulk_imports&quot;</span><span class="op">,</span> {</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="fu">serial</span>(<span class="st">&quot;id&quot;</span>)<span class="op">.</span><span class="fu">primaryKey</span>()<span class="op">,</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  companyId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;company_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> companies<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  eventId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;event_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> events<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  fileName<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;file_name&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  fileUrl<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;file_url&quot;</span>)<span class="op">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;status&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="st">&quot;pending&quot;</span>)<span class="op">,</span> <span class="co">// pending, processing, completed, failed</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  totalRows<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;total_rows&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="dv">0</span>)<span class="op">,</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  successCount<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;success_count&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="dv">0</span>)<span class="op">,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  errorCount<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;error_count&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="dv">0</span>)<span class="op">,</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>  errorReport<span class="op">:</span> <span class="fu">jsonb</span>(<span class="st">&quot;error_report&quot;</span>)<span class="op">,</span> <span class="co">// [{row, field, error}]</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>  columnMapping<span class="op">:</span> <span class="fu">jsonb</span>(<span class="st">&quot;column_mapping&quot;</span>)<span class="op">,</span> <span class="co">// {csvColumn: fieldKey}</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  createdBy<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;created_by&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> users<span class="op">.</span><span class="at">id</span>)<span class="op">,</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  createdAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;created_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  completedAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;completed_at&quot;</span>)<span class="op">,</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h4 id="rsvp_whatsapp_messages">5. rsvp_whatsapp_messages</h4>
+<p>WhatsApp message logs (Premium feature).</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="im">export</span> <span class="kw">const</span> rsvpWhatsappMessages <span class="op">=</span> <span class="fu">pgTable</span>(<span class="st">&quot;rsvp_whatsapp_messages&quot;</span><span class="op">,</span> {</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  id<span class="op">:</span> <span class="fu">serial</span>(<span class="st">&quot;id&quot;</span>)<span class="op">.</span><span class="fu">primaryKey</span>()<span class="op">,</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  companyId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;company_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> companies<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>  eventId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;event_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> events<span class="op">.</span><span class="at">id</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>  submissionId<span class="op">:</span> <span class="fu">integer</span>(<span class="st">&quot;submission_id&quot;</span>)<span class="op">.</span><span class="fu">references</span>(() <span class="kw">=&gt;</span> rsvpSubmissions<span class="op">.</span><span class="at">id</span>)<span class="op">,</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  recipientPhone<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;recipient_phone&quot;</span>)<span class="op">.</span><span class="fu">notNull</span>()<span class="op">,</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  templateName<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;template_name&quot;</span>)<span class="op">,</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  messageType<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;message_type&quot;</span>)<span class="op">,</span> <span class="co">// rsvp_link, reminder, confirmation</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  status<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;status&quot;</span>)<span class="op">.</span><span class="fu">default</span>(<span class="st">&quot;pending&quot;</span>)<span class="op">,</span> <span class="co">// pending, sent, delivered, failed</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>  externalMessageId<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;external_message_id&quot;</span>)<span class="op">,</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  sentAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;sent_at&quot;</span>)<span class="op">,</span></span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>  deliveredAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;delivered_at&quot;</span>)<span class="op">,</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>  errorMessage<span class="op">:</span> <span class="fu">text</span>(<span class="st">&quot;error_message&quot;</span>)<span class="op">,</span></span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>  createdAt<span class="op">:</span> <span class="fu">timestamp</span>(<span class="st">&quot;created_at&quot;</span>)<span class="op">.</span><span class="fu">defaultNow</span>()<span class="op">,</span></span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>})<span class="op">;</span></span></code></pre></div>
+<h3 id="indexes-required">Indexes Required</h3>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_submissions_event <span class="kw">ON</span> rsvp_submissions(event_id);</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_submissions_email <span class="kw">ON</span> rsvp_submissions(guest_email);</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_submissions_template <span class="kw">ON</span> rsvp_submissions(template_id);</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_fields_template <span class="kw">ON</span> rsvp_form_fields(template_id);</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_templates_company <span class="kw">ON</span> rsvp_form_templates(company_id);</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a><span class="kw">CREATE</span> <span class="kw">INDEX</span> idx_templates_event <span class="kw">ON</span> rsvp_form_templates(event_id);</span></code></pre></div>
+<hr />
+<h2 id="implementation-phases">Implementation Phases</h2>
+<h3 id="phase-1-mvp-core-recommended-starting-point">Phase 1: MVP Core
+(Recommended Starting Point)</h3>
+<p><strong>Duration:</strong> 2-3 weeks<br />
+<strong>Priority:</strong> High</p>
+<h4 id="features">Features:</h4>
+<ol type="1">
+<li><strong>Form Builder UI</strong>
+<ul>
+<li>Create/edit form templates</li>
+<li>Add/remove/reorder custom fields</li>
+<li>Field type selection (text, dropdown, toggle, number, date)</li>
+<li>Required/optional toggle</li>
+<li>Placeholder and default values</li>
+<li>Form preview</li>
+</ul></li>
+<li><strong>Public RSVP Form</strong>
+<ul>
+<li>Dynamic form rendering based on template</li>
+<li>Mobile-responsive design</li>
+<li>Form validation</li>
+<li>Success confirmation page</li>
+<li>Rate limiting (5 submissions per IP per hour)</li>
+</ul></li>
+<li><strong>Submissions Management</strong>
+<ul>
+<li>View all RSVP responses</li>
+<li>Filter by attendance status</li>
+<li>Search by name/email</li>
+<li>Pagination (50 per page)</li>
+<li>Mark as confirmed/pending</li>
+</ul></li>
+<li><strong>Basic Reporting</strong>
+<ul>
+<li>Guest count summary</li>
+<li>Attendance breakdown (Yes/No/Maybe)</li>
+<li>Export to CSV</li>
+</ul></li>
+<li><strong>Role Access</strong>
+<ul>
+<li>Organizer: Full access to own events</li>
+<li>Staff: View-only access to reports</li>
+</ul></li>
+</ol>
+<h4 id="database">Database:</h4>
+<ul>
+<li>rsvp_form_templates</li>
+<li>rsvp_form_fields</li>
+<li>rsvp_submissions</li>
+</ul>
+<hr />
+<h3 id="phase-2-premium-features">Phase 2: Premium Features</h3>
+<p><strong>Duration:</strong> 2 weeks<br />
+<strong>Priority:</strong> Medium</p>
+<h4 id="features-1">Features:</h4>
+<ol type="1">
+<li><strong>Advanced Reporting</strong>
+<ul>
+<li>Custom column selection</li>
+<li>Group by any field</li>
+<li>Sort by any column</li>
+<li>Export to Excel (.xlsx)</li>
+<li>Scheduled report emails</li>
+</ul></li>
+<li><strong>CSV/Excel Bulk Import</strong>
+<ul>
+<li>Upload file interface</li>
+<li>Column mapping wizard</li>
+<li>Data validation preview</li>
+<li>Duplicate detection</li>
+<li>Error reporting</li>
+</ul></li>
+<li><strong>Feature Gating</strong>
+<ul>
+<li>Free plan limits (1 event, 100 guests, 3 custom fields)</li>
+<li>Pro plan unlocks (unlimited everything)</li>
+<li>Upgrade prompts and banners</li>
+</ul></li>
+</ol>
+<h4 id="database-1">Database:</h4>
+<ul>
+<li>rsvp_bulk_imports</li>
+</ul>
+<hr />
+<h3 id="phase-3-optional-modules">Phase 3: Optional Modules</h3>
+<p><strong>Duration:</strong> 1-2 weeks<br />
+<strong>Priority:</strong> Low</p>
+<h4 id="features-2">Features:</h4>
+<ol type="1">
+<li><strong>WhatsApp Integration</strong>
+<ul>
+<li>Send RSVP link via WhatsApp</li>
+<li>Reminder messages</li>
+<li>Delivery tracking</li>
+<li>Provider abstraction (Twilio/Meta)</li>
+</ul></li>
+<li><strong>Super Admin Dashboard</strong>
+<ul>
+<li>KnotVite user analytics</li>
+<li>Revenue metrics</li>
+<li>User management</li>
+<li>Event monitoring</li>
+<li>Abuse detection</li>
+</ul></li>
+<li><strong>Advanced Security</strong>
+<ul>
+<li>GDPR consent checkbox</li>
+<li>IP-based spam prevention</li>
+<li>CSV virus scanning</li>
+</ul></li>
+</ol>
+<h4 id="database-2">Database:</h4>
+<ul>
+<li>rsvp_whatsapp_messages</li>
+</ul>
+<hr />
+<h2 id="api-endpoints">API Endpoints</h2>
+<h3 id="form-templates">Form Templates</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/templates</code></td>
+<td>List all templates for company</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/knotvite/templates/:id</code></td>
+<td>Get template with fields</td>
+<td>Organizer</td>
+</tr>
+<tr class="odd">
+<td>POST</td>
+<td><code>/api/knotvite/templates</code></td>
+<td>Create new template</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>PUT</td>
+<td><code>/api/knotvite/templates/:id</code></td>
+<td>Update template</td>
+<td>Organizer</td>
+</tr>
+<tr class="odd">
+<td>DELETE</td>
+<td><code>/api/knotvite/templates/:id</code></td>
+<td>Delete template</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>POST</td>
+<td><code>/api/knotvite/templates/:id/publish</code></td>
+<td>Publish form</td>
+<td>Organizer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="form-fields">Form Fields</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/templates/:id/fields</code></td>
+<td>List fields for template</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>POST</td>
+<td><code>/api/knotvite/templates/:id/fields</code></td>
+<td>Add field</td>
+<td>Organizer</td>
+</tr>
+<tr class="odd">
+<td>PUT</td>
+<td><code>/api/knotvite/fields/:id</code></td>
+<td>Update field</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>DELETE</td>
+<td><code>/api/knotvite/fields/:id</code></td>
+<td>Delete field</td>
+<td>Organizer</td>
+</tr>
+<tr class="odd">
+<td>PUT</td>
+<td><code>/api/knotvite/templates/:id/fields/reorder</code></td>
+<td>Reorder fields</td>
+<td>Organizer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="public-rsvp-form">Public RSVP Form</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/public/form/:eventId</code></td>
+<td>Get public form config</td>
+<td>Public</td>
+</tr>
+<tr class="even">
+<td>POST</td>
+<td><code>/api/knotvite/public/submit/:eventId</code></td>
+<td>Submit RSVP</td>
+<td>Public (rate limited)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="submissions">Submissions</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/events/:eventId/submissions</code></td>
+<td>List submissions</td>
+<td>Organizer/Staff</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/knotvite/submissions/:id</code></td>
+<td>Get submission detail</td>
+<td>Organizer</td>
+</tr>
+<tr class="odd">
+<td>PUT</td>
+<td><code>/api/knotvite/submissions/:id</code></td>
+<td>Update submission</td>
+<td>Organizer</td>
+</tr>
+<tr class="even">
+<td>DELETE</td>
+<td><code>/api/knotvite/submissions/:id</code></td>
+<td>Delete submission</td>
+<td>Organizer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reporting">Reporting</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/events/:eventId/reports/summary</code></td>
+<td>Get summary stats</td>
+<td>Organizer/Staff</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/knotvite/events/:eventId/reports/export</code></td>
+<td>Export CSV/Excel</td>
+<td>Organizer (Pro)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bulk-import-premium">Bulk Import (Premium)</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>POST</td>
+<td><code>/api/knotvite/events/:eventId/import/upload</code></td>
+<td>Upload file</td>
+<td>Organizer (Pro)</td>
+</tr>
+<tr class="even">
+<td>POST</td>
+<td><code>/api/knotvite/events/:eventId/import/preview</code></td>
+<td>Preview mapping</td>
+<td>Organizer (Pro)</td>
+</tr>
+<tr class="odd">
+<td>POST</td>
+<td><code>/api/knotvite/events/:eventId/import/confirm</code></td>
+<td>Confirm import</td>
+<td>Organizer (Pro)</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/knotvite/imports/:id/status</code></td>
+<td>Get import status</td>
+<td>Organizer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="whatsapp-premium-module">WhatsApp (Premium Module)</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>POST</td>
+<td><code>/api/knotvite/events/:eventId/whatsapp/send</code></td>
+<td>Send RSVP link</td>
+<td>Organizer (Pro)</td>
+</tr>
+<tr class="even">
+<td>POST</td>
+<td><code>/api/knotvite/events/:eventId/whatsapp/remind</code></td>
+<td>Send reminder</td>
+<td>Organizer (Pro)</td>
+</tr>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/knotvite/events/:eventId/whatsapp/logs</code></td>
+<td>View message logs</td>
+<td>Organizer</td>
+</tr>
+</tbody>
+</table>
+<h3 id="super-admin">Super Admin</h3>
+<table>
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 27%" />
+<col style="width: 35%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Method</th>
+<th>Endpoint</th>
+<th>Description</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/admin/knotvite/dashboard</code></td>
+<td>Analytics dashboard</td>
+<td>Super Admin</td>
+</tr>
+<tr class="even">
+<td>GET</td>
+<td><code>/api/admin/knotvite/users</code></td>
+<td>List organizers</td>
+<td>Super Admin</td>
+</tr>
+<tr class="odd">
+<td>GET</td>
+<td><code>/api/admin/knotvite/events</code></td>
+<td>List all events</td>
+<td>Super Admin</td>
+</tr>
+<tr class="even">
+<td>PUT</td>
+<td><code>/api/admin/knotvite/users/:id/suspend</code></td>
+<td>Suspend user</td>
+<td>Super Admin</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="frontend-components">Frontend Components</h2>
+<h3 id="new-pages">New Pages</h3>
+<h4 id="knotvite---knotvite-dashboard">1. <code>/knotvite</code> -
+KnotVite Dashboard</h4>
+<p>Main dashboard showing: - Active events with RSVP stats - Quick
+actions (Create Event, View Submissions) - Recent activity</p>
+<h4 id="knotviteform-buildereventid---form-builder">2.
+<code>/knotvite/form-builder/:eventId</code> - Form Builder</h4>
+<p>Drag-and-drop interface: - Field palette (available field types) -
+Form canvas (current fields) - Field settings panel - Form preview -
+Publish/Save buttons</p>
+<h4 id="knotvitersvpeventid---public-rsvp-form">3.
+<code>/knotvite/rsvp/:eventId</code> - Public RSVP Form</h4>
+<p>Public-facing form: - Event branding header - Dynamic form fields -
+Submit button - Success/Error messages</p>
+<h4 id="knotvitesubmissionseventid---submissions-list">4.
+<code>/knotvite/submissions/:eventId</code> - Submissions List</h4>
+<p>Table view with: - Guest name, email, phone - Attendance status -
+Custom field columns - Filters and search - Export button</p>
+<h4 id="knotvitereportseventid---reports">5.
+<code>/knotvite/reports/:eventId</code> - Reports</h4>
+<p>Report views: - Summary cards (total, attending, not attending) -
+Charts (pie chart for attendance) - Detailed tables - Export options</p>
+<h4 id="knotviteimporteventid---bulk-import-pro">6.
+<code>/knotvite/import/:eventId</code> - Bulk Import (Pro)</h4>
+<p>Import wizard: - File upload zone - Column mapping interface -
+Preview table - Confirm/Cancel buttons</p>
+<h4 id="adminknotvite---super-admin-dashboard">7.
+<code>/admin/knotvite</code> - Super Admin Dashboard</h4>
+<p>Admin views: - Usage metrics - User management - Event monitoring -
+Billing overview</p>
+<h3 id="reusable-components">Reusable Components</h3>
+<pre><code>client/src/components/knotvite/
+├── form-builder/
+│   ├── FieldPalette.tsx
+│   ├── FormCanvas.tsx
+│   ├── FieldSettings.tsx
+│   └── DraggableField.tsx
+├── public-form/
+│   ├── DynamicField.tsx
+│   ├── FormHeader.tsx
+│   └── SuccessPage.tsx
+├── submissions/
+│   ├── SubmissionsTable.tsx
+│   ├── SubmissionFilters.tsx
+│   └── SubmissionDetail.tsx
+├── reports/
+│   ├── SummaryCards.tsx
+│   ├── AttendanceChart.tsx
+│   └── ExportButton.tsx
+└── import/
+    ├── FileUploader.tsx
+    ├── ColumnMapper.tsx
+    └── PreviewTable.tsx</code></pre>
+<hr />
+<h2 id="security-performance">Security &amp; Performance</h2>
+<h3 id="security-measures">Security Measures</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Input Sanitization</td>
+<td>DOMPurify for text fields, Zod validation</td>
+</tr>
+<tr class="even">
+<td>Rate Limiting</td>
+<td>5 submissions/IP/hour on public form</td>
+</tr>
+<tr class="odd">
+<td>CSRF Protection</td>
+<td>SameSite cookies, Origin check</td>
+</tr>
+<tr class="even">
+<td>XSS Prevention</td>
+<td>React escaping, CSP headers</td>
+</tr>
+<tr class="odd">
+<td>SQL Injection</td>
+<td>Drizzle ORM parameterized queries</td>
+</tr>
+<tr class="even">
+<td>File Upload Safety</td>
+<td>File type validation, size limits (5MB)</td>
+</tr>
+<tr class="odd">
+<td>GDPR Consent</td>
+<td>Optional consent checkbox on public form</td>
+</tr>
+</tbody>
+</table>
+<h3 id="performance-optimizations">Performance Optimizations</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Feature</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Pagination</td>
+<td>50 items per page, cursor-based</td>
+</tr>
+<tr class="even">
+<td>Lazy Loading</td>
+<td>Reports load on demand</td>
+</tr>
+<tr class="odd">
+<td>Database Indexes</td>
+<td>eventId, email, templateId indexed</td>
+</tr>
+<tr class="even">
+<td>Caching</td>
+<td>React Query with 5-minute stale time</td>
+</tr>
+<tr class="odd">
+<td>Server-side Filtering</td>
+<td>Filter queries in SQL, not in memory</td>
+</tr>
+<tr class="even">
+<td>Debounced Search</td>
+<td>300ms debounce on search inputs</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="pricing-feature-gating">Pricing &amp; Feature Gating</h2>
+<h3 id="free-plan-limits">Free Plan Limits</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Resource</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Events</td>
+<td>1</td>
+</tr>
+<tr class="even">
+<td>Guests per Event</td>
+<td>100</td>
+</tr>
+<tr class="odd">
+<td>Custom Fields</td>
+<td>3</td>
+</tr>
+<tr class="even">
+<td>CSV Import</td>
+<td>❌</td>
+</tr>
+<tr class="odd">
+<td>Excel Export</td>
+<td>❌</td>
+</tr>
+<tr class="even">
+<td>WhatsApp</td>
+<td>❌</td>
+</tr>
+<tr class="odd">
+<td>Branding Removal</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pro-plan-299month-or-2999year">Pro Plan (₹299/month or
+₹2,999/year)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Resource</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Events</td>
+<td>Unlimited</td>
+</tr>
+<tr class="even">
+<td>Guests per Event</td>
+<td>Unlimited</td>
+</tr>
+<tr class="odd">
+<td>Custom Fields</td>
+<td>Unlimited</td>
+</tr>
+<tr class="even">
+<td>CSV Import</td>
+<td>✅</td>
+</tr>
+<tr class="odd">
+<td>Excel Export</td>
+<td>✅</td>
+</tr>
+<tr class="even">
+<td>WhatsApp</td>
+<td>✅ (add-on)</td>
+</tr>
+<tr class="odd">
+<td>Branding Removal</td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<h3 id="feature-gating-implementation">Feature Gating
+Implementation</h3>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode typescript"><code class="sourceCode typescript"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co">// Middleware check</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="kw">const</span> checkKnotvitePlan <span class="op">=</span> <span class="kw">async</span> (req<span class="op">,</span> res<span class="op">,</span> next) <span class="kw">=&gt;</span> {</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> company <span class="op">=</span> <span class="cf">await</span> <span class="fu">getCompany</span>(req<span class="op">.</span><span class="at">user</span><span class="op">.</span><span class="at">companyId</span>)<span class="op">;</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="kw">const</span> subscription <span class="op">=</span> <span class="cf">await</span> <span class="fu">getModuleSubscription</span>(company<span class="op">.</span><span class="at">id</span><span class="op">,</span> <span class="st">&#39;knotvite&#39;</span>)<span class="op">;</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  req<span class="op">.</span><span class="at">knotvitePlan</span> <span class="op">=</span> subscription<span class="op">?.</span><span class="at">plan</span> <span class="op">||</span> <span class="st">&#39;free&#39;</span><span class="op">;</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  req<span class="op">.</span><span class="at">knotviteLimits</span> <span class="op">=</span> PLAN_LIMITS[req<span class="op">.</span><span class="at">knotvitePlan</span>]<span class="op">;</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">next</span>()<span class="op">;</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>}<span class="op">;</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a><span class="co">// Usage in routes</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>app<span class="op">.</span><span class="fu">post</span>(<span class="st">&#39;/api/knotvite/import/upload&#39;</span><span class="op">,</span> </span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  checkKnotvitePlan<span class="op">,</span></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">requirePlan</span>(<span class="st">&#39;pro&#39;</span>)<span class="op">,</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  handleImport</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>)<span class="op">;</span></span></code></pre></div>
+<hr />
+<h2 id="file-structure">File Structure</h2>
+<h3 id="new-files-to-create">New Files to Create</h3>
+<pre><code>shared/
+└── schema.ts                    # Add new tables
+
+server/
+├── knotvite/
+│   ├── routes.ts               # KnotVite API routes
+│   ├── storage.ts              # Database operations
+│   ├── form-builder.ts         # Form template logic
+│   ├── submissions.ts          # Submission handling
+│   ├── reports.ts              # Report generation
+│   ├── import.ts               # Bulk import logic
+│   └── whatsapp.ts             # WhatsApp integration
+└── routes.ts                    # Mount KnotVite routes
+
+client/src/
+├── pages/
+│   ├── knotvite/
+│   │   ├── index.tsx           # Dashboard
+│   │   ├── form-builder.tsx    # Form builder
+│   │   ├── submissions.tsx     # Submissions list
+│   │   ├── reports.tsx         # Reports page
+│   │   └── import.tsx          # Bulk import
+│   ├── knotvite-public/
+│   │   └── rsvp.tsx            # Public RSVP form
+│   └── admin/
+│       └── knotvite.tsx        # Super admin dashboard
+└── components/
+    └── knotvite/               # Reusable components</code></pre>
+<h3 id="files-to-modify">Files to Modify</h3>
+<pre><code>shared/schema.ts                 # Add new table definitions
+server/routes.ts                 # Mount /api/knotvite routes
+client/src/App.tsx               # Add new page routes
+client/src/components/layout.tsx # Add sidebar navigation</code></pre>
+<hr />
+<h2 id="dependencies">Dependencies</h2>
+<h3 id="new-npm-packages">New NPM Packages</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Package</th>
+<th>Purpose</th>
+<th>Phase</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><span class="citation"
+data-cites="dnd-kit/core">@dnd-kit/core</span></td>
+<td>Drag-and-drop for form builder</td>
+<td>Phase 1</td>
+</tr>
+<tr class="even">
+<td><span class="citation"
+data-cites="dnd-kit/sortable">@dnd-kit/sortable</span></td>
+<td>Sortable fields</td>
+<td>Phase 1</td>
+</tr>
+<tr class="odd">
+<td>xlsx</td>
+<td>Excel file generation</td>
+<td>Phase 2</td>
+</tr>
+<tr class="even">
+<td>papaparse</td>
+<td>CSV parsing</td>
+<td>Phase 2</td>
+</tr>
+<tr class="odd">
+<td>file-type</td>
+<td>File validation</td>
+<td>Phase 2</td>
+</tr>
+</tbody>
+</table>
+<h3 id="existing-dependencies-already-installed">Existing Dependencies
+(Already Installed)</h3>
+<ul>
+<li>Drizzle ORM (database)</li>
+<li>Zod (validation)</li>
+<li>React Query (data fetching)</li>
+<li>Radix UI (components)</li>
+<li>Tailwind CSS (styling)</li>
+<li>Razorpay (billing)</li>
+<li>Resend (email)</li>
+</ul>
+<hr />
+<h2 id="timeline-estimate">Timeline Estimate</h2>
+<table>
+<colgroup>
+<col style="width: 18%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Phase</th>
+<th>Features</th>
+<th>Duration</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Phase 1</strong></td>
+<td>Form Builder, Public Form, Submissions, Basic Reports</td>
+<td>2-3 weeks</td>
+<td>High</td>
+</tr>
+<tr class="even">
+<td><strong>Phase 2</strong></td>
+<td>Advanced Reports, Bulk Import, Feature Gating</td>
+<td>2 weeks</td>
+<td>Medium</td>
+</tr>
+<tr class="odd">
+<td><strong>Phase 3</strong></td>
+<td>WhatsApp, Super Admin Dashboard</td>
+<td>1-2 weeks</td>
+<td>Low</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Total Estimated Duration:</strong> 5-7 weeks</p>
+<hr />
+<h2 id="success-metrics">Success Metrics</h2>
+<h3 id="phase-1-success-criteria">Phase 1 Success Criteria</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />Organizer can create custom RSVP
+form with 5+ field types</label></li>
+<li><label><input type="checkbox" />Public form renders correctly on
+mobile</label></li>
+<li><label><input type="checkbox" />Guests can submit RSVP without
+authentication</label></li>
+<li><label><input type="checkbox" />Organizer can view and filter
+submissions</label></li>
+<li><label><input type="checkbox" />Basic CSV export works</label></li>
+</ul>
+<h3 id="phase-2-success-criteria">Phase 2 Success Criteria</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />Excel export includes all custom
+fields</label></li>
+<li><label><input type="checkbox" />Bulk import handles 1000+
+rows</label></li>
+<li><label><input type="checkbox" />Free plan limits enforced
+correctly</label></li>
+<li><label><input type="checkbox" />Pro plan upgrade flow works with
+Razorpay</label></li>
+</ul>
+<h3 id="phase-3-success-criteria">Phase 3 Success Criteria</h3>
+<ul class="task-list">
+<li><label><input type="checkbox" />WhatsApp messages sent and
+tracked</label></li>
+<li><label><input type="checkbox" />Super admin can view all KnotVite
+metrics</label></li>
+<li><label><input type="checkbox" />Rate limiting prevents
+abuse</label></li>
+</ul>
+<hr />
+<h2 id="next-steps">Next Steps</h2>
+<ol type="1">
+<li><strong>Review this plan</strong> with stakeholders</li>
+<li><strong>Finalize Phase 1 scope</strong> (any adjustments
+needed?)</li>
+<li><strong>Create database migrations</strong> for new tables</li>
+<li><strong>Begin Phase 1 implementation</strong></li>
+</ol>
+<hr />
+<p><em>Document prepared for AtBott Wedding SaaS Platform</em></p>
+</body>
+</html>

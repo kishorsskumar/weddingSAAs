@@ -40,6 +40,7 @@ import Terms from "@/pages/terms";
 import RefundPolicy from "@/pages/refund-policy";
 import Contact from "@/pages/contact";
 import Pricing from "@/pages/pricing";
+import KnotVitePlanPDF from "@/pages/knotvite-plan-pdf";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -187,6 +188,9 @@ function App() {
             </Route>
             <Route path="/download">
               <DownloadPage />
+            </Route>
+            <Route path="/docs/knotvite-plan">
+              <KnotVitePlanPDF />
             </Route>
             <Route>
               <PublicPages />
