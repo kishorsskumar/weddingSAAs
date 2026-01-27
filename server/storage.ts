@@ -335,6 +335,18 @@ import {
   type InsertBillingEvent,
   type InAppNotification,
   type InsertInAppNotification,
+  rsvpFormTemplates,
+  rsvpFormFields,
+  rsvpSubmissions,
+  rsvpBulkImports,
+  type RsvpFormTemplate,
+  type InsertRsvpFormTemplate,
+  type RsvpFormField,
+  type InsertRsvpFormField,
+  type RsvpSubmission,
+  type InsertRsvpSubmission,
+  type RsvpBulkImport,
+  type InsertRsvpBulkImport,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -988,6 +1000,32 @@ export interface IStorage {
   createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification>;
   markInAppNotificationAsRead(id: string): Promise<void>;
   markAllInAppNotificationsAsRead(companyId: string): Promise<void>;
+  
+  // KnotVite RSVP - Form Templates
+  getRsvpFormTemplates(companyId: string): Promise<RsvpFormTemplate[]>;
+  getRsvpFormTemplatesByEvent(eventId: string): Promise<RsvpFormTemplate[]>;
+  getRsvpFormTemplate(id: string): Promise<RsvpFormTemplate | undefined>;
+  createRsvpFormTemplate(template: InsertRsvpFormTemplate): Promise<RsvpFormTemplate>;
+  updateRsvpFormTemplate(id: string, template: Partial<InsertRsvpFormTemplate>): Promise<RsvpFormTemplate | undefined>;
+  deleteRsvpFormTemplate(id: string): Promise<void>;
+  
+  // KnotVite RSVP - Form Fields
+  getRsvpFormFields(templateId: string): Promise<RsvpFormField[]>;
+  getRsvpFormField(id: string): Promise<RsvpFormField | undefined>;
+  createRsvpFormField(field: InsertRsvpFormField): Promise<RsvpFormField>;
+  createRsvpFormFields(fields: InsertRsvpFormField[]): Promise<RsvpFormField[]>;
+  updateRsvpFormField(id: string, field: Partial<InsertRsvpFormField>): Promise<RsvpFormField | undefined>;
+  deleteRsvpFormField(id: string): Promise<void>;
+  reorderRsvpFormFields(templateId: string, fieldOrders: { id: string; order: number }[]): Promise<void>;
+  
+  // KnotVite RSVP - Submissions
+  getRsvpSubmissions(eventId: string, filters?: { attending?: string; search?: string }): Promise<RsvpSubmission[]>;
+  getRsvpSubmission(id: string): Promise<RsvpSubmission | undefined>;
+  getRsvpSubmissionCount(eventId: string): Promise<number>;
+  createRsvpSubmission(submission: InsertRsvpSubmission): Promise<RsvpSubmission>;
+  updateRsvpSubmission(id: string, submission: Partial<InsertRsvpSubmission>): Promise<RsvpSubmission | undefined>;
+  deleteRsvpSubmission(id: string): Promise<void>;
+  getRsvpSubmissionStats(eventId: string): Promise<{ total: number; attending: number; notAttending: number; maybe: number; pending: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5397,6 +5435,145 @@ export class DatabaseStorage implements IStorage {
         eq(inAppNotifications.companyId, companyId),
         isNull(inAppNotifications.readAt)
       ));
+  }
+
+  // ============================================
+  // KNOTVITE RSVP MODULE
+  // ============================================
+
+  // Form Templates
+  async getRsvpFormTemplates(companyId: string): Promise<RsvpFormTemplate[]> {
+    return await db.select().from(rsvpFormTemplates)
+      .where(eq(rsvpFormTemplates.companyId, companyId))
+      .orderBy(desc(rsvpFormTemplates.createdAt));
+  }
+
+  async getRsvpFormTemplatesByEvent(eventId: string): Promise<RsvpFormTemplate[]> {
+    return await db.select().from(rsvpFormTemplates)
+      .where(eq(rsvpFormTemplates.eventId, eventId))
+      .orderBy(desc(rsvpFormTemplates.createdAt));
+  }
+
+  async getRsvpFormTemplate(id: string): Promise<RsvpFormTemplate | undefined> {
+    const [template] = await db.select().from(rsvpFormTemplates)
+      .where(eq(rsvpFormTemplates.id, id));
+    return template;
+  }
+
+  async createRsvpFormTemplate(template: InsertRsvpFormTemplate): Promise<RsvpFormTemplate> {
+    const [created] = await db.insert(rsvpFormTemplates).values(template).returning();
+    return created;
+  }
+
+  async updateRsvpFormTemplate(id: string, template: Partial<InsertRsvpFormTemplate>): Promise<RsvpFormTemplate | undefined> {
+    const [updated] = await db.update(rsvpFormTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(rsvpFormTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpFormTemplate(id: string): Promise<void> {
+    await db.delete(rsvpFormTemplates).where(eq(rsvpFormTemplates.id, id));
+  }
+
+  // Form Fields
+  async getRsvpFormFields(templateId: string): Promise<RsvpFormField[]> {
+    return await db.select().from(rsvpFormFields)
+      .where(eq(rsvpFormFields.templateId, templateId))
+      .orderBy(rsvpFormFields.order);
+  }
+
+  async getRsvpFormField(id: string): Promise<RsvpFormField | undefined> {
+    const [field] = await db.select().from(rsvpFormFields)
+      .where(eq(rsvpFormFields.id, id));
+    return field;
+  }
+
+  async createRsvpFormField(field: InsertRsvpFormField): Promise<RsvpFormField> {
+    const [created] = await db.insert(rsvpFormFields).values(field).returning();
+    return created;
+  }
+
+  async createRsvpFormFields(fields: InsertRsvpFormField[]): Promise<RsvpFormField[]> {
+    if (fields.length === 0) return [];
+    return await db.insert(rsvpFormFields).values(fields).returning();
+  }
+
+  async updateRsvpFormField(id: string, field: Partial<InsertRsvpFormField>): Promise<RsvpFormField | undefined> {
+    const [updated] = await db.update(rsvpFormFields)
+      .set(field)
+      .where(eq(rsvpFormFields.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpFormField(id: string): Promise<void> {
+    await db.delete(rsvpFormFields).where(eq(rsvpFormFields.id, id));
+  }
+
+  async reorderRsvpFormFields(templateId: string, fieldOrders: { id: string; order: number }[]): Promise<void> {
+    for (const { id, order } of fieldOrders) {
+      await db.update(rsvpFormFields)
+        .set({ order })
+        .where(and(eq(rsvpFormFields.id, id), eq(rsvpFormFields.templateId, templateId)));
+    }
+  }
+
+  // Submissions
+  async getRsvpSubmissions(eventId: string, filters?: { attending?: string; search?: string }): Promise<RsvpSubmission[]> {
+    let query = db.select().from(rsvpSubmissions).where(eq(rsvpSubmissions.eventId, eventId));
+    
+    if (filters?.attending) {
+      query = db.select().from(rsvpSubmissions).where(
+        and(eq(rsvpSubmissions.eventId, eventId), eq(rsvpSubmissions.attending, filters.attending))
+      );
+    }
+    
+    return await query.orderBy(desc(rsvpSubmissions.submittedAt));
+  }
+
+  async getRsvpSubmission(id: string): Promise<RsvpSubmission | undefined> {
+    const [submission] = await db.select().from(rsvpSubmissions)
+      .where(eq(rsvpSubmissions.id, id));
+    return submission;
+  }
+
+  async getRsvpSubmissionCount(eventId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` })
+      .from(rsvpSubmissions)
+      .where(eq(rsvpSubmissions.eventId, eventId));
+    return result[0]?.count || 0;
+  }
+
+  async createRsvpSubmission(submission: InsertRsvpSubmission): Promise<RsvpSubmission> {
+    const [created] = await db.insert(rsvpSubmissions).values(submission).returning();
+    return created;
+  }
+
+  async updateRsvpSubmission(id: string, submission: Partial<InsertRsvpSubmission>): Promise<RsvpSubmission | undefined> {
+    const [updated] = await db.update(rsvpSubmissions)
+      .set({ ...submission, updatedAt: new Date() })
+      .where(eq(rsvpSubmissions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRsvpSubmission(id: string): Promise<void> {
+    await db.delete(rsvpSubmissions).where(eq(rsvpSubmissions.id, id));
+  }
+
+  async getRsvpSubmissionStats(eventId: string): Promise<{ total: number; attending: number; notAttending: number; maybe: number; pending: number }> {
+    const submissions = await db.select().from(rsvpSubmissions)
+      .where(eq(rsvpSubmissions.eventId, eventId));
+    
+    return {
+      total: submissions.length,
+      attending: submissions.filter(s => s.attending === 'yes').length,
+      notAttending: submissions.filter(s => s.attending === 'no').length,
+      maybe: submissions.filter(s => s.attending === 'maybe').length,
+      pending: submissions.filter(s => s.attending === 'pending').length,
+    };
   }
 }
 
