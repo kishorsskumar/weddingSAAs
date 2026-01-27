@@ -574,20 +574,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                                   {subPage.group}
                                 </div>
                               )}
-                              <Link href={subPage.path}>
-                                <button
-                                  className={cn(
-                                    "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors",
-                                    isSubActive
-                                      ? "bg-primary/10 text-primary font-medium"
-                                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
-                                  )}
-                                  onClick={() => setIsMobileOpen(false)}
-                                  data-testid={`nav-${subPage.id}`}
-                                >
-                                  <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
-                                  <span>{subPage.label}</span>
-                                </button>
+                              <Link 
+                                href={subPage.path}
+                                onClick={() => setIsMobileOpen(false)}
+                                className={cn(
+                                  "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors cursor-pointer",
+                                  isSubActive
+                                    ? "bg-primary/10 text-primary font-medium"
+                                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                                )}
+                                data-testid={`nav-${subPage.id}`}
+                              >
+                                <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
+                                <span>{subPage.label}</span>
                               </Link>
                             </div>
                           );
@@ -605,20 +604,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           
           return (
             <div key={item.id}>
-              <Link href={parentHref}>
-                <button
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                    isActive || isParentOfActive
-                      ? "bg-primary/10 text-primary font-medium"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent"
-                  )}
-                  onClick={() => setIsMobileOpen(false)}
-                  data-testid={`nav-${item.id}`}
-                >
-                  <Icon className={cn("h-4 w-4", isActive || isParentOfActive ? "text-primary" : "text-sidebar-foreground/70")} />
-                  <span>{item.label}</span>
-                </button>
+              <Link 
+                href={parentHref}
+                onClick={() => setIsMobileOpen(false)}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors cursor-pointer",
+                  isActive || isParentOfActive
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent"
+                )}
+                data-testid={`nav-${item.id}`}
+              >
+                <Icon className={cn("h-4 w-4", isActive || isParentOfActive ? "text-primary" : "text-sidebar-foreground/70")} />
+                <span>{item.label}</span>
               </Link>
               {hasSubPages && subPages.map((subPage: any) => {
                 const SubIcon = ICONS[subPage.id] || Calendar;
@@ -627,20 +625,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
                 if (!hasAccess) return null;
                 return (
-                  <Link key={subPage.id} href={subPage.path}>
-                    <button
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors",
-                        isSubActive
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
-                      )}
-                      onClick={() => setIsMobileOpen(false)}
-                      data-testid={`nav-${subPage.id}`}
-                    >
-                      <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
-                      <span>{subPage.label}</span>
-                    </button>
+                  <Link 
+                    key={subPage.id} 
+                    href={subPage.path}
+                    onClick={() => setIsMobileOpen(false)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors cursor-pointer",
+                      isSubActive
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent"
+                    )}
+                    data-testid={`nav-${subPage.id}`}
+                  >
+                    <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
+                    <span>{subPage.label}</span>
                   </Link>
                 );
               })}
