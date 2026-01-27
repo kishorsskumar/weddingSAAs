@@ -55,7 +55,7 @@ export default function KnotViteSubmissions() {
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
     queryFn: async () => {
-      const res = await fetch('/api/events');
+      const res = await fetch('/api/events', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
@@ -65,7 +65,7 @@ export default function KnotViteSubmissions() {
     queryKey: ['/api/rsvp/events', selectedEventId, 'submissions'],
     queryFn: async () => {
       if (!selectedEventId) return [];
-      const res = await fetch(`/api/rsvp/events/${selectedEventId}/submissions`);
+      const res = await fetch(`/api/rsvp/events/${selectedEventId}/submissions`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch submissions');
       return res.json();
     },
@@ -76,7 +76,7 @@ export default function KnotViteSubmissions() {
     queryKey: ['/api/rsvp/events', selectedEventId, 'stats'],
     queryFn: async () => {
       if (!selectedEventId) return { total: 0, attending: 0, notAttending: 0, maybe: 0, pending: 0 };
-      const res = await fetch(`/api/rsvp/events/${selectedEventId}/stats`);
+      const res = await fetch(`/api/rsvp/events/${selectedEventId}/stats`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch stats');
       return res.json();
     },
@@ -85,7 +85,7 @@ export default function KnotViteSubmissions() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/rsvp/submissions/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/rsvp/submissions/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to delete');
       return res.json();
     },

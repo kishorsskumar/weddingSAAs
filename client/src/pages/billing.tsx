@@ -132,8 +132,14 @@ export default function BillingPage() {
     },
   });
 
+  // List of modules that can be subscribed independently (without Core Platform)
+  const independentModules = ['rsvp'];
+
   const handleSubscribe = async (module: SaasModule) => {
-    if (!subscriptionData?.hasActiveCore && !module.isCore) {
+    // Allow Core Platform and independent modules to be subscribed without Core
+    const canSubscribeIndependently = module.isCore || independentModules.includes(module.code);
+    
+    if (!subscriptionData?.hasActiveCore && !canSubscribeIndependently) {
       toast({
         title: "Core Platform Required",
         description: "Please subscribe to Core Platform first before adding modules.",
@@ -384,7 +390,7 @@ export default function BillingPage() {
               <CardContent className="py-4">
                 <div className="flex items-center gap-2 text-yellow-800">
                   <AlertCircle className="h-5 w-5" />
-                  <span>Subscribe to Core Platform first to enable add-on modules.</span>
+                  <span>Subscribe to Core Platform to enable all add-on modules. KnotVite RSVP is available as a standalone service.</span>
                 </div>
               </CardContent>
             </Card>
@@ -444,7 +450,7 @@ export default function BillingPage() {
                       <Button
                         className="w-full"
                         onClick={() => handleSubscribe(module)}
-                        disabled={isProcessing || !subscriptionData?.hasActiveCore}
+                        disabled={isProcessing || (!subscriptionData?.hasActiveCore && !independentModules.includes(module.code))}
                       >
                         {isProcessing ? (
                           <Loader2 className="h-4 w-4 animate-spin mr-2" />

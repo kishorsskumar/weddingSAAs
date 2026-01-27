@@ -76,7 +76,7 @@ export default function KnotViteForms() {
   const { data: templates = [] } = useQuery<RsvpFormTemplate[]>({
     queryKey: ['/api/rsvp/templates'],
     queryFn: async () => {
-      const res = await fetch('/api/rsvp/templates');
+      const res = await fetch('/api/rsvp/templates', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch templates');
       return res.json();
     },
@@ -85,7 +85,7 @@ export default function KnotViteForms() {
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
     queryFn: async () => {
-      const res = await fetch('/api/events');
+      const res = await fetch('/api/events', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
@@ -95,7 +95,7 @@ export default function KnotViteForms() {
     queryKey: ['/api/rsvp/templates', showFieldEditor, 'fields'],
     queryFn: async () => {
       if (!showFieldEditor) return [];
-      const res = await fetch(`/api/rsvp/templates/${showFieldEditor}/fields`);
+      const res = await fetch(`/api/rsvp/templates/${showFieldEditor}/fields`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch fields');
       return res.json();
     },
@@ -108,6 +108,7 @@ export default function KnotViteForms() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to create template');
       return res.json();
@@ -129,6 +130,7 @@ export default function KnotViteForms() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to update template');
       return res.json();
@@ -142,7 +144,7 @@ export default function KnotViteForms() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/rsvp/templates/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/rsvp/templates/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to delete template');
       return res.json();
     },
@@ -161,6 +163,7 @@ export default function KnotViteForms() {
           ...data,
           order: fields.length,
         }),
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to create field');
       return res.json();
@@ -174,7 +177,7 @@ export default function KnotViteForms() {
 
   const deleteFieldMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/rsvp/fields/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/rsvp/fields/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error('Failed to delete field');
       return res.json();
     },
