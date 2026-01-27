@@ -33,7 +33,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { sql, eq, and, gte, like, or, desc } from "drizzle-orm";
-import { customers, events, saasModules, companyModuleSubscriptions, aiAssistantSettings, aiUsage, inAppNotifications, billingEvents } from "@shared/schema";
+import { customers, events, saasModules, companyModuleSubscriptions, aiAssistantSettings, aiUsage, inAppNotifications, billingEvents, rsvpFormTemplates } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import session from "express-session";
@@ -11838,6 +11838,329 @@ Respond with a JSON array only, no markdown formatting.`;
     } catch (error: any) {
       console.error('[Chat] Error:', error);
       res.status(500).json({ error: 'Failed to process chat request' });
+    }
+  });
+
+  // ============================================
+  // KNOTVITE RSVP MODULE API
+  // ============================================
+
+  // RSVP Form Templates
+  app.get("/api/rsvp/templates", verifyJWT, async (req, res) => {
+    try {
+      const templates = await storage.getRsvpFormTemplates(req.user!.companyId);
+      res.json(templates);
+    } catch (error: any) {
+      console.error('[RSVP] Get templates error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/rsvp/templates/:id", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.getRsvpFormTemplate(req.params.id);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error: any) {
+      console.error('[RSVP] Get template error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/rsvp/templates", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.createRsvpFormTemplate({
+        ...req.body,
+        companyId: req.user!.companyId,
+        createdBy: req.user!.id,
+      });
+      res.status(201).json(template);
+    } catch (error: any) {
+      console.error('[RSVP] Create template error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/rsvp/templates/:id", verifyJWT, async (req, res) => {
+    try {
+      const existing = await storage.getRsvpFormTemplate(req.params.id);
+      if (!existing || existing.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      const updated = await storage.updateRsvpFormTemplate(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('[RSVP] Update template error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/rsvp/templates/:id", verifyJWT, async (req, res) => {
+    try {
+      const existing = await storage.getRsvpFormTemplate(req.params.id);
+      if (!existing || existing.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      await storage.deleteRsvpFormTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[RSVP] Delete template error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // RSVP Form Fields
+  app.get("/api/rsvp/templates/:templateId/fields", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.getRsvpFormTemplate(req.params.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      const fields = await storage.getRsvpFormFields(req.params.templateId);
+      res.json(fields);
+    } catch (error: any) {
+      console.error('[RSVP] Get fields error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/rsvp/templates/:templateId/fields", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.getRsvpFormTemplate(req.params.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      const field = await storage.createRsvpFormField({
+        ...req.body,
+        templateId: req.params.templateId,
+      });
+      res.status(201).json(field);
+    } catch (error: any) {
+      console.error('[RSVP] Create field error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/rsvp/templates/:templateId/fields/bulk", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.getRsvpFormTemplate(req.params.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      const fields = await storage.createRsvpFormFields(
+        req.body.fields.map((f: any) => ({ ...f, templateId: req.params.templateId }))
+      );
+      res.status(201).json(fields);
+    } catch (error: any) {
+      console.error('[RSVP] Create fields bulk error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/rsvp/fields/:id", verifyJWT, async (req, res) => {
+    try {
+      const field = await storage.getRsvpFormField(req.params.id);
+      if (!field) {
+        return res.status(404).json({ error: 'Field not found' });
+      }
+      const template = await storage.getRsvpFormTemplate(field.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      const updated = await storage.updateRsvpFormField(req.params.id, req.body);
+      res.json(updated);
+    } catch (error: any) {
+      console.error('[RSVP] Update field error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/rsvp/fields/:id", verifyJWT, async (req, res) => {
+    try {
+      const field = await storage.getRsvpFormField(req.params.id);
+      if (!field) {
+        return res.status(404).json({ error: 'Field not found' });
+      }
+      const template = await storage.getRsvpFormTemplate(field.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      await storage.deleteRsvpFormField(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[RSVP] Delete field error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/rsvp/templates/:templateId/fields/reorder", verifyJWT, async (req, res) => {
+    try {
+      const template = await storage.getRsvpFormTemplate(req.params.templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      await storage.reorderRsvpFormFields(req.params.templateId, req.body.fields);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[RSVP] Reorder fields error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // RSVP Submissions (authenticated - management)
+  app.get("/api/rsvp/events/:eventId/submissions", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.eventId, req.user!.companyId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const filters = {
+        attending: req.query.attending as string | undefined,
+        search: req.query.search as string | undefined,
+      };
+      const submissions = await storage.getRsvpSubmissions(req.params.eventId, filters);
+      res.json(submissions);
+    } catch (error: any) {
+      console.error('[RSVP] Get submissions error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/rsvp/events/:eventId/stats", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getEvent(req.params.eventId, req.user!.companyId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const stats = await storage.getRsvpSubmissionStats(req.params.eventId);
+      res.json(stats);
+    } catch (error: any) {
+      console.error('[RSVP] Get stats error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/rsvp/submissions/:id", verifyJWT, async (req, res) => {
+    try {
+      const submission = await storage.getRsvpSubmission(req.params.id);
+      if (!submission) {
+        return res.status(404).json({ error: 'Submission not found' });
+      }
+      const event = await storage.getEvent(submission.eventId, req.user!.companyId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      await storage.deleteRsvpSubmission(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('[RSVP] Delete submission error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public RSVP Form - Get template by slug (no auth required)
+  app.get("/api/public/rsvp/:slug", async (req, res) => {
+    try {
+      const templates = await db.select().from(rsvpFormTemplates)
+        .where(and(
+          eq(rsvpFormTemplates.slug, req.params.slug),
+          eq(rsvpFormTemplates.isPublished, true)
+        ));
+      
+      if (templates.length === 0) {
+        return res.status(404).json({ error: 'Form not found' });
+      }
+      
+      const template = templates[0];
+      const fields = await storage.getRsvpFormFields(template.id);
+      const event = template.eventId ? await storage.getEvent(template.eventId) : null;
+      
+      res.json({
+        template: {
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          headerImage: template.headerImage,
+          logoUrl: template.logoUrl,
+          primaryColor: template.primaryColor,
+          backgroundColor: template.backgroundColor,
+          fontFamily: template.fontFamily,
+          successMessage: template.successMessage,
+        },
+        fields: fields.map(f => ({
+          id: f.id,
+          type: f.type,
+          label: f.label,
+          placeholder: f.placeholder,
+          helpText: f.helpText,
+          required: f.required,
+          options: f.options,
+          validation: f.validation,
+        })),
+        event: event ? {
+          name: event.name,
+          date: event.date,
+          venue: event.venue,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error('[RSVP] Get public form error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public RSVP Form - Submit (no auth required)
+  app.post("/api/public/rsvp/:slug/submit", async (req, res) => {
+    try {
+      const templates = await db.select().from(rsvpFormTemplates)
+        .where(and(
+          eq(rsvpFormTemplates.slug, req.params.slug),
+          eq(rsvpFormTemplates.isPublished, true)
+        ));
+      
+      if (templates.length === 0) {
+        return res.status(404).json({ error: 'Form not found' });
+      }
+      
+      const template = templates[0];
+      
+      if (!template.eventId) {
+        return res.status(400).json({ error: 'Form not linked to an event' });
+      }
+      
+      const { name, email, phone, attending, guestCount, dietaryPreferences, message, responses } = req.body;
+      
+      const submission = await storage.createRsvpSubmission({
+        eventId: template.eventId,
+        templateId: template.id,
+        name,
+        email,
+        phone,
+        attending: attending || 'pending',
+        guestCount: guestCount || 1,
+        dietaryPreferences,
+        message,
+        responses: responses || {},
+        source: 'form',
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      
+      // Update submission count
+      await storage.updateRsvpFormTemplate(template.id, {
+        submissionCount: (template.submissionCount || 0) + 1,
+      });
+      
+      res.status(201).json({
+        success: true,
+        message: template.successMessage || 'Thank you for your RSVP!',
+        submissionId: submission.id,
+      });
+    } catch (error: any) {
+      console.error('[RSVP] Submit form error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 
