@@ -1,12 +1,21 @@
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, User, LayoutDashboard, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/auth-context";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import atbottLogo from "@/assets/atbott-logo.png";
 
 export function PublicNavbar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const navLinks = [
     { href: "/", label: "Home" },
@@ -28,6 +37,11 @@ export function PublicNavbar() {
         element.scrollIntoView({ behavior: "smooth" });
       }
     }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    setLocation("/");
   };
 
   return (
@@ -56,16 +70,42 @@ export function PublicNavbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
-            <Link href="/login">
-              <Button variant="outline" size="sm">
-                Login
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button size="sm">
-                Get Started
-              </Button>
-            </Link>
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    {user.name}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline" size="sm">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           <button
@@ -93,17 +133,42 @@ export function PublicNavbar() {
                   {link.label}
                 </Link>
               ))}
-              <div className="flex gap-3 pt-3 border-t border-gray-100 mt-2">
-                <Link href="/login" className="flex-1">
-                  <Button variant="outline" size="sm" className="w-full">
-                    Login
-                  </Button>
-                </Link>
-                <Link href="/signup" className="flex-1">
-                  <Button size="sm" className="w-full">
-                    Get Started
-                  </Button>
-                </Link>
+              <div className="flex flex-col gap-3 pt-3 border-t border-gray-100 mt-2">
+                {user ? (
+                  <>
+                    <div className="px-3 py-2 text-sm font-medium text-gray-900">
+                      Hi, {user.name}
+                    </div>
+                    <Link href="/dashboard">
+                      <Button variant="outline" size="sm" className="w-full gap-2">
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex gap-3">
+                    <Link href="/login" className="flex-1">
+                      <Button variant="outline" size="sm" className="w-full">
+                        Login
+                      </Button>
+                    </Link>
+                    <Link href="/signup" className="flex-1">
+                      <Button size="sm" className="w-full">
+                        Get Started
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>

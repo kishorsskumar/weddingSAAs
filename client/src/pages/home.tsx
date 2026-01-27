@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PublicLayout } from "@/components/public-layout";
+import { useAuth } from "@/context/auth-context";
 import { 
   Users, 
   Calendar, 
@@ -11,7 +12,8 @@ import {
   BarChart3,
   CheckCircle2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  LayoutDashboard
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -63,6 +65,8 @@ const benefits = [
 ];
 
 export default function HomePage() {
+  const { user } = useAuth();
+
   useEffect(() => {
     document.title = "AtBott Wedding SaaS - Manage Your Wedding Business Smarter";
   }, []);
@@ -90,12 +94,21 @@ export default function HomePage() {
                 automation from one dashboard.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/signup">
-                  <Button size="lg" className="w-full sm:w-auto text-base px-8">
-                    Start Free Trial
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                </Link>
+                {user ? (
+                  <Link href="/dashboard">
+                    <Button size="lg" className="w-full sm:w-auto text-base px-8">
+                      Go to Dashboard
+                      <LayoutDashboard className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <Link href="/signup">
+                    <Button size="lg" className="w-full sm:w-auto text-base px-8">
+                      Start Free Trial
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                )}
                 <Link href="/pricing">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8">
                     View Pricing
