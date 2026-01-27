@@ -207,7 +207,7 @@ export default function KnotViteForms() {
     
     createTemplateMutation.mutate({
       name,
-      eventId: eventId || null,
+      eventId: eventId === 'none' ? null : (eventId || null),
       welcomeMessage: welcomeMessage || null,
       status: 'draft',
     });
@@ -447,7 +447,7 @@ export default function KnotViteForms() {
                     <SelectValue placeholder="Select an event" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No event</SelectItem>
+                    <SelectItem value="none">No event</SelectItem>
                     {events.map(event => (
                       <SelectItem key={event.id} value={event.id}>
                         {event.name} - {format(new Date(event.date), 'MMM d, yyyy')}
@@ -583,7 +583,7 @@ export default function KnotViteForms() {
                   data: {
                     name: formData.get('name') as string,
                     description: formData.get('description') as string || null,
-                    eventId: formData.get('eventId') as string || null,
+                    eventId: (formData.get('eventId') as string) === 'none' ? null : (formData.get('eventId') as string || null),
                   },
                 });
               }}
@@ -595,12 +595,12 @@ export default function KnotViteForms() {
               </div>
               <div>
                 <Label htmlFor="edit-eventId">Link to Event</Label>
-                <Select name="eventId" defaultValue={editingTemplate.eventId || ''}>
+                <Select name="eventId" defaultValue={editingTemplate.eventId || 'none'}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select an event" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No event</SelectItem>
+                    <SelectItem value="none">No event</SelectItem>
                     {events.map(event => (
                       <SelectItem key={event.id} value={event.id}>
                         {event.name}
