@@ -86,6 +86,10 @@ const ALL_PAGES = [
     { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
     { id: "team-calendar", label: "Team Calendar", path: "/team" },
   ] },
+  { id: "knotvite", label: "KnotVite RSVP", path: "/knotvite/forms", subPages: [
+    { id: "knotvite-forms", label: "Form Builder", path: "/knotvite/forms" },
+    { id: "knotvite-submissions", label: "Submissions", path: "/knotvite/submissions" },
+  ] },
   { id: "tools", label: "Tools", path: "/whatsapp-inbox", subPages: [
     { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
     { id: "oak-rsvp", label: "RSVP Manager", path: "/oak-rsvp" },
@@ -141,6 +145,9 @@ const ICONS: Record<string, any> = {
   "ops-transportation": Package,
   "ops-manpower": Users,
   "execution-plan": ClipboardList,
+  "knotvite": FileText,
+  "knotvite-forms": FileText,
+  "knotvite-submissions": Users,
   "people": Users,
   hr: Briefcase,
   "employee-portal": UserCircle,

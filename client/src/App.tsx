@@ -41,6 +41,9 @@ import RefundPolicy from "@/pages/refund-policy";
 import Contact from "@/pages/contact";
 import Pricing from "@/pages/pricing";
 import KnotVitePlanPDF from "@/pages/knotvite-plan-pdf";
+import KnotViteForms from "@/pages/knotvite-forms";
+import KnotViteSubmissions from "@/pages/knotvite-submissions";
+import PublicRsvpForm from "@/pages/public-rsvp";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -142,6 +145,12 @@ function AppRoutes() {
         <Route path="/billing">
           <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
         </Route>
+        <Route path="/knotvite/forms">
+          <PrivateRoute component={KnotViteForms} path="/knotvite/forms" />
+        </Route>
+        <Route path="/knotvite/submissions">
+          <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -165,6 +174,7 @@ function PublicPages() {
         <Route path="/terms" component={Terms} />
         <Route path="/refund-policy" component={RefundPolicy} />
         <Route path="/contact" component={Contact} />
+        <Route path="/rsvp/:slug" component={PublicRsvpForm} />
         <Route>
           <AppRoutes />
         </Route>
