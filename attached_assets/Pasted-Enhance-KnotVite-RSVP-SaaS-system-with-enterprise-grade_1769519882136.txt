@@ -1,0 +1,284 @@
+Enhance KnotVite RSVP SaaS system with enterprise-grade customization, reporting, admin control and premium integrations.
+
+Product:
+KnotVite — Powered by AtBott
+Base Route: /knotvite
+
+--------------------------------------------------
+SECTION 1 — CUSTOM RSVP FIELD BUILDER (CORE FEATURE)
+--------------------------------------------------
+
+Add dynamic RSVP form builder for event organizers.
+
+Allow organizer to:
+
+Create custom fields per event:
+
+Field types:
+- Text input
+- Dropdown
+- Yes/No toggle
+- Multi-select
+- Number input
+- Date field
+
+Examples:
+- Hotel Name
+- Room Required (Yes/No)
+- Transportation Required (Yes/No)
+- Pickup Location
+- Arrival Date
+- Special Requests
+
+Features:
+
+- Drag-and-drop field ordering
+- Required / Optional toggle
+- Placeholder text
+- Default values
+- Preview form before publishing
+
+Store custom field definitions per event.
+
+--------------------------------------------------
+SECTION 2 — PUBLIC RSVP FORM (DYNAMIC)
+--------------------------------------------------
+
+Public RSVP page (/knotvite/rsvp/:eventId):
+
+Requirements:
+
+- Render default fields
+- Render organizer-defined custom fields dynamically
+- Validate required fields
+- Save custom field responses per guest
+- Show confirmation success page
+
+--------------------------------------------------
+SECTION 3 — REPORTING WITH CUSTOM FIELDS
+--------------------------------------------------
+
+Organizer Dashboard → Reports:
+
+Create report views:
+
+- Guest master list
+- Attendance summary
+- Meal preferences
+- Hotel allocation
+- Transportation requirement list
+
+Reports must include:
+
+- Custom field columns
+- Filter options
+- Sort functionality
+- Export to CSV / Excel
+
+--------------------------------------------------
+SECTION 4 — CSV / EXCEL BULK IMPORT (PREMIUM ONLY)
+--------------------------------------------------
+
+Premium feature:
+
+Allow organizers to upload:
+
+- CSV
+- Excel (.xlsx)
+
+Upload use cases:
+
+- Bulk guest list import
+- Pre-filled meal preferences
+- Existing RSVP data
+
+Import flow:
+
+1) Upload file
+2) Map columns to fields (including custom fields)
+3) Preview data
+4) Confirm import
+
+Validate:
+
+- Email format
+- Phone numbers
+- Duplicate entries
+- Missing required fields
+
+--------------------------------------------------
+SECTION 5 — PREMIUM WHATSAPP INTEGRATION (OPTIONAL MODULE)
+--------------------------------------------------
+
+Add WhatsApp integration as OPTIONAL premium add-on.
+
+Capabilities:
+
+- Send RSVP link via WhatsApp
+- Send reminder messages
+- Confirmation acknowledgment message
+
+Implementation:
+
+- Use provider abstraction layer
+- Do NOT hardcode provider
+- Keep toggle ON/OFF per account
+
+Admin can:
+
+- Enable WhatsApp module
+- Configure API credentials
+- Enable template approval status
+
+Fallback:
+
+If WhatsApp disabled → Email only.
+
+--------------------------------------------------
+SECTION 6 — SUPER ADMIN DASHBOARD (ATBOTT ADMIN)
+--------------------------------------------------
+
+Create internal admin panel:
+
+Route:
+ /admin/knotvite
+
+Admin features:
+
+Dashboard:
+
+- Total KnotVite users
+- Active events
+- Free vs Paid accounts
+- Revenue summary
+
+User Management:
+
+- View organizers
+- Suspend account
+- Reset usage limits
+- Force upgrade/downgrade
+
+Event Monitoring:
+
+- View events
+- Guest count per event
+- Abuse detection (spam prevention)
+
+Billing Control:
+
+- View subscriptions
+- Payment status
+- Failed payment alerts
+
+--------------------------------------------------
+SECTION 7 — ROLE BASED ACCESS
+--------------------------------------------------
+
+Roles:
+
+- Super Admin (AtBott Team)
+- Organizer (Customer)
+- Staff (Optional)
+
+Permissions:
+
+Super Admin:
+- Full access
+
+Organizer:
+- Event + Guest management
+
+Staff:
+- View reports only
+
+--------------------------------------------------
+SECTION 8 — SECURITY & DATA PROTECTION
+--------------------------------------------------
+
+Implement:
+
+- Input sanitization
+- CSV upload virus scan protection
+- Rate limiting on RSVP form
+- GDPR-style consent checkbox option
+- IP based spam prevention
+
+--------------------------------------------------
+SECTION 9 — PERFORMANCE OPTIMIZATION
+--------------------------------------------------
+
+Implement:
+
+- Pagination on guest tables
+- Lazy loading for reports
+- Indexed database columns for eventId, email
+- Server-side filtering
+
+--------------------------------------------------
+SECTION 10 — UI & UX REQUIREMENTS
+--------------------------------------------------
+
+Organizer Dashboard:
+
+Add tabs:
+
+- Events
+- Guests
+- Reports
+- Form Builder
+- Billing
+- Settings
+
+Public RSVP Page:
+
+- Clean mobile-first UI
+- Fast load
+- Large buttons
+- Wedding-friendly design
+
+--------------------------------------------------
+SECTION 11 — PRICING FEATURE GATING
+--------------------------------------------------
+
+FREE PLAN:
+
+- 1 Event
+- 100 Guests
+- No CSV import
+- No WhatsApp
+- Limited custom fields (max 3)
+
+PRO PLAN:
+
+- Unlimited Events
+- Unlimited Guests
+- CSV Import enabled
+- Unlimited custom fields
+- Reports export
+- WhatsApp integration enabled
+- Branding removal
+
+--------------------------------------------------
+SECTION 12 — INTEGRATION READY
+--------------------------------------------------
+
+Ensure:
+
+- Razorpay billing hooks ready
+- Module activation flags
+- Upgrade banner triggers
+- Feature gating middleware implemented
+
+--------------------------------------------------
+FINAL OUTPUT:
+
+Build KnotVite RSVP SaaS with:
+
+- Dynamic custom RSVP fields
+- CSV import system
+- Advanced reporting
+- Super admin dashboard
+- Premium WhatsApp integration option
+- Production SaaS architecture
+- AtBott integration
