@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -469,7 +469,7 @@ function MobileBottomNav({ allowedPages, currentPath }: { allowedPages: string[]
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
 
@@ -604,9 +604,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           
           return (
             <div key={item.id}>
-              <Link 
-                href={parentHref}
-                onClick={() => setIsMobileOpen(false)}
+              <div 
+                onClick={() => {
+                  navigate(parentHref);
+                  setIsMobileOpen(false);
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors cursor-pointer",
                   isActive || isParentOfActive
@@ -617,7 +619,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               >
                 <Icon className={cn("h-4 w-4", isActive || isParentOfActive ? "text-primary" : "text-sidebar-foreground/70")} />
                 <span>{item.label}</span>
-              </Link>
+              </div>
               {hasSubPages && subPages.map((subPage: any) => {
                 const SubIcon = ICONS[subPage.id] || Calendar;
                 const isSubActive = currentFullUrl === subPage.path || 
@@ -625,10 +627,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
                 if (!hasAccess) return null;
                 return (
-                  <Link 
+                  <div 
                     key={subPage.id} 
-                    href={subPage.path}
-                    onClick={() => setIsMobileOpen(false)}
+                    onClick={() => {
+                      navigate(subPage.path);
+                      setIsMobileOpen(false);
+                    }}
                     className={cn(
                       "w-full flex items-center gap-3 px-3 py-2 pl-10 rounded-md text-sm transition-colors cursor-pointer",
                       isSubActive
@@ -639,7 +643,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <SubIcon className={cn("h-3.5 w-3.5", isSubActive ? "text-primary" : "text-sidebar-foreground/60")} />
                     <span>{subPage.label}</span>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
