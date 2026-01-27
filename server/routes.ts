@@ -1,11 +1,13 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
+import { sendPasswordResetEmail } from "./email-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { createGitHubRepo, listUserRepos } from "./github-export";
 import { 
@@ -1107,7 +1109,26 @@ export async function registerRoutes(
 
       const user = await storage.getUserByEmail(email);
       
-      console.log(`[Password Reset] Request received for ${email}, user found: ${!!user}`);
+      if (user) {
+        const resetToken = crypto.randomBytes(32).toString('hex');
+        const resetExpiry = new Date(Date.now() + 3600000);
+
+        await db.update(users)
+          .set({ 
+            passwordResetToken: resetToken, 
+            passwordResetExpiry: resetExpiry 
+          })
+          .where(eq(users.id, user.id));
+
+        try {
+          await sendPasswordResetEmail(email, resetToken, user.name);
+          console.log(`[Password Reset] Email sent to ${email}`);
+        } catch (emailError) {
+          console.error('[Password Reset] Failed to send email:', emailError);
+        }
+      } else {
+        console.log(`[Password Reset] No user found for ${email}`);
+      }
 
       res.json({ 
         message: 'If an account exists with this email, a reset link will be sent.' 
@@ -1115,6 +1136,80 @@ export async function registerRoutes(
     } catch (error) {
       console.error('Forgot password error:', error);
       res.status(500).json({ error: 'Failed to process request' });
+    }
+  });
+
+  app.get('/api/auth/verify-reset-token', async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== 'string') {
+        return res.json({ valid: false });
+      }
+
+      const result = await db.select()
+        .from(users)
+        .where(eq(users.passwordResetToken, token))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.json({ valid: false });
+      }
+
+      const user = result[0];
+      if (!user.passwordResetExpiry || new Date() > new Date(user.passwordResetExpiry)) {
+        return res.json({ valid: false });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      console.error('Verify reset token error:', error);
+      res.json({ valid: false });
+    }
+  });
+
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, password } = req.body;
+      
+      if (!token || !password) {
+        return res.status(400).json({ error: 'Token and password are required' });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      const result = await db.select()
+        .from(users)
+        .where(eq(users.passwordResetToken, token))
+        .limit(1);
+
+      if (result.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired reset link' });
+      }
+
+      const user = result[0];
+      if (!user.passwordResetExpiry || new Date() > new Date(user.passwordResetExpiry)) {
+        return res.status(400).json({ error: 'Reset link has expired' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      await db.update(users)
+        .set({ 
+          password: hashedPassword,
+          passwordResetToken: null,
+          passwordResetExpiry: null
+        })
+        .where(eq(users.id, user.id));
+
+      console.log(`[Password Reset] Password updated for user ${user.email}`);
+
+      res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ error: 'Failed to reset password' });
     }
   });
 

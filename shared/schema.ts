@@ -47,6 +47,8 @@ export const users = pgTable("users", {
   companyId: varchar("company_id").references(() => companies.id),
   avatar: text("avatar"),
   createdVia: text("created_via").default('admin_panel'), // 'admin_panel' | 'employee_onboarding' | 'signup'
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpiry: timestamp("password_reset_expiry"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

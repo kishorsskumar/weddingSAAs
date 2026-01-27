@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Signup from "@/pages/signup";
 import Dashboard from "@/pages/dashboard";
 import EventCalendar from "@/pages/event-calendar";
@@ -156,6 +157,7 @@ function PublicPages() {
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/signup" component={Signup} />
         <Route path="/pricing" component={Pricing} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
