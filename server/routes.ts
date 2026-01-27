@@ -58,22 +58,41 @@ declare global {
   }
 }
 
-export function verifyJWT(req: Request, res: Response, next: NextFunction) {
+export async function verifyJWT(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No token provided' });
+  // Try JWT token first
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      req.user = decoded;
+      return next();
+    } catch (error) {
+      // JWT invalid, try session auth below
+    }
   }
   
-  const token = authHeader.split(' ')[1];
-  
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Invalid token' });
+  // Fall back to session-based authentication
+  const sessionUserId = (req.session as any)?.userId;
+  if (sessionUserId) {
+    try {
+      const user = await storage.getUser(sessionUserId);
+      if (user) {
+        req.user = {
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          companyId: user.companyId,
+        } as JWTPayload;
+        return next();
+      }
+    } catch (error) {
+      // Session user lookup failed
+    }
   }
+  
+  return res.status(401).json({ error: 'No token provided' });
 }
 
 const PgSession = connectPgSimple(session);
