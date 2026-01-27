@@ -337,7 +337,7 @@ function EstimateView({ doc, customer, companySettings }: any) {
           )}
           {parseFloat(doc.serviceChargeAmount) > 0 && (
             <div className="flex justify-between">
-              <span>Service Charge ({doc.serviceChargePercent}%)</span>
+              <span>Service Charge</span>
               <span>{formatIndianCurrency(parseFloat(doc.serviceChargeAmount))}</span>
             </div>
           )}
@@ -494,7 +494,7 @@ function InvoiceView({ doc, customer, companySettings }: any) {
           )}
           {parseFloat(doc.serviceChargeAmount) > 0 && (
             <div className="flex justify-between">
-              <span>Service Charge ({doc.serviceChargePercent}%)</span>
+              <span>Service Charge</span>
               <span>{formatIndianCurrency(parseFloat(doc.serviceChargeAmount))}</span>
             </div>
           )}
