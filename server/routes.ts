@@ -11872,6 +11872,66 @@ Respond with a JSON array only, no markdown formatting.`;
   // ============================================
 
   // RSVP Form Templates
+  // KnotVite Plan Status & Limits
+  app.get("/api/knotvite/plan-status", verifyJWT, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      
+      // Check if company has active RSVP module subscription
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      
+      const plan = rsvpSub ? 'pro' : 'free';
+      
+      // Get current usage
+      const templates = await storage.getRsvpFormTemplates(companyId);
+      
+      // Count total guests across all forms
+      let totalGuests = 0;
+      for (const template of templates) {
+        if (template.eventId) {
+          const submissions = await storage.getRsvpSubmissions(template.eventId);
+          totalGuests += submissions.length;
+        }
+      }
+      
+      const limits = plan === 'pro' ? {
+        maxForms: 999999,
+        maxGuestsPerForm: 999999,
+        maxCustomFields: 999999,
+        canExportExcel: true,
+        canBulkImport: true,
+        canRemoveBranding: true,
+        canUseWhatsApp: true,
+      } : {
+        maxForms: 1,
+        maxGuestsPerForm: 100,
+        maxCustomFields: 5,
+        canExportExcel: false,
+        canBulkImport: false,
+        canRemoveBranding: false,
+        canUseWhatsApp: false,
+      };
+      
+      res.json({
+        plan,
+        limits,
+        usage: {
+          formsCount: templates.length,
+          totalGuests,
+        },
+        subscription: rsvpSub ? {
+          status: rsvpSub.status,
+          billingCycle: rsvpSub.billingCycle,
+          nextBillingDate: rsvpSub.nextBillingDate,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error('[KnotVite] Get plan status error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/rsvp/templates", verifyJWT, async (req, res) => {
     try {
       const templates = await storage.getRsvpFormTemplates(req.user!.companyId);
@@ -11900,9 +11960,26 @@ Respond with a JSON array only, no markdown formatting.`;
       if (!req.user?.companyId) {
         return res.status(401).json({ error: 'Session expired. Please log in again.' });
       }
+      
+      const companyId = req.user.companyId;
+      
+      // Check plan limits for form creation
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      
+      if (!rsvpSub) {
+        // Free plan: limit to 1 form
+        const existingTemplates = await storage.getRsvpFormTemplates(companyId);
+        if (existingTemplates.length >= 1) {
+          return res.status(403).json({ 
+            error: 'Free plan limit reached. You can only create 1 form on the free plan. Upgrade to Pro for unlimited forms.' 
+          });
+        }
+      }
+      
       const template = await storage.createRsvpFormTemplate({
         ...req.body,
-        companyId: req.user.companyId,
+        companyId: companyId,
         createdBy: req.user.id || req.user.userId,
       });
       res.status(201).json(template);
@@ -11957,10 +12034,26 @@ Respond with a JSON array only, no markdown formatting.`;
 
   app.post("/api/rsvp/templates/:templateId/fields", verifyJWT, async (req, res) => {
     try {
+      const companyId = req.user!.companyId;
       const template = await storage.getRsvpFormTemplate(req.params.templateId);
-      if (!template || template.companyId !== req.user!.companyId) {
+      if (!template || template.companyId !== companyId) {
         return res.status(404).json({ error: 'Template not found' });
       }
+      
+      // Check plan limits for custom fields
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      
+      if (!rsvpSub) {
+        // Free plan: limit to 5 custom fields
+        const existingFields = await storage.getRsvpFormFields(req.params.templateId);
+        if (existingFields.length >= 5) {
+          return res.status(403).json({ 
+            error: 'Free plan limit reached. You can only create 5 fields on the free plan. Upgrade to Pro for unlimited fields.' 
+          });
+        }
+      }
+      
       const field = await storage.createRsvpFormField({
         ...req.body,
         templateId: req.params.templateId,
@@ -11974,10 +12067,27 @@ Respond with a JSON array only, no markdown formatting.`;
 
   app.post("/api/rsvp/templates/:templateId/fields/bulk", verifyJWT, async (req, res) => {
     try {
+      const companyId = req.user!.companyId;
       const template = await storage.getRsvpFormTemplate(req.params.templateId);
-      if (!template || template.companyId !== req.user!.companyId) {
+      if (!template || template.companyId !== companyId) {
         return res.status(404).json({ error: 'Template not found' });
       }
+      
+      // Check plan limits for custom fields
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      const newFieldsCount = req.body.fields?.length || 0;
+      
+      if (!rsvpSub) {
+        // Free plan: limit to 5 custom fields total
+        const existingFields = await storage.getRsvpFormFields(req.params.templateId);
+        if (existingFields.length + newFieldsCount > 5) {
+          return res.status(403).json({ 
+            error: `Free plan limit reached. You can only have 5 fields total on the free plan. Upgrade to Pro for unlimited fields.` 
+          });
+        }
+      }
+      
       const fields = await storage.createRsvpFormFields(
         req.body.fields.map((f: any) => ({ ...f, templateId: req.params.templateId }))
       );
@@ -12086,6 +12196,166 @@ Respond with a JSON array only, no markdown formatting.`;
     } catch (error: any) {
       console.error('[RSVP] Delete submission error:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Bulk Import RSVP guests
+  app.post("/api/rsvp/bulk-import", verifyJWT, async (req, res) => {
+    try {
+      const { eventId, guests } = req.body;
+      const companyId = req.user!.companyId;
+      
+      // Check Pro plan for bulk import feature
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      if (!rsvpSub) {
+        return res.status(403).json({ error: 'Bulk import requires KnotVite Pro plan. Please upgrade.' });
+      }
+      
+      if (!eventId || !Array.isArray(guests)) {
+        return res.status(400).json({ error: 'eventId and guests array are required' });
+      }
+      
+      const event = await storage.getEvent(eventId, companyId);
+      if (!event) {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      
+      // Find the template for this event
+      const templates = await storage.getRsvpFormTemplates(req.user!.companyId);
+      const template = templates.find(t => t.eventId === eventId);
+      
+      if (!template) {
+        return res.status(400).json({ error: 'No RSVP form template found for this event. Please create one first.' });
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: { row: number; error: string }[] = [];
+      
+      for (let i = 0; i < guests.length; i++) {
+        const guest = guests[i];
+        try {
+          if (!guest.guestName || guest.guestName.trim() === '') {
+            errors.push({ row: i + 1, error: 'Guest name is required' });
+            errorCount++;
+            continue;
+          }
+          
+          await storage.createRsvpSubmission({
+            eventId,
+            templateId: template.id,
+            companyId: req.user!.companyId,
+            guestName: guest.guestName.trim(),
+            guestEmail: guest.guestEmail?.trim() || null,
+            guestPhone: guest.guestPhone?.trim() || null,
+            attending: guest.attending || 'pending',
+            partySize: parseInt(guest.partySize) || 1,
+            responses: {},
+            source: 'import',
+          });
+          successCount++;
+        } catch (err: any) {
+          errors.push({ row: i + 1, error: err.message });
+          errorCount++;
+        }
+      }
+      
+      // Record the import
+      await storage.createRsvpBulkImport({
+        companyId: req.user!.companyId,
+        eventId,
+        fileName: 'bulk-import',
+        status: 'completed',
+        totalRows: guests.length,
+        successCount,
+        errorCount,
+        errorReport: errors.length > 0 ? errors : null,
+        createdBy: req.user!.id || req.user!.userId,
+      });
+      
+      res.json({ 
+        success: true, 
+        successCount, 
+        errorCount,
+        errors: errors.slice(0, 10) // Return first 10 errors for display
+      });
+    } catch (error: any) {
+      console.error('[RSVP] Bulk import error:', error);
+      res.status(500).json({ error: error.message || 'Import failed' });
+    }
+  });
+
+  // KnotVite WhatsApp - Send RSVP invitation via WhatsApp
+  app.post("/api/knotvite/send-whatsapp", verifyJWT, async (req, res) => {
+    try {
+      const { templateId, phoneNumbers, message } = req.body;
+      const companyId = req.user!.companyId;
+      
+      // Check Pro plan for WhatsApp feature
+      const subscriptions = await storage.getCompanyModuleSubscriptions(companyId);
+      const rsvpSub = subscriptions.find(s => s.moduleCode === 'rsvp' && s.status === 'active');
+      if (!rsvpSub) {
+        return res.status(403).json({ error: 'WhatsApp invitations require KnotVite Pro plan. Please upgrade.' });
+      }
+      
+      if (!templateId || !phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+        return res.status(400).json({ error: 'templateId and phoneNumbers array are required' });
+      }
+      
+      const template = await storage.getRsvpFormTemplate(templateId);
+      if (!template || template.companyId !== req.user!.companyId) {
+        return res.status(404).json({ error: 'Template not found' });
+      }
+      
+      if (template.status !== 'published') {
+        return res.status(400).json({ error: 'Form must be published before sending invitations' });
+      }
+      
+      // Check if WhatsApp is configured
+      const { isWhatsAppConfigured, sendWhatsAppMessage } = await import('./whatsapp-service');
+      if (!isWhatsAppConfigured()) {
+        return res.status(400).json({ error: 'WhatsApp is not configured. Please add Twilio credentials.' });
+      }
+      
+      // Get base URL for the RSVP form link
+      const baseUrl = process.env.REPL_SLUG 
+        ? `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER?.toLowerCase()}.repl.co`
+        : process.env.BASE_URL || 'https://app.atbottsolutions.com';
+      
+      const rsvpLink = `${baseUrl}/rsvp/${templateId}`;
+      
+      const defaultMessage = message || `You're invited! Please RSVP using this link:\n${rsvpLink}\n\nWe look forward to seeing you!`;
+      const finalMessage = defaultMessage.includes(rsvpLink) ? defaultMessage : `${defaultMessage}\n\n${rsvpLink}`;
+      
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: { phone: string; error: string }[] = [];
+      
+      for (const phone of phoneNumbers) {
+        try {
+          const result = await sendWhatsAppMessage(phone, finalMessage);
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            errors.push({ phone, error: result.error || 'Failed to send' });
+          }
+        } catch (err: any) {
+          errorCount++;
+          errors.push({ phone, error: err.message });
+        }
+      }
+      
+      res.json({
+        success: true,
+        successCount,
+        errorCount,
+        errors: errors.slice(0, 10),
+      });
+    } catch (error: any) {
+      console.error('[KnotVite] WhatsApp send error:', error);
+      res.status(500).json({ error: error.message || 'Failed to send WhatsApp messages' });
     }
   });
 

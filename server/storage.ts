@@ -1026,6 +1026,10 @@ export interface IStorage {
   updateRsvpSubmission(id: string, submission: Partial<InsertRsvpSubmission>): Promise<RsvpSubmission | undefined>;
   deleteRsvpSubmission(id: string): Promise<void>;
   getRsvpSubmissionStats(eventId: string): Promise<{ total: number; attending: number; notAttending: number; maybe: number; pending: number }>;
+  
+  // RSVP Bulk Imports
+  createRsvpBulkImport(importData: InsertRsvpBulkImport): Promise<RsvpBulkImport>;
+  getRsvpBulkImports(companyId: string): Promise<RsvpBulkImport[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5574,6 +5578,18 @@ export class DatabaseStorage implements IStorage {
       maybe: submissions.filter(s => s.attending === 'maybe').length,
       pending: submissions.filter(s => s.attending === 'pending').length,
     };
+  }
+
+  // RSVP Bulk Imports
+  async createRsvpBulkImport(importData: InsertRsvpBulkImport): Promise<RsvpBulkImport> {
+    const [created] = await db.insert(rsvpBulkImports).values(importData).returning();
+    return created;
+  }
+
+  async getRsvpBulkImports(companyId: string): Promise<RsvpBulkImport[]> {
+    return db.select().from(rsvpBulkImports)
+      .where(eq(rsvpBulkImports.companyId, companyId))
+      .orderBy(desc(rsvpBulkImports.createdAt));
   }
 }
 

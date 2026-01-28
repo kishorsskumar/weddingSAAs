@@ -43,6 +43,7 @@ import Pricing from "@/pages/pricing";
 import KnotVitePlanPDF from "@/pages/knotvite-plan-pdf";
 import KnotViteForms from "@/pages/knotvite-forms";
 import KnotViteSubmissions from "@/pages/knotvite-submissions";
+import KnotViteDashboard from "@/pages/knotvite-dashboard";
 import PublicRsvpForm from "@/pages/public-rsvp";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect } from "react";
@@ -144,6 +145,9 @@ function AppRoutes() {
         </Route>
         <Route path="/billing">
           <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
+        </Route>
+        <Route path="/knotvite">
+          <PrivateRoute component={KnotViteDashboard} path="/knotvite" skipSubscriptionCheck={true} />
         </Route>
         <Route path="/knotvite/forms">
           <PrivateRoute component={KnotViteForms} path="/knotvite/forms" skipSubscriptionCheck={true} />

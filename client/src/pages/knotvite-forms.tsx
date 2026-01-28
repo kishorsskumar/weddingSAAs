@@ -3,19 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Plus, Trash2, Edit, Copy, ExternalLink, GripVertical, Settings2, FileText, Users, Eye, MoreVertical } from "lucide-react";
+import { Search, Plus, Trash2, Edit, Copy, ExternalLink, GripVertical, Settings2, FileText, Users, Eye, MoreVertical, MessageSquare, Send, Crown, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 interface RsvpFormTemplate {
   id: string;
@@ -69,6 +69,10 @@ export default function KnotViteForms() {
   const [editingTemplate, setEditingTemplate] = useState<RsvpFormTemplate | null>(null);
   const [showFieldEditor, setShowFieldEditor] = useState<string | null>(null);
   const [newField, setNewField] = useState({ type: 'text', label: '', placeholder: '', required: false, options: '' });
+  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState<string | null>(null);
+  const [whatsAppPhones, setWhatsAppPhones] = useState("");
+  const [whatsAppMessage, setWhatsAppMessage] = useState("");
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -556,13 +560,34 @@ export default function KnotViteForms() {
                         Settings
                       </DropdownMenuItem>
                       {template.status === 'published' && (
-                        <DropdownMenuItem asChild>
-                          <a href={`/rsvp/${template.id}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Preview
-                          </a>
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem asChild>
+                            <a href={`/rsvp/${template.id}`} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Preview
+                            </a>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              const link = `${window.location.origin}/rsvp/${template.id}`;
+                              navigator.clipboard.writeText(link);
+                              toast({ title: "Link Copied", description: "RSVP form link copied to clipboard" });
+                            }}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Copy Link
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setShowWhatsAppDialog(template.id)}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Send via WhatsApp
+                            <Crown className="h-3 w-3 ml-auto text-yellow-500" />
+                          </DropdownMenuItem>
+                        </>
                       )}
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"
                         onClick={() => {
@@ -653,6 +678,100 @@ export default function KnotViteForms() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* WhatsApp Send Dialog */}
+      <Dialog open={!!showWhatsAppDialog} onOpenChange={(open) => !open && setShowWhatsAppDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Send RSVP via WhatsApp
+            </DialogTitle>
+            <DialogDescription>
+              Send the RSVP form link to guests via WhatsApp
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="wa-phones">Phone Numbers</Label>
+              <Textarea
+                id="wa-phones"
+                placeholder="Enter phone numbers (one per line)&#10;+91 98765 43210&#10;+91 87654 32109"
+                value={whatsAppPhones}
+                onChange={(e) => setWhatsAppPhones(e.target.value)}
+                className="min-h-[100px]"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter one phone number per line. Include country code.
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="wa-message">Message (optional)</Label>
+              <Textarea
+                id="wa-message"
+                placeholder="Custom message to include with the RSVP link..."
+                value={whatsAppMessage}
+                onChange={(e) => setWhatsAppMessage(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowWhatsAppDialog(null)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                if (!showWhatsAppDialog) return;
+                const phones = whatsAppPhones
+                  .split('\n')
+                  .map(p => p.trim())
+                  .filter(p => p.length > 0);
+                
+                if (phones.length === 0) {
+                  toast({ title: "Error", description: "Please enter at least one phone number", variant: "destructive" });
+                  return;
+                }
+                
+                setIsSendingWhatsApp(true);
+                try {
+                  const res = await fetch('/api/knotvite/send-whatsapp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      templateId: showWhatsAppDialog,
+                      phoneNumbers: phones,
+                      message: whatsAppMessage || undefined,
+                    }),
+                    credentials: 'include',
+                  });
+                  
+                  const data = await res.json();
+                  if (!res.ok) {
+                    throw new Error(data.error || 'Failed to send');
+                  }
+                  
+                  toast({ 
+                    title: "Messages Sent", 
+                    description: `Successfully sent to ${data.successCount} of ${phones.length} recipients` 
+                  });
+                  setShowWhatsAppDialog(null);
+                  setWhatsAppPhones("");
+                  setWhatsAppMessage("");
+                } catch (error: any) {
+                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                } finally {
+                  setIsSendingWhatsApp(false);
+                }
+              }}
+              disabled={isSendingWhatsApp}
+            >
+              {isSendingWhatsApp ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" /> Send</> 
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
