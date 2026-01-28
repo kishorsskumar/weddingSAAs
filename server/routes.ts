@@ -11899,15 +11899,18 @@ Respond with a JSON array only, no markdown formatting.`;
 
   app.post("/api/rsvp/templates", verifyJWT, async (req, res) => {
     try {
+      if (!req.user?.companyId) {
+        return res.status(401).json({ error: 'Session expired. Please log in again.' });
+      }
       const template = await storage.createRsvpFormTemplate({
         ...req.body,
-        companyId: req.user!.companyId,
-        createdBy: req.user!.id,
+        companyId: req.user.companyId,
+        createdBy: req.user.id || req.user.userId,
       });
       res.status(201).json(template);
     } catch (error: any) {
       console.error('[RSVP] Create template error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: error.message || 'Failed to create template' });
     }
   });
 
