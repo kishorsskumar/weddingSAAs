@@ -854,10 +854,8 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Trust proxy for production (Replit uses reverse proxy)
-  if (process.env.NODE_ENV === 'production') {
-    app.set('trust proxy', 1);
-  }
+  // Trust proxy - Replit uses reverse proxy in all environments
+  app.set('trust proxy', 1);
   
   // Session middleware
   app.use(
@@ -874,7 +872,7 @@ export async function registerRoutes(
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'lax',
+        sameSite: 'lax',
       },
     })
   );
