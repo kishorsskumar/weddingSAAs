@@ -75,6 +75,7 @@ export async function verifyJWT(req: Request, res: Response, next: NextFunction)
   
   // Fall back to session-based authentication
   const sessionUserId = (req.session as any)?.userId;
+  console.log('[Auth Debug] Session userId:', sessionUserId, 'Session ID:', req.sessionID, 'Has cookie:', !!req.headers.cookie);
   if (sessionUserId) {
     try {
       const user = await storage.getUser(sessionUserId);
@@ -88,10 +89,11 @@ export async function verifyJWT(req: Request, res: Response, next: NextFunction)
         return next();
       }
     } catch (error) {
-      // Session user lookup failed
+      console.log('[Auth Debug] Session user lookup failed:', error);
     }
   }
   
+  console.log('[Auth Debug] No valid auth found for:', req.method, req.path);
   return res.status(401).json({ error: 'No token provided' });
 }
 
