@@ -110,7 +110,10 @@ export default function KnotViteForms() {
         body: JSON.stringify(data),
         credentials: 'include',
       });
-      if (!res.ok) throw new Error('Failed to create template');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || `Server error: ${res.status}`);
+      }
       return res.json();
     },
     onSuccess: async (template) => {
@@ -125,13 +128,17 @@ export default function KnotViteForms() {
         { fieldKey: 'message', fieldType: 'textarea', label: 'Message for the Couple', placeholder: 'Share your wishes or any special requests...', required: false, order: 7 },
       ];
 
-      for (const field of defaultFields) {
-        await fetch(`/api/rsvp/templates/${template.id}/fields`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(field),
-          credentials: 'include',
-        });
+      try {
+        for (const field of defaultFields) {
+          await fetch(`/api/rsvp/templates/${template.id}/fields`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(field),
+            credentials: 'include',
+          });
+        }
+      } catch (e) {
+        console.error('Failed to add default fields:', e);
       }
 
       queryClient.invalidateQueries({ queryKey: ['/api/rsvp/templates'] });
@@ -139,8 +146,8 @@ export default function KnotViteForms() {
       toast({ title: "Success", description: "Form created with default fields" });
       setShowFieldEditor(template.id);
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to create template", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create template", variant: "destructive" });
     },
   });
 
