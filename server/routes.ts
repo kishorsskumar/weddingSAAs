@@ -1036,20 +1036,28 @@ export async function registerRoutes(
       // Also set session for backward compatibility
       (req.session as any).userId = user.id;
       
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          companyId: company.id,
-        },
-        company: {
-          id: company.id,
-          name: company.name,
-        },
-        permissions: ALL_PAGES,
+      // Explicitly save session before sending response to prevent race conditions
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Auth] Signup session save error:', err);
+          return res.status(500).json({ error: 'Signup failed - session error' });
+        }
+        
+        res.json({
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            companyId: company.id,
+          },
+          company: {
+            id: company.id,
+            name: company.name,
+          },
+          permissions: ALL_PAGES,
+        });
       });
     } catch (error) {
       console.error('Signup error:', error);
@@ -1090,20 +1098,29 @@ export async function registerRoutes(
       
       (req.session as any).userId = user.id;
       
-      res.json({ 
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          avatar: user.avatar,
-          createdVia: user.createdVia,
-          companyId: user.companyId,
-        },
-        permissions: permissionsList
+      // Explicitly save session before sending response to prevent race conditions
+      req.session.save((err) => {
+        if (err) {
+          console.error('[Auth] Session save error:', err);
+          return res.status(500).json({ error: 'Login failed - session error' });
+        }
+        
+        res.json({ 
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar,
+            createdVia: user.createdVia,
+            companyId: user.companyId,
+          },
+          permissions: permissionsList
+        });
       });
     } catch (error) {
+      console.error('[Auth] Login error:', error);
       res.status(500).json({ error: 'Login failed' });
     }
   });
