@@ -13,7 +13,10 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
-  LayoutDashboard
+  LayoutDashboard,
+  Link2,
+  FileSpreadsheet,
+  MessageSquare
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -138,6 +141,151 @@ export default function HomePage() {
               <div className="absolute -top-4 -left-4 w-32 h-32 bg-blue-200/30 rounded-full blur-2xl"></div>
             </motion.div>
           </div>
+        </div>
+      </section>
+
+      {/* KnotVite Promotional Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-br from-[#2F6B3F]/5 via-[#2F6B3F]/10 to-[#2F6B3F]/5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="bg-white rounded-3xl shadow-xl border border-[#2F6B3F]/10 overflow-hidden"
+          >
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 p-8 lg:p-12 items-center">
+              {/* Left Content */}
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 bg-[#2F6B3F]/10 text-[#2F6B3F] px-4 py-2 rounded-full text-sm font-semibold">
+                  <Sparkles className="h-4 w-4" />
+                  NEW PRODUCT
+                </div>
+                
+                <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight">
+                  KnotVite — Wedding RSVP Made Simple
+                </h2>
+                
+                <p className="text-lg text-gray-600">
+                  Create RSVP links, track guest responses and manage attendance without spreadsheets or WhatsApp chaos.
+                </p>
+                
+                <ul className="space-y-3">
+                  {[
+                    { icon: Link2, text: "Smart RSVP links" },
+                    { icon: Users, text: "Custom guest fields" },
+                    { icon: FileSpreadsheet, text: "Excel import/export" },
+                    { icon: MessageSquare, text: "WhatsApp reminders", badge: "Pro" },
+                  ].map((item, index) => (
+                    <motion.li
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.4, delay: index * 0.1 }}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-[#2F6B3F]/10 flex items-center justify-center flex-shrink-0">
+                        <item.icon className="h-4 w-4 text-[#2F6B3F]" />
+                      </div>
+                      <span className="text-gray-700">{item.text}</span>
+                      {item.badge && (
+                        <span className="text-xs bg-[#2F6B3F]/10 text-[#2F6B3F] px-2 py-0.5 rounded-full font-medium">
+                          {item.badge}
+                        </span>
+                      )}
+                    </motion.li>
+                  ))}
+                </ul>
+                
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <Link href="/signup">
+                    <Button 
+                      size="lg" 
+                      className="w-full sm:w-auto bg-[#2F6B3F] hover:bg-[#245530] text-base px-8"
+                      data-testid="knotvite-promo-cta-primary"
+                    >
+                      Try KnotVite Free
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                  <Link href="/knotvite">
+                    <Button 
+                      variant="outline" 
+                      size="lg" 
+                      className="w-full sm:w-auto text-base px-8 border-[#2F6B3F]/30 text-[#2F6B3F] hover:bg-[#2F6B3F]/5"
+                      data-testid="knotvite-promo-cta-secondary"
+                    >
+                      Learn More
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              
+              {/* Right Side - Dashboard Preview */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="relative"
+              >
+                <div className="bg-gradient-to-br from-[#2F6B3F]/10 to-[#2F6B3F]/5 rounded-2xl p-6 border border-[#2F6B3F]/10">
+                  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div className="bg-[#2F6B3F] px-4 py-3 flex items-center gap-2">
+                      <div className="flex gap-1.5">
+                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                      </div>
+                      <span className="text-white/80 text-sm ml-2">KnotVite RSVP Dashboard</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-green-50 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-green-600">124</div>
+                          <div className="text-xs text-green-700">Attending</div>
+                        </div>
+                        <div className="bg-yellow-50 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-yellow-600">45</div>
+                          <div className="text-xs text-yellow-700">Pending</div>
+                        </div>
+                        <div className="bg-red-50 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-red-600">12</div>
+                          <div className="text-xs text-red-700">Declined</div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        {[
+                          { name: "Sharma Family", guests: 4, status: "Attending" },
+                          { name: "Patel Wedding", guests: 2, status: "Pending" },
+                          { name: "Kapoor Group", guests: 6, status: "Attending" },
+                        ].map((guest, i) => (
+                          <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                            <div className="w-8 h-8 rounded-full bg-[#2F6B3F]/20 flex items-center justify-center text-xs font-medium text-[#2F6B3F]">
+                              {guest.name.charAt(0)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{guest.name}</div>
+                              <div className="text-xs text-gray-500">{guest.guests} guests</div>
+                            </div>
+                            <div className={`px-2 py-1 rounded text-xs font-medium ${
+                              guest.status === 'Attending' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {guest.status}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-[#2F6B3F]/20 rounded-full blur-2xl"></div>
+              </motion.div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
