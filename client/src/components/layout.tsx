@@ -86,8 +86,8 @@ const ALL_PAGES = [
     { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
     { id: "team-calendar", label: "Team Calendar", path: "/team" },
   ] },
-  { id: "knotvite", label: "KnotVite RSVP", path: "/knotvite", subPages: [
-    { id: "knotvite-dashboard", label: "Dashboard", path: "/knotvite" },
+  { id: "knotvite", label: "KnotVite RSVP", path: "/knotvite/dashboard", subPages: [
+    { id: "knotvite-dashboard", label: "Dashboard", path: "/knotvite/dashboard" },
     { id: "knotvite-forms", label: "Form Builder", path: "/knotvite/forms" },
     { id: "knotvite-submissions", label: "Submissions", path: "/knotvite/submissions" },
   ] },

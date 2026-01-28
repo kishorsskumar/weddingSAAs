@@ -1,0 +1,158 @@
+Create a high-conversion SaaS landing page for KnotVite RSVP product.
+
+Product Branding:
+Name: KnotVite
+Tagline: Powered by AtBott
+Route: /knotvite
+
+--------------------------------
+HERO SECTION
+--------------------------------
+
+Layout:
+Two column layout
+
+Left Content:
+
+Headline:
+"KnotVite — Smart Wedding RSVP Management"
+
+Subheading:
+"Create RSVP links, track guest responses, manage hotel stays, meal preferences and attendance — all in one dashboard."
+
+CTA Buttons:
+Primary:
+"Create Free RSVP Event"
+Secondary:
+"View Demo"
+
+Add trust microcopy under buttons:
+"No credit card required • Free forever plan available"
+
+Right Side:
+Dashboard mockup / RSVP workflow illustration placeholder
+
+--------------------------------
+FEATURES SECTION
+--------------------------------
+
+Create responsive grid cards:
+
+1) Smart RSVP Links  
+Description:
+Share one link and track guest confirmations instantly.
+
+2) Custom Guest Fields  
+Description:
+Collect hotel stay, transport needs, meal preference and special requests.
+
+3) Live Guest Dashboard  
+Description:
+View confirmed, pending and declined guests in real-time.
+
+4) Excel Import & Export (Pro)  
+Description:
+Upload guest lists and export reports in CSV/Excel.
+
+5) QR Check-in  
+Description:
+Scan guests at venue for instant attendance tracking.
+
+6) WhatsApp Integration (Premium)  
+Description:
+Send RSVP links and reminders via WhatsApp.
+
+--------------------------------
+HOW IT WORKS SECTION
+--------------------------------
+
+Step layout:
+
+1) Create Event  
+2) Customize RSVP Form  
+3) Share RSVP Link  
+4) Track Responses  
+
+--------------------------------
+PRICING PREVIEW STRIP
+--------------------------------
+
+Display teaser cards:
+
+FREE PLAN:
+- 1 Event
+- 100 Guests
+- Basic RSVP
+- AtBott Branding
+
+PRO PLAN:
+- Unlimited Events
+- Unlimited Guests
+- Excel Import/Export
+- Custom Fields
+- WhatsApp Integration
+- Remove Branding
+
+CTA Button:
+"View Full Pricing"
+
+--------------------------------
+UPSELL TO ATBOTT PLATFORM
+--------------------------------
+
+Banner section:
+
+Headline:
+"Need Full Wedding Business Management?"
+
+Text:
+"Upgrade to AtBott platform to manage clients, vendors, payments and automation."
+
+Button:
+Explore AtBott Platform
+
+--------------------------------
+FOOTER
+--------------------------------
+
+Footer content:
+
+Left:
+"KnotVite powered by AtBott Solutions © 2026"
+
+Right:
+Privacy Policy
+Terms
+Refund Policy
+Contact
+
+--------------------------------
+DESIGN REQUIREMENTS
+--------------------------------
+
+Theme:
+- Primary green (#2F6B3F)
+- White background
+- Rounded cards
+- Soft shadows
+- SaaS style UI
+- Mobile responsive
+- Smooth scroll animation
+
+--------------------------------
+SEO REQUIREMENTS
+--------------------------------
+
+Meta title:
+KnotVite RSVP | Wedding Guest Management Software
+
+Meta description:
+Collect wedding RSVPs, manage guest lists and track attendance with KnotVite powered by AtBott.
+
+--------------------------------
+PERFORMANCE
+--------------------------------
+
+- Lazy load images
+- Lighthouse optimized layout
+- No heavy animation libraries
