@@ -111,8 +111,15 @@ export default function KnotViteForms() {
         credentials: 'include',
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `Server error: ${res.status}`);
+        const errorText = await res.text();
+        let errorMessage = `Server error: ${res.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          if (errorText) errorMessage = errorText;
+        }
+        throw new Error(errorMessage);
       }
       return res.json();
     },
