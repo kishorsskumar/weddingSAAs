@@ -113,10 +113,30 @@ export default function KnotViteForms() {
       if (!res.ok) throw new Error('Failed to create template');
       return res.json();
     },
-    onSuccess: (template) => {
+    onSuccess: async (template) => {
+      // Add default fields for a new RSVP form
+      const defaultFields = [
+        { fieldKey: 'guest_name', fieldType: 'text', label: 'Guest Name', placeholder: 'Enter your full name', required: true, order: 1 },
+        { fieldKey: 'email', fieldType: 'text', label: 'Email Address', placeholder: 'your@email.com', required: true, order: 2 },
+        { fieldKey: 'phone', fieldType: 'text', label: 'Phone Number', placeholder: '+91 98765 43210', required: false, order: 3 },
+        { fieldKey: 'attending', fieldType: 'dropdown', label: 'Will you attend?', options: [{ value: 'yes', label: 'Yes, I will attend' }, { value: 'no', label: 'No, I cannot attend' }, { value: 'maybe', label: 'Maybe / Not sure yet' }], required: true, order: 4 },
+        { fieldKey: 'party_size', fieldType: 'number', label: 'Number of Guests', placeholder: 'Including yourself', required: false, order: 5 },
+        { fieldKey: 'dietary', fieldType: 'dropdown', label: 'Dietary Preference', options: [{ value: 'veg', label: 'Vegetarian' }, { value: 'non-veg', label: 'Non-Vegetarian' }, { value: 'vegan', label: 'Vegan' }, { value: 'jain', label: 'Jain' }], required: false, order: 6 },
+        { fieldKey: 'message', fieldType: 'textarea', label: 'Message for the Couple', placeholder: 'Share your wishes or any special requests...', required: false, order: 7 },
+      ];
+
+      for (const field of defaultFields) {
+        await fetch(`/api/rsvp/templates/${template.id}/fields`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(field),
+          credentials: 'include',
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['/api/rsvp/templates'] });
       setIsCreateOpen(false);
-      toast({ title: "Success", description: "Form template created" });
+      toast({ title: "Success", description: "Form created with default fields" });
       setShowFieldEditor(template.id);
     },
     onError: () => {
@@ -327,7 +347,7 @@ export default function KnotViteForms() {
                   />
                 </div>
                 <div>
-                  <Label>Placeholder (optional)</Label>
+                  <Label>Hint Text (shown inside the field)</Label>
                   <Input
                     value={newField.placeholder}
                     onChange={(e) => setNewField({ ...newField, placeholder: e.target.value })}
