@@ -1037,10 +1037,11 @@ export async function registerRoutes(
       (req.session as any).userId = user.id;
       
       // Explicitly save session before sending response to prevent race conditions
+      // If session save fails, still return JWT token (primary auth method)
       req.session.save((err) => {
         if (err) {
-          console.error('[Auth] Signup session save error:', err);
-          return res.status(500).json({ error: 'Signup failed - session error' });
+          console.error('[Auth] Signup session save error (non-fatal, JWT still valid):', err);
+          // Don't block signup - JWT is primary auth, session is backup
         }
         
         res.json({
@@ -1099,10 +1100,11 @@ export async function registerRoutes(
       (req.session as any).userId = user.id;
       
       // Explicitly save session before sending response to prevent race conditions
+      // If session save fails, still return JWT token (primary auth method)
       req.session.save((err) => {
         if (err) {
-          console.error('[Auth] Session save error:', err);
-          return res.status(500).json({ error: 'Login failed - session error' });
+          console.error('[Auth] Session save error (non-fatal, JWT still valid):', err);
+          // Don't block login - JWT is primary auth, session is backup
         }
         
         res.json({ 
