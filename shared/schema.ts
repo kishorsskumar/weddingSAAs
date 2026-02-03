@@ -2520,3 +2520,354 @@ export const rsvpBulkImports = pgTable("rsvp_bulk_imports", {
 export const insertRsvpBulkImportSchema = createInsertSchema(rsvpBulkImports).omit({ id: true, createdAt: true, completedAt: true });
 export type InsertRsvpBulkImport = z.infer<typeof insertRsvpBulkImportSchema>;
 export type RsvpBulkImport = typeof rsvpBulkImports.$inferSelect;
+
+// Portal Leads - Client portal lead submissions
+export const portalLeads = pgTable("portal_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  whatsappNumber: text("whatsapp_number").notNull(),
+  address: text("address"),
+  city: text("city"),
+  eventDate: date("event_date"),
+  eventType: text("event_type"),
+  venue: text("venue"),
+  venueCity: text("venue_city"),
+  guestCount: integer("guest_count"),
+  budgetRange: text("budget_range"),
+  servicesRequired: jsonb("services_required").$type<string[]>(),
+  additionalNotes: text("additional_notes"),
+  referenceUrls: jsonb("reference_urls").$type<string[]>(),
+  termsAccepted: boolean("terms_accepted").default(false),
+  otpVerified: boolean("otp_verified").default(false),
+  otpCode: text("otp_code"),
+  otpExpiresAt: timestamp("otp_expires_at"),
+  portalToken: text("portal_token"),
+  portalTokenExpiresAt: timestamp("portal_token_expires_at"),
+  phase: text("phase").notNull().default('submitted'),
+  phaseUpdatedAt: timestamp("phase_updated_at").defaultNow(),
+  assignedPlannerId: varchar("assigned_planner_id").references(() => users.id),
+  assignedPlannerName: text("assigned_planner_name"),
+  assignedAt: timestamp("assigned_at"),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  dealId: varchar("deal_id").references(() => salesDeals.id),
+  eventId: varchar("event_id").references(() => events.id),
+  sharedEstimateId: varchar("shared_estimate_id").references(() => estimates.id),
+  sharedPresentationId: varchar("shared_presentation_id").references(() => presentations.id),
+  sharedContractUrl: text("shared_contract_url"),
+  sharedPresentationUrl: text("shared_presentation_url"),
+  documentsSharedAt: timestamp("documents_shared_at"),
+  documentsSharedBy: varchar("documents_shared_by").references(() => users.id),
+  clientApprovalStatus: text("client_approval_status").default('pending'),
+  clientApprovalAt: timestamp("client_approval_at"),
+  clientApprovalNotes: text("client_approval_notes"),
+  clientSignatureUrl: text("client_signature_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalLeadSchema = createInsertSchema(portalLeads).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalLead = z.infer<typeof insertPortalLeadSchema>;
+export type PortalLead = typeof portalLeads.$inferSelect;
+
+// Portfolio Albums
+export const portfolioAlbums = pgTable("portfolio_albums", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  title: text("title").notNull(),
+  tagline: text("tagline"),
+  venue: text("venue"),
+  coverImageUrl: text("cover_image_url").notNull(),
+  category: text("category").notNull().default('Wedding'),
+  eventDate: date("event_date"),
+  featured: boolean("featured").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortfolioAlbumSchema = createInsertSchema(portfolioAlbums).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortfolioAlbum = z.infer<typeof insertPortfolioAlbumSchema>;
+export type PortfolioAlbum = typeof portfolioAlbums.$inferSelect;
+
+// Portfolio Sets
+export const portfolioSets = pgTable("portfolio_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  albumId: varchar("album_id").notNull().references(() => portfolioAlbums.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortfolioSetSchema = createInsertSchema(portfolioSets).omit({ id: true, createdAt: true });
+export type InsertPortfolioSet = z.infer<typeof insertPortfolioSetSchema>;
+export type PortfolioSet = typeof portfolioSets.$inferSelect;
+
+// Portfolio Photos
+export const portfolioPhotos = pgTable("portfolio_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  albumId: varchar("album_id").references(() => portfolioAlbums.id, { onDelete: 'cascade' }),
+  setId: varchar("set_id").references(() => portfolioSets.id, { onDelete: 'cascade' }),
+  imageUrl: text("image_url").notNull(),
+  caption: text("caption"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortfolioPhotoSchema = createInsertSchema(portfolioPhotos).omit({ id: true, createdAt: true });
+export type InsertPortfolioPhoto = z.infer<typeof insertPortfolioPhotoSchema>;
+export type PortfolioPhoto = typeof portfolioPhotos.$inferSelect;
+
+// Portfolio Items (legacy)
+export const portfolioItems = pgTable("portfolio_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  venue: text("venue"),
+  imageUrl: text("image_url").notNull(),
+  description: text("description"),
+  eventDate: date("event_date"),
+  featured: boolean("featured").default(false),
+  sortOrder: integer("sort_order").default(0),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortfolioItemSchema = createInsertSchema(portfolioItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortfolioItem = z.infer<typeof insertPortfolioItemSchema>;
+export type PortfolioItem = typeof portfolioItems.$inferSelect;
+
+// Portal Client Inputs
+export const portalClientInputs = pgTable("portal_client_inputs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  inputType: text("input_type").notNull(),
+  title: text("title").notNull(),
+  content: text("content"),
+  urls: jsonb("urls").$type<string[]>(),
+  attachments: jsonb("attachments").$type<{ name: string; url: string }[]>(),
+  status: text("status").default('pending'),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalClientInputSchema = createInsertSchema(portalClientInputs).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalClientInput = z.infer<typeof insertPortalClientInputSchema>;
+export type PortalClientInput = typeof portalClientInputs.$inferSelect;
+
+// Portal Feedback
+export const portalFeedback = pgTable("portal_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  overallRating: integer("overall_rating"),
+  planningRating: integer("planning_rating"),
+  executionRating: integer("execution_rating"),
+  communicationRating: integer("communication_rating"),
+  decorRating: integer("decor_rating"),
+  comments: text("comments"),
+  suggestions: text("suggestions"),
+  wouldRecommend: boolean("would_recommend"),
+  testimonial: text("testimonial"),
+  testimonialApproved: boolean("testimonial_approved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalFeedbackSchema = createInsertSchema(portalFeedback).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalFeedback = z.infer<typeof insertPortalFeedbackSchema>;
+export type PortalFeedback = typeof portalFeedback.$inferSelect;
+
+// Portal Timelines
+export const portalTimelines = pgTable("portal_timelines", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  phase: integer("phase").notNull(),
+  phaseName: text("phase_name").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: date("date"),
+  time: text("time"),
+  status: text("status").default('upcoming'),
+  icon: text("icon"),
+  sortOrder: integer("sort_order").default(0),
+  pushedBy: varchar("pushed_by").references(() => users.id),
+  pushedAt: timestamp("pushed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortalTimelineSchema = createInsertSchema(portalTimelines).omit({ id: true, createdAt: true, pushedAt: true });
+export type InsertPortalTimeline = z.infer<typeof insertPortalTimelineSchema>;
+export type PortalTimeline = typeof portalTimelines.$inferSelect;
+
+// Portal Milestone Phases
+export const portalMilestonePhases = pgTable("portal_milestone_phases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  phaseNumber: integer("phase_number").notNull(),
+  phaseName: text("phase_name").notNull(),
+  description: text("description"),
+  daysBeforeStart: integer("days_before_start").notNull(),
+  daysBeforeEnd: integer("days_before_end").notNull(),
+  status: text("status").default('upcoming'),
+  isLocked: boolean("is_locked").default(false),
+  lockedAt: timestamp("locked_at"),
+  lockedBy: varchar("locked_by").references(() => users.id),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalMilestonePhaseSchema = createInsertSchema(portalMilestonePhases).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalMilestonePhase = z.infer<typeof insertPortalMilestonePhaseSchema>;
+export type PortalMilestonePhase = typeof portalMilestonePhases.$inferSelect;
+
+// Portal Milestone Tasks
+export const portalMilestoneTasks = pgTable("portal_milestone_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  phaseId: varchar("phase_id").notNull().references(() => portalMilestonePhases.id, { onDelete: 'cascade' }),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  taskName: text("task_name").notNull(),
+  description: text("description"),
+  status: text("status").default('pending'),
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by").references(() => users.id),
+  dueDate: date("due_date"),
+  requiresUpload: boolean("requires_upload").default(false),
+  uploadUrl: text("upload_url"),
+  uploadName: text("upload_name"),
+  uploadedAt: timestamp("uploaded_at"),
+  uploadedBy: varchar("uploaded_by").references(() => users.id),
+  isClientTask: boolean("is_client_task").default(false),
+  isApprovalRequired: boolean("is_approval_required").default(false),
+  approvalStatus: text("approval_status"),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  sortOrder: integer("sort_order").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalMilestoneTaskSchema = createInsertSchema(portalMilestoneTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalMilestoneTask = z.infer<typeof insertPortalMilestoneTaskSchema>;
+export type PortalMilestoneTask = typeof portalMilestoneTasks.$inferSelect;
+
+// Portal Event Flows
+export const portalEventFlows = pgTable("portal_event_flows", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  eventName: text("event_name").notNull(),
+  eventDate: date("event_date"),
+  eventTime: text("event_time"),
+  venue: text("venue"),
+  venueAddress: text("venue_address"),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  isPublished: boolean("is_published").default(false),
+  publishedAt: timestamp("published_at"),
+  publishedBy: varchar("published_by").references(() => users.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalEventFlowSchema = createInsertSchema(portalEventFlows).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalEventFlow = z.infer<typeof insertPortalEventFlowSchema>;
+export type PortalEventFlow = typeof portalEventFlows.$inferSelect;
+
+// Portal Event Flow Items
+export const portalEventFlowItems = pgTable("portal_event_flow_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventFlowId: varchar("event_flow_id").notNull().references(() => portalEventFlows.id, { onDelete: 'cascade' }),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  description: text("description"),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  duration: integer("duration"),
+  category: text("category"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalEventFlowItemSchema = createInsertSchema(portalEventFlowItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalEventFlowItem = z.infer<typeof insertPortalEventFlowItemSchema>;
+export type PortalEventFlowItem = typeof portalEventFlowItems.$inferSelect;
+
+// Portal Financial Milestones
+export const portalFinancialMilestones = pgTable("portal_financial_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portalLeadId: varchar("portal_lead_id").notNull().references(() => portalLeads.id, { onDelete: 'cascade' }),
+  milestoneName: text("milestone_name").notNull(),
+  percentage: decimal("percentage", { precision: 5, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }),
+  dueDescription: text("due_description"),
+  dueDate: date("due_date"),
+  daysBefore: integer("days_before"),
+  isPaid: boolean("is_paid").default(false),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }),
+  paidAt: timestamp("paid_at"),
+  paymentMethod: text("payment_method"),
+  paymentReference: text("payment_reference"),
+  confirmedBy: varchar("confirmed_by").references(() => users.id),
+  confirmedAt: timestamp("confirmed_at"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalFinancialMilestoneSchema = createInsertSchema(portalFinancialMilestones).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalFinancialMilestone = z.infer<typeof insertPortalFinancialMilestoneSchema>;
+export type PortalFinancialMilestone = typeof portalFinancialMilestones.$inferSelect;
+
+// Portal Oaksy Chat
+export const portalOaksyChats = pgTable("portal_oaksy_chats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").notNull(),
+  portalLeadId: varchar("portal_lead_id").references(() => portalLeads.id, { onDelete: 'cascade' }),
+  visitorName: text("visitor_name"),
+  visitorPhone: text("visitor_phone"),
+  visitorEmail: text("visitor_email"),
+  chatType: text("chat_type").notNull().default('landing'),
+  messages: jsonb("messages").$type<Array<{ role: 'user' | 'assistant'; content: string; timestamp: string }>>().default([]),
+  leadCollected: boolean("lead_collected").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortalOaksyChatSchema = createInsertSchema(portalOaksyChats).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortalOaksyChat = z.infer<typeof insertPortalOaksyChatSchema>;
+export type PortalOaksyChat = typeof portalOaksyChats.$inferSelect;
+
+// Event Vendor Costs
+export const eventVendorCosts = pgTable("event_vendor_costs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => events.id, { onDelete: 'cascade' }),
+  vendorName: text("vendor_name").notNull(),
+  serviceDescription: text("service_description").notNull(),
+  estimatedAmount: decimal("estimated_amount", { precision: 12, scale: 2 }).notNull().default('0'),
+  actualAmount: decimal("actual_amount", { precision: 12, scale: 2 }),
+  paymentStatus: text("payment_status").notNull().default('pending'),
+  paymentDate: date("payment_date"),
+  paymentReference: text("payment_reference"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEventVendorCostSchema = createInsertSchema(eventVendorCosts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEventVendorCost = z.infer<typeof insertEventVendorCostSchema>;
+export type EventVendorCost = typeof eventVendorCosts.$inferSelect;
