@@ -1,0 +1,126 @@
+Oakstreet Events - Changes After January 27, 2026
+
+This document lists all feature changes, improvements, and fixes made to the Oakstreet Event Management System after January 27, 2026.
+February 2, 2026
+Portfolio Management
+
+    Fullscreen Image Lightbox: Added fullscreen image viewer for portfolio photos with left/right navigation, keyboard support (arrow keys, ESC), and photo counter
+    Event Date Selection: Added date picker to collection editing dialog for setting event dates
+    Direct File Upload: Added ability to upload images directly to portfolio (in addition to URL/Drive links)
+    Cover Image Upload: Dual-mode cover image upload - supports both file upload and URL input
+    Image Display Fixes: Fixed blank image issues by correcting object storage route serving
+    Upload Reliability: Improved upload progress feedback and error handling with try/finally blocks
+
+Client Portal
+
+    Client Registration: Allow new clients to register directly for the event portal with enhanced security and validation
+    Oaksy Chat Widget: Added AI chat assistant (floating widget) for client portal assistance and lead collection
+    Portal Testing Mode: Enabled client portal testing with personal phone numbers
+
+Event Management
+
+    Searchable Event Dropdowns: Made all event selector dropdowns searchable and scrollable using Combobox pattern
+    Vendor Cost Tracking: Added vendor cost management system for tracking event profitability
+    Event Flow Editing: Added ability to edit and update existing event flow items
+    Default Templates: Added option to load default event templates into existing flows
+    Excel Export: Added ability to download event flow data as Excel file
+
+Sales & Leads
+
+    Client Input Viewing: Added functionality to view client creative inputs in sales leads
+    New Lead Notifications: Automatic WhatsApp notification to administrators when new leads come in
+
+Notifications
+
+    Leave Request Notifications: Added WhatsApp notifications when new leave requests are submitted
+    Improved Phone Lookup: Enhanced notification system to check multiple phone number locations
+
+Testing
+
+    Comprehensive Test Suite: Added 44+ automated Vitest tests covering:
+        Authentication and authorization
+        Event CRUD operations
+        Financial calculations
+        Timeline management
+        Daybook operations
+        Utility functions
+    Test Reports: Generate test reports in CSV and HTML formats
+
+February 1, 2026
+Payment System
+
+    Payment Editing: Superadmins can now edit payment confirmations with date
+    Receipt Downloads: Added ability to download payment receipts with correct receipt numbering
+    Payment Access Control: Restricted payment access to authorized administrators only
+    Sales Page Updates: Corrected payment status display for users
+
+WhatsApp Integration
+
+    Template Enforcement: All WhatsApp notifications now use approved templates (no freeform messages)
+    Template Fallback: Automatic fallback to templates when sending notifications
+    Recipient Names: Include recipient names in notifications for better template matching
+    Planner Notifications: Notify wedding planners immediately when new leads are assigned
+    Event Booking Notifications: Notify planners when events are booked
+
+Client Portal UI Enhancements
+
+    Client Feedback Viewing: Superadmins can view client feedback in event database
+    Feedback Page Branding: Updated with Oakstreet branding and improved UX
+    "Your Inputs" Page: Enhanced with micro-polish and improved interactions
+    Brand Colors: Updated all portal pages to use Oak Green (#4b7c29) color scheme
+    Financial Page UI: Improved payment user experience
+    Estimate Status Badges: Improved readability and styling
+    Home Page Refinements: Subtle UI improvements to client portal home
+    Pay Now Button: Removed from financial milestones (payment handled differently)
+
+Notification System
+
+    General Messaging Function: Updated notification system to use more flexible messaging
+
+Key Technical Changes
+Database Schema Updates
+
+    Added vendorCosts table for tracking vendor expenses per event
+    Added portalChatMessages and portalChatConversations tables for chat widget
+    Added fields for notification tracking and client inputs
+
+API Endpoints Added
+
+    POST /api/portfolio/albums/:albumId/photos/upload - Direct image upload
+    GET/POST/DELETE /api/events/:eventId/vendor-costs - Vendor cost management
+    GET/POST /api/portal/chat - Portal chat widget endpoints
+    PATCH /api/event-flow/:id - Update event flow items
+    GET /api/event-flow/:eventId/export - Excel export
+
+Object Storage
+
+    Portfolio images stored in public storage at /public/portfolio/...
+    Served via /api/objects/public/:objectPath(*) route
+    Uses searchPublicObject() method for retrieval
+
+Files Modified
+Frontend (client/src/)
+
+    pages/portfolio-admin.tsx - Portfolio management with lightbox
+    pages/client-portal-*.tsx - All portal pages updated
+    pages/oak-sales.tsx - Lead management updates
+    components/portal-chat-widget.tsx - New chat widget
+    components/oak-book/*.tsx - Financial UI updates
+
+Backend (server/)
+
+    routes.ts - New API endpoints
+    storage.ts - Database operations for new features
+    objectStorage.ts - Image serving fixes
+    whatsappService.ts - Template-based notifications
+
+Shared
+
+    shared/schema.ts - New tables and fields
+
+Configuration Notes
+
+    All WhatsApp notifications MUST use templates (TWILIO_WHATSAPP_*_TEMPLATE_SID)
+    Portal uses ONLY white and Oak Green (#4b7c29, #3d6622) colors
+    All dropdowns should use searchable Combobox pattern
+    Mobile-first design with 44x44px touch targets
