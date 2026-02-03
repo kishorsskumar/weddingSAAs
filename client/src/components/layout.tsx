@@ -33,6 +33,7 @@ import {
   Home,
   FileText,
   Settings,
+  Image,
   ChevronDown,
   DollarSign,
   Building2
@@ -97,6 +98,10 @@ const ALL_PAGES = [
     { id: "oaksy", label: "AI Assistant", path: "/oaksy" },
     { id: "oak-creative", label: "Creative Studio", path: "/oak-creative" },
   ] },
+  { id: "client-portal", label: "Client Portal", path: "/portal-admin", subPages: [
+    { id: "portal-admin", label: "Portal Dashboard", path: "/portal-admin" },
+    { id: "portfolio-admin", label: "Portfolio Manager", path: "/portfolio-admin" },
+  ] },
   { id: "management-mis", label: "Management MIS", path: "/management-mis", superadminOnly: true, subPages: [
     { id: "mis-overview", label: "Overview Dashboard", path: "/management-mis" },
     { id: "event-database", label: "Event Database", path: "/database", superadminOnly: true },
@@ -158,6 +163,9 @@ const ICONS: Record<string, any> = {
   "oak-creative": Palette,
   "whatsapp-inbox": MessageSquare,
   "oak-rsvp": Users,
+  "client-portal": Users,
+  "portal-admin": LayoutDashboard,
+  "portfolio-admin": Image,
   admin: Shield,
 };
 

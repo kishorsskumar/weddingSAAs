@@ -975,6 +975,9 @@ export async function registerRoutes(
     'knotvite',
     'knotvite-forms',
     'knotvite-submissions',
+    'client-portal',
+    'portal-admin',
+    'portfolio-admin',
     'management-mis',
     'mis-overview',
     'event-database',
@@ -12521,6 +12524,49 @@ Respond with a JSON array only, no markdown formatting.`;
     try {
       const items = await storage.getFeaturedPortfolioItems();
       res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portal Leads - Admin endpoints (protected)
+  app.get('/api/portal-leads', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const leads = await storage.getAllPortalLeads();
+      res.json(leads);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/portal-leads/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const lead = await storage.getPortalLead(req.params.id);
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      res.json(lead);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/portal-leads/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const lead = await storage.updatePortalLead(req.params.id, req.body);
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+      res.json(lead);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -5772,6 +5772,10 @@ export class DatabaseStorage implements IStorage {
     return lead || undefined;
   }
 
+  async getAllPortalLeads(): Promise<PortalLead[]> {
+    return await db.select().from(portalLeads).orderBy(desc(portalLeads.createdAt));
+  }
+
   async createPortalLead(lead: InsertPortalLead): Promise<PortalLead> {
     const [newLead] = await db.insert(portalLeads).values(lead).returning();
     return newLead;

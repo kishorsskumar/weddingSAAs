@@ -47,6 +47,7 @@ import KnotViteDashboard from "@/pages/knotvite-dashboard";
 import KnotViteLanding from "@/pages/knotvite-landing";
 import PublicRsvpForm from "@/pages/public-rsvp";
 import PortfolioAdmin from "@/pages/portfolio-admin";
+import PortalAdmin from "@/pages/portal-admin";
 import PortfolioPage from "@/pages/portfolio-page";
 import ClientPortal from "@/pages/client-portal";
 import PortalLanding from "@/pages/portal-landing";
@@ -163,6 +164,9 @@ function AppRoutes() {
         </Route>
         <Route path="/portfolio-admin">
           <PrivateRoute component={PortfolioAdmin} path="/portfolio-admin" />
+        </Route>
+        <Route path="/portal-admin">
+          <PrivateRoute component={PortalAdmin} path="/portal-admin" />
         </Route>
         <Route component={NotFound} />
       </Switch>

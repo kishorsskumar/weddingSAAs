@@ -41,7 +41,8 @@ import {
   ClipboardList,
   Palette,
   MessageSquare,
-  Settings
+  Settings,
+  Image
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -68,6 +69,9 @@ const ALL_PAGES = [
   { id: "oak-rsvp", label: "Oak RSVP", path: "/oak-rsvp", icon: Users, description: "Event guest management" },
   { id: "oaksy", label: "Oaksy AI", path: "/oaksy", icon: Sparkles, description: "AI assistant" },
   { id: "oak-creative", label: "Oak Creative", path: "/oak-creative", icon: Palette, description: "Presentation builder" },
+  { id: "client-portal", label: "Client Portal", path: "/portal-admin", icon: Users, description: "Manage client leads & portal access" },
+  { id: "portal-admin", label: "Portal Dashboard", path: "/portal-admin", icon: LayoutDashboard, description: "View & manage portal leads" },
+  { id: "portfolio-admin", label: "Portfolio Manager", path: "/portfolio-admin", icon: Image, description: "Manage portfolio albums & photos" },
   { id: "management-mis", label: "Management MIS", path: "/management-mis", icon: LayoutDashboard, description: "Executive dashboard & reports" },
   { id: "event-database", label: "Event Database", path: "/database", icon: Database, description: "Event records" },
   { id: "event-milestones", label: "Oak Milestones", path: "/milestones", icon: CheckSquare, description: "Track milestones" },
