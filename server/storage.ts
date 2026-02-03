@@ -347,6 +347,51 @@ import {
   type InsertRsvpSubmission,
   type RsvpBulkImport,
   type InsertRsvpBulkImport,
+  portalLeads,
+  portfolioAlbums,
+  portfolioSets,
+  portfolioPhotos,
+  portfolioItems,
+  portalClientInputs,
+  portalFeedback,
+  portalTimelines,
+  portalMilestonePhases,
+  portalMilestoneTasks,
+  portalEventFlows,
+  portalEventFlowItems,
+  portalFinancialMilestones,
+  portalOaksyChats,
+  eventVendorCosts,
+  type PortalLead,
+  type InsertPortalLead,
+  type PortfolioAlbum,
+  type InsertPortfolioAlbum,
+  type PortfolioSet,
+  type InsertPortfolioSet,
+  type PortfolioPhoto,
+  type InsertPortfolioPhoto,
+  type PortfolioItem,
+  type InsertPortfolioItem,
+  type PortalClientInput,
+  type InsertPortalClientInput,
+  type PortalFeedback,
+  type InsertPortalFeedback,
+  type PortalTimeline,
+  type InsertPortalTimeline,
+  type PortalMilestonePhase,
+  type InsertPortalMilestonePhase,
+  type PortalMilestoneTask,
+  type InsertPortalMilestoneTask,
+  type PortalEventFlow,
+  type InsertPortalEventFlow,
+  type PortalEventFlowItem,
+  type InsertPortalEventFlowItem,
+  type PortalFinancialMilestone,
+  type InsertPortalFinancialMilestone,
+  type PortalOaksyChat,
+  type InsertPortalOaksyChat,
+  type EventVendorCost,
+  type InsertEventVendorCost,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -5590,6 +5635,182 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(rsvpBulkImports)
       .where(eq(rsvpBulkImports.companyId, companyId))
       .orderBy(desc(rsvpBulkImports.createdAt));
+  }
+
+  // Portfolio Items
+  async getAllPortfolioItems(): Promise<PortfolioItem[]> {
+    return await db.select().from(portfolioItems).orderBy(desc(portfolioItems.sortOrder), desc(portfolioItems.createdAt));
+  }
+
+  async getFeaturedPortfolioItems(): Promise<PortfolioItem[]> {
+    return await db.select().from(portfolioItems)
+      .where(eq(portfolioItems.featured, true))
+      .orderBy(desc(portfolioItems.sortOrder), desc(portfolioItems.createdAt))
+      .limit(6);
+  }
+
+  async getPortfolioItem(id: string): Promise<PortfolioItem | undefined> {
+    const [item] = await db.select().from(portfolioItems).where(eq(portfolioItems.id, id));
+    return item || undefined;
+  }
+
+  async createPortfolioItem(item: InsertPortfolioItem): Promise<PortfolioItem> {
+    const [newItem] = await db.insert(portfolioItems).values(item).returning();
+    return newItem;
+  }
+
+  async updatePortfolioItem(id: string, item: Partial<InsertPortfolioItem>): Promise<PortfolioItem | undefined> {
+    const [updated] = await db.update(portfolioItems)
+      .set({ ...item, updatedAt: new Date() })
+      .where(eq(portfolioItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortfolioItem(id: string): Promise<void> {
+    await db.delete(portfolioItems).where(eq(portfolioItems.id, id));
+  }
+
+  // Portfolio Albums
+  async getAllPortfolioAlbums(): Promise<PortfolioAlbum[]> {
+    return await db.select().from(portfolioAlbums).orderBy(desc(portfolioAlbums.sortOrder), desc(portfolioAlbums.createdAt));
+  }
+
+  async getFeaturedPortfolioAlbums(): Promise<PortfolioAlbum[]> {
+    return await db.select().from(portfolioAlbums)
+      .where(eq(portfolioAlbums.featured, true))
+      .orderBy(desc(portfolioAlbums.sortOrder), desc(portfolioAlbums.createdAt))
+      .limit(6);
+  }
+
+  async getPortfolioAlbum(id: string): Promise<PortfolioAlbum | undefined> {
+    const [album] = await db.select().from(portfolioAlbums).where(eq(portfolioAlbums.id, id));
+    return album || undefined;
+  }
+
+  async createPortfolioAlbum(album: InsertPortfolioAlbum): Promise<PortfolioAlbum> {
+    const [newAlbum] = await db.insert(portfolioAlbums).values(album).returning();
+    return newAlbum;
+  }
+
+  async updatePortfolioAlbum(id: string, album: Partial<InsertPortfolioAlbum>): Promise<PortfolioAlbum | undefined> {
+    const [updated] = await db.update(portfolioAlbums)
+      .set({ ...album, updatedAt: new Date() })
+      .where(eq(portfolioAlbums.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortfolioAlbum(id: string): Promise<void> {
+    await db.delete(portfolioAlbums).where(eq(portfolioAlbums.id, id));
+  }
+
+  // Portfolio Photos
+  async getPortfolioPhotosByAlbum(albumId: string): Promise<PortfolioPhoto[]> {
+    return await db.select().from(portfolioPhotos)
+      .where(eq(portfolioPhotos.albumId, albumId))
+      .orderBy(portfolioPhotos.sortOrder, portfolioPhotos.createdAt);
+  }
+
+  async createPortfolioPhoto(photo: InsertPortfolioPhoto): Promise<PortfolioPhoto> {
+    const [newPhoto] = await db.insert(portfolioPhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async deletePortfolioPhoto(id: string): Promise<void> {
+    await db.delete(portfolioPhotos).where(eq(portfolioPhotos.id, id));
+  }
+
+  async createPortfolioPhotos(photos: InsertPortfolioPhoto[]): Promise<PortfolioPhoto[]> {
+    if (photos.length === 0) return [];
+    const newPhotos = await db.insert(portfolioPhotos).values(photos).returning();
+    return newPhotos;
+  }
+
+  // Portfolio Sets
+  async getPortfolioSetsByAlbum(albumId: string): Promise<PortfolioSet[]> {
+    return await db.select().from(portfolioSets)
+      .where(eq(portfolioSets.albumId, albumId))
+      .orderBy(portfolioSets.sortOrder, portfolioSets.createdAt);
+  }
+
+  async getPortfolioSet(id: string): Promise<PortfolioSet | undefined> {
+    const [set] = await db.select().from(portfolioSets).where(eq(portfolioSets.id, id));
+    return set || undefined;
+  }
+
+  async createPortfolioSet(set: InsertPortfolioSet): Promise<PortfolioSet> {
+    const [newSet] = await db.insert(portfolioSets).values(set).returning();
+    return newSet;
+  }
+
+  async updatePortfolioSet(id: string, data: Partial<InsertPortfolioSet>): Promise<PortfolioSet | undefined> {
+    const [updated] = await db.update(portfolioSets)
+      .set(data)
+      .where(eq(portfolioSets.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortfolioSet(id: string): Promise<void> {
+    await db.delete(portfolioSets).where(eq(portfolioSets.id, id));
+  }
+
+  async getPortfolioPhotosBySet(setId: string): Promise<PortfolioPhoto[]> {
+    return await db.select().from(portfolioPhotos)
+      .where(eq(portfolioPhotos.setId, setId))
+      .orderBy(portfolioPhotos.sortOrder, portfolioPhotos.createdAt);
+  }
+
+  // Portal Leads
+  async getPortalLeads(): Promise<PortalLead[]> {
+    return await db.select().from(portalLeads).orderBy(desc(portalLeads.createdAt));
+  }
+
+  async getPortalLead(id: string): Promise<PortalLead | undefined> {
+    const [lead] = await db.select().from(portalLeads).where(eq(portalLeads.id, id));
+    return lead || undefined;
+  }
+
+  async createPortalLead(lead: InsertPortalLead): Promise<PortalLead> {
+    const [newLead] = await db.insert(portalLeads).values(lead).returning();
+    return newLead;
+  }
+
+  async updatePortalLead(id: string, data: Partial<InsertPortalLead>): Promise<PortalLead | undefined> {
+    const [updated] = await db.update(portalLeads)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(portalLeads.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortalLead(id: string): Promise<void> {
+    await db.delete(portalLeads).where(eq(portalLeads.id, id));
+  }
+
+  // Event Vendor Costs
+  async getEventVendorCosts(eventId: string): Promise<EventVendorCost[]> {
+    return await db.select().from(eventVendorCosts)
+      .where(eq(eventVendorCosts.eventId, eventId))
+      .orderBy(eventVendorCosts.createdAt);
+  }
+
+  async createEventVendorCost(cost: InsertEventVendorCost): Promise<EventVendorCost> {
+    const [newCost] = await db.insert(eventVendorCosts).values(cost).returning();
+    return newCost;
+  }
+
+  async updateEventVendorCost(id: string, data: Partial<InsertEventVendorCost>): Promise<EventVendorCost | undefined> {
+    const [updated] = await db.update(eventVendorCosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(eventVendorCosts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEventVendorCost(id: string): Promise<void> {
+    await db.delete(eventVendorCosts).where(eq(eventVendorCosts.id, id));
   }
 }
 

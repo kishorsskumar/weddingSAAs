@@ -12473,5 +12473,285 @@ Respond with a JSON array only, no markdown formatting.`;
     }
   });
 
+  // ===== Portfolio API Endpoints =====
+
+  // Portfolio Albums - Public endpoints
+  app.get('/api/portfolio/albums', async (req, res) => {
+    try {
+      const albums = await storage.getAllPortfolioAlbums();
+      res.json(albums);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/portfolio/albums/featured', async (req, res) => {
+    try {
+      const albums = await storage.getFeaturedPortfolioAlbums();
+      res.json(albums);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/portfolio/albums/:id', async (req, res) => {
+    try {
+      const album = await storage.getPortfolioAlbum(req.params.id);
+      if (!album) {
+        return res.status(404).json({ error: 'Album not found' });
+      }
+      const photos = await storage.getPortfolioPhotosByAlbum(req.params.id);
+      res.json({ album, photos });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio Items - Public endpoints (legacy)
+  app.get('/api/portfolio', async (req, res) => {
+    try {
+      const items = await storage.getAllPortfolioItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/portfolio/featured', async (req, res) => {
+    try {
+      const items = await storage.getFeaturedPortfolioItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio Items - Admin endpoints (protected)
+  app.get('/api/admin/portfolio', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const items = await storage.getAllPortfolioItems();
+      res.json(items);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/admin/portfolio', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const item = await storage.createPortfolioItem({ ...req.body, createdBy: req.session.userId });
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/admin/portfolio/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const item = await storage.updatePortfolioItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: 'Portfolio item not found' });
+      }
+      res.json(item);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/admin/portfolio/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      await storage.deletePortfolioItem(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio Albums - Admin endpoints
+  app.get('/api/admin/portfolio/albums', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const albums = await storage.getAllPortfolioAlbums();
+      res.json(albums);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/admin/portfolio/albums', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const album = await storage.createPortfolioAlbum({ ...req.body, createdBy: req.session.userId });
+      res.json(album);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/admin/portfolio/albums/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const { id, createdAt, updatedAt, ...updateData } = req.body;
+      const cleanData: any = {};
+      if (updateData.title !== undefined) cleanData.title = updateData.title;
+      if (updateData.tagline !== undefined) cleanData.tagline = updateData.tagline;
+      if (updateData.venue !== undefined) cleanData.venue = updateData.venue;
+      if (updateData.coverImageUrl !== undefined) cleanData.coverImageUrl = updateData.coverImageUrl;
+      if (updateData.category !== undefined) cleanData.category = updateData.category;
+      if (updateData.featured !== undefined) cleanData.featured = updateData.featured;
+      if (updateData.sortOrder !== undefined) cleanData.sortOrder = updateData.sortOrder;
+      if (updateData.eventDate !== undefined) cleanData.eventDate = updateData.eventDate;
+      
+      const album = await storage.updatePortfolioAlbum(req.params.id, cleanData);
+      if (!album) {
+        return res.status(404).json({ error: 'Album not found' });
+      }
+      res.json(album);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/admin/portfolio/albums/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      await storage.deletePortfolioAlbum(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio Photos - Admin endpoints
+  app.get('/api/admin/portfolio/albums/:albumId/photos', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const photos = await storage.getPortfolioPhotosByAlbum(req.params.albumId);
+      res.json(photos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/admin/portfolio/albums/:albumId/photos', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const photo = await storage.createPortfolioPhoto({ ...req.body, albumId: req.params.albumId });
+      res.json(photo);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/admin/portfolio/photos/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      await storage.deletePortfolioPhoto(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio Sets endpoints
+  app.get('/api/portfolio/albums/:albumId/sets', async (req, res) => {
+    try {
+      const sets = await storage.getPortfolioSetsByAlbum(req.params.albumId);
+      res.json(sets);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/portfolio/sets/:setId/photos', async (req, res) => {
+    try {
+      const photos = await storage.getPortfolioPhotosBySet(req.params.setId);
+      res.json(photos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ===== Event Vendor Costs Endpoints =====
+  app.get('/api/events/:eventId/vendor-costs', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const costs = await storage.getEventVendorCosts(req.params.eventId);
+      res.json(costs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post('/api/events/:eventId/vendor-costs', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const cost = await storage.createEventVendorCost({ 
+        ...req.body, 
+        eventId: req.params.eventId,
+        createdBy: req.session.userId 
+      });
+      res.json(cost);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put('/api/vendor-costs/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const cost = await storage.updateEventVendorCost(req.params.id, req.body);
+      if (!cost) {
+        return res.status(404).json({ error: 'Vendor cost not found' });
+      }
+      res.json(cost);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete('/api/vendor-costs/:id', async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      await storage.deleteEventVendorCost(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return httpServer;
 }
