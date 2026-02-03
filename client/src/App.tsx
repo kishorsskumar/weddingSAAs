@@ -46,6 +46,11 @@ import KnotViteSubmissions from "@/pages/knotvite-submissions";
 import KnotViteDashboard from "@/pages/knotvite-dashboard";
 import KnotViteLanding from "@/pages/knotvite-landing";
 import PublicRsvpForm from "@/pages/public-rsvp";
+import PortfolioAdmin from "@/pages/portfolio-admin";
+import PortfolioPage from "@/pages/portfolio-page";
+import ClientPortal from "@/pages/client-portal";
+import PortalLanding from "@/pages/portal-landing";
+import MyPortal from "@/pages/my-portal";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -156,6 +161,9 @@ function AppRoutes() {
         <Route path="/knotvite/submissions">
           <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" skipSubscriptionCheck={true} />
         </Route>
+        <Route path="/portfolio-admin">
+          <PrivateRoute component={PortfolioAdmin} path="/portfolio-admin" />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -181,6 +189,8 @@ function PublicPages() {
         <Route path="/contact" component={Contact} />
         <Route path="/knotvite" component={KnotViteLanding} />
         <Route path="/rsvp/:slug" component={PublicRsvpForm} />
+        <Route path="/portfolio" component={PortfolioPage} />
+        <Route path="/client-portal" component={PortalLanding} />
         <Route>
           <AppRoutes />
         </Route>
@@ -198,6 +208,9 @@ function App() {
           <Switch>
             <Route path="/portal/:token">
               <CustomerPortal />
+            </Route>
+            <Route path="/my-portal/:token">
+              <MyPortal />
             </Route>
             <Route path="/print/:type/:id">
               <PrintDocument />
