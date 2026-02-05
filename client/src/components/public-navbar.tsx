@@ -18,10 +18,10 @@ export function PublicNavbar() {
   const { user, logout } = useAuth();
 
   const navLinks = [
-    { href: "/", label: "Home" },
+    { href: "/#product", label: "Product" },
     { href: "/#features", label: "Features" },
     { href: "/pricing", label: "Pricing" },
-    { href: "/contact", label: "Contact" },
+    { href: "/#demo", label: "Demo" },
   ];
 
   const isActive = (href: string) => {
@@ -95,13 +95,18 @@ export function PublicNavbar() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="outline" size="sm">
+                  <Button variant="ghost" size="sm">
                     Login
                   </Button>
                 </Link>
+                <Link href="/#demo">
+                  <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/5">
+                    Book Demo
+                  </Button>
+                </Link>
                 <Link href="/signup">
-                  <Button size="sm">
-                    Get Started
+                  <Button size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                    Start Free Trial
                   </Button>
                 </Link>
               </>
@@ -156,15 +161,20 @@ export function PublicNavbar() {
                     </Button>
                   </>
                 ) : (
-                  <div className="flex gap-3">
-                    <Link href="/login" className="flex-1">
-                      <Button variant="outline" size="sm" className="w-full">
+                  <div className="flex flex-col gap-3">
+                    <Link href="/login">
+                      <Button variant="ghost" size="sm" className="w-full">
                         Login
                       </Button>
                     </Link>
-                    <Link href="/signup" className="flex-1">
-                      <Button size="sm" className="w-full">
-                        Get Started
+                    <Link href="/#demo">
+                      <Button variant="outline" size="sm" className="w-full border-primary text-primary">
+                        Book Demo
+                      </Button>
+                    </Link>
+                    <Link href="/signup">
+                      <Button size="sm" className="w-full bg-gradient-to-r from-purple-600 to-blue-600">
+                        Start Free Trial
                       </Button>
                     </Link>
                   </div>

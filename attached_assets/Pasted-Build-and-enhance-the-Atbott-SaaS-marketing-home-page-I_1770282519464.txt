@@ -1,0 +1,300 @@
+Build and enhance the Atbott SaaS marketing home page.
+
+IMPORTANT:
+This is an existing SaaS product. Maintain UI consistency, workflow consistency, and scalable architecture. Do NOT redesign the product structure. Extend existing design language.
+
+--------------------------------------------------
+
+PRODUCT OVERVIEW
+
+Product Name: Atbott SaaS
+Product Type: CRM + Client Portal + Event Calendar
+Target Users: Event planners, wedding companies, event agencies
+
+--------------------------------------------------
+
+GLOBAL DESIGN REQUIREMENTS
+
+Modern premium SaaS UI
+Clean white background
+Purple and blue gradient accent theme
+Fully mobile responsive
+Smooth scroll animations
+Sticky navigation bar
+Rounded card UI style
+Reusable React components
+SEO friendly structure
+Match existing Atbott dashboard visual language
+
+--------------------------------------------------
+
+TECH STACK REQUIREMENTS
+
+React
+Tailwind CSS
+Framer Motion for animations
+Lucide React icons
+Component based architecture
+Mobile-first responsive design
+
+--------------------------------------------------
+
+UI CONSISTENCY RULES
+
+Maintain:
+Sidebar navigation pattern
+Dashboard visual styling
+Card component style
+Spacing and typography hierarchy
+Existing branding tone
+Lead → Client → Event workflow logic
+Supabase compatibility
+Multi-tenant SaaS architecture
+
+Do NOT:
+Redesign navigation flow
+Break existing modules
+Remove working components
+Change user workflow sequence
+
+--------------------------------------------------
+
+AUTHENTICATION REQUIREMENTS
+
+REMOVE:
+WhatsApp login authentication
+
+ADD:
+Email OTP login using Supabase passwordless auth
+Google OAuth login using Supabase provider
+
+IMPORTANT:
+Keep WhatsApp communication features inside CRM.
+
+--------------------------------------------------
+
+HOME PAGE STRUCTURE
+
+--------------------------------------------------
+SECTION 1 — NAVIGATION BAR
+
+Logo: Atbott
+
+Menu:
+Product
+Features
+Pricing
+Demo
+Login
+
+Buttons:
+Primary Button: Book Demo
+Secondary Button: Start Free Trial
+
+Navbar must remain sticky on scroll.
+
+--------------------------------------------------
+SECTION 2 — HERO SECTION
+
+Headline:
+Close More Event Clients Without Losing Leads
+
+Subheading:
+Lead Management, Client Portal, and Event Calendar built for event planners and wedding businesses.
+
+Buttons:
+Book Live Demo
+Start Free Trial
+
+Add trust credibility statements below CTA.
+
+Right Side:
+Animated dashboard preview placeholder.
+
+--------------------------------------------------
+SECTION 3 — PROBLEM SECTION
+
+Heading:
+Still Managing Clients in Excel, WhatsApp and Diaries?
+
+Create 5 problem cards:
+
+Leads getting missed
+Clients asking repeated updates
+Team coordination confusion
+Vendor schedule clashes
+Payment tracking chaos
+
+Closing line:
+Event planning is stressful. Your software shouldn’t be.
+
+--------------------------------------------------
+SECTION 4 — SOLUTION SECTION
+
+Heading:
+Everything You Need To Run Your Event Business
+
+Column 1: Lead Management
+Pipeline tracking
+Automated follow-ups
+Lead assignment
+Analytics dashboard
+
+Column 2: Client Portal
+Event timeline
+Document sharing
+Payment tracking
+Client checklist
+Communication hub
+
+Column 3: Event Calendar
+Event scheduling
+Vendor coordination
+Team scheduling
+Conflict detection
+Milestone tracking
+
+--------------------------------------------------
+SECTION 5 — DEMO SHOWCASE
+
+Add product demo video placeholder.
+
+Button:
+Watch Full Demo
+
+--------------------------------------------------
+SECTION 6 — HOW IT WORKS
+
+Step 1: Capture Leads
+Step 2: Convert Clients
+Step 3: Manage Event
+Step 4: Deliver Experience
+
+Include icons and animations.
+
+--------------------------------------------------
+SECTION 7 — INDUSTRY FOCUS
+
+Create cards for:
+
+Wedding Planners
+Event Management Companies
+Photography Agencies
+Decor Companies
+Corporate Event Teams
+
+--------------------------------------------------
+SECTION 8 — DIFFERENTIATION
+
+Heading:
+Why Event Businesses Choose Atbott
+
+Bullet Points:
+Event specific CRM
+Client experience portal
+WhatsApp workflow ready
+Multi-event tracking
+Vendor milestone visibility
+
+--------------------------------------------------
+SECTION 9 — PRICING PREVIEW
+
+Create 3 pricing cards:
+
+Starter
+Growth (Highlight as recommended)
+Enterprise
+
+Each card must include:
+Price placeholder
+Feature bullet list
+CTA button
+
+Add button:
+View Full Pricing
+
+--------------------------------------------------
+SECTION 10 — TESTIMONIALS
+
+Create testimonial slider with:
+Client photo placeholder
+Quote text
+Company name
+Star rating
+
+--------------------------------------------------
+SECTION 11 — DEMO BOOKING FORM
+
+Fields:
+Name
+Company Name
+Email
+Phone
+Business Type dropdown
+
+CTA:
+Schedule Demo
+
+--------------------------------------------------
+SECTION 12 — FAQ SECTION
+
+Accordion FAQs:
+
+Is this only for wedding planners?
+Can I migrate from Excel?
+Do clients need mobile app?
+Does it support multiple events?
+Do you provide onboarding help?
+
+--------------------------------------------------
+SECTION 13 — FINAL CTA BANNER
+
+Headline:
+Stop Losing Event Leads. Start Scaling Your Business.
+
+Buttons:
+Start Free Trial
+Book Demo
+
+--------------------------------------------------
+SECTION 14 — FOOTER
+
+Include:
+Product links
+Pricing
+Blog
+Privacy Policy
+Terms and Conditions
+Contact Info
+Social Media Icons
+
+--------------------------------------------------
+MOBILE REQUIREMENTS
+
+Stack sections vertically
+Navbar collapses into hamburger menu
+Maintain readable font sizes
+Keep CTA buttons visible
+
+--------------------------------------------------
+PERFORMANCE REQUIREMENTS
+
+Lazy load images
+Optimize animations
+Maintain fast loading performance
+Add SEO meta tags
+
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+
+Create reusable React components for each section
+Keep code modular and scalable
+Use Tailwind utility classes
+Include placeholder content and dummy images
+Ensure production-ready landing page quality
+
+--------------------------------------------------
+
+Before implementing any feature:
+Check if similar component exists and reuse it.
+Maintain backward compatibility with existing data.
