@@ -3260,7 +3260,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                             <TableCell>
                               <Button
                                 size="sm"
-                                className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+                                className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]"
                                 onClick={() => handlePushToDaybook(payout)}
                                 data-testid={`button-push-daybook-${payout.id}`}
                               >
@@ -3478,7 +3478,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDaybookDialogOpen(false)}>Cancel</Button>
             <Button
-              className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
+              className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]"
               onClick={confirmPushToDaybook}
               disabled={pushToDaybook.isPending}
               data-testid="button-confirm-push-daybook"

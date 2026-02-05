@@ -1532,7 +1532,7 @@ export default function Daybook() {
             <Button 
               size="sm"
               onClick={() => setIsScanDialogOpen(true)}
-              className="gap-1 bg-[#7C8B5D] hover:bg-[#6A7850]"
+              className="gap-1 bg-[hsl(var(--primary))] hover:bg-[#6A7850]"
               data-testid="button-scan-transaction"
             >
               <Camera className="h-4 w-4" />
@@ -2376,14 +2376,14 @@ export default function Daybook() {
       }}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-lg font-serif text-[#7C8B5D] flex items-center gap-2">
+            <DialogTitle className="text-lg font-serif text-primary flex items-center gap-2">
               <Camera className="h-5 w-5" />
               Scan Transaction
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {!scanningImage ? (
-              <div className="border-2 border-dashed border-[#7C8B5D]/50 rounded-lg p-8 text-center hover:border-[#7C8B5D] transition-colors">
+              <div className="border-2 border-dashed border-[hsl(var(--primary))]/50 rounded-lg p-8 text-center hover:border-[hsl(var(--primary))] transition-colors">
                 <input
                   type="file"
                   accept="image/*"
@@ -2394,8 +2394,8 @@ export default function Daybook() {
                 />
                 <label htmlFor="transaction-image" className="cursor-pointer">
                   <div className="flex flex-col items-center gap-3">
-                    <div className="p-4 bg-[#7C8B5D]/10 rounded-full">
-                      <Upload className="h-8 w-8 text-[#7C8B5D]" />
+                    <div className="p-4 bg-primary/10 rounded-full">
+                      <Upload className="h-8 w-8 text-primary" />
                     </div>
                     <div>
                       <p className="font-medium text-foreground">Upload Transaction Screenshot</p>
@@ -2420,7 +2420,7 @@ export default function Daybook() {
                   {scanTransactionMutation.isPending && (
                     <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2">
-                        <Loader2 className="h-8 w-8 animate-spin text-[#7C8B5D]" />
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         <p className="text-sm font-medium">Analyzing transaction...</p>
                       </div>
                     </div>
@@ -2428,7 +2428,7 @@ export default function Daybook() {
                 </div>
 
                 {scannedData && (
-                  <Card className="border-[#7C8B5D]/30">
+                  <Card className="border-[hsl(var(--primary))]/30">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Transaction Type</span>
@@ -2506,7 +2506,7 @@ export default function Daybook() {
                   </Button>
                   {scannedData && (
                     <Button 
-                      className="flex-1 bg-[#7C8B5D] hover:bg-[#6A7850]"
+                      className="flex-1 bg-[hsl(var(--primary))] hover:bg-[#6A7850]"
                       onClick={handleCreateFromScan}
                       disabled={createMutation.isPending}
                       data-testid="button-create-from-scan"
@@ -2540,7 +2540,7 @@ export default function Daybook() {
           <div className="space-y-6" id="daybook-preview-content">
             {/* Header for print */}
             <div className="text-center border-b pb-4">
-              <h1 className="text-2xl font-bold font-serif text-[#7C8B5D]">Oakstreet Events</h1>
+              <h1 className="text-2xl font-bold font-serif text-primary">Oakstreet Events</h1>
               <h2 className="text-lg font-medium mt-1">Daybook Report</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {format(periodDateRange.start, "dd MMM yyyy")} - {format(periodDateRange.end, "dd MMM yyyy")}
@@ -2681,7 +2681,7 @@ export default function Daybook() {
             </Button>
             <Button 
               onClick={() => window.print()}
-              className="bg-[#7C8B5D] hover:bg-[#6A7850]"
+              className="bg-[hsl(var(--primary))] hover:bg-[#6A7850]"
             >
               <Printer className="h-4 w-4 mr-1" />
               Print

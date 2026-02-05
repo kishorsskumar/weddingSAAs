@@ -1501,7 +1501,7 @@ export default function EmployeePortal() {
               <div className="flex gap-2">
                 {isSuperadmin && (
                   <Link href="/hr">
-                    <Button className="gap-2 bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-add-new-employee">
+                    <Button className="gap-2 bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-add-new-employee">
                       <Plus className="h-4 w-4" />
                       Add New Employee
                     </Button>
@@ -1755,7 +1755,7 @@ export default function EmployeePortal() {
         <div className="flex gap-2">
           {isSuperadmin && (
             <Link href="/hr">
-              <Button className="gap-2 bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-add-new-employee">
+              <Button className="gap-2 bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-add-new-employee">
                 <Plus className="h-4 w-4" />
                 Add New Employee
               </Button>

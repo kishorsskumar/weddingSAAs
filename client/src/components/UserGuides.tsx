@@ -6,7 +6,7 @@ import { Download, Smartphone, BookOpen, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const OAK_COLORS = {
-  primary: '#7C8B5D',
+  primary: 'hsl(var(--primary))',
   accent: '#9AAF6C',
   dark: '#2D3A1F',
   light: '#F5F7F0',
