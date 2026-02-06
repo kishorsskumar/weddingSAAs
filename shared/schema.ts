@@ -2943,3 +2943,33 @@ export const adminNotifications = pgTable("admin_notifications", {
 export const insertAdminNotificationSchema = createInsertSchema(adminNotifications).omit({ id: true, createdAt: true });
 export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
 export type AdminNotification = typeof adminNotifications.$inferSelect;
+
+// System Notifications (Atbott AI Admin Notification System)
+export const systemNotifications = pgTable("system_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(), // 'demo_booking', 'trial_signup', 'enterprise_inquiry'
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  payload: jsonb("payload"),
+  isRead: boolean("is_read").notNull().default(false),
+  createdBy: text("created_by").notNull().default('system'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSystemNotificationSchema = createInsertSchema(systemNotifications).omit({ id: true, createdAt: true });
+export type InsertSystemNotification = z.infer<typeof insertSystemNotificationSchema>;
+export type SystemNotification = typeof systemNotifications.$inferSelect;
+
+// Email Logs
+export const emailLogs = pgTable("email_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  recipient: text("recipient").notNull(),
+  type: text("type").notNull(), // 'demo_confirmation', 'signup_welcome', 'enterprise_acknowledgment'
+  status: text("status").notNull().default('pending'), // 'sent', 'failed', 'pending'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmailLogSchema = createInsertSchema(emailLogs).omit({ id: true, createdAt: true });
+export type InsertEmailLog = z.infer<typeof insertEmailLogSchema>;
+export type EmailLog = typeof emailLogs.$inferSelect;
