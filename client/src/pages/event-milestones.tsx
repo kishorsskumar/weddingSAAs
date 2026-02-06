@@ -245,7 +245,7 @@ export default function EventMilestones() {
   // Phase icons and colors - matching reference design
   const phaseConfig: Record<number, { icon: any; color: string; bgColor: string }> = {
     1: { icon: Rocket, color: 'text-rose-500', bgColor: 'bg-rose-100 dark:bg-rose-900/40' },
-    2: { icon: Palette, color: 'text-purple-500', bgColor: 'bg-purple-100 dark:bg-purple-900/40' },
+    2: { icon: Palette, color: 'text-green-700', bgColor: 'bg-green-100 dark:bg-green-900/40' },
     3: { icon: ShoppingCart, color: 'text-amber-500', bgColor: 'bg-amber-100 dark:bg-amber-900/40' },
     4: { icon: CalendarDays, color: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/40' },
     5: { icon: Truck, color: 'text-emerald-500', bgColor: 'bg-emerald-100 dark:bg-emerald-900/40' },

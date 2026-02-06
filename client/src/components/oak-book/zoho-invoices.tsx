@@ -1109,9 +1109,9 @@ function InvoiceFormModal({
           </div>
 
           {isTaxInvoice && (
-            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-              <p className="text-sm font-medium text-purple-800 mb-1">Tax Invoice (GST)</p>
-              <p className="text-xs text-purple-600">This invoice will be issued under Yepman International</p>
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm font-medium text-green-800 mb-1">Tax Invoice (GST)</p>
+              <p className="text-xs text-primary">This invoice will be issued under Yepman International</p>
             </div>
           )}
 

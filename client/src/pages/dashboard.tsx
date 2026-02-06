@@ -471,10 +471,10 @@ export default function Dashboard() {
             {pendingQuickEntries.length > 0 && (
               <motion.div variants={itemVariants} whileHover={{ y: -4 }}>
                 <Link href="/hr?tab=quick-entries">
-                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-purple-500 bg-purple-50/50 dark:bg-purple-950/20">
+                  <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-primary bg-primary/5 dark:bg-primary/10">
                     <CardContent className="p-4 flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-purple-100 dark:bg-purple-900/50">
-                        <Camera className="h-5 w-5 text-purple-600" />
+                      <div className="p-2 rounded-full bg-primary/10 dark:bg-primary/20">
+                        <Camera className="h-5 w-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="font-semibold text-lg">{pendingQuickEntries.length}</p>

@@ -421,8 +421,8 @@ function BillDetailPanel({
             <X className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-purple-600" />
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{bill.number}</h3>
@@ -461,11 +461,11 @@ function BillDetailPanel({
         </Button>
       </div>
 
-      <div className="p-4 bg-purple-50 border-b border-purple-100">
+      <div className="p-4 bg-green-50 border-b border-green-100">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-purple-600 uppercase font-medium">Bill Total</p>
-            <p className="text-2xl font-bold text-purple-700">
+            <p className="text-xs text-primary uppercase font-medium">Bill Total</p>
+            <p className="text-2xl font-bold text-green-700">
               ₹{parseFloat(bill.total || "0").toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </p>
             {parseFloat(bill.balanceDue || "0") > 0 && (

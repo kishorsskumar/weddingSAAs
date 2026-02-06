@@ -5053,7 +5053,7 @@ const PASTEL_COLORS: Record<string, { bg: string; border: string; badge: string 
   pink: { bg: 'bg-pink-50', border: 'border-pink-200', badge: 'bg-pink-100 text-pink-700' },
   green: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700' },
   yellow: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
-  purple: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
+  purple: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-700' },
   teal: { bg: 'bg-teal-50', border: 'border-teal-200', badge: 'bg-teal-100 text-teal-700' },
   rose: { bg: 'bg-rose-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700' },
@@ -5377,7 +5377,7 @@ function DecorPlanningSection({
     const colors: Record<string, string> = {
       in_stock: 'bg-green-100 text-green-700',
       to_buy: 'bg-blue-100 text-blue-700',
-      to_rent: 'bg-purple-100 text-purple-700',
+      to_rent: 'bg-green-100 text-green-700',
     };
     const labels: Record<string, string> = { in_stock: 'In Stock', to_buy: 'To Buy', to_rent: 'To Rent' };
     return <Badge className={colors[source] || 'bg-gray-100 text-gray-700'}>{labels[source] || source}</Badge>;

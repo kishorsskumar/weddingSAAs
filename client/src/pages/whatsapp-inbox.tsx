@@ -164,7 +164,7 @@ export default function WhatsappInbox() {
                           {approval.type === 'expense' ? (
                             <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                           ) : (
-                            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
                           )}
                           <span className="truncate">{approval.approvalCode}</span>
                           <Badge variant="outline" className="text-xs">
@@ -245,7 +245,7 @@ export default function WhatsappInbox() {
                         {approval.type === 'expense' ? (
                           <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                          <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0 mt-0.5" />
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm sm:text-base truncate">{approval.approvalCode} - {approval.employeeName}</p>

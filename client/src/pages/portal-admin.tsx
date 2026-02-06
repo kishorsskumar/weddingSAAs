@@ -28,7 +28,7 @@ import type { PortalLead } from "@shared/schema";
 const PHASES = [
   { value: "submitted", label: "Submitted", color: "bg-blue-100 text-blue-800" },
   { value: "contacted", label: "Contacted", color: "bg-yellow-100 text-yellow-800" },
-  { value: "meeting_scheduled", label: "Meeting Scheduled", color: "bg-purple-100 text-purple-800" },
+  { value: "meeting_scheduled", label: "Meeting Scheduled", color: "bg-green-100 text-green-800" },
   { value: "proposal_sent", label: "Proposal Sent", color: "bg-indigo-100 text-indigo-800" },
   { value: "negotiation", label: "Negotiation", color: "bg-orange-100 text-orange-800" },
   { value: "converted", label: "Converted", color: "bg-green-100 text-green-800" },

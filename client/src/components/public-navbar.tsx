@@ -105,7 +105,7 @@ export function PublicNavbar() {
                   </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                  <Button size="sm" className="bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800">
                     Start Free Trial
                   </Button>
                 </Link>
@@ -173,7 +173,7 @@ export function PublicNavbar() {
                       </Button>
                     </Link>
                     <Link href="/signup">
-                      <Button size="sm" className="w-full bg-gradient-to-r from-purple-600 to-blue-600">
+                      <Button size="sm" className="w-full bg-gradient-to-r from-green-700 to-emerald-700">
                         Start Free Trial
                       </Button>
                     </Link>

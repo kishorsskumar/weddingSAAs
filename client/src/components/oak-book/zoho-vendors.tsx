@@ -139,7 +139,7 @@ export function ZohoVendors() {
     const colors: Record<string, string> = {
       catering: "bg-orange-50 text-orange-700 border-orange-200",
       decoration: "bg-pink-50 text-pink-700 border-pink-200",
-      photography: "bg-purple-50 text-purple-700 border-purple-200",
+      photography: "bg-green-50 text-green-700 border-green-200",
       venue: "bg-blue-50 text-primary border-blue-200",
       sound: "bg-yellow-50 text-yellow-700 border-yellow-200",
       transport: "bg-green-50 text-green-700 border-green-200",
@@ -233,8 +233,8 @@ export function ZohoVendors() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                        <Building2 className="h-5 w-5 text-purple-600" />
+                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <Building2 className="h-5 w-5 text-primary" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-primary truncate">{vendor.name}</p>
@@ -286,8 +286,8 @@ export function ZohoVendors() {
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center">
-                          <Building2 className="h-4 w-4 text-purple-600" />
+                        <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center">
+                          <Building2 className="h-4 w-4 text-primary" />
                         </div>
                         <div>
                           <span className="text-primary hover:underline font-medium">{vendor.name}</span>
@@ -377,8 +377,8 @@ function VendorDetailPanel({
             <X className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-purple-600" />
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <Building2 className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">{vendor.name}</h3>

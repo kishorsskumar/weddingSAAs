@@ -523,8 +523,8 @@ function DashboardSection({
         <Card>
           <CardContent className="p-3 sm:pt-6 sm:p-6">
             <div className="flex items-center gap-2 sm:gap-4">
-              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
-                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-purple-600" />
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <Clock className="w-4 h-4 sm:w-6 sm:h-6 text-primary" />
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Tasks</p>
@@ -586,11 +586,11 @@ function DashboardSection({
                 <div key={activity.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
                   <div className={`p-2 rounded-lg ${
                     activity.type === 'task' ? 'bg-blue-100' :
-                    activity.type === 'call' ? 'bg-green-100' : 'bg-purple-100'
+                    activity.type === 'call' ? 'bg-green-100' : 'bg-green-100'
                   }`}>
                     {activity.type === 'task' ? <CheckSquare className="w-4 h-4 text-blue-600" /> :
                      activity.type === 'call' ? <Phone className="w-4 h-4 text-green-600" /> :
-                     <Calendar className="w-4 h-4 text-purple-600" />}
+                     <Calendar className="w-4 h-4 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{activity.subject}</p>
@@ -2229,11 +2229,11 @@ function ActivitiesSection({
                 <div className="flex items-start gap-4">
                   <div className={`p-2 rounded-lg ${
                     activity.type === 'task' ? 'bg-blue-100' :
-                    activity.type === 'call' ? 'bg-green-100' : 'bg-purple-100'
+                    activity.type === 'call' ? 'bg-green-100' : 'bg-green-100'
                   }`}>
                     {activity.type === 'task' ? <CheckSquare className="w-5 h-5 text-blue-600" /> :
                      activity.type === 'call' ? <Phone className="w-5 h-5 text-green-600" /> :
-                     <Calendar className="w-5 h-5 text-purple-600" />}
+                     <Calendar className="w-5 h-5 text-primary" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -2515,8 +2515,8 @@ function AutomationsSection({ automations }: { automations: SalesAutomation[] })
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Workflow className="w-5 h-5 text-purple-600" />
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Workflow className="w-5 h-5 text-primary" />
                     </div>
                     <div>
                       <h3 className="font-medium">{automation.name}</h3>
@@ -2662,7 +2662,7 @@ function ReportsSection({
                 </span>
               </div>
               <div className="flex items-center gap-4">
-                <Calendar className="w-5 h-5 text-purple-600" />
+                <Calendar className="w-5 h-5 text-primary" />
                 <span className="flex-1">Meetings</span>
                 <span className="font-medium">
                   {activities.filter(a => a.type === 'meeting').length}

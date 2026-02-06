@@ -264,8 +264,8 @@ export default function ClientPortal() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                          <Presentation className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <Presentation className="w-5 h-5 text-primary" />
                         </div>
                         <div>
                           <CardTitle className="text-lg">Presentation</CardTitle>

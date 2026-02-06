@@ -208,9 +208,9 @@ export default function KnotVitePlanPDF() {
             </ul>
           </div>
 
-          <div className="mb-6 p-4 bg-purple-50 border-l-4 border-purple-500 rounded">
-            <h3 className="text-lg font-semibold text-purple-800">Phase 3: Optional Modules</h3>
-            <p className="text-purple-700 text-sm">Duration: 1-2 weeks | Priority: Low</p>
+          <div className="mb-6 p-4 bg-green-50 border-l-4 border-primary rounded">
+            <h3 className="text-lg font-semibold text-green-800">Phase 3: Optional Modules</h3>
+            <p className="text-green-700 text-sm">Duration: 1-2 weeks | Priority: Low</p>
             <ul className="mt-2 text-gray-700 space-y-1 text-sm">
               <li>• WhatsApp Integration (send RSVP links, reminders, delivery tracking)</li>
               <li>• Super Admin Dashboard (analytics, user management, abuse detection)</li>
@@ -447,11 +447,11 @@ client/src/
                 <td className="border p-2">2 weeks</td>
                 <td className="border p-2 text-blue-700">Medium</td>
               </tr>
-              <tr className="bg-purple-50">
+              <tr className="bg-green-50">
                 <td className="border p-2 font-medium">Phase 3</td>
                 <td className="border p-2">WhatsApp, Super Admin Dashboard</td>
                 <td className="border p-2">1-2 weeks</td>
-                <td className="border p-2 text-purple-700">Low</td>
+                <td className="border p-2 text-green-700">Low</td>
               </tr>
             </tbody>
           </table>

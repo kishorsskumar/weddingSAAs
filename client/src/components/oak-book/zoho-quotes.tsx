@@ -221,7 +221,7 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
       case "declined":
         return "bg-red-100 text-red-700";
       case "converted":
-        return "bg-purple-100 text-purple-700";
+        return "bg-green-100 text-green-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -810,7 +810,7 @@ function QuoteDetailPanel({
       case "declined":
         return "bg-red-100 text-red-700";
       case "converted":
-        return "bg-purple-100 text-purple-700";
+        return "bg-green-100 text-green-700";
       default:
         return "bg-gray-100 text-gray-700";
     }

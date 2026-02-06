@@ -581,7 +581,7 @@ function CustomerDetailPanel({
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium">₹{parseFloat(estimate.total).toLocaleString("en-IN")}</p>
-                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
                           Quote
                         </Badge>
                       </div>

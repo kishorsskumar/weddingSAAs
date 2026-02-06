@@ -163,7 +163,7 @@ export function ZohoExpenses() {
     const colors: Record<string, string> = {
       travel: "bg-blue-50 text-primary border-blue-200",
       food: "bg-orange-50 text-orange-700 border-orange-200",
-      materials: "bg-purple-50 text-purple-700 border-purple-200",
+      materials: "bg-green-50 text-green-700 border-green-200",
       equipment: "bg-green-50 text-green-700 border-green-200",
       labor: "bg-yellow-50 text-yellow-700 border-yellow-200",
       transport: "bg-teal-50 text-teal-700 border-teal-200",

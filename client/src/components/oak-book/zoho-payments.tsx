@@ -197,7 +197,7 @@ export function ZohoPayments() {
     const colors: Record<string, string> = {
       cash: "bg-green-50 text-green-700 border-green-200",
       bank_transfer: "bg-blue-50 text-primary border-blue-200",
-      cheque: "bg-purple-50 text-purple-700 border-purple-200",
+      cheque: "bg-green-50 text-green-700 border-green-200",
       upi: "bg-orange-50 text-orange-700 border-orange-200",
       card: "bg-pink-50 text-pink-700 border-pink-200",
     };

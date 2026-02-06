@@ -1449,12 +1449,12 @@ export default function MyPortal() {
 
                 <div>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Image className="w-5 h-5 text-purple-600" /> Photos
+                    <Image className="w-5 h-5 text-primary" /> Photos
                   </h2>
                   <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
-                      <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Camera className="w-8 h-8 text-purple-400" />
+                      <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Camera className="w-8 h-8 text-green-400" />
                       </div>
                       <p className="font-medium text-gray-600">No photos shared yet</p>
                       <p className="text-sm text-gray-400 mt-1">Event photos will be shared here</p>

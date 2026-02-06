@@ -3248,7 +3248,7 @@ function ManagerApprovalsSection({ isAdmin, approvalTab, setApprovalTab }: { isA
                         approvedPayouts.map((payout: any) => (
                           <TableRow key={`${payout.type}-${payout.id}`} data-testid={`row-approved-payout-${payout.id}`}>
                             <TableCell>
-                              <Badge variant={payout.type === 'expense' ? 'default' : 'secondary'} className={payout.type === 'expense' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}>
+                              <Badge variant={payout.type === 'expense' ? 'default' : 'secondary'} className={payout.type === 'expense' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}>
                                 {payout.type === 'expense' ? 'Expense' : 'Advance'}
                               </Badge>
                             </TableCell>
@@ -3898,7 +3898,7 @@ function ConsolidatedReportSection() {
               <Card className="bg-muted/50">
                 <CardContent className="p-3">
                   <div className="text-xs text-muted-foreground">Expenses</div>
-                  <div className="text-xl font-bold text-purple-600" data-testid="stat-total-expenses">
+                  <div className="text-xl font-bold text-primary" data-testid="stat-total-expenses">
                     ₹{consolidatedReport.summary.totalExpenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </CardContent>

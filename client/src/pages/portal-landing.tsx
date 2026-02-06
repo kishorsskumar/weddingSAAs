@@ -592,9 +592,9 @@ export default function PortalLanding() {
                 href="https://www.instagram.com/oakstreetevent" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="group flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-pink-50 to-purple-50 hover:from-pink-100 hover:to-purple-100 transition-all duration-300 hover:scale-105 hover:shadow-md"
+                className="group flex flex-col items-center p-4 rounded-xl bg-gradient-to-br from-pink-50 to-green-50 hover:from-pink-100 hover:to-green-100 transition-all duration-300 hover:scale-105 hover:shadow-md"
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-green-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Instagram className="w-6 h-6 text-white" />
                 </div>
                 <span className="text-sm font-medium text-gray-700">Instagram</span>
