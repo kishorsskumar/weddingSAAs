@@ -203,10 +203,23 @@ export default function HomePage() {
   const handleDemoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({ title: "Demo request submitted!", description: "We'll contact you within 24 hours." });
-    setDemoFormData({ name: "", companyName: "", email: "", phone: "", businessType: "" });
-    setIsSubmitting(false);
+    try {
+      const res = await fetch("/api/demo-bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(demoFormData),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to submit");
+      }
+      toast({ title: "Demo request submitted!", description: "We'll contact you within 24 hours." });
+      setDemoFormData({ name: "", companyName: "", email: "", phone: "", businessType: "" });
+    } catch (err: any) {
+      toast({ title: "Something went wrong", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -232,13 +245,13 @@ export default function HomePage() {
                 Lead Management, Client Portal, and Event Calendar built for event planners and wedding businesses.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-10">
-                <Link href="/#demo">
+                <Link href="/demo">
                   <Button size="lg" className="w-full sm:w-auto text-base px-8 bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" data-testid="button-hero-demo">
                     Book Live Demo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <Link href="/signup">
+                <Link href="/signup?plan=growth">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5" data-testid="button-hero-trial">
                     Start Free Trial
                   </Button>
@@ -459,7 +472,7 @@ export default function HomePage() {
               Watch Full Demo
               <Play className="ml-2 h-4 w-4" />
             </Button>
-            <Link href="/#demo">
+            <Link href="/demo">
               <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
                 Book Live Demo
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -675,16 +688,23 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <Button 
-                  className={`w-full ${
-                    plan.highlighted 
-                      ? "bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" 
-                      : "border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5"
-                  }`}
-                  variant={plan.highlighted ? "default" : "outline"}
-                >
-                  Get Started
-                </Button>
+                <Link href={
+                  plan.name === "Enterprise" ? "/contact-enterprise" :
+                  plan.name === "Growth" ? "/signup?plan=growth" :
+                  "/signup?plan=starter"
+                }>
+                  <Button 
+                    className={`w-full ${
+                      plan.highlighted 
+                        ? "bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" 
+                        : "border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5"
+                    }`}
+                    variant={plan.highlighted ? "default" : "outline"}
+                    data-testid={`button-pricing-${plan.name.toLowerCase()}`}
+                  >
+                    {plan.name === "Enterprise" ? "Contact Sales" : "Get Started"}
+                  </Button>
+                </Link>
               </motion.div>
             ))}
           </div>
@@ -944,13 +964,13 @@ export default function HomePage() {
               Join hundreds of event professionals who've transformed their business with Atbott
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/signup">
+              <Link href="/signup?plan=growth">
                 <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-[#2FA4BC] hover:bg-gray-50 shadow-sm">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Link href="/#demo">
+              <Link href="/demo">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-10 text-white border-white/40 hover:bg-white/10">
                   Book Demo
                 </Button>

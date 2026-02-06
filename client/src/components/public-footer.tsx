@@ -45,7 +45,7 @@ export function PublicFooter() {
                 <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
               </li>
               <li>
-                <Link href="/#demo" className="hover:text-white transition-colors">Book Demo</Link>
+                <Link href="/demo" className="hover:text-white transition-colors">Book Demo</Link>
               </li>
               <li>
                 <Link href="/signup" className="hover:text-white transition-colors">Start Free Trial</Link>

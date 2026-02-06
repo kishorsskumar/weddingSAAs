@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
-import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured } from "./whatsapp-service";
+import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured, sendAdminWhatsAppNotification } from "./whatsapp-service";
 import { sendPasswordResetEmail } from "./email-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { createGitHubRepo, listUserRepos } from "./github-export";
@@ -994,7 +994,7 @@ export async function registerRoutes(
   // JWT-based signup for new companies
   app.post('/api/auth/signup', async (req, res) => {
     try {
-      const { name, email, password, companyName } = req.body;
+      const { name, email, password, companyName, plan } = req.body;
       
       if (!name || !email || !password || !companyName) {
         return res.status(400).json({ error: 'All fields are required' });
@@ -1023,6 +1023,57 @@ export async function registerRoutes(
         companyId: company.id,
         createdVia: 'signup',
       });
+
+      // Determine plan and create subscription
+      const selectedPlan = plan || 'growth';
+      const isTrialPlan = selectedPlan === 'growth' || selectedPlan === 'trial_growth';
+      const planName = isTrialPlan ? 'trial_growth' : selectedPlan;
+      const now = new Date();
+      const trialEnd = new Date(now);
+      trialEnd.setDate(trialEnd.getDate() + 14);
+
+      try {
+        await storage.createSubscription({
+          companyId: company.id,
+          planName,
+          status: isTrialPlan ? 'active' : 'active',
+          startDate: now,
+          endDate: isTrialPlan ? trialEnd : null,
+        });
+      } catch (subErr) {
+        console.error('[Signup] Subscription creation error (non-fatal):', subErr);
+      }
+
+      // Create CRM lead entry
+      try {
+        await storage.createCrmLead({
+          name,
+          email,
+          companyName,
+          source: 'Free Trial',
+          status: 'new',
+          planInterest: planName,
+        });
+      } catch (crmErr) {
+        console.error('[Signup] CRM lead creation error (non-fatal):', crmErr);
+      }
+
+      // Send WhatsApp notification to Super Admin (non-blocking)
+      (async () => {
+        try {
+          const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+          const message = `🎉 New Trial Signup – Atbott SaaS\n\nName: ${name}\nEmail: ${email}\nCompany: ${companyName}\nPlan: ${isTrialPlan ? '14-Day Growth Trial' : planName}\nSignup Time: ${timestamp}`;
+          
+          const result = await sendAdminWhatsAppNotification(message);
+          await storage.createAdminNotification({
+            type: 'signup',
+            payload: JSON.stringify({ name, email, companyName, plan: planName }),
+            status: result.success ? 'sent' : 'failed',
+          });
+        } catch (err) {
+          console.error('[Signup] Admin notification error (non-fatal):', err);
+        }
+      })();
       
       // Generate JWT token
       const token = jwt.sign(
@@ -1044,7 +1095,6 @@ export async function registerRoutes(
       req.session.save((err) => {
         if (err) {
           console.error('[Auth] Signup session save error (non-fatal, JWT still valid):', err);
-          // Don't block signup - JWT is primary auth, session is backup
         }
         
         res.json({
@@ -1069,6 +1119,123 @@ export async function registerRoutes(
     }
   });
   
+  // Public: Demo Booking
+  app.post('/api/demo-bookings', async (req, res) => {
+    try {
+      const { name, companyName, email, phone, businessType, preferredDate, preferredTime } = req.body;
+
+      if (!name || !companyName || !email || !phone) {
+        return res.status(400).json({ error: 'Name, company, email, and phone are required' });
+      }
+
+      const booking = await storage.createDemoBooking({
+        name,
+        companyName,
+        email,
+        phone,
+        businessType: businessType || null,
+        preferredDate: preferredDate || null,
+        preferredTime: preferredTime || null,
+        status: 'pending',
+      });
+
+      // Create CRM lead
+      try {
+        await storage.createCrmLead({
+          name,
+          email,
+          phone,
+          companyName,
+          source: 'Demo Booking',
+          status: 'new',
+          metadata: JSON.stringify({ businessType, preferredDate, preferredTime }),
+        });
+      } catch (crmErr) {
+        console.error('[Demo] CRM lead creation error (non-fatal):', crmErr);
+      }
+
+      // Send WhatsApp to admin (non-blocking)
+      (async () => {
+        try {
+          const message = `🚀 New Demo Booked – Atbott SaaS\n\nName: ${name}\nCompany: ${companyName}\nEmail: ${email}\nPhone: ${phone}\nBusiness Type: ${businessType || 'Not specified'}\nDate: ${preferredDate || 'Not specified'}\nTime: ${preferredTime || 'Not specified'}\n\nPlease follow up if required.`;
+          
+          const result = await sendAdminWhatsAppNotification(message);
+          await storage.createAdminNotification({
+            type: 'demo',
+            payload: JSON.stringify({ name, companyName, email, phone, businessType, preferredDate, preferredTime }),
+            status: result.success ? 'sent' : 'failed',
+          });
+        } catch (err) {
+          console.error('[Demo] Admin notification error (non-fatal):', err);
+        }
+      })();
+
+      res.json({ success: true, booking });
+    } catch (error) {
+      console.error('Demo booking error:', error);
+      res.status(500).json({ error: 'Failed to submit demo booking' });
+    }
+  });
+
+  // Public: Enterprise Lead
+  app.post('/api/enterprise-leads', async (req, res) => {
+    try {
+      const { companyName, teamSize, eventsPerMonth, integrationNeeds, whatsappVolume, contactName, contactEmail, contactPhone } = req.body;
+
+      if (!companyName) {
+        return res.status(400).json({ error: 'Company name is required' });
+      }
+
+      const lead = await storage.createEnterpriseLead({
+        companyName,
+        teamSize: teamSize || null,
+        eventsPerMonth: eventsPerMonth || null,
+        integrationNeeds: integrationNeeds || null,
+        whatsappVolume: whatsappVolume || null,
+        contactName: contactName || null,
+        contactEmail: contactEmail || null,
+        contactPhone: contactPhone || null,
+        status: 'new',
+      });
+
+      // Create CRM lead
+      try {
+        await storage.createCrmLead({
+          name: contactName || companyName,
+          email: contactEmail,
+          phone: contactPhone,
+          companyName,
+          source: 'Enterprise Inquiry',
+          status: 'new',
+          metadata: JSON.stringify({ teamSize, eventsPerMonth, integrationNeeds, whatsappVolume }),
+        });
+      } catch (crmErr) {
+        console.error('[Enterprise] CRM lead creation error (non-fatal):', crmErr);
+      }
+
+      // Send WhatsApp to admin (non-blocking)
+      (async () => {
+        try {
+          const message = `🏢 Enterprise Inquiry – Atbott SaaS\n\nCompany: ${companyName}\nContact: ${contactName || 'Not provided'}\nEmail: ${contactEmail || 'Not provided'}\nTeam Size: ${teamSize || 'Not specified'}\nEvents/Month: ${eventsPerMonth || 'Not specified'}\nIntegration Needs: ${integrationNeeds || 'Not specified'}`;
+          
+          const result = await sendAdminWhatsAppNotification(message);
+          await storage.createAdminNotification({
+            type: 'enterprise',
+            payload: JSON.stringify({ companyName, teamSize, eventsPerMonth, integrationNeeds, contactName, contactEmail }),
+            status: result.success ? 'sent' : 'failed',
+          });
+        } catch (err) {
+          console.error('[Enterprise] Admin notification error (non-fatal):', err);
+        }
+      })();
+
+      res.json({ success: true, lead });
+    } catch (error) {
+      console.error('Enterprise lead error:', error);
+      res.status(500).json({ error: 'Failed to submit enterprise inquiry' });
+    }
+  });
+
   // Session-based login (existing)
   app.post('/api/auth/login', async (req, res) => {
     try {

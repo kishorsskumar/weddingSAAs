@@ -22,7 +22,7 @@ export function PublicNavbar() {
     { href: "/#product", label: "Product" },
     { href: "/#features", label: "Features" },
     { href: "/pricing", label: "Pricing" },
-    { href: "/#demo", label: "Demo" },
+    { href: "/demo", label: "Demo" },
   ];
 
   const isActive = (href: string) => {
@@ -100,7 +100,7 @@ export function PublicNavbar() {
                     Login
                   </Button>
                 </Link>
-                <Link href="/#demo">
+                <Link href="/demo">
                   <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/5">
                     Book Demo
                   </Button>
@@ -168,7 +168,7 @@ export function PublicNavbar() {
                         Login
                       </Button>
                     </Link>
-                    <Link href="/#demo">
+                    <Link href="/demo">
                       <Button variant="outline" size="sm" className="w-full border-primary text-primary">
                         Book Demo
                       </Button>

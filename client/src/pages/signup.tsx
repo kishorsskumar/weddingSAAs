@@ -3,12 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocation, Link } from "wouter";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Building2, Mail, Lock, User } from "lucide-react";
 import { GlobalFooter } from "@/components/global-footer";
 import { PublicNavbar } from "@/components/public-navbar";
 import atbottLogo from "@/assets/atbott-logo.png";
+
+const planLabels: Record<string, string> = {
+  starter: "Starter Plan",
+  growth: "14-Day Growth Trial",
+  trial_growth: "14-Day Growth Trial",
+  enterprise: "Enterprise Plan",
+};
 
 export default function Signup() {
   const { signup, user, isLoading } = useAuth();
@@ -19,6 +26,11 @@ export default function Signup() {
   const [companyName, setCompanyName] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const plan = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("plan") || "growth";
+  }, []);
 
   useEffect(() => {
     if (user) setLocation("/dashboard");
@@ -35,7 +47,7 @@ export default function Signup() {
     
     setSubmitting(true);
     try {
-      await signup(name, email, password, companyName);
+      await signup(name, email, password, companyName, plan);
     } catch (err: any) {
       setError(err.message || "Signup failed");
     } finally {
@@ -103,6 +115,11 @@ export default function Signup() {
           >
             <h2 className="text-2xl font-bold text-foreground mb-2">Create Your Account</h2>
             <p className="text-muted-foreground">Start managing your events today</p>
+            {planLabels[plan] && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-[#2FA4BC]/10 text-[#1e7a8c] px-3 py-1.5 rounded-full text-sm font-medium">
+                {planLabels[plan]}
+              </div>
+            )}
           </motion.div>
 
           {error && (

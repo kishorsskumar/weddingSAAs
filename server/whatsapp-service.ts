@@ -258,3 +258,34 @@ export async function sendQuickWhatsAppMessage(
     return { jobId: '', success: false, error: error.message };
   }
 }
+
+export async function sendAdminWhatsAppNotification(message: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const adminNumber = process.env.SUPERADMIN_WHATSAPP_NUMBER;
+    if (!adminNumber) {
+      console.log('[WhatsApp] SUPERADMIN_WHATSAPP_NUMBER not configured');
+      return { success: false, error: 'Admin WhatsApp number not configured' };
+    }
+
+    const client = getTwilioClient();
+    if (!client || !fromNumber) {
+      console.log('[WhatsApp] Twilio not configured for admin notifications');
+      return { success: false, error: 'WhatsApp not configured' };
+    }
+
+    const to = formatPhoneForWhatsApp(adminNumber);
+    const from = `whatsapp:${fromNumber}`;
+
+    await client.messages.create({
+      body: message,
+      from,
+      to,
+    });
+
+    console.log('[WhatsApp] Admin notification sent successfully');
+    return { success: true };
+  } catch (error: any) {
+    console.error('[WhatsApp] Failed to send admin notification:', error.message);
+    return { success: false, error: error.message };
+  }
+}

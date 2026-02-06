@@ -40,6 +40,9 @@ import Terms from "@/pages/terms";
 import RefundPolicy from "@/pages/refund-policy";
 import Contact from "@/pages/contact";
 import Pricing from "@/pages/pricing";
+import DemoPage from "@/pages/demo";
+import DemoConfirmation from "@/pages/demo-confirmation";
+import ContactEnterprise from "@/pages/contact-enterprise";
 import KnotVitePlanPDF from "@/pages/knotvite-plan-pdf";
 import KnotViteForms from "@/pages/knotvite-forms";
 import KnotViteSubmissions from "@/pages/knotvite-submissions";
@@ -187,6 +190,9 @@ function PublicPages() {
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/signup" component={Signup} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/demo" component={DemoPage} />
+        <Route path="/demo-confirmation" component={DemoConfirmation} />
+        <Route path="/contact-enterprise" component={ContactEnterprise} />
         <Route path="/privacy-policy" component={PrivacyPolicy} />
         <Route path="/terms" component={Terms} />
         <Route path="/refund-policy" component={RefundPolicy} />
