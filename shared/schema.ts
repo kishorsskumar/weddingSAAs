@@ -2871,3 +2871,75 @@ export const eventVendorCosts = pgTable("event_vendor_costs", {
 export const insertEventVendorCostSchema = createInsertSchema(eventVendorCosts).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEventVendorCost = z.infer<typeof insertEventVendorCostSchema>;
 export type EventVendorCost = typeof eventVendorCosts.$inferSelect;
+
+// Demo Bookings
+export const demoBookings = pgTable("demo_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  companyName: text("company_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone").notNull(),
+  businessType: text("business_type"),
+  preferredDate: text("preferred_date"),
+  preferredTime: text("preferred_time"),
+  status: text("status").notNull().default('pending'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDemoBookingSchema = createInsertSchema(demoBookings).omit({ id: true, createdAt: true });
+export type InsertDemoBooking = z.infer<typeof insertDemoBookingSchema>;
+export type DemoBooking = typeof demoBookings.$inferSelect;
+
+// Enterprise Leads
+export const enterpriseLeads = pgTable("enterprise_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyName: text("company_name").notNull(),
+  teamSize: text("team_size"),
+  eventsPerMonth: text("events_per_month"),
+  integrationNeeds: text("integration_needs"),
+  whatsappVolume: text("whatsapp_volume"),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  status: text("status").notNull().default('new'),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEnterpriseLeadSchema = createInsertSchema(enterpriseLeads).omit({ id: true, createdAt: true });
+export type InsertEnterpriseLead = z.infer<typeof insertEnterpriseLeadSchema>;
+export type EnterpriseLead = typeof enterpriseLeads.$inferSelect;
+
+// CRM Leads
+export const crmLeads = pgTable("crm_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  companyName: text("company_name"),
+  source: text("source").notNull(),
+  status: text("status").notNull().default('new'),
+  planInterest: text("plan_interest"),
+  notes: text("notes"),
+  metadata: text("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCrmLeadSchema = createInsertSchema(crmLeads).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCrmLead = z.infer<typeof insertCrmLeadSchema>;
+export type CrmLead = typeof crmLeads.$inferSelect;
+
+// Admin Notifications
+export const adminNotifications = pgTable("admin_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: text("type").notNull(),
+  payload: text("payload").notNull(),
+  status: text("status").notNull().default('pending'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAdminNotificationSchema = createInsertSchema(adminNotifications).omit({ id: true, createdAt: true });
+export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
+export type AdminNotification = typeof adminNotifications.$inferSelect;

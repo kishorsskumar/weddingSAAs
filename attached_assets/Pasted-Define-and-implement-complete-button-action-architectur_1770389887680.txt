@@ -1,0 +1,255 @@
+Define and implement complete button action architecture for Atbott SaaS.
+
+IMPORTANT:
+Do NOT redesign UI.
+Do NOT change layout.
+Only implement routing logic, action handlers, and backend workflows.
+Maintain existing React + Supabase structure.
+
+--------------------------------------------------
+GLOBAL OBJECTIVE
+
+Every button on homepage must have:
+
+1. Clear routing
+2. Clear backend trigger
+3. Clear plan logic
+4. Clear conversion flow
+
+--------------------------------------------------
+PRIMARY CONVERSION BUTTONS
+
+--------------------------------------------------
+1. START FREE TRIAL (Hero + Pricing + Final CTA)
+
+Route to:
+ /auth/signup
+
+Flow:
+
+1. User enters email
+2. OTP verification
+3. Auto-create new account
+4. Auto-assign 14-day Growth plan trial
+5. Create tenant workspace
+6. Redirect to onboarding flow
+
+Backend actions after successful signup:
+
+• Create user record
+• Create tenant record
+• Assign plan = "trial_growth"
+• Trial expiry = current_date + 14 days
+• Create CRM lead entry with source = "Free Trial"
+
+Also trigger:
+Send WhatsApp notification to Super Admin:
+
+Message:
+"🎉 New Trial Signup – Atbott SaaS
+
+Name: {{name}}
+Email: {{email}}
+Plan: 14-Day Growth Trial
+Signup Time: {{timestamp}}"
+
+Do NOT block user flow if WhatsApp fails.
+
+--------------------------------------------------
+2. BOOK DEMO (Hero + Navbar + CTA Section)
+
+Route to:
+ /demo
+
+Demo Page Must Include:
+
+• Name
+• Company Name
+• Email
+• Phone
+• Business Type
+• Preferred Date
+• Preferred Time
+
+On form submission:
+
+1. Save record in demo_bookings table
+2. Create CRM lead entry with source = "Demo Booking"
+3. Send confirmation email to user
+4. Send WhatsApp notification to Super Admin
+
+WhatsApp Message:
+
+"🚀 New Demo Booked – Atbott SaaS
+
+Name: {{name}}
+Company: {{company}}
+Email: {{email}}
+Phone: {{phone}}
+Business Type: {{business_type}}
+Date: {{date}}
+Time: {{time}}"
+
+Redirect user to:
+ /demo-confirmation
+
+--------------------------------------------------
+SECONDARY ENGAGEMENT BUTTONS
+
+--------------------------------------------------
+3. WATCH FULL DEMO
+
+Action:
+Open modal popup with embedded video.
+
+Inside modal include CTA:
+"Start Free Trial"
+
+Do NOT redirect page.
+
+--------------------------------------------------
+4. VIEW FULL PRICING
+
+Route to:
+ /pricing
+
+--------------------------------------------------
+PRICING CARD BUTTONS
+
+--------------------------------------------------
+STARTER – GET STARTED
+
+Route to:
+ /auth/signup?plan=starter
+
+After signup:
+Assign plan = starter
+No trial
+Limit event count = 10
+Team limit = 1
+
+--------------------------------------------------
+GROWTH – GET STARTED
+
+Route to:
+ /auth/signup?plan=growth
+
+After signup:
+Assign plan = growth_trial
+Trial duration = 14 days
+Full feature access during trial
+
+--------------------------------------------------
+ENTERPRISE – CONTACT SALES
+
+Route to:
+ /contact-enterprise
+
+Form fields:
+Company Name
+Team Size
+Estimated Events per Month
+Integration Needs
+WhatsApp Usage Volume
+
+On submission:
+
+1. Save to enterprise_leads table
+2. Create CRM lead entry source = "Enterprise Inquiry"
+3. Send WhatsApp notification to Super Admin
+
+Message:
+
+"🏢 Enterprise Inquiry – Atbott SaaS
+
+Company: {{company}}
+Team Size: {{team_size}}
+Events/Month: {{events}}
+Integration Needs: {{integration}}"
+
+--------------------------------------------------
+NAVIGATION BUTTONS
+
+--------------------------------------------------
+Product → Scroll to features section
+Features → Route to /features
+Pricing → Route to /pricing
+Demo → Route to /demo
+Login → Route to /auth/login
+
+--------------------------------------------------
+ONBOARDING FLOW AFTER SIGNUP
+
+Step 1: Business Type
+Step 2: Team Size
+Step 3: Create First Event
+Step 4: Add First Lead
+
+After completion:
+Redirect to dashboard.
+
+--------------------------------------------------
+PLAN RESTRICTION LOGIC
+
+Starter:
+• Max 10 active events
+• 1 team member
+• No payment tracking
+• No WhatsApp integration
+
+Growth:
+• Unlimited events
+• 5 team members
+• Payment tracking enabled
+• No WhatsApp integration
+
+Enterprise:
+• Unlimited everything
+• WhatsApp integration enabled
+• API access enabled
+
+--------------------------------------------------
+DATABASE TABLES REQUIRED
+
+demo_bookings
+enterprise_leads
+admin_notifications
+crm_leads
+
+Ensure proper foreign keys and tenant isolation.
+
+--------------------------------------------------
+WHATSAPP CONFIG
+
+Use backend only.
+Store admin number in ENV:
+
+SUPERADMIN_WHATSAPP_NUMBER
+
+Log all admin notifications in:
+admin_notifications table
+
+Fields:
+- id
+- type (demo/signup/enterprise)
+- payload (JSON)
+- status (sent/failed)
+- created_at
+
+--------------------------------------------------
+SECURITY REQUIREMENTS
+
+• Do not expose API keys in frontend
+• Validate all forms
+• Handle errors gracefully
+• Do not block user flow on notification failure
+
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+
+Implement routing logic.
+Implement backend triggers.
+Maintain UI structure.
+Maintain Supabase compatibility.
+Maintain multi-tenant isolation.
+Ensure production-ready implementation.
