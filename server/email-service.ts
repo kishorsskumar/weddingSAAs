@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { storage } from './storage';
 
 let connectionSettings: any;
 
@@ -87,5 +88,148 @@ export async function sendPasswordResetEmail(toEmail: string, resetToken: string
   } catch (error) {
     console.error('[Email] Failed to send password reset email:', error);
     throw error;
+  }
+}
+
+export async function sendDemoConfirmationEmail(toEmail: string, name: string, preferredDate?: string | null, preferredTime?: string | null): Promise<{ success: boolean }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    
+    const dateDisplay = preferredDate || 'To be confirmed';
+    const timeDisplay = preferredTime || 'To be confirmed';
+
+    const result = await client.emails.send({
+      from: fromEmail || 'noreply@resend.dev',
+      to: toEmail,
+      subject: 'Your Atbott Demo is Confirmed',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #2FA4BC 0%, #258da2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Atbott</h1>
+            <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 14px;">Wedding SaaS Platform</p>
+          </div>
+          <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+            <h2 style="color: #333; margin-top: 0;">Demo Confirmed!</h2>
+            <p>Hi ${name},</p>
+            <p>Your demo booking has been received. Here are your details:</p>
+            <div style="background: #f8fafb; border-left: 4px solid #2FA4BC; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 24px 0;">
+              <p style="margin: 4px 0; font-size: 15px;"><strong>Date:</strong> ${dateDisplay}</p>
+              <p style="margin: 4px 0; font-size: 15px;"><strong>Time:</strong> ${timeDisplay}</p>
+            </div>
+            <p>Our team will contact you shortly to confirm the schedule and share the meeting link.</p>
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">– Team Atbott</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log('[Email] Demo confirmation sent to:', toEmail, 'Result:', result);
+    
+    await storage.createEmailLog({
+      recipient: toEmail,
+      type: 'demo_confirmation',
+      status: 'sent',
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Email] Failed to send demo confirmation:', error);
+    
+    try {
+      await storage.createEmailLog({
+        recipient: toEmail,
+        type: 'demo_confirmation',
+        status: 'failed',
+        errorMessage: error?.message || 'Unknown error',
+      });
+    } catch (logErr) {
+      console.error('[Email] Failed to log email error:', logErr);
+    }
+
+    return { success: false };
+  }
+}
+
+export async function sendSignupWelcomeEmail(toEmail: string, name: string, companyName: string, plan: string): Promise<{ success: boolean }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+
+    const result = await client.emails.send({
+      from: fromEmail || 'noreply@resend.dev',
+      to: toEmail,
+      subject: 'Welcome to Atbott - Your Account is Ready!',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #2FA4BC 0%, #258da2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Welcome to Atbott!</h1>
+          </div>
+          <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+            <p>Hi ${name},</p>
+            <p>Your account for <strong>${companyName}</strong> has been created successfully on the <strong>${plan}</strong> plan.</p>
+            <p>You can now log in and start managing your events.</p>
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">– Team Atbott</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log('[Email] Signup welcome sent to:', toEmail);
+    await storage.createEmailLog({ recipient: toEmail, type: 'signup_welcome', status: 'sent' });
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Email] Failed to send signup welcome:', error);
+    try { await storage.createEmailLog({ recipient: toEmail, type: 'signup_welcome', status: 'failed', errorMessage: error?.message }); } catch {}
+    return { success: false };
+  }
+}
+
+export async function sendEnterpriseAcknowledgmentEmail(toEmail: string, contactName: string, companyName: string): Promise<{ success: boolean }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+
+    const result = await client.emails.send({
+      from: fromEmail || 'noreply@resend.dev',
+      to: toEmail,
+      subject: 'Atbott Enterprise - We Received Your Inquiry',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #2FA4BC 0%, #258da2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Atbott Enterprise</h1>
+          </div>
+          <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+            <p>Hi ${contactName},</p>
+            <p>Thank you for your interest in Atbott Enterprise for <strong>${companyName}</strong>.</p>
+            <p>Our team will reach out within 24 hours to discuss your requirements and schedule a personalized demo.</p>
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">– Team Atbott</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log('[Email] Enterprise acknowledgment sent to:', toEmail);
+    await storage.createEmailLog({ recipient: toEmail, type: 'enterprise_acknowledgment', status: 'sent' });
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Email] Failed to send enterprise acknowledgment:', error);
+    try { await storage.createEmailLog({ recipient: toEmail, type: 'enterprise_acknowledgment', status: 'failed', errorMessage: error?.message }); } catch {}
+    return { success: false };
   }
 }

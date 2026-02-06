@@ -7,7 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured, sendAdminWhatsAppNotification } from "./whatsapp-service";
-import { sendPasswordResetEmail } from "./email-service";
+import { sendPasswordResetEmail, sendDemoConfirmationEmail, sendSignupWelcomeEmail, sendEnterpriseAcknowledgmentEmail } from "./email-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { createGitHubRepo, listUserRepos } from "./github-export";
 import { 
@@ -30,6 +30,9 @@ import {
   customerCreationLogs,
   insertCompanySchema,
   type InsertEventMilestone,
+  users,
+  oaksyConversations,
+  oaksyMessages,
 } from "@shared/schema";
 import { db } from "./db";
 import { sql, eq, and, gte, like, or, desc } from "drizzle-orm";
@@ -901,7 +904,7 @@ export async function registerRoutes(
   // Health check endpoint for debugging
   app.get('/api/health', async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const allUsers = await storage.getAllUsers();
       const roles = await storage.getAllRoles();
       
       // Also check session
@@ -914,7 +917,7 @@ export async function registerRoutes(
       res.json({
         status: 'ok',
         database: 'connected',
-        userCount: users.length,
+        userCount: allUsers.length,
         roleCount: roles.length,
         sessionUserId: sessionUserId || null,
         sessionUserEmail: sessionUser?.email || null,
@@ -1058,20 +1061,60 @@ export async function registerRoutes(
         console.error('[Signup] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // Send WhatsApp notification to Super Admin (non-blocking)
+      // System notification + welcome email (non-blocking)
       (async () => {
         try {
           const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-          const message = `🎉 New Trial Signup – Atbott SaaS\n\nName: ${name}\nEmail: ${email}\nCompany: ${companyName}\nPlan: ${isTrialPlan ? '14-Day Growth Trial' : planName}\nSignup Time: ${timestamp}`;
-          
-          const result = await sendAdminWhatsAppNotification(message);
-          await storage.createAdminNotification({
-            type: 'signup',
-            payload: JSON.stringify({ name, email, companyName, plan: planName }),
-            status: result.success ? 'sent' : 'failed',
+          await storage.createSystemNotification({
+            eventType: 'trial_signup',
+            title: '🎉 New Trial Signup',
+            message: `New trial signup by ${name} (${companyName}). Plan: ${isTrialPlan ? '14-Day Growth Trial' : planName}. Time: ${timestamp}.`,
+            payload: { name, email, companyName, plan: planName, userId: user.id, companyId: company.id },
+            isRead: false,
+            createdBy: 'system',
           });
+          console.log('[Signup] System notification created');
         } catch (err) {
-          console.error('[Signup] Admin notification error (non-fatal):', err);
+          console.error('[Signup] System notification error (non-fatal):', err);
+        }
+
+        // Send welcome email
+        try {
+          await sendSignupWelcomeEmail(email, name, companyName, isTrialPlan ? '14-Day Growth Trial' : planName);
+          console.log('[Signup] Welcome email sent to:', email);
+        } catch (emailErr) {
+          console.error('[Signup] Email error (non-fatal):', emailErr);
+        }
+
+        // AI chatbot message for superadmin
+        try {
+          const superadmins = await db.select().from(users).where(eq(users.role, 'superadmin'));
+          for (const admin of superadmins) {
+            const [conversation] = await db.select().from(oaksyConversations)
+              .where(eq(oaksyConversations.userId, admin.id))
+              .orderBy(desc(oaksyConversations.updatedAt))
+              .limit(1);
+            
+            let convId = conversation?.id;
+            if (!convId) {
+              const [newConv] = await db.insert(oaksyConversations).values({
+                userId: admin.id,
+                title: 'System Notifications',
+                department: 'general',
+              }).returning();
+              convId = newConv.id;
+            }
+            
+            await db.insert(oaksyMessages).values({
+              conversationId: convId,
+              role: 'assistant',
+              content: `New trial signup by ${name} (${companyName}).\nPlan: ${isTrialPlan ? '14-Day Growth Trial' : planName}. You may review and assign follow-up.`,
+              metadata: { source: 'system', eventType: 'trial_signup', userId: user.id },
+            });
+            console.log('[Signup] AI chatbot message created for superadmin:', admin.id);
+          }
+        } catch (aiErr) {
+          console.error('[Signup] AI chatbot message error (non-fatal):', aiErr);
         }
       })();
       
@@ -1123,8 +1166,10 @@ export async function registerRoutes(
   app.post('/api/demo-bookings', async (req, res) => {
     try {
       const { name, companyName, email, phone, businessType, preferredDate, preferredTime } = req.body;
+      console.log('[Demo] Received booking request:', { name, companyName, email, phone, businessType, preferredDate, preferredTime });
 
       if (!name || !companyName || !email || !phone) {
+        console.log('[Demo] Validation failed: missing required fields');
         return res.status(400).json({ error: 'Name, company, email, and phone are required' });
       }
 
@@ -1138,8 +1183,9 @@ export async function registerRoutes(
         preferredTime: preferredTime || null,
         status: 'pending',
       });
+      console.log('[Demo] Booking created successfully, ID:', booking.id);
 
-      // Create CRM lead
+      // Create CRM lead (non-blocking)
       try {
         await storage.createCrmLead({
           name,
@@ -1150,29 +1196,70 @@ export async function registerRoutes(
           status: 'new',
           metadata: JSON.stringify({ businessType, preferredDate, preferredTime }),
         });
+        console.log('[Demo] CRM lead created');
       } catch (crmErr) {
         console.error('[Demo] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // Send WhatsApp to admin (non-blocking)
+      // System notification for admin (non-blocking)
       (async () => {
         try {
-          const message = `🚀 New Demo Booked – Atbott SaaS\n\nName: ${name}\nCompany: ${companyName}\nEmail: ${email}\nPhone: ${phone}\nBusiness Type: ${businessType || 'Not specified'}\nDate: ${preferredDate || 'Not specified'}\nTime: ${preferredTime || 'Not specified'}\n\nPlease follow up if required.`;
-          
-          const result = await sendAdminWhatsAppNotification(message);
-          await storage.createAdminNotification({
-            type: 'demo',
-            payload: JSON.stringify({ name, companyName, email, phone, businessType, preferredDate, preferredTime }),
-            status: result.success ? 'sent' : 'failed',
+          await storage.createSystemNotification({
+            eventType: 'demo_booking',
+            title: '🚀 New Demo Booked',
+            message: `New demo booked by ${name} from ${companyName} on ${preferredDate || 'TBD'} at ${preferredTime || 'TBD'}.`,
+            payload: { name, companyName, email, phone, businessType, preferredDate, preferredTime, bookingId: booking.id },
+            isRead: false,
+            createdBy: 'system',
           });
+          console.log('[Demo] System notification created');
         } catch (err) {
-          console.error('[Demo] Admin notification error (non-fatal):', err);
+          console.error('[Demo] System notification error (non-fatal):', err);
+        }
+
+        // Send confirmation email (non-blocking)
+        try {
+          await sendDemoConfirmationEmail(email, name, preferredDate, preferredTime);
+          console.log('[Demo] Confirmation email sent to:', email);
+        } catch (emailErr) {
+          console.error('[Demo] Email error (non-fatal):', emailErr);
+        }
+
+        // Create AI chatbot message for superadmin
+        try {
+          const superadmins = await db.select().from(users).where(eq(users.role, 'superadmin'));
+          for (const admin of superadmins) {
+            const [conversation] = await db.select().from(oaksyConversations)
+              .where(eq(oaksyConversations.userId, admin.id))
+              .orderBy(desc(oaksyConversations.updatedAt))
+              .limit(1);
+            
+            let convId = conversation?.id;
+            if (!convId) {
+              const [newConv] = await db.insert(oaksyConversations).values({
+                userId: admin.id,
+                title: 'System Notifications',
+                department: 'general',
+              }).returning();
+              convId = newConv.id;
+            }
+            
+            await db.insert(oaksyMessages).values({
+              conversationId: convId,
+              role: 'assistant',
+              content: `New demo booked by ${name} (${companyName}).\nYou may review and assign follow-up.`,
+              metadata: { source: 'system', eventType: 'demo_booking', bookingId: booking.id },
+            });
+            console.log('[Demo] AI chatbot message created for superadmin:', admin.id);
+          }
+        } catch (aiErr) {
+          console.error('[Demo] AI chatbot message error (non-fatal):', aiErr);
         }
       })();
 
       res.json({ success: true, booking });
     } catch (error) {
-      console.error('Demo booking error:', error);
+      console.error('[Demo] Booking error:', error);
       res.status(500).json({ error: 'Failed to submit demo booking' });
     }
   });
@@ -1213,26 +1300,137 @@ export async function registerRoutes(
         console.error('[Enterprise] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // Send WhatsApp to admin (non-blocking)
+      // System notification + email (non-blocking)
       (async () => {
         try {
-          const message = `🏢 Enterprise Inquiry – Atbott SaaS\n\nCompany: ${companyName}\nContact: ${contactName || 'Not provided'}\nEmail: ${contactEmail || 'Not provided'}\nTeam Size: ${teamSize || 'Not specified'}\nEvents/Month: ${eventsPerMonth || 'Not specified'}\nIntegration Needs: ${integrationNeeds || 'Not specified'}`;
-          
-          const result = await sendAdminWhatsAppNotification(message);
-          await storage.createAdminNotification({
-            type: 'enterprise',
-            payload: JSON.stringify({ companyName, teamSize, eventsPerMonth, integrationNeeds, contactName, contactEmail }),
-            status: result.success ? 'sent' : 'failed',
+          await storage.createSystemNotification({
+            eventType: 'enterprise_inquiry',
+            title: '🏢 Enterprise Inquiry',
+            message: `Enterprise inquiry from ${contactName || companyName} (${companyName}). Team size: ${teamSize || 'N/A'}, Events/mo: ${eventsPerMonth || 'N/A'}.`,
+            payload: { companyName, teamSize, eventsPerMonth, integrationNeeds, whatsappVolume, contactName, contactEmail, contactPhone, leadId: lead.id },
+            isRead: false,
+            createdBy: 'system',
           });
+          console.log('[Enterprise] System notification created');
         } catch (err) {
-          console.error('[Enterprise] Admin notification error (non-fatal):', err);
+          console.error('[Enterprise] System notification error (non-fatal):', err);
+        }
+
+        // Send acknowledgment email
+        if (contactEmail) {
+          try {
+            await sendEnterpriseAcknowledgmentEmail(contactEmail, contactName || companyName, companyName);
+            console.log('[Enterprise] Acknowledgment email sent to:', contactEmail);
+          } catch (emailErr) {
+            console.error('[Enterprise] Email error (non-fatal):', emailErr);
+          }
+        }
+
+        // AI chatbot message for superadmin
+        try {
+          const superadmins = await db.select().from(users).where(eq(users.role, 'superadmin'));
+          for (const admin of superadmins) {
+            const [conversation] = await db.select().from(oaksyConversations)
+              .where(eq(oaksyConversations.userId, admin.id))
+              .orderBy(desc(oaksyConversations.updatedAt))
+              .limit(1);
+            
+            let convId = conversation?.id;
+            if (!convId) {
+              const [newConv] = await db.insert(oaksyConversations).values({
+                userId: admin.id,
+                title: 'System Notifications',
+                department: 'general',
+              }).returning();
+              convId = newConv.id;
+            }
+            
+            await db.insert(oaksyMessages).values({
+              conversationId: convId,
+              role: 'assistant',
+              content: `Enterprise inquiry from ${contactName || companyName} (${companyName}).\nTeam size: ${teamSize || 'N/A'}. You may review and assign follow-up.`,
+              metadata: { source: 'system', eventType: 'enterprise_inquiry', leadId: lead.id },
+            });
+            console.log('[Enterprise] AI chatbot message created for superadmin:', admin.id);
+          }
+        } catch (aiErr) {
+          console.error('[Enterprise] AI chatbot message error (non-fatal):', aiErr);
         }
       })();
 
       res.json({ success: true, lead });
     } catch (error) {
-      console.error('Enterprise lead error:', error);
+      console.error('[Enterprise] Lead error:', error);
       res.status(500).json({ error: 'Failed to submit enterprise inquiry' });
+    }
+  });
+
+  // System Notifications API (Superadmin only)
+  app.get('/api/system-notifications', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const limit = parseInt(req.query.limit as string) || 50;
+      const notifications = await storage.getSystemNotifications(limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error('[Notifications] Get error:', error);
+      res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.get('/api/system-notifications/unread-count', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const count = await storage.getUnreadSystemNotificationCount();
+      res.json({ count });
+    } catch (error) {
+      console.error('[Notifications] Unread count error:', error);
+      res.status(500).json({ error: 'Failed to fetch unread count' });
+    }
+  });
+
+  app.patch('/api/system-notifications/:id/read', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      await storage.markSystemNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Notifications] Mark read error:', error);
+      res.status(500).json({ error: 'Failed to mark notification as read' });
+    }
+  });
+
+  app.patch('/api/system-notifications/mark-all-read', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      await storage.markAllSystemNotificationsRead();
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[Notifications] Mark all read error:', error);
+      res.status(500).json({ error: 'Failed to mark all notifications as read' });
+    }
+  });
+
+  // Email Logs API (Superadmin only)
+  app.get('/api/email-logs', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const limit = parseInt(req.query.limit as string) || 50;
+      const logs = await storage.getEmailLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error('[Email Logs] Get error:', error);
+      res.status(500).json({ error: 'Failed to fetch email logs' });
     }
   });
 

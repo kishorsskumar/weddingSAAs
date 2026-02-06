@@ -36,7 +36,8 @@ import {
   Image,
   ChevronDown,
   DollarSign,
-  Building2
+  Building2,
+  Rocket
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -184,7 +185,23 @@ const NOTIFICATION_ICONS: Record<string, any> = {
   success: Check,
   warning: AlertTriangle,
   error: AlertCircle,
+  demo_booking: Rocket,
+  trial_signup: Check,
+  enterprise_inquiry: Building2,
 };
+
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  demo_booking: "bg-blue-100 text-blue-600",
+  trial_signup: "bg-green-100 text-green-600",
+  enterprise_inquiry: "bg-purple-100 text-purple-600",
+};
+
+function getAuthHeaders(): HeadersInit {
+  const headers: HeadersInit = {};
+  const token = localStorage.getItem('auth_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 function NotificationBell() {
   const queryClient = useQueryClient();
@@ -192,20 +209,20 @@ function NotificationBell() {
   const [selectedNotification, setSelectedNotification] = useState<any>(null);
 
   const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["/api/notifications/unread-count"],
+    queryKey: ["/api/system-notifications/unread-count"],
     queryFn: async () => {
-      const res = await fetch("/api/notifications/unread-count", { credentials: "include" });
+      const res = await fetch("/api/system-notifications/unread-count", { credentials: "include", headers: getAuthHeaders() });
       if (!res.ok) return 0;
       const data = await res.json();
       return data.count || 0;
     },
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ["/api/notifications"],
+    queryKey: ["/api/system-notifications"],
     queryFn: async () => {
-      const res = await fetch("/api/notifications", { credentials: "include" });
+      const res = await fetch("/api/system-notifications?limit=20", { credentials: "include", headers: getAuthHeaders() });
       if (!res.ok) return [];
       return res.json();
     },
@@ -214,14 +231,29 @@ function NotificationBell() {
 
   const markAsRead = useMutation({
     mutationFn: async (id: string) => {
-      await fetch(`/api/notifications/${id}/read`, {
-        method: "POST",
+      await fetch(`/api/system-notifications/${id}/read`, {
+        method: "PATCH",
         credentials: "include",
+        headers: getAuthHeaders(),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/system-notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/system-notifications"] });
+    },
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: async () => {
+      await fetch("/api/system-notifications/mark-all-read", {
+        method: "PATCH",
+        credentials: "include",
+        headers: getAuthHeaders(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system-notifications/unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/system-notifications"] });
     },
   });
 
@@ -237,15 +269,20 @@ function NotificationBell() {
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#6b9937] text-white text-xs flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#2FA4BC] text-white text-xs flex items-center justify-center">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        <div className="p-3 border-b bg-muted/50">
+        <div className="p-3 border-b bg-muted/50 flex items-center justify-between">
           <h4 className="font-semibold text-sm">Notifications</h4>
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" className="text-xs h-7 text-primary" onClick={() => markAllRead.mutate()} data-testid="button-mark-all-read">
+              Mark all read
+            </Button>
+          )}
         </div>
         <ScrollArea className="h-[300px]">
           {notifications.length === 0 ? (
@@ -255,14 +292,15 @@ function NotificationBell() {
           ) : (
             <div className="divide-y">
               {notifications.map((notification: any) => {
-                const Icon = NOTIFICATION_ICONS[notification.type] || Info;
-                const isUnread = !notification.readAt;
+                const Icon = NOTIFICATION_ICONS[notification.eventType] || Info;
+                const colorClass = EVENT_TYPE_COLORS[notification.eventType] || "bg-blue-100 text-blue-600";
+                const isUnread = !notification.isRead;
                 return (
                   <div
                     key={notification.id}
                     className={cn(
                       "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
-                      isUnread && "bg-[#6b9937]/5"
+                      isUnread && "bg-[#2FA4BC]/5"
                     )}
                     onClick={() => {
                       if (isUnread) {
@@ -274,13 +312,7 @@ function NotificationBell() {
                     data-testid={`notification-item-${notification.id}`}
                   >
                     <div className="flex gap-3">
-                      <div className={cn(
-                        "mt-0.5 p-1.5 rounded-full shrink-0",
-                        notification.type === "success" && "bg-green-100 text-green-600",
-                        notification.type === "warning" && "bg-amber-100 text-amber-600",
-                        notification.type === "error" && "bg-red-100 text-red-600",
-                        notification.type === "info" && "bg-blue-100 text-blue-600"
-                      )}>
+                      <div className={cn("mt-0.5 p-1.5 rounded-full shrink-0", colorClass)}>
                         <Icon className="h-3.5 w-3.5" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -289,7 +321,7 @@ function NotificationBell() {
                             {notification.title}
                           </p>
                           {isUnread && (
-                            <span className="h-2 w-2 rounded-full bg-[#6b9937]" />
+                            <span className="h-2 w-2 rounded-full bg-[#2FA4BC]" />
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
@@ -316,13 +348,10 @@ function NotificationBell() {
             {selectedNotification && (
               <div className={cn(
                 "p-2 rounded-full shrink-0",
-                selectedNotification.type === "success" && "bg-green-100 text-green-600",
-                selectedNotification.type === "warning" && "bg-amber-100 text-amber-600",
-                selectedNotification.type === "error" && "bg-red-100 text-red-600",
-                selectedNotification.type === "info" && "bg-blue-100 text-blue-600"
+                EVENT_TYPE_COLORS[selectedNotification.eventType] || "bg-blue-100 text-blue-600"
               )}>
                 {(() => {
-                  const Icon = NOTIFICATION_ICONS[selectedNotification?.type] || Info;
+                  const Icon = NOTIFICATION_ICONS[selectedNotification?.eventType] || Info;
                   return <Icon className="h-5 w-5" />;
                 })()}
               </div>
@@ -354,7 +383,7 @@ function NotificationBell() {
           )}
           <Button
             onClick={() => setSelectedNotification(null)}
-            className="bg-[#6b9937] hover:bg-[#5a8230]"
+            className="bg-[#2FA4BC] hover:bg-[#2590a6]"
             data-testid="button-close-notification"
           >
             Close

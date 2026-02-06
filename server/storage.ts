@@ -396,6 +396,8 @@ import {
   enterpriseLeads,
   crmLeads,
   adminNotifications,
+  systemNotifications,
+  emailLogs,
   type DemoBooking,
   type InsertDemoBooking,
   type EnterpriseLead,
@@ -404,6 +406,10 @@ import {
   type InsertCrmLead,
   type AdminNotification,
   type InsertAdminNotification,
+  type SystemNotification,
+  type InsertSystemNotification,
+  type EmailLog,
+  type InsertEmailLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -1103,6 +1109,17 @@ export interface IStorage {
   // Admin Notifications
   createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
   getAdminNotifications(): Promise<AdminNotification[]>;
+
+  // System Notifications
+  createSystemNotification(notification: InsertSystemNotification): Promise<SystemNotification>;
+  getSystemNotifications(limit?: number): Promise<SystemNotification[]>;
+  getUnreadSystemNotificationCount(): Promise<number>;
+  markSystemNotificationRead(id: string): Promise<void>;
+  markAllSystemNotificationsRead(): Promise<void>;
+
+  // Email Logs
+  createEmailLog(log: InsertEmailLog): Promise<EmailLog>;
+  getEmailLogs(limit?: number): Promise<EmailLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5883,6 +5900,39 @@ export class DatabaseStorage implements IStorage {
 
   async getAdminNotifications(): Promise<AdminNotification[]> {
     return db.select().from(adminNotifications).orderBy(desc(adminNotifications.createdAt));
+  }
+
+  // System Notifications
+  async createSystemNotification(notification: InsertSystemNotification): Promise<SystemNotification> {
+    const [created] = await db.insert(systemNotifications).values(notification).returning();
+    return created;
+  }
+
+  async getSystemNotifications(limit = 50): Promise<SystemNotification[]> {
+    return db.select().from(systemNotifications).orderBy(desc(systemNotifications.createdAt)).limit(limit);
+  }
+
+  async getUnreadSystemNotificationCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(systemNotifications).where(eq(systemNotifications.isRead, false));
+    return Number(result[0]?.count || 0);
+  }
+
+  async markSystemNotificationRead(id: string): Promise<void> {
+    await db.update(systemNotifications).set({ isRead: true }).where(eq(systemNotifications.id, id));
+  }
+
+  async markAllSystemNotificationsRead(): Promise<void> {
+    await db.update(systemNotifications).set({ isRead: true }).where(eq(systemNotifications.isRead, false));
+  }
+
+  // Email Logs
+  async createEmailLog(log: InsertEmailLog): Promise<EmailLog> {
+    const [created] = await db.insert(emailLogs).values(log).returning();
+    return created;
+  }
+
+  async getEmailLogs(limit = 50): Promise<EmailLog[]> {
+    return db.select().from(emailLogs).orderBy(desc(emailLogs.createdAt)).limit(limit);
   }
 }
 
