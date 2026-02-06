@@ -1,0 +1,112 @@
+Update the Pricing section of the Atbott SaaS homepage.
+
+IMPORTANT:
+Maintain existing layout and UI structure.
+Only update feature lists and pricing logic.
+Keep Atbott teal + white branding.
+Do not redesign card structure.
+
+--------------------------------------------------
+UPDATED PRICING STRUCTURE
+
+STARTER – ₹999/month
+Perfect for solo planners
+
+Features:
+• Up to 10 active events per month
+• Lead Management System
+• Basic Client Portal (view-only timeline + documents)
+• Event Calendar
+• 1 Team Member
+• Email Support
+
+Remove:
+• "Basic CRM" wording
+
+--------------------------------------------------
+
+GROWTH – ₹2,499/month
+For growing businesses (Most Popular)
+
+Features:
+• Unlimited events
+• Full Lead Management System
+• Full Client Portal
+• Event Calendar + Milestone Tracking
+• Client Payment Tracking (Installments & Due Dates)
+• Automated Follow-up Reminders
+• Advanced Analytics Dashboard
+• Custom Branding (Logo in client portal)
+• 5 Team Members
+• Priority Support
+
+IMPORTANT:
+Remove WhatsApp integration from Growth plan.
+
+--------------------------------------------------
+
+ENTERPRISE – Custom Pricing
+For large agencies
+
+Features:
+• Everything in Growth
+• Unlimited Team Members
+• WhatsApp Integration
+• API Access & Custom Integrations
+• Vendor Management Module
+• Multi-Branch Management
+• Advanced Reporting & Data Export
+• Dedicated Account Manager
+• SLA Guarantee
+• Data Migration Assistance
+
+--------------------------------------------------
+
+UI REQUIREMENTS
+
+• Keep Growth plan visually highlighted as "Most Popular"
+• Maintain teal primary button for Growth
+• Keep subtle border for Starter and Enterprise
+• Add small reassurance text below pricing cards:
+
+Under Growth card add:
+✔ No setup fees
+✔ Free onboarding
+✔ Cancel anytime
+
+Keep reassurance minimal and professional.
+
+--------------------------------------------------
+
+COPY IMPROVEMENT
+
+Replace generic feature text with more specific wording.
+
+Instead of:
+"Payment Tracking"
+Use:
+"Client Payment & Installment Tracking"
+
+Instead of:
+"Advanced Analytics"
+Use:
+"Revenue & Lead Analytics Dashboard"
+
+--------------------------------------------------
+
+STRUCTURAL RULES
+
+• Do not change pricing layout
+• Do not modify card dimensions
+• Maintain responsive behavior
+• Ensure clean spacing between bullet points
+• Keep icon style consistent
+
+--------------------------------------------------
+
+OUTPUT REQUIREMENT
+
+Update feature lists inside pricing component.
+Maintain React + Tailwind structure.
+Keep design consistent with Atbott branding.
+Ensure production-ready UI.

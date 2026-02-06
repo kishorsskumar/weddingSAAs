@@ -112,7 +112,14 @@ const pricingPlans = [
     price: "₹999",
     period: "/month",
     description: "Perfect for solo planners",
-    features: ["Up to 10 events/month", "Basic CRM", "Email support", "1 team member"],
+    features: [
+      "Up to 10 active events per month",
+      "Lead Management System",
+      "Basic Client Portal (view-only)",
+      "Event Calendar",
+      "1 Team Member",
+      "Email Support"
+    ],
     highlighted: false
   },
   {
@@ -120,7 +127,18 @@ const pricingPlans = [
     price: "₹2,499",
     period: "/month",
     description: "For growing businesses",
-    features: ["Unlimited events", "Full CRM + Client Portal", "WhatsApp integration", "5 team members", "Priority support"],
+    features: [
+      "Unlimited events",
+      "Full Lead Management System",
+      "Full Client Portal",
+      "Event Calendar + Milestone Tracking",
+      "Client Payment & Installment Tracking",
+      "Automated Follow-up Reminders",
+      "Revenue & Lead Analytics Dashboard",
+      "Custom Branding (Logo in portal)",
+      "5 Team Members",
+      "Priority Support"
+    ],
     highlighted: true
   },
   {
@@ -128,7 +146,18 @@ const pricingPlans = [
     price: "Custom",
     period: "",
     description: "For large agencies",
-    features: ["Everything in Growth", "Unlimited team members", "Custom integrations", "Dedicated account manager", "SLA guarantee"],
+    features: [
+      "Everything in Growth",
+      "Unlimited Team Members",
+      "WhatsApp Integration",
+      "API Access & Custom Integrations",
+      "Vendor Management Module",
+      "Multi-Branch Management",
+      "Advanced Reporting & Data Export",
+      "Dedicated Account Manager",
+      "SLA Guarantee",
+      "Data Migration Assistance"
+    ],
     highlighted: false
   }
 ];
