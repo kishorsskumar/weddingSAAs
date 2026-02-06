@@ -1,0 +1,188 @@
+Refine and improve the Atbott SaaS homepage UI for a cleaner, lighter, and more premium SaaS feel.
+
+IMPORTANT:
+Do NOT change layout structure or section order.
+Only refine visual tone, contrast, and conversion clarity.
+Maintain Atbott teal branding (#2FA4BC family) and white theme.
+
+--------------------------------------------------
+GLOBAL UI REFINEMENT GOALS
+
+Make the design:
+Cleaner
+Less flashy
+More premium SaaS
+Lighter in tone
+More trustworthy
+
+Reduce heavy dark backgrounds.
+Reduce overly strong green blocks.
+Increase white space.
+
+--------------------------------------------------
+HERO SECTION REFINEMENT
+
+Current issue:
+Hero feels slightly dark and flashy.
+
+Make these changes:
+
+1. Use pure white background for hero.
+2. Reduce heavy color blocks.
+3. Keep accent color only in:
+   - Headline highlight word
+   - Primary CTA button
+   - Small badge/tag
+
+4. Soften dashboard preview shadow.
+5. Add subtle light teal glow instead of dark background.
+
+6. Add trust proof below CTA:
+
+Example:
+Trusted by 50+ Event Professionals
+⭐ 4.8/5 average rating
+
+Keep it minimal and subtle.
+
+Hero must feel:
+Calm
+Premium
+Confident
+Not loud
+
+--------------------------------------------------
+VIDEO SECTION REFINEMENT
+
+Current issue:
+Dark green background is too heavy.
+
+Fix:
+
+1. Change full dark green background to:
+   Very light teal tint (5% opacity of brand color)
+   OR white background.
+
+2. Keep play button in primary brand color.
+3. Add two CTAs below video:
+   - Watch Full Demo
+   - Book Live Demo
+
+Section must blend smoothly with rest of page.
+
+--------------------------------------------------
+WHY CHOOSE ATBOTT (STATS SECTION)
+
+Improve credibility:
+
+1. Reduce exaggerated visual emphasis.
+2. Make stat cards white with subtle border.
+3. Add small caption below numbers:
+
+Example:
+"Based on early customer data"
+
+Keep it subtle.
+
+--------------------------------------------------
+PRICING SECTION POLISH
+
+Keep structure.
+
+Refine:
+
+1. Reduce heavy green border thickness.
+2. Make highlight subtle but premium.
+3. Add small reassurance text below pricing:
+
+✔ No setup fees
+✔ Free onboarding
+✔ Cancel anytime
+
+Keep it minimal.
+
+--------------------------------------------------
+TESTIMONIAL SECTION REFINEMENT
+
+1. Lighten green background tint.
+2. Make testimonial card white with soft teal accent.
+3. Increase whitespace.
+4. Add company name in slightly bolder style.
+
+Make it feel more enterprise SaaS.
+
+--------------------------------------------------
+FINAL CTA SECTION FIX
+
+1. Remove empty button.
+2. Keep only:
+   - Start Free Trial
+   - Book Demo
+
+3. Reduce background intensity.
+4. Use softer teal gradient or light background.
+
+--------------------------------------------------
+FOOTER REFINEMENT
+
+Current issue:
+Footer navy feels disconnected.
+
+Change footer to:
+Deep teal version of brand color
+OR dark desaturated teal.
+
+Maintain white text.
+
+Ensure brand consistency.
+
+--------------------------------------------------
+SPACING & WHITESPACE
+
+Increase vertical padding between sections.
+Increase breathing space around cards.
+Avoid cramped feeling.
+
+--------------------------------------------------
+BUTTON STYLE STANDARDIZATION
+
+Primary Button:
+Brand teal background
+White text
+Rounded corners
+Subtle shadow
+Smooth hover (slightly darker teal)
+
+Secondary Button:
+White background
+Teal border
+Teal text
+Hover fill teal
+
+Ensure consistency across entire page.
+
+--------------------------------------------------
+SHADOW REFINEMENT
+
+Use softer, subtle shadows.
+Avoid heavy glow or strong drop shadows.
+Keep it modern and minimal.
+
+--------------------------------------------------
+MOBILE CHECK
+
+Ensure:
+Hero text does not feel oversized.
+Buttons are well spaced.
+No heavy green blocks dominating screen.
+Clean scroll flow.
+
+--------------------------------------------------
+OUTPUT REQUIREMENTS
+
+Maintain React + Tailwind structure.
+Do not restructure components.
+Only refine styles.
+Keep production-ready quality.
+Maintain brand consistency.
+Do not introduce new color families.

@@ -6,7 +6,7 @@ export function PublicFooter() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <footer className="bg-[#1a3a42] text-gray-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12">
           <div className="col-span-1 lg:col-span-2">
@@ -17,19 +17,19 @@ export function PublicFooter() {
               All-in-one CRM, Client Portal, and Event Calendar for event planners and wedding businesses. Close more clients, deliver better events.
             </p>
             <div className="flex items-center gap-4">
-              <a href="https://twitter.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+              <a href="https://twitter.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
                 <Twitter className="h-5 w-5" />
               </a>
-              <a href="https://linkedin.com/company/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+              <a href="https://linkedin.com/company/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a href="https://instagram.com/atbott.co" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+              <a href="https://instagram.com/atbott.co" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a href="https://facebook.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+              <a href="https://facebook.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="https://youtube.com/@atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors">
+              <a href="https://youtube.com/@atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors">
                 <Youtube className="h-5 w-5" />
               </a>
             </div>
@@ -81,19 +81,19 @@ export function PublicFooter() {
             <h3 className="font-semibold text-white mb-4">Contact</h3>
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-gray-500" />
+                <Mail className="h-4 w-4 text-[#2FA4BC]/60" />
                 <a href="mailto:sales@atbott.co" className="hover:text-white transition-colors">
                   sales@atbott.co
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-gray-500" />
+                <Phone className="h-4 w-4 text-[#2FA4BC]/60" />
                 <a href="tel:+918089191221" className="hover:text-white transition-colors">
                   +91 8089191221
                 </a>
               </li>
               <li className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
+                <MapPin className="h-4 w-4 text-[#2FA4BC]/60 mt-0.5" />
                 <span className="text-gray-400">
                   Kochi, Kerala, India
                 </span>
@@ -102,7 +102,7 @@ export function PublicFooter() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="border-t border-white/10 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-sm text-gray-500">
             © {currentYear} Atbott Solutions Pvt Ltd. All rights reserved.
           </p>

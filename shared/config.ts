@@ -19,8 +19,8 @@ export const config = {
 
   // Theme Configuration
   theme: {
-    primaryColor: process.env.THEME_PRIMARY_COLOR || '135 35% 30%', // HSL format
-    primaryHex: process.env.THEME_PRIMARY_HEX || '#5B8C51',
+    primaryColor: process.env.THEME_PRIMARY_COLOR || '191 61% 46%', // HSL format
+    primaryHex: process.env.THEME_PRIMARY_HEX || '#2FA4BC',
     logoUrl: process.env.LOGO_URL || '',
     faviconUrl: process.env.FAVICON_URL || '',
   },

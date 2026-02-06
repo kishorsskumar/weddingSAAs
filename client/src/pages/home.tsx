@@ -46,6 +46,17 @@ import {
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
+const BRAND = {
+  solid: "bg-[#2FA4BC]",
+  hover: "hover:bg-[#2590a6]",
+  text: "text-[#2FA4BC]",
+  textDark: "text-[#1e7a8c]",
+  light: "bg-[#2FA4BC]/5",
+  light10: "bg-[#2FA4BC]/10",
+  border: "border-[#2FA4BC]/20",
+  borderStrong: "border-[#2FA4BC]/40",
+};
+
 const problemCards = [
   { icon: AlertTriangle, title: "Leads Getting Missed", description: "Potential clients slip through the cracks with scattered follow-ups" },
   { icon: MessageSquare, title: "Clients Asking Repeated Updates", description: "Spending hours answering the same questions over WhatsApp" },
@@ -171,47 +182,56 @@ export default function HomePage() {
 
   return (
     <PublicLayout>
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-white py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+      {/* Hero Section - Clean, calm, premium */}
+      <section className="relative bg-white py-24 lg:py-36">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
+              <div className="inline-flex items-center gap-2 bg-[#2FA4BC]/8 text-[#1e7a8c] px-4 py-2 rounded-full text-sm font-medium mb-8">
                 <Sparkles className="h-4 w-4" />
                 CRM + Client Portal + Event Calendar
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
                 Close More Event Clients{" "}
-                <span className="bg-gradient-to-r from-green-700 to-emerald-700 bg-clip-text text-transparent">Without Losing Leads</span>
+                <span className="text-[#2FA4BC]">Without Losing Leads</span>
               </h1>
-              <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-xl">
+              <p className="text-lg sm:text-xl text-gray-500 mb-10 max-w-xl leading-relaxed">
                 Lead Management, Client Portal, and Event Calendar built for event planners and wedding businesses.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row gap-4 mb-10">
                 <Link href="/#demo">
-                  <Button size="lg" className="w-full sm:w-auto text-base px-8 bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800">
+                  <Button size="lg" className="w-full sm:w-auto text-base px-8 bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" data-testid="button-hero-demo">
                     Book Live Demo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 border-2">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5" data-testid="button-hero-trial">
                     Start Free Trial
                   </Button>
                 </Link>
               </div>
-              <div className="flex items-center gap-6 text-sm text-gray-500">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-gray-400">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                   <span>No credit card required</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                   <span>14-day free trial</span>
+                </div>
+              </div>
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                <p className="text-sm text-gray-400 mb-1">Trusted by 50+ Event Professionals</p>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  ))}
+                  <span className="text-sm text-gray-500 ml-2">4.8/5 average rating</span>
                 </div>
               </div>
             </motion.div>
@@ -223,70 +243,70 @@ export default function HomePage() {
               className="relative mt-12 lg:mt-0"
             >
               <motion.div
-                animate={{ y: [-6, 6, -6] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                animate={{ y: [-4, 4, -4] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl p-4 shadow-2xl">
-                  <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    <div className="bg-gradient-to-r from-green-700 to-emerald-700 px-4 py-3 flex items-center gap-2">
+                <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100">
+                  <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                    <div className="bg-[#2FA4BC] px-4 py-3 flex items-center gap-2">
                       <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                        <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
+                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
                       </div>
                       <span className="text-white/80 text-sm ml-2">Atbott Dashboard</span>
                     </div>
                     <div className="p-4 space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-green-50 rounded-lg p-3 text-center">
-                          <div className="text-xl font-bold text-green-700">24</div>
-                          <div className="text-xs text-green-700">Active Leads</div>
+                        <div className="bg-[#2FA4BC]/5 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-[#2FA4BC]">24</div>
+                          <div className="text-xs text-gray-500">Active Leads</div>
                         </div>
                         <div className="bg-blue-50 rounded-lg p-3 text-center">
                           <div className="text-xl font-bold text-blue-600">12</div>
-                          <div className="text-xs text-blue-700">This Month</div>
+                          <div className="text-xs text-gray-500">This Month</div>
                         </div>
-                        <div className="bg-green-50 rounded-lg p-3 text-center">
-                          <div className="text-xl font-bold text-green-600">₹8.5L</div>
-                          <div className="text-xs text-green-700">Revenue</div>
+                        <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-emerald-600">₹8.5L</div>
+                          <div className="text-xs text-gray-500">Revenue</div>
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <Users className="h-4 w-4 text-green-700" />
+                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
+                          <div className="w-8 h-8 bg-[#2FA4BC]/10 rounded-full flex items-center justify-center">
+                            <Users className="h-4 w-4 text-[#2FA4BC]" />
                           </div>
                           <div className="flex-1">
-                            <div className="text-sm font-medium">Sharma Wedding</div>
-                            <div className="text-xs text-gray-500">March 15, 2026</div>
+                            <div className="text-sm font-medium text-gray-800">Sharma Wedding</div>
+                            <div className="text-xs text-gray-400">March 15, 2026</div>
                           </div>
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Confirmed</span>
+                          <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full font-medium">Confirmed</span>
                         </div>
-                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Calendar className="h-4 w-4 text-blue-600" />
+                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
+                          <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
+                            <Calendar className="h-4 w-4 text-blue-500" />
                           </div>
                           <div className="flex-1">
-                            <div className="text-sm font-medium">Patel Reception</div>
-                            <div className="text-xs text-gray-500">April 8, 2026</div>
+                            <div className="text-sm font-medium text-gray-800">Patel Reception</div>
+                            <div className="text-xs text-gray-400">April 8, 2026</div>
                           </div>
-                          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">Planning</span>
+                          <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-full font-medium">Planning</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </motion.div>
-              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-green-200/50 rounded-full blur-2xl"></div>
-              <div className="absolute -top-4 -left-4 w-32 h-32 bg-blue-200/50 rounded-full blur-2xl"></div>
+              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
+              <div className="absolute -top-6 -left-6 w-40 h-40 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* Problem Section */}
-      <section className="py-20 lg:py-28 bg-gray-50">
+      <section className="py-24 lg:py-32 bg-gray-50/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -297,7 +317,7 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Still Managing Clients in Excel, WhatsApp and Diaries?
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
               We understand the challenges event professionals face every day
             </p>
           </motion.div>
@@ -310,13 +330,13 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-shadow"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
               >
                 <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4">
-                  <card.icon className="h-6 w-6 text-red-500" />
+                  <card.icon className="h-6 w-6 text-red-400" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">{card.title}</h3>
-                <p className="text-sm text-gray-600">{card.description}</p>
+                <p className="text-sm text-gray-500">{card.description}</p>
               </motion.div>
             ))}
           </div>
@@ -325,15 +345,15 @@ export default function HomePage() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="text-center text-lg text-gray-600 mt-12 font-medium"
+            className="text-center text-lg text-gray-500 mt-14 font-medium"
           >
-            Event planning is stressful. <span className="text-green-700">Your software shouldn't be.</span>
+            Event planning is stressful. <span className="text-[#2FA4BC] font-semibold">Your software shouldn't be.</span>
           </motion.p>
         </div>
       </section>
 
       {/* Solution Section */}
-      <section id="product" className="py-20 lg:py-28 bg-white">
+      <section id="product" className="py-24 lg:py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -344,7 +364,7 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Everything You Need To Run Your Event Business
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
               One platform to manage leads, clients, and events seamlessly
             </p>
           </motion.div>
@@ -357,16 +377,16 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-8 border border-green-100"
+                className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="w-14 h-14 bg-gradient-to-br from-green-700 to-emerald-700 rounded-xl flex items-center justify-center mb-6">
+                <div className="w-14 h-14 bg-[#2FA4BC] rounded-xl flex items-center justify-center mb-6">
                   <column.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">{column.title}</h3>
                 <ul className="space-y-3">
                   {column.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-gray-700">
-                      <CheckCircle2 className="h-5 w-5 text-green-700 flex-shrink-0" />
+                    <li key={idx} className="flex items-center gap-3 text-gray-600">
+                      <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -377,18 +397,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Demo Video Section */}
-      <section id="features" className="py-20 lg:py-28 bg-gradient-to-br from-green-900 to-emerald-900">
+      {/* Demo Video Section - Light, airy */}
+      <section id="features" className="py-24 lg:py-32 bg-[#2FA4BC]/[0.03]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               See Atbott In Action
             </h2>
-            <p className="text-lg text-green-200 mb-12 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
               Watch how event professionals manage their entire business with Atbott
             </p>
           </motion.div>
@@ -397,24 +417,31 @@ export default function HomePage() {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="relative aspect-video bg-black/20 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center group cursor-pointer"
+            className="relative aspect-video bg-gray-900/5 rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center group cursor-pointer shadow-sm"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-green-700/20 to-emerald-700/20"></div>
-            <div className="relative z-10 w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-              <Play className="h-8 w-8 text-green-700 ml-1" />
+            <div className="relative z-10 w-20 h-20 bg-[#2FA4BC] rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+              <Play className="h-8 w-8 text-white ml-1" />
             </div>
-            <p className="absolute bottom-6 text-white/60 text-sm">Click to watch demo video</p>
+            <p className="absolute bottom-6 text-gray-400 text-sm">Click to watch demo video</p>
           </motion.div>
 
-          <Button size="lg" variant="outline" className="mt-8 text-white border-white/30 hover:bg-white/10">
-            Watch Full Demo
-            <Play className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+            <Button size="lg" variant="outline" className="border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5">
+              Watch Full Demo
+              <Play className="ml-2 h-4 w-4" />
+            </Button>
+            <Link href="/#demo">
+              <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
+                Book Live Demo
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* How It Works */}
-      <section className="py-20 lg:py-28 bg-white">
+      <section className="py-24 lg:py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -425,12 +452,12 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               How It Works
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
               From first inquiry to event delivery in 4 simple steps
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
             {howItWorks.map((step, index) => (
               <motion.div
                 key={index}
@@ -442,19 +469,19 @@ export default function HomePage() {
               >
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl flex items-center justify-center">
-                      <step.icon className="h-10 w-10 text-green-700" />
+                    <div className="w-20 h-20 bg-[#2FA4BC]/8 rounded-2xl flex items-center justify-center">
+                      <step.icon className="h-10 w-10 text-[#2FA4BC]" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-green-700 to-emerald-700 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-[#2FA4BC] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
                       {step.step}
                     </div>
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 mb-2">{step.title}</h3>
-                  <p className="text-sm text-gray-600">{step.description}</p>
+                  <p className="text-sm text-gray-500">{step.description}</p>
                 </div>
                 {index < howItWorks.length - 1 && (
                   <div className="hidden lg:block absolute top-10 left-full w-full">
-                    <ChevronRight className="h-6 w-6 text-green-300 mx-auto" />
+                    <ChevronRight className="h-6 w-6 text-gray-300 mx-auto" />
                   </div>
                 )}
               </motion.div>
@@ -464,7 +491,7 @@ export default function HomePage() {
       </section>
 
       {/* Industry Focus */}
-      <section className="py-20 lg:py-28 bg-gray-50">
+      <section className="py-24 lg:py-32 bg-gray-50/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -475,7 +502,7 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Built For Event Professionals
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
               Trusted by businesses across the event industry
             </p>
           </motion.div>
@@ -488,10 +515,10 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-lg hover:border-green-200 transition-all cursor-pointer"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-md hover:border-[#2FA4BC]/20 transition-all cursor-pointer"
               >
-                <div className="w-14 h-14 bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <industry.icon className="h-7 w-7 text-green-700" />
+                <div className="w-14 h-14 bg-[#2FA4BC]/8 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <industry.icon className="h-7 w-7 text-[#2FA4BC]" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1">{industry.title}</h3>
                 <p className="text-xs text-gray-500">{industry.description}</p>
@@ -501,8 +528,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Differentiation */}
-      <section className="py-20 lg:py-28 bg-white">
+      {/* Why Choose Atbott - Stats */}
+      <section className="py-24 lg:py-32 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -513,7 +540,7 @@ export default function HomePage() {
               <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
                 Why Event Businesses Choose Atbott
               </h2>
-              <p className="text-lg text-gray-600 mb-8">
+              <p className="text-lg text-gray-500 mb-8">
                 Unlike generic CRMs, Atbott is purpose-built for the event industry with features that actually matter.
               </p>
               <ul className="space-y-4">
@@ -526,10 +553,10 @@ export default function HomePage() {
                     transition={{ delay: index * 0.1 }}
                     className="flex items-center gap-4"
                   >
-                    <div className="w-8 h-8 bg-gradient-to-br from-green-700 to-emerald-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-[#2FA4BC] rounded-lg flex items-center justify-center flex-shrink-0">
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-gray-700 font-medium">{item}</span>
+                    <span className="text-gray-600 font-medium">{item}</span>
                   </motion.li>
                 ))}
               </ul>
@@ -541,37 +568,36 @@ export default function HomePage() {
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-3xl p-8">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <Zap className="h-8 w-8 text-green-700 mb-2" />
-                    <div className="text-2xl font-bold text-gray-900">3x</div>
-                    <div className="text-sm text-gray-500">Faster lead response</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <TrendingUp className="h-8 w-8 text-blue-600 mb-2" />
-                    <div className="text-2xl font-bold text-gray-900">40%</div>
-                    <div className="text-sm text-gray-500">Higher conversion</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <Clock className="h-8 w-8 text-green-600 mb-2" />
-                    <div className="text-2xl font-bold text-gray-900">10hrs</div>
-                    <div className="text-sm text-gray-500">Saved per week</div>
-                  </div>
-                  <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <Shield className="h-8 w-8 text-orange-600 mb-2" />
-                    <div className="text-2xl font-bold text-gray-900">100%</div>
-                    <div className="text-sm text-gray-500">Data secure</div>
-                  </div>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                  <Zap className="h-8 w-8 text-[#2FA4BC] mb-3" />
+                  <div className="text-3xl font-bold text-gray-900">3x</div>
+                  <div className="text-sm text-gray-500 mt-1">Faster lead response</div>
+                </div>
+                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                  <TrendingUp className="h-8 w-8 text-[#2FA4BC] mb-3" />
+                  <div className="text-3xl font-bold text-gray-900">40%</div>
+                  <div className="text-sm text-gray-500 mt-1">Higher conversion</div>
+                </div>
+                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                  <Clock className="h-8 w-8 text-[#2FA4BC] mb-3" />
+                  <div className="text-3xl font-bold text-gray-900">10hrs</div>
+                  <div className="text-sm text-gray-500 mt-1">Saved per week</div>
+                </div>
+                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
+                  <Shield className="h-8 w-8 text-[#2FA4BC] mb-3" />
+                  <div className="text-3xl font-bold text-gray-900">100%</div>
+                  <div className="text-sm text-gray-500 mt-1">Data secure</div>
                 </div>
               </div>
+              <p className="text-xs text-gray-400 text-center mt-4">Based on early customer data</p>
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-20 lg:py-28 bg-gray-50">
+      <section className="py-24 lg:py-32 bg-gray-50/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -582,7 +608,7 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
               Simple, Transparent Pricing
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
               Choose the plan that fits your business
             </p>
           </motion.div>
@@ -595,14 +621,14 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className={`relative bg-white rounded-2xl p-8 shadow-sm border-2 ${
+                className={`relative bg-white rounded-2xl p-8 shadow-sm border ${
                   plan.highlighted 
-                    ? "border-green-600 shadow-lg scale-105" 
+                    ? "border-[#2FA4BC]/40 shadow-md scale-105" 
                     : "border-gray-100"
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-700 to-emerald-700 text-white text-sm font-medium px-4 py-1 rounded-full">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#2FA4BC] text-white text-sm font-medium px-4 py-1 rounded-full shadow-sm">
                     Most Popular
                   </div>
                 )}
@@ -610,12 +636,12 @@ export default function HomePage() {
                 <p className="text-sm text-gray-500 mb-4">{plan.description}</p>
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-500">{plan.period}</span>
+                  <span className="text-gray-400">{plan.period}</span>
                 </div>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                      <CheckCircle2 className="h-4 w-4 text-green-700" />
+                      <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                       {feature}
                     </li>
                   ))}
@@ -623,8 +649,8 @@ export default function HomePage() {
                 <Button 
                   className={`w-full ${
                     plan.highlighted 
-                      ? "bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800" 
-                      : ""
+                      ? "bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" 
+                      : "border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5"
                   }`}
                   variant={plan.highlighted ? "default" : "outline"}
                 >
@@ -634,9 +660,24 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="text-center mt-12">
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-gray-500">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              No setup fees
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              Free onboarding
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              Cancel anytime
+            </div>
+          </div>
+
+          <div className="text-center mt-8">
             <Link href="/pricing">
-              <Button variant="link" className="text-green-700">
+              <Button variant="link" className="text-[#2FA4BC]">
                 View Full Pricing Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -645,8 +686,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="py-20 lg:py-28 bg-white">
+      {/* Testimonials - Light, enterprise feel */}
+      <section className="py-24 lg:py-32 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -665,10 +706,10 @@ export default function HomePage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-3xl p-8 lg:p-12 text-center"
+              className="bg-white rounded-3xl p-10 lg:p-14 text-center border border-gray-100 shadow-sm"
             >
-              <Quote className="h-12 w-12 text-green-300 mx-auto mb-6" />
-              <p className="text-xl lg:text-2xl text-gray-700 mb-8 font-medium">
+              <Quote className="h-10 w-10 text-[#2FA4BC]/30 mx-auto mb-8" />
+              <p className="text-xl lg:text-2xl text-gray-700 mb-8 font-medium leading-relaxed">
                 "{testimonials[currentTestimonial].quote}"
               </p>
               <div className="flex items-center justify-center gap-1 mb-4">
@@ -676,22 +717,22 @@ export default function HomePage() {
                   <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-white">
+              <div className="w-14 h-14 bg-[#2FA4BC] rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-xl font-bold text-white">
                   {testimonials[currentTestimonial].name.charAt(0)}
                 </span>
               </div>
-              <h4 className="font-semibold text-gray-900">{testimonials[currentTestimonial].name}</h4>
-              <p className="text-sm text-gray-500">{testimonials[currentTestimonial].company}</p>
+              <h4 className="font-bold text-gray-900 text-lg">{testimonials[currentTestimonial].name}</h4>
+              <p className="text-sm text-gray-500 font-medium">{testimonials[currentTestimonial].company}</p>
             </motion.div>
 
-            <div className="flex justify-center gap-2 mt-6">
+            <div className="flex justify-center gap-2 mt-8">
               {testimonials.map((_, index) => (
                 <button
                   key={index}
                   onClick={() => setCurrentTestimonial(index)}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    index === currentTestimonial ? "bg-green-700" : "bg-gray-300"
+                  className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                    index === currentTestimonial ? "bg-[#2FA4BC]" : "bg-gray-200"
                   }`}
                 />
               ))}
@@ -701,7 +742,7 @@ export default function HomePage() {
       </section>
 
       {/* Demo Booking Form */}
-      <section id="demo" className="py-20 lg:py-28 bg-gradient-to-br from-green-900 to-emerald-900">
+      <section id="demo" className="py-24 lg:py-32 bg-gray-900">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
@@ -713,20 +754,20 @@ export default function HomePage() {
               <h2 className="text-3xl sm:text-4xl font-bold mb-6">
                 Ready to Transform Your Event Business?
               </h2>
-              <p className="text-lg text-green-200 mb-8">
+              <p className="text-lg text-gray-300 mb-8">
                 Schedule a personalized demo and see how Atbott can help you close more clients and deliver better events.
               </p>
               <ul className="space-y-4">
-                <li className="flex items-center gap-3 text-green-100">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                <li className="flex items-center gap-3 text-gray-300">
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
                   30-minute personalized walkthrough
                 </li>
-                <li className="flex items-center gap-3 text-green-100">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                <li className="flex items-center gap-3 text-gray-300">
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
                   See features tailored to your business
                 </li>
-                <li className="flex items-center gap-3 text-green-100">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                <li className="flex items-center gap-3 text-gray-300">
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
                   Get answers to all your questions
                 </li>
               </ul>
@@ -737,7 +778,7 @@ export default function HomePage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <form onSubmit={handleDemoSubmit} className="bg-white rounded-2xl p-8 shadow-xl">
+              <form onSubmit={handleDemoSubmit} className="bg-white rounded-2xl p-8 shadow-lg">
                 <h3 className="text-xl font-bold text-gray-900 mb-6">Schedule Your Demo</h3>
                 <div className="space-y-4">
                   <div>
@@ -803,7 +844,7 @@ export default function HomePage() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-green-700 to-emerald-700 hover:from-green-800 hover:to-emerald-800"
+                    className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm"
                     disabled={isSubmitting}
                     data-testid="button-submit-demo"
                   >
@@ -827,7 +868,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="py-20 lg:py-28 bg-white">
+      <section className="py-24 lg:py-32 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -845,12 +886,12 @@ export default function HomePage() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-gray-50 rounded-xl px-6 border-0"
+                className="bg-gray-50/80 rounded-xl px-6 border-0"
               >
                 <AccordionTrigger className="text-left font-medium text-gray-900 hover:no-underline py-5">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-gray-600 pb-5">
+                <AccordionContent className="text-gray-500 pb-5">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -859,8 +900,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA Banner */}
-      <section className="py-20 lg:py-28 bg-gradient-to-br from-green-700 to-emerald-700">
+      {/* Final CTA Banner - Softer teal */}
+      <section className="py-24 lg:py-32 bg-[#2FA4BC]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -870,18 +911,18 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
               Stop Losing Event Leads.<br />Start Scaling Your Business.
             </h2>
-            <p className="text-lg text-green-100 mb-10 max-w-2xl mx-auto">
+            <p className="text-lg text-white/80 mb-10 max-w-2xl mx-auto">
               Join hundreds of event professionals who've transformed their business with Atbott
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
-                <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-green-700 hover:bg-gray-100">
+                <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-[#2FA4BC] hover:bg-gray-50 shadow-sm">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link href="/#demo">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-10 text-white border-white/50 hover:bg-white/10">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-10 text-white border-white/40 hover:bg-white/10">
                   Book Demo
                 </Button>
               </Link>
