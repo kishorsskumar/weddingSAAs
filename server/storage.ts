@@ -392,6 +392,18 @@ import {
   type InsertPortalOaksyChat,
   type EventVendorCost,
   type InsertEventVendorCost,
+  demoBookings,
+  enterpriseLeads,
+  crmLeads,
+  adminNotifications,
+  type DemoBooking,
+  type InsertDemoBooking,
+  type EnterpriseLead,
+  type InsertEnterpriseLead,
+  type CrmLead,
+  type InsertCrmLead,
+  type AdminNotification,
+  type InsertAdminNotification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -1075,6 +1087,22 @@ export interface IStorage {
   // RSVP Bulk Imports
   createRsvpBulkImport(importData: InsertRsvpBulkImport): Promise<RsvpBulkImport>;
   getRsvpBulkImports(companyId: string): Promise<RsvpBulkImport[]>;
+
+  // Demo Bookings
+  createDemoBooking(booking: InsertDemoBooking): Promise<DemoBooking>;
+  getDemoBookings(): Promise<DemoBooking[]>;
+
+  // Enterprise Leads
+  createEnterpriseLead(lead: InsertEnterpriseLead): Promise<EnterpriseLead>;
+  getEnterpriseLeads(): Promise<EnterpriseLead[]>;
+
+  // CRM Leads
+  createCrmLead(lead: InsertCrmLead): Promise<CrmLead>;
+  getCrmLeads(): Promise<CrmLead[]>;
+
+  // Admin Notifications
+  createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification>;
+  getAdminNotifications(): Promise<AdminNotification[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5815,6 +5843,46 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEventVendorCost(id: string): Promise<void> {
     await db.delete(eventVendorCosts).where(eq(eventVendorCosts.id, id));
+  }
+
+  // Demo Bookings
+  async createDemoBooking(booking: InsertDemoBooking): Promise<DemoBooking> {
+    const [created] = await db.insert(demoBookings).values(booking).returning();
+    return created;
+  }
+
+  async getDemoBookings(): Promise<DemoBooking[]> {
+    return db.select().from(demoBookings).orderBy(desc(demoBookings.createdAt));
+  }
+
+  // Enterprise Leads
+  async createEnterpriseLead(lead: InsertEnterpriseLead): Promise<EnterpriseLead> {
+    const [created] = await db.insert(enterpriseLeads).values(lead).returning();
+    return created;
+  }
+
+  async getEnterpriseLeads(): Promise<EnterpriseLead[]> {
+    return db.select().from(enterpriseLeads).orderBy(desc(enterpriseLeads.createdAt));
+  }
+
+  // CRM Leads
+  async createCrmLead(lead: InsertCrmLead): Promise<CrmLead> {
+    const [created] = await db.insert(crmLeads).values(lead).returning();
+    return created;
+  }
+
+  async getCrmLeads(): Promise<CrmLead[]> {
+    return db.select().from(crmLeads).orderBy(desc(crmLeads.createdAt));
+  }
+
+  // Admin Notifications
+  async createAdminNotification(notification: InsertAdminNotification): Promise<AdminNotification> {
+    const [created] = await db.insert(adminNotifications).values(notification).returning();
+    return created;
+  }
+
+  async getAdminNotifications(): Promise<AdminNotification[]> {
+    return db.select().from(adminNotifications).orderBy(desc(adminNotifications.createdAt));
   }
 }
 
