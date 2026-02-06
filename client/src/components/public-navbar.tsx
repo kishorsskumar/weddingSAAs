@@ -18,6 +18,7 @@ export function PublicNavbar() {
   const { user, logout } = useAuth();
 
   const navLinks = [
+    { href: "/", label: "Home" },
     { href: "/#product", label: "Product" },
     { href: "/#features", label: "Features" },
     { href: "/pricing", label: "Pricing" },
