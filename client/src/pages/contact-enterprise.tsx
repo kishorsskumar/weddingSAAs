@@ -50,12 +50,12 @@ export default function ContactEnterprise() {
         <section className="py-24 lg:py-32 flex-1 flex items-center">
           <div className="max-w-2xl mx-auto px-4 text-center">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-              <div className="w-20 h-20 bg-[#2FA4BC]/10 rounded-full flex items-center justify-center mx-auto mb-8">
-                <CheckCircle2 className="h-10 w-10 text-[#2FA4BC]" />
+              <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-green-100">
+                <CheckCircle2 className="h-10 w-10 text-green-500" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-4" data-testid="text-enterprise-success">Thank You!</h1>
-              <p className="text-lg text-gray-500 mb-10">Our enterprise team will reach out within 24 hours to discuss your requirements.</p>
-              <Button onClick={() => setLocation("/")} className="bg-[#2FA4BC] hover:bg-[#2590a6]" data-testid="button-back-home">
+              <h1 className="text-3xl font-bold text-slate-800 mb-4" data-testid="text-enterprise-success">Thank You!</h1>
+              <p className="text-lg text-slate-500 mb-10">Our enterprise team will reach out within 24 hours to discuss your requirements.</p>
+              <Button onClick={() => setLocation("/")} className="bg-green-500 hover:bg-green-600 shadow-md shadow-green-500/20 text-white font-semibold" data-testid="button-back-home">
                 Back to Home
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -84,35 +84,35 @@ export default function ContactEnterprise() {
 
               <div className="space-y-6 mb-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-[#2FA4BC]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Users className="h-5 w-5 text-[#2FA4BC]" />
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-green-100">
+                    <Users className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">Unlimited Team Members</h3>
-                    <p className="text-sm text-gray-500">Scale your team without limits</p>
+                    <h3 className="font-semibold text-slate-800">Unlimited Team Members</h3>
+                    <p className="text-sm text-slate-500">Scale your team without limits</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-[#2FA4BC]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Zap className="h-5 w-5 text-[#2FA4BC]" />
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-green-100">
+                    <Zap className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">WhatsApp & API Access</h3>
-                    <p className="text-sm text-gray-500">Full integration capabilities</p>
+                    <h3 className="font-semibold text-slate-800">WhatsApp & API Access</h3>
+                    <p className="text-sm text-slate-500">Full integration capabilities</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-[#2FA4BC]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Shield className="h-5 w-5 text-[#2FA4BC]" />
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-green-100">
+                    <Shield className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">SLA & Dedicated Support</h3>
-                    <p className="text-sm text-gray-500">Priority assistance with guaranteed uptime</p>
+                    <h3 className="font-semibold text-slate-800">SLA & Dedicated Support</h3>
+                    <p className="text-sm text-slate-500">Priority assistance with guaranteed uptime</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-[#2FA4BC]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Building2 className="h-5 w-5 text-[#2FA4BC]" />
+                  <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-green-100">
+                    <Building2 className="h-5 w-5 text-green-500" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Multi-Branch Management</h3>
@@ -192,7 +192,7 @@ export default function ContactEnterprise() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button type="submit" className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" disabled={isSubmitting} data-testid="button-submit-enterprise">
+                  <Button type="submit" className="w-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold" disabled={isSubmitting} data-testid="button-submit-enterprise">
                     {isSubmitting ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
                     ) : (

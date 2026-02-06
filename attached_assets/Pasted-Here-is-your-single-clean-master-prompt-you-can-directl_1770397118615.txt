@@ -1,0 +1,71 @@
+Here is your **single, clean master prompt** you can directly paste into Replit AI:
+
+---
+
+Redesign the current Atbott homepage UI to match the visual style, color palette, and hero design of the previous version (reference screenshot provided). Do not change content or structure — update only the visual styling.
+
+Objective: Restore the premium SaaS aesthetic from the old page, including its green accent palette, soft background tones, elegant typography, and attractive hero dashboard image styling.
+
+Design Requirements:
+
+1. Color System
+   Reintroduce the old color palette:
+
+* Primary brand green for buttons, highlights, badges, and key words (especially “Smarter” in hero heading).
+* Slightly darker green for hover states.
+* Deep navy/charcoal for headings (not pure black).
+* Soft light grey or subtle green-tinted background for page sections (avoid plain white).
+* White cards with soft borders and gentle shadows.
+
+Create centralized CSS variables for consistent usage across the site.
+
+2. Hero Section
+   Match the previous layout:
+
+* Small green badge at top (“Built for Wedding Professionals” style).
+* Large bold headline with one highlighted green word.
+* Two CTA buttons:
+
+  * Primary: Solid green with soft shadow.
+  * Secondary: Light bordered button.
+* Right side: Dashboard mockup image with:
+
+  * Rounded corners (16px+),
+  * Soft drop shadow,
+  * Slight floating/elevated effect,
+  * Subtle background glow or gradient behind it.
+
+Increase vertical padding to give a spacious premium feel.
+
+3. Typography
+
+* Large, bold, clean H1.
+* Strong hierarchy between headings and body text.
+* Muted grey for descriptions.
+* Comfortable line-height.
+* Modern SaaS look.
+
+4. Cards & Sections
+
+* Rounded white cards.
+* Soft shadow (not harsh).
+* Light grey background sections between content blocks.
+* Icons placed inside subtle green-tinted circular backgrounds.
+
+5. Spacing & Layout
+
+* Add generous spacing between sections.
+* Improve breathing room.
+* Avoid crowded layouts.
+* Maintain minimal, calm, modern SaaS aesthetic.
+
+6. Responsiveness
+
+* Ensure proper mobile optimization.
+* Maintain visual hierarchy on small screens.
+* Keep hero image proportionally balanced on mobile.
+
+Final Goal:
+Make the homepage feel premium, clean, calm, modern, and trustworthy — similar to the older version — while keeping the existing content and functionality unchanged.
+
+---

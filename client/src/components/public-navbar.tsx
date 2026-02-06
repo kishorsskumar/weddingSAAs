@@ -46,7 +46,7 @@ export function PublicNavbar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
+    <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center">
@@ -61,8 +61,8 @@ export function PublicNavbar() {
                 onClick={() => handleNavClick(link.href)}
                 className={`text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? "text-primary"
-                    : "text-gray-600 hover:text-gray-900"
+                    ? "text-green-600"
+                    : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 {link.label}
@@ -96,17 +96,17 @@ export function PublicNavbar() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" className="text-slate-600 hover:text-slate-900">
                     Login
                   </Button>
                 </Link>
                 <Link href="/demo">
-                  <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/5">
+                  <Button variant="outline" size="sm" className="border-green-200 text-green-600 hover:bg-green-50">
                     Book Demo
                   </Button>
                 </Link>
                 <Link href="/signup?plan=growth">
-                  <Button size="sm" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
+                  <Button size="sm" className="bg-green-500 hover:bg-green-600 shadow-sm shadow-green-500/20 text-white font-semibold">
                     Start Free Trial
                   </Button>
                 </Link>
@@ -115,7 +115,7 @@ export function PublicNavbar() {
           </div>
 
           <button
-            className="md:hidden p-2 text-gray-600"
+            className="md:hidden p-2 text-slate-600"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -123,7 +123,7 @@ export function PublicNavbar() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-gray-100">
+          <div className="md:hidden py-4 border-t border-slate-100">
             <div className="flex flex-col gap-3">
               {navLinks.map((link) => (
                 <Link
@@ -132,17 +132,17 @@ export function PublicNavbar() {
                   onClick={() => handleNavClick(link.href)}
                   className={`px-3 py-2 text-sm font-medium rounded-md ${
                     isActive(link.href)
-                      ? "text-primary bg-primary/5"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      ? "text-green-600 bg-green-50"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="flex flex-col gap-3 pt-3 border-t border-gray-100 mt-2">
+              <div className="flex flex-col gap-3 pt-3 border-t border-slate-100 mt-2">
                 {user ? (
                   <>
-                    <div className="px-3 py-2 text-sm font-medium text-gray-900">
+                    <div className="px-3 py-2 text-sm font-medium text-slate-900">
                       Hi, {user.name}
                     </div>
                     <Link href="/dashboard">
@@ -164,17 +164,17 @@ export function PublicNavbar() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     <Link href="/login">
-                      <Button variant="ghost" size="sm" className="w-full">
+                      <Button variant="ghost" size="sm" className="w-full text-slate-600">
                         Login
                       </Button>
                     </Link>
                     <Link href="/demo">
-                      <Button variant="outline" size="sm" className="w-full border-primary text-primary">
+                      <Button variant="outline" size="sm" className="w-full border-green-200 text-green-600">
                         Book Demo
                       </Button>
                     </Link>
                     <Link href="/signup?plan=growth">
-                      <Button size="sm" className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
+                      <Button size="sm" className="w-full bg-green-500 hover:bg-green-600 shadow-sm text-white font-semibold">
                         Start Free Trial
                       </Button>
                     </Link>

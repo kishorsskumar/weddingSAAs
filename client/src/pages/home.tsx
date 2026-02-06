@@ -46,17 +46,6 @@ import {
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
-const BRAND = {
-  solid: "bg-[#2FA4BC]",
-  hover: "hover:bg-[#2590a6]",
-  text: "text-[#2FA4BC]",
-  textDark: "text-[#1e7a8c]",
-  light: "bg-[#2FA4BC]/5",
-  light10: "bg-[#2FA4BC]/10",
-  border: "border-[#2FA4BC]/20",
-  borderStrong: "border-[#2FA4BC]/40",
-};
-
 const problemCards = [
   { icon: AlertTriangle, title: "Leads Getting Missed", description: "Potential clients slip through the cracks with scattered follow-ups" },
   { icon: MessageSquare, title: "Clients Asking Repeated Updates", description: "Spending hours answering the same questions over WhatsApp" },
@@ -224,56 +213,60 @@ export default function HomePage() {
 
   return (
     <PublicLayout>
-      {/* Hero Section - Clean, calm, premium */}
-      <section className="relative bg-white py-24 lg:py-36">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden py-28 lg:py-40" style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #f8fafc 40%, #ecfdf5 100%)" }}>
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-green-200/30 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-emerald-100/40 rounded-full blur-3xl"></div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 bg-[#2FA4BC]/8 text-[#1e7a8c] px-4 py-2 rounded-full text-sm font-medium mb-8">
+              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-8 border border-green-200/60">
                 <Sparkles className="h-4 w-4" />
-                CRM + Client Portal + Event Calendar
+                Built for Wedding Professionals
               </div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-                Close More Event Clients{" "}
-                <span className="text-[#2FA4BC]">Without Losing Leads</span>
+              <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-800 leading-[1.1] mb-6 tracking-tight">
+                Plan Events{" "}
+                <span className="text-green-500">Smarter</span>
+                ,{" "}Not Harder
               </h1>
-              <p className="text-lg sm:text-xl text-gray-500 mb-10 max-w-xl leading-relaxed">
+              <p className="text-lg sm:text-xl text-slate-500 mb-10 max-w-xl leading-relaxed">
                 Lead Management, Client Portal, and Event Calendar built for event planners and wedding businesses.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-10">
                 <Link href="/demo">
-                  <Button size="lg" className="w-full sm:w-auto text-base px-8 bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" data-testid="button-hero-demo">
+                  <Button size="lg" className="w-full sm:w-auto text-base px-8 py-6 bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/25 text-white font-semibold" data-testid="button-hero-demo">
                     Book Live Demo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
                 <Link href="/signup?plan=growth">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5" data-testid="button-hero-trial">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 py-6 border-2 border-slate-200 text-slate-700 hover:bg-slate-50 font-semibold" data-testid="button-hero-trial">
                     Start Free Trial
                   </Button>
                 </Link>
               </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-gray-400">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-slate-400">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
                   <span>No credit card required</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
                   <span>14-day free trial</span>
                 </div>
               </div>
-              <div className="mt-8 pt-6 border-t border-gray-100">
-                <p className="text-sm text-gray-400 mb-1">Trusted by 50+ Event Professionals</p>
+              <div className="mt-8 pt-6 border-t border-slate-200/60">
+                <p className="text-sm text-slate-400 mb-1">Trusted by 50+ Event Professionals</p>
                 <div className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
                     <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   ))}
-                  <span className="text-sm text-gray-500 ml-2">4.8/5 average rating</span>
+                  <span className="text-sm text-slate-500 ml-2">4.8/5 average rating</span>
                 </div>
               </div>
             </motion.div>
@@ -284,71 +277,69 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative mt-12 lg:mt-0"
             >
+              <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-300/10 rounded-3xl blur-2xl scale-105"></div>
               <motion.div
                 animate={{ y: [-4, 4, -4] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-white rounded-2xl p-4 shadow-lg border border-gray-100">
-                  <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                    <div className="bg-[#2FA4BC] px-4 py-3 flex items-center gap-2">
+                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-green-900/10 border border-green-100/60">
+                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-5 py-3.5 flex items-center gap-2">
                       <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-white/30"></div>
                         <div className="w-3 h-3 rounded-full bg-white/30"></div>
                         <div className="w-3 h-3 rounded-full bg-white/30"></div>
                       </div>
-                      <span className="text-white/80 text-sm ml-2">Atbott Dashboard</span>
+                      <span className="text-white/90 text-sm font-medium ml-2">Atbott Dashboard</span>
                     </div>
-                    <div className="p-4 space-y-4">
+                    <div className="p-5 space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-[#2FA4BC]/5 rounded-lg p-3 text-center">
-                          <div className="text-xl font-bold text-[#2FA4BC]">24</div>
-                          <div className="text-xs text-gray-500">Active Leads</div>
+                        <div className="bg-green-50 rounded-xl p-3.5 text-center border border-green-100/50">
+                          <div className="text-xl font-bold text-green-600">24</div>
+                          <div className="text-xs text-slate-500 mt-0.5">Active Leads</div>
                         </div>
-                        <div className="bg-blue-50 rounded-lg p-3 text-center">
+                        <div className="bg-blue-50 rounded-xl p-3.5 text-center border border-blue-100/50">
                           <div className="text-xl font-bold text-blue-600">12</div>
-                          <div className="text-xs text-gray-500">This Month</div>
+                          <div className="text-xs text-slate-500 mt-0.5">This Month</div>
                         </div>
-                        <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                        <div className="bg-emerald-50 rounded-xl p-3.5 text-center border border-emerald-100/50">
                           <div className="text-xl font-bold text-emerald-600">₹8.5L</div>
-                          <div className="text-xs text-gray-500">Revenue</div>
+                          <div className="text-xs text-slate-500 mt-0.5">Revenue</div>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
-                          <div className="w-8 h-8 bg-[#2FA4BC]/10 rounded-full flex items-center justify-center">
-                            <Users className="h-4 w-4 text-[#2FA4BC]" />
+                      <div className="space-y-2.5">
+                        <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
+                          <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
+                            <Users className="h-4 w-4 text-green-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-800">Sharma Wedding</div>
-                            <div className="text-xs text-gray-400">March 15, 2026</div>
+                            <div className="text-sm font-semibold text-slate-800">Sharma Wedding</div>
+                            <div className="text-xs text-slate-400">March 15, 2026</div>
                           </div>
-                          <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full font-medium">Confirmed</span>
+                          <span className="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-medium border border-emerald-100">Confirmed</span>
                         </div>
-                        <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2.5">
-                          <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center">
-                            <Calendar className="h-4 w-4 text-blue-500" />
+                        <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
+                          <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Calendar className="h-4 w-4 text-blue-600" />
                           </div>
                           <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-800">Patel Reception</div>
-                            <div className="text-xs text-gray-400">April 8, 2026</div>
+                            <div className="text-sm font-semibold text-slate-800">Patel Reception</div>
+                            <div className="text-xs text-slate-400">April 8, 2026</div>
                           </div>
-                          <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-full font-medium">Planning</span>
+                          <span className="text-xs bg-amber-50 text-amber-600 px-2.5 py-1 rounded-full font-medium border border-amber-100">Planning</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </motion.div>
-              <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
-              <div className="absolute -top-6 -left-6 w-40 h-40 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Problem Section */}
-      <section className="py-24 lg:py-32 bg-gray-50/70">
+      <section className="py-28 lg:py-36 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -356,10 +347,10 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Still Managing Clients in Excel, WhatsApp and Diaries?
             </h2>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               We understand the challenges event professionals face every day
             </p>
           </motion.div>
@@ -372,13 +363,13 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-0.5"
               >
                 <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mb-4">
                   <card.icon className="h-6 w-6 text-red-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">{card.title}</h3>
-                <p className="text-sm text-gray-500">{card.description}</p>
+                <h3 className="font-semibold text-slate-800 mb-2">{card.title}</h3>
+                <p className="text-sm text-slate-500">{card.description}</p>
               </motion.div>
             ))}
           </div>
@@ -387,15 +378,14 @@ export default function HomePage() {
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            className="text-center text-lg text-gray-500 mt-14 font-medium"
+            className="text-center text-lg text-slate-500 mt-14 font-medium"
           >
-            Event planning is stressful. <span className="text-[#2FA4BC] font-semibold">Your software shouldn't be.</span>
+            Event planning is stressful. <span className="text-green-500 font-semibold">Your software shouldn't be.</span>
           </motion.p>
         </div>
       </section>
 
-      {/* Solution Section */}
-      <section id="product" className="py-24 lg:py-32 bg-white">
+      <section id="product" className="py-28 lg:py-36 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -403,10 +393,10 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Everything You Need To Run Your Event Business
             </h2>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               One platform to manage leads, clients, and events seamlessly
             </p>
           </motion.div>
@@ -419,16 +409,16 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
+                className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-lg transition-all hover:-translate-y-1"
               >
-                <div className="w-14 h-14 bg-[#2FA4BC] rounded-xl flex items-center justify-center mb-6">
+                <div className="w-14 h-14 bg-green-500 rounded-xl flex items-center justify-center mb-6 shadow-sm shadow-green-500/20">
                   <column.icon className="h-7 w-7 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">{column.title}</h3>
+                <h3 className="text-xl font-bold text-slate-800 mb-4">{column.title}</h3>
                 <ul className="space-y-3">
                   {column.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-gray-600">
-                      <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
+                    <li key={idx} className="flex items-center gap-3 text-slate-600">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -439,18 +429,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Demo Video Section - Light, airy */}
-      <section id="features" className="py-24 lg:py-32 bg-[#2FA4BC]/[0.03]">
+      <section id="features" className="py-28 lg:py-36" style={{ background: "linear-gradient(180deg, #f0fdf4 0%, #fafafa 100%)" }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               See Atbott In Action
             </h2>
-            <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 mb-12 max-w-2xl mx-auto">
               Watch how event professionals manage their entire business with Atbott
             </p>
           </motion.div>
@@ -459,21 +448,21 @@ export default function HomePage() {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="relative aspect-video bg-gray-900/5 rounded-2xl overflow-hidden border border-gray-200 flex items-center justify-center group cursor-pointer shadow-sm"
+            className="relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group cursor-pointer shadow-lg shadow-slate-200/50"
           >
-            <div className="relative z-10 w-20 h-20 bg-[#2FA4BC] rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+            <div className="relative z-10 w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-xl shadow-green-500/30 group-hover:scale-110 transition-transform">
               <Play className="h-8 w-8 text-white ml-1" />
             </div>
-            <p className="absolute bottom-6 text-gray-400 text-sm">Click to watch demo video</p>
+            <p className="absolute bottom-6 text-slate-400 text-sm">Click to watch demo video</p>
           </motion.div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-            <Button size="lg" variant="outline" className="border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5">
+            <Button size="lg" variant="outline" className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50">
               Watch Full Demo
               <Play className="ml-2 h-4 w-4" />
             </Button>
             <Link href="/demo">
-              <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
+              <Button size="lg" className="bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold">
                 Book Live Demo
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -482,8 +471,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How It Works */}
-      <section className="py-24 lg:py-32 bg-white">
+      <section className="py-28 lg:py-36 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -491,10 +479,10 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               How It Works
             </h2>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               From first inquiry to event delivery in 4 simple steps
             </p>
           </motion.div>
@@ -511,19 +499,19 @@ export default function HomePage() {
               >
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-[#2FA4BC]/8 rounded-2xl flex items-center justify-center">
-                      <step.icon className="h-10 w-10 text-[#2FA4BC]" />
+                    <div className="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center border border-green-100/60">
+                      <step.icon className="h-10 w-10 text-green-500" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-[#2FA4BC] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-green-500/30">
                       {step.step}
                     </div>
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">{step.title}</h3>
-                  <p className="text-sm text-gray-500">{step.description}</p>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">{step.title}</h3>
+                  <p className="text-sm text-slate-500">{step.description}</p>
                 </div>
                 {index < howItWorks.length - 1 && (
                   <div className="hidden lg:block absolute top-10 left-full w-full">
-                    <ChevronRight className="h-6 w-6 text-gray-300 mx-auto" />
+                    <ChevronRight className="h-6 w-6 text-slate-300 mx-auto" />
                   </div>
                 )}
               </motion.div>
@@ -532,8 +520,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Industry Focus */}
-      <section className="py-24 lg:py-32 bg-gray-50/70">
+      <section className="py-28 lg:py-36 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -541,10 +528,10 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Built For Event Professionals
             </h2>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               Trusted by businesses across the event industry
             </p>
           </motion.div>
@@ -557,21 +544,20 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-md hover:border-[#2FA4BC]/20 transition-all cursor-pointer"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 hover:shadow-md hover:border-green-200 transition-all cursor-pointer hover:-translate-y-0.5"
               >
-                <div className="w-14 h-14 bg-[#2FA4BC]/8 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <industry.icon className="h-7 w-7 text-[#2FA4BC]" />
+                <div className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-green-100/60">
+                  <industry.icon className="h-7 w-7 text-green-500" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-1">{industry.title}</h3>
-                <p className="text-xs text-gray-500">{industry.description}</p>
+                <h3 className="font-semibold text-slate-800 mb-1">{industry.title}</h3>
+                <p className="text-xs text-slate-500">{industry.description}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Why Choose Atbott - Stats */}
-      <section className="py-24 lg:py-32 bg-white">
+      <section className="py-28 lg:py-36 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -579,10 +565,10 @@ export default function HomePage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-6">
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-6">
                 Why Event Businesses Choose Atbott
               </h2>
-              <p className="text-lg text-gray-500 mb-8">
+              <p className="text-lg text-slate-500 mb-8">
                 Unlike generic CRMs, Atbott is purpose-built for the event industry with features that actually matter.
               </p>
               <ul className="space-y-4">
@@ -595,10 +581,10 @@ export default function HomePage() {
                     transition={{ delay: index * 0.1 }}
                     className="flex items-center gap-4"
                   >
-                    <div className="w-8 h-8 bg-[#2FA4BC] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm shadow-green-500/20">
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
-                    <span className="text-gray-600 font-medium">{item}</span>
+                    <span className="text-slate-600 font-medium">{item}</span>
                   </motion.li>
                 ))}
               </ul>
@@ -611,35 +597,34 @@ export default function HomePage() {
               className="relative"
             >
               <div className="grid grid-cols-2 gap-5">
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-                  <Zap className="h-8 w-8 text-[#2FA4BC] mb-3" />
-                  <div className="text-3xl font-bold text-gray-900">3x</div>
-                  <div className="text-sm text-gray-500 mt-1">Faster lead response</div>
+                <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <Zap className="h-8 w-8 text-green-500 mb-3" />
+                  <div className="text-3xl font-bold text-slate-800">3x</div>
+                  <div className="text-sm text-slate-500 mt-1">Faster lead response</div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-                  <TrendingUp className="h-8 w-8 text-[#2FA4BC] mb-3" />
-                  <div className="text-3xl font-bold text-gray-900">40%</div>
-                  <div className="text-sm text-gray-500 mt-1">Higher conversion</div>
+                <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <TrendingUp className="h-8 w-8 text-green-500 mb-3" />
+                  <div className="text-3xl font-bold text-slate-800">40%</div>
+                  <div className="text-sm text-slate-500 mt-1">Higher conversion</div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-                  <Clock className="h-8 w-8 text-[#2FA4BC] mb-3" />
-                  <div className="text-3xl font-bold text-gray-900">10hrs</div>
-                  <div className="text-sm text-gray-500 mt-1">Saved per week</div>
+                <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <Clock className="h-8 w-8 text-green-500 mb-3" />
+                  <div className="text-3xl font-bold text-slate-800">10hrs</div>
+                  <div className="text-sm text-slate-500 mt-1">Saved per week</div>
                 </div>
-                <div className="bg-white rounded-xl p-6 border border-gray-100 shadow-sm">
-                  <Shield className="h-8 w-8 text-[#2FA4BC] mb-3" />
-                  <div className="text-3xl font-bold text-gray-900">100%</div>
-                  <div className="text-sm text-gray-500 mt-1">Data secure</div>
+                <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                  <Shield className="h-8 w-8 text-green-500 mb-3" />
+                  <div className="text-3xl font-bold text-slate-800">100%</div>
+                  <div className="text-sm text-slate-500 mt-1">Data secure</div>
                 </div>
               </div>
-              <p className="text-xs text-gray-400 text-center mt-4">Based on early customer data</p>
+              <p className="text-xs text-slate-400 text-center mt-4">Based on early customer data</p>
             </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Pricing Preview */}
-      <section className="py-24 lg:py-32 bg-gray-50/70">
+      <section className="py-28 lg:py-36 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -647,10 +632,10 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Simple, Transparent Pricing
             </h2>
-            <p className="text-lg text-gray-500 max-w-2xl mx-auto">
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
               Choose the plan that fits your business
             </p>
           </motion.div>
@@ -663,27 +648,27 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className={`relative bg-white rounded-2xl p-8 shadow-sm border ${
+                className={`relative bg-white rounded-2xl p-8 border ${
                   plan.highlighted 
-                    ? "border-[#2FA4BC]/40 shadow-md scale-105" 
-                    : "border-gray-100"
+                    ? "border-green-300 shadow-xl shadow-green-500/10 scale-105" 
+                    : "border-slate-100 shadow-sm"
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#2FA4BC] text-white text-sm font-medium px-4 py-1 rounded-full shadow-sm">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-5 py-1.5 rounded-full shadow-md shadow-green-500/30">
                     Most Popular
                   </div>
                 )}
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                <p className="text-sm text-gray-500 mb-4">{plan.description}</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{plan.name}</h3>
+                <p className="text-sm text-slate-500 mb-4">{plan.description}</p>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-400">{plan.period}</span>
+                  <span className="text-4xl font-bold text-slate-800">{plan.price}</span>
+                  <span className="text-slate-400">{plan.period}</span>
                 </div>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                      <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+                    <li key={idx} className="flex items-center gap-2 text-sm text-slate-600">
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
                       {feature}
                     </li>
                   ))}
@@ -696,8 +681,8 @@ export default function HomePage() {
                   <Button 
                     className={`w-full ${
                       plan.highlighted 
-                        ? "bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" 
-                        : "border-[#2FA4BC]/30 text-[#2FA4BC] hover:bg-[#2FA4BC]/5"
+                        ? "bg-green-500 hover:bg-green-600 shadow-md shadow-green-500/20 text-white font-semibold" 
+                        : "border-2 border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                     variant={plan.highlighted ? "default" : "outline"}
                     data-testid={`button-pricing-${plan.name.toLowerCase()}`}
@@ -709,24 +694,24 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-gray-500">
+          <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-slate-500">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
               No setup fees
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
               Free onboarding
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
               Cancel anytime
             </div>
           </div>
 
           <div className="text-center mt-8">
             <Link href="/pricing">
-              <Button variant="link" className="text-[#2FA4BC]">
+              <Button variant="link" className="text-green-600 hover:text-green-700 font-semibold">
                 View Full Pricing Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -735,8 +720,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials - Light, enterprise feel */}
-      <section className="py-24 lg:py-32 bg-white">
+      <section className="py-28 lg:py-36 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -744,7 +728,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Loved By Event Professionals
             </h2>
           </motion.div>
@@ -755,10 +739,10 @@ export default function HomePage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-white rounded-3xl p-10 lg:p-14 text-center border border-gray-100 shadow-sm"
+              className="bg-white rounded-3xl p-10 lg:p-14 text-center border border-slate-100 shadow-lg shadow-slate-100/50"
             >
-              <Quote className="h-10 w-10 text-[#2FA4BC]/30 mx-auto mb-8" />
-              <p className="text-xl lg:text-2xl text-gray-700 mb-8 font-medium leading-relaxed">
+              <Quote className="h-10 w-10 text-green-200 mx-auto mb-8" />
+              <p className="text-xl lg:text-2xl text-slate-700 mb-8 font-medium leading-relaxed">
                 "{testimonials[currentTestimonial].quote}"
               </p>
               <div className="flex items-center justify-center gap-1 mb-4">
@@ -766,13 +750,13 @@ export default function HomePage() {
                   <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <div className="w-14 h-14 bg-[#2FA4BC] rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-green-500/20">
                 <span className="text-xl font-bold text-white">
                   {testimonials[currentTestimonial].name.charAt(0)}
                 </span>
               </div>
-              <h4 className="font-bold text-gray-900 text-lg">{testimonials[currentTestimonial].name}</h4>
-              <p className="text-sm text-gray-500 font-medium">{testimonials[currentTestimonial].company}</p>
+              <h4 className="font-bold text-slate-800 text-lg">{testimonials[currentTestimonial].name}</h4>
+              <p className="text-sm text-slate-500 font-medium">{testimonials[currentTestimonial].company}</p>
             </motion.div>
 
             <div className="flex justify-center gap-2 mt-8">
@@ -781,7 +765,7 @@ export default function HomePage() {
                   key={index}
                   onClick={() => setCurrentTestimonial(index)}
                   className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                    index === currentTestimonial ? "bg-[#2FA4BC]" : "bg-gray-200"
+                    index === currentTestimonial ? "bg-green-500" : "bg-slate-200"
                   }`}
                 />
               ))}
@@ -790,8 +774,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Demo Booking Form */}
-      <section id="demo" className="py-24 lg:py-32 bg-gray-900">
+      <section id="demo" className="py-28 lg:py-36 bg-slate-900">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
@@ -803,20 +786,20 @@ export default function HomePage() {
               <h2 className="text-3xl sm:text-4xl font-bold mb-6">
                 Ready to Transform Your Event Business?
               </h2>
-              <p className="text-lg text-gray-300 mb-8">
+              <p className="text-lg text-slate-300 mb-8">
                 Schedule a personalized demo and see how Atbott can help you close more clients and deliver better events.
               </p>
               <ul className="space-y-4">
-                <li className="flex items-center gap-3 text-gray-300">
-                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
+                <li className="flex items-center gap-3 text-slate-300">
+                  <CheckCircle2 className="h-5 w-5 text-green-400" />
                   30-minute personalized walkthrough
                 </li>
-                <li className="flex items-center gap-3 text-gray-300">
-                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
+                <li className="flex items-center gap-3 text-slate-300">
+                  <CheckCircle2 className="h-5 w-5 text-green-400" />
                   See features tailored to your business
                 </li>
-                <li className="flex items-center gap-3 text-gray-300">
-                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC]" />
+                <li className="flex items-center gap-3 text-slate-300">
+                  <CheckCircle2 className="h-5 w-5 text-green-400" />
                   Get answers to all your questions
                 </li>
               </ul>
@@ -827,8 +810,8 @@ export default function HomePage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <form onSubmit={handleDemoSubmit} className="bg-white rounded-2xl p-8 shadow-lg">
-                <h3 className="text-xl font-bold text-gray-900 mb-6">Schedule Your Demo</h3>
+              <form onSubmit={handleDemoSubmit} className="bg-white rounded-2xl p-8 shadow-2xl">
+                <h3 className="text-xl font-bold text-slate-800 mb-6">Schedule Your Demo</h3>
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="name">Your Name</Label>
@@ -893,7 +876,7 @@ export default function HomePage() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm"
+                    className="w-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold"
                     disabled={isSubmitting}
                     data-testid="button-submit-demo"
                   >
@@ -916,8 +899,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-24 lg:py-32 bg-white">
+      <section className="py-28 lg:py-36 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -925,7 +907,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">
               Frequently Asked Questions
             </h2>
           </motion.div>
@@ -935,12 +917,12 @@ export default function HomePage() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-gray-50/80 rounded-xl px-6 border-0"
+                className="bg-slate-50 rounded-xl px-6 border border-slate-100"
               >
-                <AccordionTrigger className="text-left font-medium text-gray-900 hover:no-underline py-5">
+                <AccordionTrigger className="text-left font-semibold text-slate-800 hover:no-underline py-5">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-gray-500 pb-5">
+                <AccordionContent className="text-slate-500 pb-5 leading-relaxed">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>
@@ -949,8 +931,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA Banner - Softer teal */}
-      <section className="py-24 lg:py-32 bg-[#2FA4BC]">
+      <section className="py-28 lg:py-36" style={{ background: "linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)" }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -965,13 +946,13 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup?plan=growth">
-                <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-[#2FA4BC] hover:bg-gray-50 shadow-sm">
+                <Button size="lg" className="w-full sm:w-auto text-base px-10 py-6 bg-white text-green-600 hover:bg-green-50 shadow-xl font-semibold">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link href="/demo">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-10 text-white border-white/40 hover:bg-white/10">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base px-10 py-6 text-white border-2 border-white/40 hover:bg-white/10 font-semibold">
                   Book Demo
                 </Button>
               </Link>
