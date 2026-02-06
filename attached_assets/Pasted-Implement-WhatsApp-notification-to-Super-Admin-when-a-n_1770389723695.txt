@@ -1,0 +1,109 @@
+Implement WhatsApp notification to Super Admin when a new demo is booked or new client signs up.
+
+IMPORTANT:
+This notification is for internal admin only.
+Do not send this to the client.
+Trigger only after successful demo booking or account creation.
+
+--------------------------------------------------
+TRIGGER EVENTS
+
+1. When a demo booking form is successfully submitted.
+2. When a new client account is created (after OTP verification).
+
+--------------------------------------------------
+DATA TO CAPTURE
+
+For Demo Booking:
+
+- Full Name
+- Company Name
+- Email
+- Phone Number
+- Business Type
+- Selected Date & Time
+
+For New Client Signup:
+
+- Name
+- Email
+- Company Name (if available)
+- Selected Plan
+- Signup Date & Time
+
+--------------------------------------------------
+WHATSAPP MESSAGE FORMAT (DEMO BOOKED)
+
+Send this message to Super Admin number:
+
+"🚀 New Demo Booked – Atbott SaaS
+
+Name: {{name}}
+Company: {{company}}
+Email: {{email}}
+Phone: {{phone}}
+Business Type: {{business_type}}
+Demo Date: {{date}}
+Demo Time: {{time}}
+
+Please follow up if required."
+
+--------------------------------------------------
+WHATSAPP MESSAGE FORMAT (NEW CLIENT SIGNUP)
+
+"🎉 New Client Signup – Atbott SaaS
+
+Name: {{name}}
+Email: {{email}}
+Company: {{company}}
+Plan: {{plan}}
+Signup Time: {{timestamp}}
+
+Client has entered trial flow."
+
+--------------------------------------------------
+IMPLEMENTATION REQUIREMENTS
+
+1. Create backend function: sendAdminWhatsAppNotification(data)
+2. Call function after:
+   - Demo form submission success
+   - Successful account creation
+
+3. Use existing WhatsApp API integration.
+4. Ensure error handling:
+   - If WhatsApp fails, log error.
+   - Do not block user flow.
+
+5. Store log of notification in database table:
+   admin_notifications
+
+Fields:
+- id
+- type (demo/signup)
+- payload (JSON)
+- status (sent/failed)
+- created_at
+
+--------------------------------------------------
+CONFIGURATION
+
+Super Admin WhatsApp number must be stored in environment variable:
+
+SUPERADMIN_WHATSAPP_NUMBER
+
+Do not hardcode number in frontend.
+
+--------------------------------------------------
+SECURITY
+
+- Trigger only from backend.
+- Do not expose WhatsApp API keys in frontend.
+- Validate input before sending message.
+
+--------------------------------------------------
+OUTPUT
+
+Extend existing backend structure.
+Maintain current architecture.
+Ensure multi-tenant compatibility.
+Do not affect client-facing functionality.
