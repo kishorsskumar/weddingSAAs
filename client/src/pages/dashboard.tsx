@@ -504,10 +504,10 @@ export default function Dashboard() {
             </h2>
           </div>
           <Link href="/employee-portal?tab=quick-entry">
-            <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-primary bg-primary/5 hover:bg-primary/10">
+            <Card className="cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-[#7C8B5D] bg-[#7C8B5D]/5 hover:bg-[#7C8B5D]/10">
               <CardContent className="p-4 flex items-center gap-4">
-                <div className="p-3 rounded-full bg-primary/20">
-                  <Camera className="h-6 w-6 text-primary" />
+                <div className="p-3 rounded-full bg-[#7C8B5D]/20">
+                  <Camera className="h-6 w-6 text-[#7C8B5D]" />
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">Upload Payment Screenshot</p>

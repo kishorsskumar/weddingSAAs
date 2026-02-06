@@ -297,13 +297,13 @@ export default function OaksyPage() {
         <CardHeader className="pb-3 p-3 sm:p-6 sm:pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TreeDeciduous className="h-5 w-5 text-primary" />
+              <TreeDeciduous className="h-5 w-5 text-[#7C8B5D]" />
               Oaksy
             </CardTitle>
             <Button
               size="sm"
               onClick={handleNewConversation}
-              className="bg-[hsl(var(--primary))] hover:bg-[#6a7950] min-h-[44px] md:min-h-0"
+              className="bg-[#7C8B5D] hover:bg-[#6a7950] min-h-[44px] md:min-h-0"
               data-testid="button-new-conversation"
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -422,7 +422,7 @@ export default function OaksyPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <Avatar className="h-8 w-8 sm:h-10 sm:w-10 bg-[#9AAF6C] flex-shrink-0">
-                <AvatarFallback className="bg-[hsl(var(--primary))] text-white">
+                <AvatarFallback className="bg-[#7C8B5D] text-white">
                   <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                 </AvatarFallback>
               </Avatar>
@@ -457,7 +457,7 @@ export default function OaksyPage() {
           <ScrollArea className="h-full p-4">
             {loadingMessages ? (
               <div className="flex items-center justify-center h-full" data-testid="status-loading-messages">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#7C8B5D]" />
               </div>
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-8" data-testid="container-welcome">
@@ -486,7 +486,7 @@ export default function OaksyPage() {
                     className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                     data-testid={`message-${msg.id}`}
                   >
-                    <Avatar className={`h-8 w-8 flex-shrink-0 ${msg.role === "assistant" ? "bg-[hsl(var(--primary))]" : "bg-[#B8A44C]"}`}>
+                    <Avatar className={`h-8 w-8 flex-shrink-0 ${msg.role === "assistant" ? "bg-[#7C8B5D]" : "bg-[#B8A44C]"}`}>
                       <AvatarFallback className="text-white text-xs">
                         {msg.role === "assistant" ? (
                           <Sparkles className="h-4 w-4" />
@@ -498,7 +498,7 @@ export default function OaksyPage() {
                     <div
                       className={`max-w-[75%] rounded-lg p-3 ${
                         msg.role === "user"
-                          ? "bg-[hsl(var(--primary))] text-white"
+                          ? "bg-[#7C8B5D] text-white"
                           : "bg-muted"
                       }`}
                     >
@@ -550,7 +550,7 @@ export default function OaksyPage() {
                 ))}
                 {isLoading && (
                   <div className="flex gap-3" data-testid="status-loading-response">
-                    <Avatar className="h-8 w-8 bg-[hsl(var(--primary))]">
+                    <Avatar className="h-8 w-8 bg-[#7C8B5D]">
                       <AvatarFallback className="text-white">
                         <Sparkles className="h-4 w-4" />
                       </AvatarFallback>
@@ -596,7 +596,7 @@ export default function OaksyPage() {
             <Button
               onClick={handleSendMessage}
               disabled={isLoading || !inputMessage.trim()}
-              className="bg-[hsl(var(--primary))] hover:bg-[#6a7950]"
+              className="bg-[#7C8B5D] hover:bg-[#6a7950]"
               data-testid="button-send"
             >
               {isLoading ? (

@@ -172,8 +172,8 @@ export default function HomePage() {
   return (
     <PublicLayout>
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-slate-50 py-20 lg:py-32">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMxRTQwQUYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
+      <section className="relative overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 py-20 lg:py-32">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiM5Qzk5REYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
@@ -181,20 +181,20 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-6">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-100 to-blue-100 text-purple-700 px-4 py-2 rounded-full text-sm font-medium mb-6">
                 <Sparkles className="h-4 w-4" />
                 CRM + Client Portal + Event Calendar
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
                 Close More Event Clients{" "}
-                <span className="text-primary">Without Losing Leads</span>
+                <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Without Losing Leads</span>
               </h1>
               <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-xl">
                 Lead Management, Client Portal, and Event Calendar built for event planners and wedding businesses.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
                 <Link href="/#demo">
-                  <Button size="lg" className="w-full sm:w-auto text-base px-8">
+                  <Button size="lg" className="w-full sm:w-auto text-base px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
                     Book Live Demo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -228,9 +228,9 @@ export default function HomePage() {
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-primary/10 rounded-2xl p-4 shadow-2xl">
+                <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl p-4 shadow-2xl">
                   <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                    <div className="bg-primary px-4 py-3 flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-3 flex items-center gap-2">
                       <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-red-400"></div>
                         <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
@@ -240,9 +240,9 @@ export default function HomePage() {
                     </div>
                     <div className="p-4 space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-primary/10 rounded-lg p-3 text-center">
-                          <div className="text-xl font-bold text-primary">24</div>
-                          <div className="text-xs text-primary/80">Active Leads</div>
+                        <div className="bg-purple-50 rounded-lg p-3 text-center">
+                          <div className="text-xl font-bold text-purple-600">24</div>
+                          <div className="text-xs text-purple-700">Active Leads</div>
                         </div>
                         <div className="bg-blue-50 rounded-lg p-3 text-center">
                           <div className="text-xl font-bold text-blue-600">12</div>
@@ -255,8 +255,8 @@ export default function HomePage() {
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-3 bg-gray-50 rounded-lg p-2">
-                          <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                            <Users className="h-4 w-4 text-primary" />
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <Users className="h-4 w-4 text-purple-600" />
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-medium">Sharma Wedding</div>
@@ -279,7 +279,7 @@ export default function HomePage() {
                   </div>
                 </div>
               </motion.div>
-              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-primary/20 rounded-full blur-2xl"></div>
+              <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-purple-200/50 rounded-full blur-2xl"></div>
               <div className="absolute -top-4 -left-4 w-32 h-32 bg-blue-200/50 rounded-full blur-2xl"></div>
             </motion.div>
           </div>
@@ -287,7 +287,7 @@ export default function HomePage() {
       </section>
 
       {/* Problem Section */}
-      <section className="py-20 lg:py-28 bg-slate-50">
+      <section className="py-20 lg:py-28 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -328,7 +328,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center text-lg text-gray-600 mt-12 font-medium"
           >
-            Event planning is stressful. <span className="text-primary">Your software shouldn't be.</span>
+            Event planning is stressful. <span className="text-purple-600">Your software shouldn't be.</span>
           </motion.p>
         </div>
       </section>
@@ -358,16 +358,16 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-slate-50 rounded-2xl p-8 border border-gray-100"
+                className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-8 border border-purple-100"
               >
-                <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mb-6">
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center mb-6">
                   <column.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">{column.title}</h3>
                 <ul className="space-y-3">
                   {column.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-3 text-gray-700">
-                      <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-purple-600 flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -379,7 +379,7 @@ export default function HomePage() {
       </section>
 
       {/* Demo Video Section */}
-      <section id="features" className="py-20 lg:py-28 bg-primary">
+      <section id="features" className="py-20 lg:py-28 bg-gradient-to-br from-purple-900 to-blue-900">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -389,7 +389,7 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
               See Atbott In Action
             </h2>
-            <p className="text-lg text-white/80 mb-12 max-w-2xl mx-auto">
+            <p className="text-lg text-purple-200 mb-12 max-w-2xl mx-auto">
               Watch how event professionals manage their entire business with Atbott
             </p>
           </motion.div>
@@ -400,9 +400,9 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="relative aspect-video bg-black/20 rounded-2xl overflow-hidden border border-white/10 flex items-center justify-center group cursor-pointer"
           >
-            <div className="absolute inset-0 bg-white/5"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/20"></div>
             <div className="relative z-10 w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-              <Play className="h-8 w-8 text-primary ml-1" />
+              <Play className="h-8 w-8 text-purple-600 ml-1" />
             </div>
             <p className="absolute bottom-6 text-white/60 text-sm">Click to watch demo video</p>
           </motion.div>
@@ -443,10 +443,10 @@ export default function HomePage() {
               >
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center">
-                      <step.icon className="h-10 w-10 text-primary" />
+                    <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl flex items-center justify-center">
+                      <step.icon className="h-10 w-10 text-purple-600" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                       {step.step}
                     </div>
                   </div>
@@ -455,7 +455,7 @@ export default function HomePage() {
                 </div>
                 {index < howItWorks.length - 1 && (
                   <div className="hidden lg:block absolute top-10 left-full w-full">
-                    <ChevronRight className="h-6 w-6 text-primary/30 mx-auto" />
+                    <ChevronRight className="h-6 w-6 text-purple-300 mx-auto" />
                   </div>
                 )}
               </motion.div>
@@ -465,7 +465,7 @@ export default function HomePage() {
       </section>
 
       {/* Industry Focus */}
-      <section className="py-20 lg:py-28 bg-slate-50">
+      <section className="py-20 lg:py-28 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -489,10 +489,10 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-lg hover:border-primary/30 transition-all cursor-pointer"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-gray-100 hover:shadow-lg hover:border-purple-200 transition-all cursor-pointer"
               >
-                <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                  <industry.icon className="h-7 w-7 text-primary" />
+                <div className="w-14 h-14 bg-gradient-to-br from-purple-100 to-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+                  <industry.icon className="h-7 w-7 text-purple-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1">{industry.title}</h3>
                 <p className="text-xs text-gray-500">{industry.description}</p>
@@ -527,7 +527,7 @@ export default function HomePage() {
                     transition={{ delay: index * 0.1 }}
                     className="flex items-center gap-4"
                   >
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
                     <span className="text-gray-700 font-medium">{item}</span>
@@ -542,10 +542,10 @@ export default function HomePage() {
               viewport={{ once: true }}
               className="relative"
             >
-              <div className="bg-slate-50 rounded-3xl p-8 border border-gray-100">
+              <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl p-8">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl p-4 shadow-sm">
-                    <Zap className="h-8 w-8 text-primary mb-2" />
+                    <Zap className="h-8 w-8 text-purple-600 mb-2" />
                     <div className="text-2xl font-bold text-gray-900">3x</div>
                     <div className="text-sm text-gray-500">Faster lead response</div>
                   </div>
@@ -572,7 +572,7 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-20 lg:py-28 bg-slate-50">
+      <section className="py-20 lg:py-28 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -598,12 +598,12 @@ export default function HomePage() {
                 transition={{ delay: index * 0.1 }}
                 className={`relative bg-white rounded-2xl p-8 shadow-sm border-2 ${
                   plan.highlighted 
-                    ? "border-primary shadow-lg scale-105" 
+                    ? "border-purple-500 shadow-lg scale-105" 
                     : "border-gray-100"
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white text-sm font-medium px-4 py-1 rounded-full">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-sm font-medium px-4 py-1 rounded-full">
                     Most Popular
                   </div>
                 )}
@@ -616,13 +616,17 @@ export default function HomePage() {
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <CheckCircle2 className="h-4 w-4 text-purple-600" />
                       {feature}
                     </li>
                   ))}
                 </ul>
                 <Button 
-                  className="w-full"
+                  className={`w-full ${
+                    plan.highlighted 
+                      ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700" 
+                      : ""
+                  }`}
                   variant={plan.highlighted ? "default" : "outline"}
                 >
                   Get Started
@@ -633,7 +637,7 @@ export default function HomePage() {
 
           <div className="text-center mt-12">
             <Link href="/pricing">
-              <Button variant="link" className="text-primary">
+              <Button variant="link" className="text-purple-600">
                 View Full Pricing Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -662,9 +666,9 @@ export default function HomePage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="bg-slate-50 rounded-3xl p-8 lg:p-12 text-center border border-gray-100"
+              className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl p-8 lg:p-12 text-center"
             >
-              <Quote className="h-12 w-12 text-primary/30 mx-auto mb-6" />
+              <Quote className="h-12 w-12 text-purple-300 mx-auto mb-6" />
               <p className="text-xl lg:text-2xl text-gray-700 mb-8 font-medium">
                 "{testimonials[currentTestimonial].quote}"
               </p>
@@ -673,7 +677,7 @@ export default function HomePage() {
                   <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-400 to-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-white">
                   {testimonials[currentTestimonial].name.charAt(0)}
                 </span>
@@ -688,7 +692,7 @@ export default function HomePage() {
                   key={index}
                   onClick={() => setCurrentTestimonial(index)}
                   className={`w-2 h-2 rounded-full transition-colors ${
-                    index === currentTestimonial ? "bg-primary" : "bg-gray-300"
+                    index === currentTestimonial ? "bg-purple-600" : "bg-gray-300"
                   }`}
                 />
               ))}
@@ -698,7 +702,7 @@ export default function HomePage() {
       </section>
 
       {/* Demo Booking Form */}
-      <section id="demo" className="py-20 lg:py-28 bg-primary">
+      <section id="demo" className="py-20 lg:py-28 bg-gradient-to-br from-purple-900 to-blue-900">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <motion.div
@@ -710,19 +714,19 @@ export default function HomePage() {
               <h2 className="text-3xl sm:text-4xl font-bold mb-6">
                 Ready to Transform Your Event Business?
               </h2>
-              <p className="text-lg text-white/80 mb-8">
+              <p className="text-lg text-purple-200 mb-8">
                 Schedule a personalized demo and see how Atbott can help you close more clients and deliver better events.
               </p>
               <ul className="space-y-4">
-                <li className="flex items-center gap-3 text-white/90">
+                <li className="flex items-center gap-3 text-purple-100">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                   30-minute personalized walkthrough
                 </li>
-                <li className="flex items-center gap-3 text-white/90">
+                <li className="flex items-center gap-3 text-purple-100">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                   See features tailored to your business
                 </li>
-                <li className="flex items-center gap-3 text-white/90">
+                <li className="flex items-center gap-3 text-purple-100">
                   <CheckCircle2 className="h-5 w-5 text-green-400" />
                   Get answers to all your questions
                 </li>
@@ -800,7 +804,7 @@ export default function HomePage() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full"
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
                     disabled={isSubmitting}
                     data-testid="button-submit-demo"
                   >
@@ -842,7 +846,7 @@ export default function HomePage() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-slate-50 rounded-xl px-6 border-0"
+                className="bg-gray-50 rounded-xl px-6 border-0"
               >
                 <AccordionTrigger className="text-left font-medium text-gray-900 hover:no-underline py-5">
                   {faq.question}
@@ -857,7 +861,7 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA Banner */}
-      <section className="py-20 lg:py-28 bg-primary">
+      <section className="py-20 lg:py-28 bg-gradient-to-br from-purple-600 to-blue-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -867,12 +871,12 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">
               Stop Losing Event Leads.<br />Start Scaling Your Business.
             </h2>
-            <p className="text-lg text-white/80 mb-10 max-w-2xl mx-auto">
+            <p className="text-lg text-purple-100 mb-10 max-w-2xl mx-auto">
               Join hundreds of event professionals who've transformed their business with Atbott
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
-                <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-primary hover:bg-gray-100">
+                <Button size="lg" className="w-full sm:w-auto text-base px-10 bg-white text-purple-600 hover:bg-gray-100">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

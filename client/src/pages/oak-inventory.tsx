@@ -6847,7 +6847,7 @@ function EventTransportationSection({ events }: { events: Event[] }) {
         </div>
         <Button
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]"
+          className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
           data-testid="button-add-transportation"
         >
           <Plus className="w-4 h-4 mr-2" /> Add Transportation
@@ -6997,7 +6997,7 @@ function EventTransportationSection({ events }: { events: Event[] }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-save-transportation">
+            <Button onClick={handleSubmit} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-save-transportation">
               {editingRecord ? 'Update' : 'Add'}
             </Button>
           </DialogFooter>
@@ -7023,7 +7023,7 @@ function EventTransportationSection({ events }: { events: Event[] }) {
             <Button variant="destructive" onClick={() => { if (selectedRecordForAction) rejectMutation.mutate(selectedRecordForAction.id); }} data-testid="button-reject-transportation">
               <XCircle className="w-4 h-4 mr-1" /> Reject
             </Button>
-            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-transportation">
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-transportation">
               <CheckCircle className="w-4 h-4 mr-1" /> Approve
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -7261,7 +7261,7 @@ function EventManpowerSection({ events }: { events: Event[] }) {
         </div>
         <Button
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]"
+          className="bg-[#7C8B5D] hover:bg-[#6a7a4d]"
           data-testid="button-add-manpower"
         >
           <Plus className="w-4 h-4 mr-2" /> Add Manpower
@@ -7442,7 +7442,7 @@ function EventManpowerSection({ events }: { events: Event[] }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-save-manpower">
+            <Button onClick={handleSubmit} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-save-manpower">
               {editingRecord ? 'Update' : 'Add'}
             </Button>
           </DialogFooter>
@@ -7469,7 +7469,7 @@ function EventManpowerSection({ events }: { events: Event[] }) {
             <Button variant="destructive" onClick={() => { if (selectedRecordForAction) rejectMutation.mutate(selectedRecordForAction.id); }} data-testid="button-reject-manpower">
               <XCircle className="w-4 h-4 mr-1" /> Reject
             </Button>
-            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[hsl(var(--primary))] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-manpower">
+            <AlertDialogAction onClick={() => { if (selectedRecordForAction) { approveMutation.mutate(selectedRecordForAction.id); setApproveDialogOpen(false); setSelectedRecordForAction(null); } }} className="bg-[#7C8B5D] hover:bg-[#6a7a4d]" data-testid="button-confirm-approve-manpower">
               <CheckCircle className="w-4 h-4 mr-1" /> Approve
             </AlertDialogAction>
           </AlertDialogFooter>
