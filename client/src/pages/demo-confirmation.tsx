@@ -51,7 +51,7 @@ export default function DemoConfirmation() {
                   Back to Home
                 </Button>
               </Link>
-              <Link href="/signup">
+              <Link href="/signup?plan=growth">
                 <Button className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm" data-testid="button-start-trial">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-4 w-4" />

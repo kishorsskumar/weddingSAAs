@@ -48,7 +48,7 @@ export function PublicFooter() {
                 <Link href="/demo" className="hover:text-white transition-colors">Book Demo</Link>
               </li>
               <li>
-                <Link href="/signup" className="hover:text-white transition-colors">Start Free Trial</Link>
+                <Link href="/signup?plan=growth" className="hover:text-white transition-colors">Start Free Trial</Link>
               </li>
               <li>
                 <Link href="/knotvite" className="hover:text-white transition-colors">KnotVite RSVP</Link>

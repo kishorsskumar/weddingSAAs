@@ -105,7 +105,7 @@ export function PublicNavbar() {
                     Book Demo
                   </Button>
                 </Link>
-                <Link href="/signup">
+                <Link href="/signup?plan=growth">
                   <Button size="sm" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
                     Start Free Trial
                   </Button>
@@ -173,7 +173,7 @@ export function PublicNavbar() {
                         Book Demo
                       </Button>
                     </Link>
-                    <Link href="/signup">
+                    <Link href="/signup?plan=growth">
                       <Button size="sm" className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm">
                         Start Free Trial
                       </Button>

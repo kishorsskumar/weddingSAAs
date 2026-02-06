@@ -262,7 +262,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link href="/signup">
+                <Link href={plan.code === "agency" ? "/contact-enterprise" : `/signup?plan=${plan.code}`}>
                   <Button 
                     size="lg" 
                     className="w-full text-sm"
@@ -414,7 +414,7 @@ export default function PricingPage() {
               <p className="text-gray-600 mb-6">
                 Pay only for what you need. Add or remove modules anytime.
               </p>
-              <Link href="/signup">
+              <Link href="/signup?plan=growth">
                 <Button size="lg" data-testid="get-started-btn">
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
