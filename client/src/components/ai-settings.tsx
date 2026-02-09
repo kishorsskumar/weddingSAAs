@@ -214,18 +214,18 @@ export function AiSettingsPanel() {
               <Input
                 id="primary-color"
                 type="color"
-                value={formData.primaryColor || "#5B8C51"}
+                value={formData.primaryColor || "#2FA4BC"}
                 onChange={(e) => 
                   setFormData(prev => ({ ...prev, primaryColor: e.target.value }))
                 }
                 className="w-16 h-10 p-1 cursor-pointer"
               />
               <Input
-                value={formData.primaryColor || "#5B8C51"}
+                value={formData.primaryColor || "#2FA4BC"}
                 onChange={(e) => 
                   setFormData(prev => ({ ...prev, primaryColor: e.target.value }))
                 }
-                placeholder="#5B8C51"
+                placeholder="#2FA4BC"
                 className="w-32"
               />
               <p className="text-xs text-gray-500">
@@ -240,7 +240,7 @@ export function AiSettingsPanel() {
               <div className="flex items-start gap-3">
                 <div 
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                  style={{ backgroundColor: formData.primaryColor || '#5B8C51' }}
+                  style={{ backgroundColor: formData.primaryColor || '#2FA4BC' }}
                 >
                   {formData.avatarUrl ? (
                     <img 

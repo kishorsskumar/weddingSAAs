@@ -66,7 +66,7 @@ export default function DownloadPage() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {deferredPrompt && (
-            <Card className="border-2 border-[#5B8C51]/20 bg-[#5B8C51]/5 shadow-xl hover:shadow-2xl transition-shadow">
+            <Card className="border-2 border-[#2FA4BC]/20 bg-[#2FA4BC]/5 shadow-xl hover:shadow-2xl transition-shadow">
               <CardHeader>
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-green-100 rounded-xl">
@@ -82,7 +82,7 @@ export default function DownloadPage() {
                 <p className="text-gray-600 mb-4">
                   Click the button below to instantly install the app on your device.
                 </p>
-                <Button onClick={handleInstall} className="w-full bg-[#5B8C51] hover:bg-[#4a7342]" size="lg">
+                <Button onClick={handleInstall} className="w-full bg-[#2FA4BC] hover:bg-[#2590a6]" size="lg">
                   <Download className="mr-2 h-5 w-5" />
                   Install App
                 </Button>
@@ -105,15 +105,15 @@ export default function DownloadPage() {
             <CardContent>
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome or Edge</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Chrome or Edge</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
                   <span>Click the <strong>install icon</strong> in the address bar (or menu → "Install app")</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
                   <span>The app will appear on your desktop like any other program</span>
                 </li>
               </ol>
@@ -135,19 +135,19 @@ export default function DownloadPage() {
             <CardContent>
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Safari</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Safari</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
                   <span>Tap the <strong>Share button</strong> (box with arrow)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
                   <span>Scroll and tap <strong>"Add to Home Screen"</strong></span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
                   <span>Tap <strong>"Add"</strong> - done!</span>
                 </li>
               </ol>
@@ -169,19 +169,19 @@ export default function DownloadPage() {
             <CardContent>
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#5B8C51] underline font-semibold">www.oakstreetevent.com</a> in Chrome</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
+                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Chrome</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
                   <span>Tap the <strong>3-dot menu</strong> (top right)</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">3</span>
                   <span>Tap <strong>"Install app"</strong> or "Add to Home screen"</span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="flex-shrink-0 w-6 h-6 bg-[#5B8C51] text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
+                  <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">4</span>
                   <span>Tap <strong>"Install"</strong> - done!</span>
                 </li>
               </ol>
@@ -194,7 +194,7 @@ export default function DownloadPage() {
           <Button 
             variant="outline" 
             size="lg"
-            className="border-[#5B8C51] text-[#5B8C51] hover:bg-[#5B8C51] hover:text-white"
+            className="border-[#2FA4BC] text-[#2FA4BC] hover:bg-[#2FA4BC] hover:text-white"
             onClick={() => window.location.href = '/login'}
           >
             Go to Login
