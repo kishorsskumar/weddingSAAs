@@ -45,7 +45,6 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import dashboardPreview from "@/assets/images/dashboard-preview.png";
 
 const problemCards = [
   { icon: AlertTriangle, title: "Leads Getting Missed", description: "Potential clients slip through the cracks with scattered follow-ups" },
@@ -216,8 +215,8 @@ export default function HomePage() {
     <PublicLayout>
       <section className="relative overflow-hidden py-28 lg:py-40 bg-white">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#2FA4BC]/[0.03] rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#2FA4BC]/[0.03] rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -284,11 +283,98 @@ export default function HomePage() {
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <img 
-                  src={dashboardPreview} 
-                  alt="Atbott Dashboard Preview" 
-                  className="rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/60 w-full"
-                />
+                <div className="bg-white rounded-[20px] p-1.5 shadow-2xl shadow-slate-900/10 border border-slate-200/60">
+                  <div className="bg-white rounded-2xl overflow-hidden border border-slate-100">
+                    <div className="flex">
+                      <div className="w-44 bg-slate-50 border-r border-slate-100 p-4 hidden sm:block">
+                        <div className="flex items-center gap-2 mb-6">
+                          <div className="w-8 h-8 rounded-lg bg-[#2FA4BC] flex items-center justify-center">
+                            <span className="text-white font-bold text-sm">A</span>
+                          </div>
+                          <span className="font-semibold text-slate-800 text-sm">Dashboard</span>
+                        </div>
+                        <nav className="space-y-1">
+                          {["Dashboard", "Leads", "Clients", "Events", "Calendar", "Finance", "Team"].map((item, i) => (
+                            <div key={item} className={`px-3 py-2 rounded-lg text-xs font-medium ${i === 0 ? "bg-[#2FA4BC]/10 text-[#2FA4BC]" : "text-slate-500"}`}>
+                              {item}
+                            </div>
+                          ))}
+                        </nav>
+                      </div>
+                      <div className="flex-1 p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-bold text-slate-800 text-base">Dashboard</h3>
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-slate-100"></div>
+                            <div className="w-7 h-7 rounded-full bg-slate-200"></div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2.5 mb-4">
+                          <div className="bg-[#2FA4BC]/5 rounded-xl p-3 border border-[#2FA4BC]/10">
+                            <div className="text-[10px] text-slate-500 mb-1">Active Leads</div>
+                            <div className="text-lg font-bold text-[#2FA4BC]">24</div>
+                          </div>
+                          <div className="bg-[#2FA4BC] rounded-xl p-3">
+                            <div className="text-[10px] text-white/70 mb-1">Revenue</div>
+                            <div className="text-lg font-bold text-white">₹8.5L</div>
+                          </div>
+                          <div className="bg-[#2FA4BC]/5 rounded-xl p-3 border border-[#2FA4BC]/10">
+                            <div className="text-[10px] text-slate-500 mb-1">Events</div>
+                            <div className="text-lg font-bold text-[#2FA4BC]">12</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-xs font-semibold text-slate-700 mb-2">Upcoming Weddings</div>
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2 bg-[#2FA4BC]/5 rounded-lg p-2 border border-[#2FA4BC]/10">
+                                <div className="w-1 h-8 rounded-full bg-[#2FA4BC]"></div>
+                                <div>
+                                  <div className="text-[11px] font-semibold text-slate-800">Sharma Wedding</div>
+                                  <div className="text-[10px] text-slate-400">March 15, 2026</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 bg-amber-50 rounded-lg p-2 border border-amber-100">
+                                <div className="w-1 h-8 rounded-full bg-amber-400"></div>
+                                <div>
+                                  <div className="text-[11px] font-semibold text-slate-800">Patel Reception</div>
+                                  <div className="text-[10px] text-slate-400">April 8, 2026</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 bg-blue-50 rounded-lg p-2 border border-blue-100">
+                                <div className="w-1 h-8 rounded-full bg-blue-400"></div>
+                                <div>
+                                  <div className="text-[11px] font-semibold text-slate-800">Menon Engagement</div>
+                                  <div className="text-[10px] text-slate-400">April 20, 2026</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-slate-700 mb-2">Recent Clients</div>
+                            <div className="space-y-1.5">
+                              {[
+                                { name: "Priya Sharma", status: "Confirmed", color: "text-emerald-600 bg-emerald-50" },
+                                { name: "Rahul Patel", status: "Planning", color: "text-amber-600 bg-amber-50" },
+                                { name: "Sneha Menon", status: "New Lead", color: "text-blue-600 bg-blue-50" },
+                              ].map((client) => (
+                                <div key={client.name} className="flex items-center justify-between bg-slate-50 rounded-lg p-2 border border-slate-100">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center">
+                                      <span className="text-[9px] font-bold text-slate-500">{client.name.charAt(0)}</span>
+                                    </div>
+                                    <span className="text-[11px] font-medium text-slate-700">{client.name}</span>
+                                  </div>
+                                  <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${client.color}`}>{client.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           </div>
