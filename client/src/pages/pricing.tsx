@@ -210,7 +210,7 @@ export default function PricingPage() {
             />
             <Label htmlFor="billing-toggle" className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>
               Yearly
-              <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-100">Save 17%</Badge>
+              <Badge className="ml-2 bg-cyan-100 text-cyan-800 hover:bg-cyan-100">Save 17%</Badge>
             </Label>
           </div>
 
@@ -256,7 +256,7 @@ export default function PricingPage() {
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <Check className="h-4 w-4 text-[#2FA4BC] flex-shrink-0" />
                       {feature}
                     </li>
                   ))}
@@ -311,21 +311,21 @@ export default function PricingPage() {
                         <td className="p-4 text-gray-700">{feature.name}</td>
                         <td className="p-4 text-center">
                           {typeof feature.starter === 'boolean' ? (
-                            feature.starter ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                            feature.starter ? <Check className="h-5 w-5 text-[#2FA4BC] mx-auto" /> : <span className="text-gray-300">—</span>
                           ) : (
                             <span className="font-medium">{feature.starter}</span>
                           )}
                         </td>
                         <td className="p-4 text-center bg-primary/5">
                           {typeof feature.growth === 'boolean' ? (
-                            feature.growth ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                            feature.growth ? <Check className="h-5 w-5 text-[#2FA4BC] mx-auto" /> : <span className="text-gray-300">—</span>
                           ) : (
                             <span className="font-medium">{feature.growth}</span>
                           )}
                         </td>
                         <td className="p-4 text-center">
                           {typeof feature.agency === 'boolean' ? (
-                            feature.agency ? <Check className="h-5 w-5 text-green-500 mx-auto" /> : <span className="text-gray-300">—</span>
+                            feature.agency ? <Check className="h-5 w-5 text-[#2FA4BC] mx-auto" /> : <span className="text-gray-300">—</span>
                           ) : (
                             <span className="font-medium">{feature.agency}</span>
                           )}
@@ -377,7 +377,7 @@ export default function PricingPage() {
                 <ul className="space-y-2">
                   {module.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2 text-sm text-gray-700">
-                      <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      <Check className="h-4 w-4 text-[#2FA4BC] flex-shrink-0" />
                       {feature}
                     </li>
                   ))}

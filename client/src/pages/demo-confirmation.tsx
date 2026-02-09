@@ -17,8 +17,8 @@ export default function DemoConfirmation() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-green-100">
-              <CheckCircle2 className="h-10 w-10 text-green-500" />
+            <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-cyan-100">
+              <CheckCircle2 className="h-10 w-10 text-[#2FA4BC]" />
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4" data-testid="text-confirmation-title">
@@ -30,14 +30,14 @@ export default function DemoConfirmation() {
 
             <div className="bg-gray-50 rounded-xl p-6 mb-10 text-left space-y-4 max-w-md mx-auto">
               <div className="flex items-start gap-3">
-                <Mail className="h-5 w-5 text-green-500 mt-0.5" />
+                <Mail className="h-5 w-5 text-[#2FA4BC] mt-0.5" />
                 <div>
                   <h3 className="font-medium text-gray-900 text-sm">Check your email</h3>
                   <p className="text-sm text-gray-500">We'll send a confirmation with meeting details</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-green-500 mt-0.5" />
+                <Calendar className="h-5 w-5 text-[#2FA4BC] mt-0.5" />
                 <div>
                   <h3 className="font-medium text-gray-900 text-sm">Calendar invite</h3>
                   <p className="text-sm text-gray-500">You'll receive a Google Meet or Zoom link</p>
@@ -47,12 +47,12 @@ export default function DemoConfirmation() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/">
-                <Button variant="outline" className="border-green-200 text-green-600 hover:bg-green-50" data-testid="button-back-home">
+                <Button variant="outline" className="border-cyan-200 text-[#2FA4BC] hover:bg-cyan-50" data-testid="button-back-home">
                   Back to Home
                 </Button>
               </Link>
               <Link href="/signup?plan=growth">
-                <Button className="bg-green-500 hover:bg-green-600 shadow-md shadow-green-500/20 text-white font-semibold" data-testid="button-start-trial">
+                <Button className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-md shadow-[#2FA4BC]/20 text-white font-semibold" data-testid="button-start-trial">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

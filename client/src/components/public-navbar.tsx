@@ -61,7 +61,7 @@ export function PublicNavbar() {
                 onClick={() => handleNavClick(link.href)}
                 className={`text-sm font-medium transition-colors ${
                   isActive(link.href)
-                    ? "text-green-600"
+                    ? "text-[#2FA4BC]"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -101,12 +101,12 @@ export function PublicNavbar() {
                   </Button>
                 </Link>
                 <Link href="/demo">
-                  <Button variant="outline" size="sm" className="border-green-200 text-green-600 hover:bg-green-50">
+                  <Button variant="outline" size="sm" className="border-cyan-200 text-[#2FA4BC] hover:bg-cyan-50">
                     Book Demo
                   </Button>
                 </Link>
                 <Link href="/signup?plan=growth">
-                  <Button size="sm" className="bg-green-500 hover:bg-green-600 shadow-sm shadow-green-500/20 text-white font-semibold">
+                  <Button size="sm" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm shadow-[#2FA4BC]/20 text-white font-semibold">
                     Start Free Trial
                   </Button>
                 </Link>
@@ -132,7 +132,7 @@ export function PublicNavbar() {
                   onClick={() => handleNavClick(link.href)}
                   className={`px-3 py-2 text-sm font-medium rounded-md ${
                     isActive(link.href)
-                      ? "text-green-600 bg-green-50"
+                      ? "text-[#2FA4BC] bg-cyan-50"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
@@ -169,12 +169,12 @@ export function PublicNavbar() {
                       </Button>
                     </Link>
                     <Link href="/demo">
-                      <Button variant="outline" size="sm" className="w-full border-green-200 text-green-600">
+                      <Button variant="outline" size="sm" className="w-full border-cyan-200 text-[#2FA4BC]">
                         Book Demo
                       </Button>
                     </Link>
                     <Link href="/signup?plan=growth">
-                      <Button size="sm" className="w-full bg-green-500 hover:bg-green-600 shadow-sm text-white font-semibold">
+                      <Button size="sm" className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-sm text-white font-semibold">
                         Start Free Trial
                       </Button>
                     </Link>

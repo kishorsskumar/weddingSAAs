@@ -17,19 +17,19 @@ export function PublicFooter() {
               All-in-one CRM, Client Portal, and Event Calendar for event planners and wedding businesses. Close more clients, deliver better events.
             </p>
             <div className="flex items-center gap-4">
-              <a href="https://twitter.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-green-500/20 hover:text-green-400 transition-colors">
+              <a href="https://twitter.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-[#2FA4BC]/20 hover:text-cyan-400 transition-colors">
                 <Twitter className="h-5 w-5" />
               </a>
-              <a href="https://linkedin.com/company/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-green-500/20 hover:text-green-400 transition-colors">
+              <a href="https://linkedin.com/company/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-[#2FA4BC]/20 hover:text-cyan-400 transition-colors">
                 <Linkedin className="h-5 w-5" />
               </a>
-              <a href="https://instagram.com/atbott.co" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-green-500/20 hover:text-green-400 transition-colors">
+              <a href="https://instagram.com/atbott.co" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-[#2FA4BC]/20 hover:text-cyan-400 transition-colors">
                 <Instagram className="h-5 w-5" />
               </a>
-              <a href="https://facebook.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-green-500/20 hover:text-green-400 transition-colors">
+              <a href="https://facebook.com/atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-[#2FA4BC]/20 hover:text-cyan-400 transition-colors">
                 <Facebook className="h-5 w-5" />
               </a>
-              <a href="https://youtube.com/@atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-green-500/20 hover:text-green-400 transition-colors">
+              <a href="https://youtube.com/@atbott" target="_blank" rel="noopener noreferrer" className="w-10 h-10 bg-white/5 rounded-lg flex items-center justify-center hover:bg-[#2FA4BC]/20 hover:text-cyan-400 transition-colors">
                 <Youtube className="h-5 w-5" />
               </a>
             </div>
@@ -39,19 +39,19 @@ export function PublicFooter() {
             <h3 className="font-semibold text-white mb-4">Product</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="/#product" className="hover:text-green-400 transition-colors">Features</Link>
+                <Link href="/#product" className="hover:text-cyan-400 transition-colors">Features</Link>
               </li>
               <li>
-                <Link href="/pricing" className="hover:text-green-400 transition-colors">Pricing</Link>
+                <Link href="/pricing" className="hover:text-cyan-400 transition-colors">Pricing</Link>
               </li>
               <li>
-                <Link href="/demo" className="hover:text-green-400 transition-colors">Book Demo</Link>
+                <Link href="/demo" className="hover:text-cyan-400 transition-colors">Book Demo</Link>
               </li>
               <li>
-                <Link href="/signup?plan=growth" className="hover:text-green-400 transition-colors">Start Free Trial</Link>
+                <Link href="/signup?plan=growth" className="hover:text-cyan-400 transition-colors">Start Free Trial</Link>
               </li>
               <li>
-                <Link href="/knotvite" className="hover:text-green-400 transition-colors">KnotVite RSVP</Link>
+                <Link href="/knotvite" className="hover:text-cyan-400 transition-colors">KnotVite RSVP</Link>
               </li>
             </ul>
           </div>
@@ -60,17 +60,17 @@ export function PublicFooter() {
             <h3 className="font-semibold text-white mb-4">Legal</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="/privacy-policy" className="hover:text-green-400 transition-colors">
+                <Link href="/privacy-policy" className="hover:text-cyan-400 transition-colors">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="/terms" className="hover:text-green-400 transition-colors">
+                <Link href="/terms" className="hover:text-cyan-400 transition-colors">
                   Terms & Conditions
                 </Link>
               </li>
               <li>
-                <Link href="/refund-policy" className="hover:text-green-400 transition-colors">
+                <Link href="/refund-policy" className="hover:text-cyan-400 transition-colors">
                   Refund Policy
                 </Link>
               </li>
@@ -81,19 +81,19 @@ export function PublicFooter() {
             <h3 className="font-semibold text-white mb-4">Contact</h3>
             <ul className="space-y-3 text-sm">
               <li className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-green-400/60" />
-                <a href="mailto:sales@atbott.co" className="hover:text-green-400 transition-colors">
+                <Mail className="h-4 w-4 text-cyan-400/60" />
+                <a href="mailto:sales@atbott.co" className="hover:text-cyan-400 transition-colors">
                   sales@atbott.co
                 </a>
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-green-400/60" />
-                <a href="tel:+918089191221" className="hover:text-green-400 transition-colors">
+                <Phone className="h-4 w-4 text-cyan-400/60" />
+                <a href="tel:+918089191221" className="hover:text-cyan-400 transition-colors">
                   +91 8089191221
                 </a>
               </li>
               <li className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-green-400/60 mt-0.5" />
+                <MapPin className="h-4 w-4 text-cyan-400/60 mt-0.5" />
                 <span className="text-slate-400">
                   Kochi, Kerala, India
                 </span>

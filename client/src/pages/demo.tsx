@@ -61,24 +61,24 @@ export default function DemoPage() {
 
               <ul className="space-y-4 mb-8">
                 <li className="flex items-center gap-3 text-gray-600">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                   30-minute personalized walkthrough
                 </li>
                 <li className="flex items-center gap-3 text-slate-600">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                   See features tailored to your business
                 </li>
                 <li className="flex items-center gap-3 text-slate-600">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                   Get answers to all your questions
                 </li>
                 <li className="flex items-center gap-3 text-slate-600">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                   No commitment required
                 </li>
               </ul>
 
-              <div className="bg-green-50 rounded-xl p-6 border border-green-100">
+              <div className="bg-cyan-50 rounded-xl p-6 border border-cyan-100">
                 <h3 className="font-semibold text-gray-900 mb-2">What to expect</h3>
                 <p className="text-sm text-gray-500">
                   After submitting your request, our team will confirm your preferred time slot within 24 hours. The demo will be conducted over Google Meet or Zoom.
@@ -151,7 +151,7 @@ export default function DemoPage() {
                       </Select>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold" disabled={isSubmitting} data-testid="button-submit-demo">
+                  <Button type="submit" className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/20 text-white font-semibold" disabled={isSubmitting} data-testid="button-submit-demo">
                     {isSubmitting ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting...</>
                     ) : (

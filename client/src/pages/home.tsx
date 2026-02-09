@@ -213,10 +213,10 @@ export default function HomePage() {
 
   return (
     <PublicLayout>
-      <section className="relative overflow-hidden py-28 lg:py-40" style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #f8fafc 40%, #ecfdf5 100%)" }}>
+      <section className="relative overflow-hidden py-28 lg:py-40" style={{ background: "linear-gradient(135deg, #ecfeff 0%, #f8fafc 40%, #e0f7fa 100%)" }}>
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-green-200/30 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-emerald-100/40 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-cyan-100/40 rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -225,13 +225,13 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 bg-green-100 text-green-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-8 border border-green-200/60">
+              <div className="inline-flex items-center gap-2 bg-cyan-100 text-cyan-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-8 border border-cyan-200/60">
                 <Sparkles className="h-4 w-4" />
                 Built for Wedding Professionals
               </div>
               <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-800 leading-[1.1] mb-6 tracking-tight">
                 Plan Events{" "}
-                <span className="text-green-500">Smarter</span>
+                <span className="text-[#2FA4BC]">Smarter</span>
                 ,{" "}Not Harder
               </h1>
               <p className="text-lg sm:text-xl text-slate-500 mb-10 max-w-xl leading-relaxed">
@@ -239,7 +239,7 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-10">
                 <Link href="/demo">
-                  <Button size="lg" className="w-full sm:w-auto text-base px-8 py-6 bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/25 text-white font-semibold" data-testid="button-hero-demo">
+                  <Button size="lg" className="w-full sm:w-auto text-base px-8 py-6 bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/25 text-white font-semibold" data-testid="button-hero-demo">
                     Book Live Demo
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -252,11 +252,11 @@ export default function HomePage() {
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-slate-400">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                   <span>No credit card required</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                   <span>14-day free trial</span>
                 </div>
               </div>
@@ -277,15 +277,15 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative mt-12 lg:mt-0"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-emerald-300/10 rounded-3xl blur-2xl scale-105"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 to-cyan-300/10 rounded-3xl blur-2xl scale-105"></div>
               <motion.div
                 animate={{ y: [-4, 4, -4] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-green-900/10 border border-green-100/60">
+                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-cyan-900/10 border border-cyan-100/60">
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
-                    <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-5 py-3.5 flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-[#2FA4BC] to-[#2FA4BC] px-5 py-3.5 flex items-center gap-2">
                       <div className="flex gap-1.5">
                         <div className="w-3 h-3 rounded-full bg-white/30"></div>
                         <div className="w-3 h-3 rounded-full bg-white/30"></div>
@@ -295,29 +295,29 @@ export default function HomePage() {
                     </div>
                     <div className="p-5 space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-green-50 rounded-xl p-3.5 text-center border border-green-100/50">
-                          <div className="text-xl font-bold text-green-600">24</div>
+                        <div className="bg-cyan-50 rounded-xl p-3.5 text-center border border-cyan-100/50">
+                          <div className="text-xl font-bold text-[#2FA4BC]">24</div>
                           <div className="text-xs text-slate-500 mt-0.5">Active Leads</div>
                         </div>
                         <div className="bg-blue-50 rounded-xl p-3.5 text-center border border-blue-100/50">
                           <div className="text-xl font-bold text-blue-600">12</div>
                           <div className="text-xs text-slate-500 mt-0.5">This Month</div>
                         </div>
-                        <div className="bg-emerald-50 rounded-xl p-3.5 text-center border border-emerald-100/50">
-                          <div className="text-xl font-bold text-emerald-600">₹8.5L</div>
+                        <div className="bg-cyan-50 rounded-xl p-3.5 text-center border border-cyan-100/50">
+                          <div className="text-xl font-bold text-cyan-600">₹8.5L</div>
                           <div className="text-xs text-slate-500 mt-0.5">Revenue</div>
                         </div>
                       </div>
                       <div className="space-y-2.5">
                         <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
-                          <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center">
-                            <Users className="h-4 w-4 text-green-600" />
+                          <div className="w-9 h-9 bg-cyan-100 rounded-full flex items-center justify-center">
+                            <Users className="h-4 w-4 text-[#2FA4BC]" />
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-semibold text-slate-800">Sharma Wedding</div>
                             <div className="text-xs text-slate-400">March 15, 2026</div>
                           </div>
-                          <span className="text-xs bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-medium border border-emerald-100">Confirmed</span>
+                          <span className="text-xs bg-cyan-50 text-cyan-600 px-2.5 py-1 rounded-full font-medium border border-cyan-100">Confirmed</span>
                         </div>
                         <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
                           <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
@@ -380,7 +380,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="text-center text-lg text-slate-500 mt-14 font-medium"
           >
-            Event planning is stressful. <span className="text-green-500 font-semibold">Your software shouldn't be.</span>
+            Event planning is stressful. <span className="text-[#2FA4BC] font-semibold">Your software shouldn't be.</span>
           </motion.p>
         </div>
       </section>
@@ -411,14 +411,14 @@ export default function HomePage() {
                 transition={{ delay: index * 0.1 }}
                 className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-lg transition-all hover:-translate-y-1"
               >
-                <div className="w-14 h-14 bg-green-500 rounded-xl flex items-center justify-center mb-6 shadow-sm shadow-green-500/20">
+                <div className="w-14 h-14 bg-[#2FA4BC] rounded-xl flex items-center justify-center mb-6 shadow-sm shadow-[#2FA4BC]/20">
                   <column.icon className="h-7 w-7 text-white" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-800 mb-4">{column.title}</h3>
                 <ul className="space-y-3">
                   {column.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-3 text-slate-600">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                      <CheckCircle2 className="h-5 w-5 text-[#2FA4BC] flex-shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -429,7 +429,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="features" className="py-28 lg:py-36" style={{ background: "linear-gradient(180deg, #f0fdf4 0%, #fafafa 100%)" }}>
+      <section id="features" className="py-28 lg:py-36" style={{ background: "linear-gradient(180deg, #ecfeff 0%, #fafafa 100%)" }}>
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -450,7 +450,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group cursor-pointer shadow-lg shadow-slate-200/50"
           >
-            <div className="relative z-10 w-20 h-20 bg-green-500 rounded-full flex items-center justify-center shadow-xl shadow-green-500/30 group-hover:scale-110 transition-transform">
+            <div className="relative z-10 w-20 h-20 bg-[#2FA4BC] rounded-full flex items-center justify-center shadow-xl shadow-[#2FA4BC]/30 group-hover:scale-110 transition-transform">
               <Play className="h-8 w-8 text-white ml-1" />
             </div>
             <p className="absolute bottom-6 text-slate-400 text-sm">Click to watch demo video</p>
@@ -462,7 +462,7 @@ export default function HomePage() {
               <Play className="ml-2 h-4 w-4" />
             </Button>
             <Link href="/demo">
-              <Button size="lg" className="bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold">
+              <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/20 text-white font-semibold">
                 Book Live Demo
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -499,10 +499,10 @@ export default function HomePage() {
               >
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center border border-green-100/60">
-                      <step.icon className="h-10 w-10 text-green-500" />
+                    <div className="w-20 h-20 bg-cyan-50 rounded-2xl flex items-center justify-center border border-cyan-100/60">
+                      <step.icon className="h-10 w-10 text-[#2FA4BC]" />
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-green-500/30">
+                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-[#2FA4BC] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-[#2FA4BC]/30">
                       {step.step}
                     </div>
                   </div>
@@ -544,10 +544,10 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 hover:shadow-md hover:border-green-200 transition-all cursor-pointer hover:-translate-y-0.5"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 hover:shadow-md hover:border-cyan-200 transition-all cursor-pointer hover:-translate-y-0.5"
               >
-                <div className="w-14 h-14 bg-green-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-green-100/60">
-                  <industry.icon className="h-7 w-7 text-green-500" />
+                <div className="w-14 h-14 bg-cyan-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-cyan-100/60">
+                  <industry.icon className="h-7 w-7 text-[#2FA4BC]" />
                 </div>
                 <h3 className="font-semibold text-slate-800 mb-1">{industry.title}</h3>
                 <p className="text-xs text-slate-500">{industry.description}</p>
@@ -581,7 +581,7 @@ export default function HomePage() {
                     transition={{ delay: index * 0.1 }}
                     className="flex items-center gap-4"
                   >
-                    <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm shadow-green-500/20">
+                    <div className="w-8 h-8 bg-[#2FA4BC] rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm shadow-[#2FA4BC]/20">
                       <CheckCircle2 className="h-5 w-5 text-white" />
                     </div>
                     <span className="text-slate-600 font-medium">{item}</span>
@@ -598,22 +598,22 @@ export default function HomePage() {
             >
               <div className="grid grid-cols-2 gap-5">
                 <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                  <Zap className="h-8 w-8 text-green-500 mb-3" />
+                  <Zap className="h-8 w-8 text-[#2FA4BC] mb-3" />
                   <div className="text-3xl font-bold text-slate-800">3x</div>
                   <div className="text-sm text-slate-500 mt-1">Faster lead response</div>
                 </div>
                 <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                  <TrendingUp className="h-8 w-8 text-green-500 mb-3" />
+                  <TrendingUp className="h-8 w-8 text-[#2FA4BC] mb-3" />
                   <div className="text-3xl font-bold text-slate-800">40%</div>
                   <div className="text-sm text-slate-500 mt-1">Higher conversion</div>
                 </div>
                 <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                  <Clock className="h-8 w-8 text-green-500 mb-3" />
+                  <Clock className="h-8 w-8 text-[#2FA4BC] mb-3" />
                   <div className="text-3xl font-bold text-slate-800">10hrs</div>
                   <div className="text-sm text-slate-500 mt-1">Saved per week</div>
                 </div>
                 <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                  <Shield className="h-8 w-8 text-green-500 mb-3" />
+                  <Shield className="h-8 w-8 text-[#2FA4BC] mb-3" />
                   <div className="text-3xl font-bold text-slate-800">100%</div>
                   <div className="text-sm text-slate-500 mt-1">Data secure</div>
                 </div>
@@ -650,12 +650,12 @@ export default function HomePage() {
                 transition={{ delay: index * 0.1 }}
                 className={`relative bg-white rounded-2xl p-8 border ${
                   plan.highlighted 
-                    ? "border-green-300 shadow-xl shadow-green-500/10 scale-105" 
+                    ? "border-cyan-300 shadow-xl shadow-[#2FA4BC]/10 scale-105" 
                     : "border-slate-100 shadow-sm"
                 }`}
               >
                 {plan.highlighted && (
-                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white text-sm font-semibold px-5 py-1.5 rounded-full shadow-md shadow-green-500/30">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#2FA4BC] text-white text-sm font-semibold px-5 py-1.5 rounded-full shadow-md shadow-[#2FA4BC]/30">
                     Most Popular
                   </div>
                 )}
@@ -668,7 +668,7 @@ export default function HomePage() {
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-center gap-2 text-sm text-slate-600">
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
                       {feature}
                     </li>
                   ))}
@@ -681,7 +681,7 @@ export default function HomePage() {
                   <Button 
                     className={`w-full ${
                       plan.highlighted 
-                        ? "bg-green-500 hover:bg-green-600 shadow-md shadow-green-500/20 text-white font-semibold" 
+                        ? "bg-[#2FA4BC] hover:bg-[#2590a6] shadow-md shadow-[#2FA4BC]/20 text-white font-semibold" 
                         : "border-2 border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                     variant={plan.highlighted ? "default" : "outline"}
@@ -696,22 +696,22 @@ export default function HomePage() {
 
           <div className="flex flex-wrap items-center justify-center gap-6 mt-10 text-sm text-slate-500">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
               No setup fees
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
               Free onboarding
             </div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <CheckCircle2 className="h-4 w-4 text-[#2FA4BC]" />
               Cancel anytime
             </div>
           </div>
 
           <div className="text-center mt-8">
             <Link href="/pricing">
-              <Button variant="link" className="text-green-600 hover:text-green-700 font-semibold">
+              <Button variant="link" className="text-[#2FA4BC] hover:text-cyan-700 font-semibold">
                 View Full Pricing Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -741,7 +741,7 @@ export default function HomePage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-3xl p-10 lg:p-14 text-center border border-slate-100 shadow-lg shadow-slate-100/50"
             >
-              <Quote className="h-10 w-10 text-green-200 mx-auto mb-8" />
+              <Quote className="h-10 w-10 text-cyan-200 mx-auto mb-8" />
               <p className="text-xl lg:text-2xl text-slate-700 mb-8 font-medium leading-relaxed">
                 "{testimonials[currentTestimonial].quote}"
               </p>
@@ -750,7 +750,7 @@ export default function HomePage() {
                   <Star key={i} className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                 ))}
               </div>
-              <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-green-500/20">
+              <div className="w-14 h-14 bg-[#2FA4BC] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-[#2FA4BC]/20">
                 <span className="text-xl font-bold text-white">
                   {testimonials[currentTestimonial].name.charAt(0)}
                 </span>
@@ -765,7 +765,7 @@ export default function HomePage() {
                   key={index}
                   onClick={() => setCurrentTestimonial(index)}
                   className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                    index === currentTestimonial ? "bg-green-500" : "bg-slate-200"
+                    index === currentTestimonial ? "bg-[#2FA4BC]" : "bg-slate-200"
                   }`}
                 />
               ))}
@@ -791,15 +791,15 @@ export default function HomePage() {
               </p>
               <ul className="space-y-4">
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
                   30-minute personalized walkthrough
                 </li>
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
                   See features tailored to your business
                 </li>
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
+                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
                   Get answers to all your questions
                 </li>
               </ul>
@@ -876,7 +876,7 @@ export default function HomePage() {
                   </div>
                   <Button
                     type="submit"
-                    className="w-full bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/20 text-white font-semibold"
+                    className="w-full bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/20 text-white font-semibold"
                     disabled={isSubmitting}
                     data-testid="button-submit-demo"
                   >
@@ -931,7 +931,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="py-28 lg:py-36" style={{ background: "linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #15803d 100%)" }}>
+      <section className="py-28 lg:py-36" style={{ background: "linear-gradient(135deg, #2FA4BC 0%, #2590a6 50%, #1e7a8c 100%)" }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -946,7 +946,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup?plan=growth">
-                <Button size="lg" className="w-full sm:w-auto text-base px-10 py-6 bg-white text-green-600 hover:bg-green-50 shadow-xl font-semibold">
+                <Button size="lg" className="w-full sm:w-auto text-base px-10 py-6 bg-white text-[#2FA4BC] hover:bg-cyan-50 shadow-xl font-semibold">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
