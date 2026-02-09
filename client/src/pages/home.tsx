@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import dashboardPreview from "@/assets/images/dashboard-preview.png";
 
 const problemCards = [
   { icon: AlertTriangle, title: "Leads Getting Missed", description: "Potential clients slip through the cracks with scattered follow-ups" },
@@ -213,10 +214,10 @@ export default function HomePage() {
 
   return (
     <PublicLayout>
-      <section className="relative overflow-hidden py-28 lg:py-40" style={{ background: "linear-gradient(135deg, #ecfeff 0%, #f8fafc 40%, #e0f7fa 100%)" }}>
+      <section className="relative overflow-hidden py-28 lg:py-40 bg-white">
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#2FA4BC]/20/30 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#2FA4BC]/10/40 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#2FA4BC]/5 rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -277,62 +278,17 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative mt-12 lg:mt-0"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#5cbdd0]/20 to-[#8dd0de]/10 rounded-3xl blur-2xl scale-105"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-[#2FA4BC]/10 to-[#2FA4BC]/5 rounded-3xl blur-2xl scale-105"></div>
               <motion.div
                 animate={{ y: [-4, 4, -4] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-[#1e7a8c]/10 border border-[#2FA4BC]/15/60">
-                  <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
-                    <div className="bg-gradient-to-r from-[#2FA4BC] to-[#2FA4BC] px-5 py-3.5 flex items-center gap-2">
-                      <div className="flex gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
-                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
-                        <div className="w-3 h-3 rounded-full bg-white/30"></div>
-                      </div>
-                      <span className="text-white/90 text-sm font-medium ml-2">Atbott Dashboard</span>
-                    </div>
-                    <div className="p-5 space-y-4">
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-[#2FA4BC]/5 rounded-xl p-3.5 text-center border border-[#2FA4BC]/15/50">
-                          <div className="text-xl font-bold text-[#2FA4BC]">24</div>
-                          <div className="text-xs text-slate-500 mt-0.5">Active Leads</div>
-                        </div>
-                        <div className="bg-blue-50 rounded-xl p-3.5 text-center border border-blue-100/50">
-                          <div className="text-xl font-bold text-blue-600">12</div>
-                          <div className="text-xs text-slate-500 mt-0.5">This Month</div>
-                        </div>
-                        <div className="bg-[#2FA4BC]/5 rounded-xl p-3.5 text-center border border-[#2FA4BC]/15/50">
-                          <div className="text-xl font-bold text-[#2FA4BC]">₹8.5L</div>
-                          <div className="text-xs text-slate-500 mt-0.5">Revenue</div>
-                        </div>
-                      </div>
-                      <div className="space-y-2.5">
-                        <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
-                          <div className="w-9 h-9 bg-[#2FA4BC]/10 rounded-full flex items-center justify-center">
-                            <Users className="h-4 w-4 text-[#2FA4BC]" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-slate-800">Sharma Wedding</div>
-                            <div className="text-xs text-slate-400">March 15, 2026</div>
-                          </div>
-                          <span className="text-xs bg-[#2FA4BC]/5 text-[#2FA4BC] px-2.5 py-1 rounded-full font-medium border border-[#2FA4BC]/15">Confirmed</span>
-                        </div>
-                        <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
-                          <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Calendar className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-slate-800">Patel Reception</div>
-                            <div className="text-xs text-slate-400">April 8, 2026</div>
-                          </div>
-                          <span className="text-xs bg-amber-50 text-amber-600 px-2.5 py-1 rounded-full font-medium border border-amber-100">Planning</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <img 
+                  src={dashboardPreview} 
+                  alt="Atbott Dashboard Preview" 
+                  className="rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/60 w-full"
+                />
               </motion.div>
             </motion.div>
           </div>
