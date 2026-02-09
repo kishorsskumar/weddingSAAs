@@ -50,7 +50,7 @@ export default function ContactEnterprise() {
         <section className="py-24 lg:py-32 flex-1 flex items-center">
           <div className="max-w-2xl mx-auto px-4 text-center">
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-              <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-cyan-100">
+              <div className="w-20 h-20 bg-[#2FA4BC]/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-[#2FA4BC]/15">
                 <CheckCircle2 className="h-10 w-10 text-[#2FA4BC]" />
               </div>
               <h1 className="text-3xl font-bold text-slate-800 mb-4" data-testid="text-enterprise-success">Thank You!</h1>
@@ -84,7 +84,7 @@ export default function ContactEnterprise() {
 
               <div className="space-y-6 mb-8">
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-cyan-100">
+                  <div className="w-10 h-10 bg-[#2FA4BC]/5 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#2FA4BC]/15">
                     <Users className="h-5 w-5 text-[#2FA4BC]" />
                   </div>
                   <div>
@@ -93,7 +93,7 @@ export default function ContactEnterprise() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-cyan-100">
+                  <div className="w-10 h-10 bg-[#2FA4BC]/5 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#2FA4BC]/15">
                     <Zap className="h-5 w-5 text-[#2FA4BC]" />
                   </div>
                   <div>
@@ -102,7 +102,7 @@ export default function ContactEnterprise() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-cyan-100">
+                  <div className="w-10 h-10 bg-[#2FA4BC]/5 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#2FA4BC]/15">
                     <Shield className="h-5 w-5 text-[#2FA4BC]" />
                   </div>
                   <div>
@@ -111,7 +111,7 @@ export default function ContactEnterprise() {
                   </div>
                 </div>
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-cyan-50 rounded-lg flex items-center justify-center flex-shrink-0 border border-cyan-100">
+                  <div className="w-10 h-10 bg-[#2FA4BC]/5 rounded-lg flex items-center justify-center flex-shrink-0 border border-[#2FA4BC]/15">
                     <Building2 className="h-5 w-5 text-[#2FA4BC]" />
                   </div>
                   <div>

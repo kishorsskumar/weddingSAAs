@@ -78,7 +78,7 @@ export default function DemoPage() {
                 </li>
               </ul>
 
-              <div className="bg-cyan-50 rounded-xl p-6 border border-cyan-100">
+              <div className="bg-[#2FA4BC]/5 rounded-xl p-6 border border-[#2FA4BC]/15">
                 <h3 className="font-semibold text-gray-900 mb-2">What to expect</h3>
                 <p className="text-sm text-gray-500">
                   After submitting your request, our team will confirm your preferred time slot within 24 hours. The demo will be conducted over Google Meet or Zoom.

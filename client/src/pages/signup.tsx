@@ -116,7 +116,7 @@ export default function Signup() {
             <h2 className="text-2xl font-bold text-foreground mb-2">Create Your Account</h2>
             <p className="text-muted-foreground">Start managing your events today</p>
             {planLabels[plan] && (
-              <div className="mt-3 inline-flex items-center gap-2 bg-cyan-50 text-cyan-700 px-3 py-1.5 rounded-full text-sm font-medium border border-cyan-100">
+              <div className="mt-3 inline-flex items-center gap-2 bg-[#2FA4BC]/5 text-[#2590a6] px-3 py-1.5 rounded-full text-sm font-medium border border-[#2FA4BC]/15">
                 {planLabels[plan]}
               </div>
             )}

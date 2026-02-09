@@ -101,7 +101,7 @@ export function PublicNavbar() {
                   </Button>
                 </Link>
                 <Link href="/demo">
-                  <Button variant="outline" size="sm" className="border-cyan-200 text-[#2FA4BC] hover:bg-cyan-50">
+                  <Button variant="outline" size="sm" className="border-[#2FA4BC]/20 text-[#2FA4BC] hover:bg-[#2FA4BC]/5">
                     Book Demo
                   </Button>
                 </Link>
@@ -132,7 +132,7 @@ export function PublicNavbar() {
                   onClick={() => handleNavClick(link.href)}
                   className={`px-3 py-2 text-sm font-medium rounded-md ${
                     isActive(link.href)
-                      ? "text-[#2FA4BC] bg-cyan-50"
+                      ? "text-[#2FA4BC] bg-[#2FA4BC]/5"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                   }`}
                 >
@@ -169,7 +169,7 @@ export function PublicNavbar() {
                       </Button>
                     </Link>
                     <Link href="/demo">
-                      <Button variant="outline" size="sm" className="w-full border-cyan-200 text-[#2FA4BC]">
+                      <Button variant="outline" size="sm" className="w-full border-[#2FA4BC]/20 text-[#2FA4BC]">
                         Book Demo
                       </Button>
                     </Link>

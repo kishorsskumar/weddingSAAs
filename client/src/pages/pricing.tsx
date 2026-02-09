@@ -210,7 +210,7 @@ export default function PricingPage() {
             />
             <Label htmlFor="billing-toggle" className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>
               Yearly
-              <Badge className="ml-2 bg-cyan-100 text-cyan-800 hover:bg-cyan-100">Save 17%</Badge>
+              <Badge className="ml-2 bg-[#2FA4BC]/10 text-[#1e7a8c] hover:bg-[#2FA4BC]/10">Save 17%</Badge>
             </Label>
           </div>
 

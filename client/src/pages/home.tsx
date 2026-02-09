@@ -215,8 +215,8 @@ export default function HomePage() {
     <PublicLayout>
       <section className="relative overflow-hidden py-28 lg:py-40" style={{ background: "linear-gradient(135deg, #ecfeff 0%, #f8fafc 40%, #e0f7fa 100%)" }}>
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-cyan-200/30 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-cyan-100/40 rounded-full blur-3xl"></div>
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#2FA4BC]/20/30 rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-[#2FA4BC]/10/40 rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -225,7 +225,7 @@ export default function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 bg-cyan-100 text-cyan-700 px-5 py-2.5 rounded-full text-sm font-semibold mb-8 border border-cyan-200/60">
+              <div className="inline-flex items-center gap-2 bg-[#2FA4BC]/10 text-[#2590a6] px-5 py-2.5 rounded-full text-sm font-semibold mb-8 border border-[#2FA4BC]/20/60">
                 <Sparkles className="h-4 w-4" />
                 Built for Wedding Professionals
               </div>
@@ -277,13 +277,13 @@ export default function HomePage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative mt-12 lg:mt-0"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/20 to-cyan-300/10 rounded-3xl blur-2xl scale-105"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-[#5cbdd0]/20 to-[#8dd0de]/10 rounded-3xl blur-2xl scale-105"></div>
               <motion.div
                 animate={{ y: [-4, 4, -4] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
                 className="relative"
               >
-                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-cyan-900/10 border border-cyan-100/60">
+                <div className="bg-white rounded-[20px] p-5 shadow-2xl shadow-[#1e7a8c]/10 border border-[#2FA4BC]/15/60">
                   <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-slate-100">
                     <div className="bg-gradient-to-r from-[#2FA4BC] to-[#2FA4BC] px-5 py-3.5 flex items-center gap-2">
                       <div className="flex gap-1.5">
@@ -295,7 +295,7 @@ export default function HomePage() {
                     </div>
                     <div className="p-5 space-y-4">
                       <div className="grid grid-cols-3 gap-3">
-                        <div className="bg-cyan-50 rounded-xl p-3.5 text-center border border-cyan-100/50">
+                        <div className="bg-[#2FA4BC]/5 rounded-xl p-3.5 text-center border border-[#2FA4BC]/15/50">
                           <div className="text-xl font-bold text-[#2FA4BC]">24</div>
                           <div className="text-xs text-slate-500 mt-0.5">Active Leads</div>
                         </div>
@@ -303,21 +303,21 @@ export default function HomePage() {
                           <div className="text-xl font-bold text-blue-600">12</div>
                           <div className="text-xs text-slate-500 mt-0.5">This Month</div>
                         </div>
-                        <div className="bg-cyan-50 rounded-xl p-3.5 text-center border border-cyan-100/50">
-                          <div className="text-xl font-bold text-cyan-600">₹8.5L</div>
+                        <div className="bg-[#2FA4BC]/5 rounded-xl p-3.5 text-center border border-[#2FA4BC]/15/50">
+                          <div className="text-xl font-bold text-[#2FA4BC]">₹8.5L</div>
                           <div className="text-xs text-slate-500 mt-0.5">Revenue</div>
                         </div>
                       </div>
                       <div className="space-y-2.5">
                         <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
-                          <div className="w-9 h-9 bg-cyan-100 rounded-full flex items-center justify-center">
+                          <div className="w-9 h-9 bg-[#2FA4BC]/10 rounded-full flex items-center justify-center">
                             <Users className="h-4 w-4 text-[#2FA4BC]" />
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-semibold text-slate-800">Sharma Wedding</div>
                             <div className="text-xs text-slate-400">March 15, 2026</div>
                           </div>
-                          <span className="text-xs bg-cyan-50 text-cyan-600 px-2.5 py-1 rounded-full font-medium border border-cyan-100">Confirmed</span>
+                          <span className="text-xs bg-[#2FA4BC]/5 text-[#2FA4BC] px-2.5 py-1 rounded-full font-medium border border-[#2FA4BC]/15">Confirmed</span>
                         </div>
                         <div className="flex items-center gap-3 bg-slate-50/80 rounded-xl p-3 border border-slate-100/50">
                           <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
@@ -499,7 +499,7 @@ export default function HomePage() {
               >
                 <div className="text-center">
                   <div className="relative inline-block mb-6">
-                    <div className="w-20 h-20 bg-cyan-50 rounded-2xl flex items-center justify-center border border-cyan-100/60">
+                    <div className="w-20 h-20 bg-[#2FA4BC]/5 rounded-2xl flex items-center justify-center border border-[#2FA4BC]/15/60">
                       <step.icon className="h-10 w-10 text-[#2FA4BC]" />
                     </div>
                     <div className="absolute -top-2 -right-2 w-8 h-8 bg-[#2FA4BC] rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md shadow-[#2FA4BC]/30">
@@ -544,9 +544,9 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 hover:shadow-md hover:border-cyan-200 transition-all cursor-pointer hover:-translate-y-0.5"
+                className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 hover:shadow-md hover:border-[#2FA4BC]/20 transition-all cursor-pointer hover:-translate-y-0.5"
               >
-                <div className="w-14 h-14 bg-cyan-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-cyan-100/60">
+                <div className="w-14 h-14 bg-[#2FA4BC]/5 rounded-xl flex items-center justify-center mx-auto mb-4 border border-[#2FA4BC]/15/60">
                   <industry.icon className="h-7 w-7 text-[#2FA4BC]" />
                 </div>
                 <h3 className="font-semibold text-slate-800 mb-1">{industry.title}</h3>
@@ -650,7 +650,7 @@ export default function HomePage() {
                 transition={{ delay: index * 0.1 }}
                 className={`relative bg-white rounded-2xl p-8 border ${
                   plan.highlighted 
-                    ? "border-cyan-300 shadow-xl shadow-[#2FA4BC]/10 scale-105" 
+                    ? "border-[#2FA4BC]/30 shadow-xl shadow-[#2FA4BC]/10 scale-105" 
                     : "border-slate-100 shadow-sm"
                 }`}
               >
@@ -711,7 +711,7 @@ export default function HomePage() {
 
           <div className="text-center mt-8">
             <Link href="/pricing">
-              <Button variant="link" className="text-[#2FA4BC] hover:text-cyan-700 font-semibold">
+              <Button variant="link" className="text-[#2FA4BC] hover:text-[#2590a6] font-semibold">
                 View Full Pricing Details
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -741,7 +741,7 @@ export default function HomePage() {
               exit={{ opacity: 0, x: -20 }}
               className="bg-white rounded-3xl p-10 lg:p-14 text-center border border-slate-100 shadow-lg shadow-slate-100/50"
             >
-              <Quote className="h-10 w-10 text-cyan-200 mx-auto mb-8" />
+              <Quote className="h-10 w-10 text-[#2FA4BC]/20 mx-auto mb-8" />
               <p className="text-xl lg:text-2xl text-slate-700 mb-8 font-medium leading-relaxed">
                 "{testimonials[currentTestimonial].quote}"
               </p>
@@ -791,15 +791,15 @@ export default function HomePage() {
               </p>
               <ul className="space-y-4">
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
+                  <CheckCircle2 className="h-5 w-5 text-[#5cbdd0]" />
                   30-minute personalized walkthrough
                 </li>
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
+                  <CheckCircle2 className="h-5 w-5 text-[#5cbdd0]" />
                   See features tailored to your business
                 </li>
                 <li className="flex items-center gap-3 text-slate-300">
-                  <CheckCircle2 className="h-5 w-5 text-cyan-400" />
+                  <CheckCircle2 className="h-5 w-5 text-[#5cbdd0]" />
                   Get answers to all your questions
                 </li>
               </ul>
@@ -946,7 +946,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup?plan=growth">
-                <Button size="lg" className="w-full sm:w-auto text-base px-10 py-6 bg-white text-[#2FA4BC] hover:bg-cyan-50 shadow-xl font-semibold">
+                <Button size="lg" className="w-full sm:w-auto text-base px-10 py-6 bg-white text-[#2FA4BC] hover:bg-[#2FA4BC]/5 shadow-xl font-semibold">
                   Start Free Trial
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

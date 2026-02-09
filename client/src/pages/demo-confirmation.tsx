@@ -17,7 +17,7 @@ export default function DemoConfirmation() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <div className="w-20 h-20 bg-cyan-50 rounded-full flex items-center justify-center mx-auto mb-8 border border-cyan-100">
+            <div className="w-20 h-20 bg-[#2FA4BC]/5 rounded-full flex items-center justify-center mx-auto mb-8 border border-[#2FA4BC]/15">
               <CheckCircle2 className="h-10 w-10 text-[#2FA4BC]" />
             </div>
 
@@ -47,7 +47,7 @@ export default function DemoConfirmation() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/">
-                <Button variant="outline" className="border-cyan-200 text-[#2FA4BC] hover:bg-cyan-50" data-testid="button-back-home">
+                <Button variant="outline" className="border-[#2FA4BC]/20 text-[#2FA4BC] hover:bg-[#2FA4BC]/5" data-testid="button-back-home">
                   Back to Home
                 </Button>
               </Link>
