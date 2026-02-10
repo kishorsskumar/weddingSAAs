@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Clock, ArrowUpRight } from "lucide-react";
+import { InteractiveTutorial, TutorialTriggerButton, useTutorial } from "@/components/interactive-tutorial";
 import {
   Calendar,
   Users,
@@ -559,6 +560,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>({});
+  const tutorial = useTutorial();
 
   if (!user) return <div className="min-h-screen bg-background">{children}</div>;
 
@@ -768,6 +770,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </div>
+        <TutorialTriggerButton onClick={tutorial.startTutorial} />
         <Button
           variant="ghost"
           size="sm"
@@ -788,6 +791,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <TrialBanner />
         {children}
         <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
+        <InteractiveTutorial isActive={tutorial.isActive} onComplete={tutorial.completeTutorial} onDismiss={tutorial.dismissTutorial} />
       </div>
     );
   }
@@ -844,6 +848,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
       </div>
+      <InteractiveTutorial isActive={tutorial.isActive} onComplete={tutorial.completeTutorial} onDismiss={tutorial.dismissTutorial} />
     </div>
   );
 }
