@@ -1,9 +1,13 @@
 import { Resend } from 'resend';
 import { storage } from './storage';
 
-let connectionSettings: any;
+const DEFAULT_FROM_EMAIL = 'Atbott <onboarding@resend.dev>';
 
 async function getCredentials() {
+  if (process.env.RESEND_API_KEY) {
+    return { apiKey: process.env.RESEND_API_KEY, fromEmail: process.env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL };
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY 
     ? 'repl ' + process.env.REPL_IDENTITY 
@@ -12,10 +16,10 @@ async function getCredentials() {
     : null;
 
   if (!xReplitToken) {
-    throw new Error('X_REPLIT_TOKEN not found for repl/depl');
+    throw new Error('No Resend API key found');
   }
 
-  connectionSettings = await fetch(
+  const connectionSettings = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
     {
       headers: {
@@ -28,7 +32,7 @@ async function getCredentials() {
   if (!connectionSettings || (!connectionSettings.settings.api_key)) {
     throw new Error('Resend not connected');
   }
-  return { apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email };
+  return { apiKey: connectionSettings.settings.api_key, fromEmail: connectionSettings.settings.from_email || DEFAULT_FROM_EMAIL };
 }
 
 async function getResendClient() {
