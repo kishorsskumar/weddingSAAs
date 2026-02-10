@@ -1,0 +1,113 @@
+Implement complete 14-day Growth Trial flow for Atbott SaaS.
+
+IMPORTANT:
+Maintain existing UI.
+Implement backend logic, onboarding flow, and plan control.
+
+--------------------------------------------------
+WHEN USER CLICKS "START FREE TRIAL"
+
+Route:
+ /auth/signup
+
+After OTP success:
+
+1. Create tenant workspace
+2. Assign:
+   plan_type = "growth"
+   plan_status = "active"
+   is_trial = true
+   trial_expiry_date = current_date + 14 days
+3. Create CRM lead entry (source = trial_signup)
+4. Create system notification (event_type = trial_signup)
+5. Trigger AI admin notification
+
+--------------------------------------------------
+ONBOARDING FLOW
+
+Redirect to:
+ /onboarding
+
+Steps:
+1. Business Type
+2. Team Size
+3. Create First Event
+4. Add First Lead
+
+Only after completion:
+Set onboarding_completed = true
+Redirect to dashboard
+
+--------------------------------------------------
+TRIAL DASHBOARD BANNER
+
+Display banner if is_trial = true
+
+Show:
+Days remaining
+Upgrade button
+
+If < 3 days left:
+Change banner to warning tone.
+
+--------------------------------------------------
+TRIAL EXPIRY LOGIC
+
+If current_date > trial_expiry_date:
+
+Set plan_status = expired
+
+Restrict:
+• New event creation
+• New lead creation
+• Advanced features
+
+Allow dashboard view.
+
+Show upgrade modal.
+
+--------------------------------------------------
+UPGRADE FLOW
+
+On successful payment:
+
+Update:
+plan_type = selected_plan
+plan_status = active
+is_trial = false
+Remove banner
+
+--------------------------------------------------
+DATABASE REQUIREMENTS
+
+Ensure tenants table includes:
+
+plan_type
+plan_status
+trial_expiry_date
+is_trial
+activated_at
+onboarding_completed
+
+--------------------------------------------------
+SECURITY
+
+Ensure:
+Plan restrictions cannot be bypassed via direct URL.
+Check plan access on backend.
+Enforce row-level security.
+
+--------------------------------------------------
+TESTING
+
+Test:
+
+• New signup
+• Trial activation
+• Onboarding flow
+• Trial expiry
+• Upgrade success
+• Upgrade failure
+• Plan restriction enforcement
+
+Provide full report after implementation.
