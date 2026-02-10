@@ -398,6 +398,7 @@ import {
   adminNotifications,
   systemNotifications,
   emailLogs,
+  adminEventLogs,
   type DemoBooking,
   type InsertDemoBooking,
   type EnterpriseLead,
@@ -410,6 +411,8 @@ import {
   type InsertSystemNotification,
   type EmailLog,
   type InsertEmailLog,
+  type AdminEventLog,
+  type InsertAdminEventLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -1120,6 +1123,10 @@ export interface IStorage {
   // Email Logs
   createEmailLog(log: InsertEmailLog): Promise<EmailLog>;
   getEmailLogs(limit?: number): Promise<EmailLog[]>;
+
+  // Admin Event Logs
+  createAdminEventLog(log: InsertAdminEventLog): Promise<AdminEventLog>;
+  getAdminEventLogs(limit?: number, eventType?: string): Promise<AdminEventLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5933,6 +5940,20 @@ export class DatabaseStorage implements IStorage {
 
   async getEmailLogs(limit = 50): Promise<EmailLog[]> {
     return db.select().from(emailLogs).orderBy(desc(emailLogs.createdAt)).limit(limit);
+  }
+
+  async createAdminEventLog(log: InsertAdminEventLog): Promise<AdminEventLog> {
+    const [created] = await db.insert(adminEventLogs).values(log).returning();
+    return created;
+  }
+
+  async getAdminEventLogs(limit = 100, eventType?: string): Promise<AdminEventLog[]> {
+    if (eventType) {
+      return db.select().from(adminEventLogs)
+        .where(eq(adminEventLogs.eventType, eventType))
+        .orderBy(desc(adminEventLogs.createdAt)).limit(limit);
+    }
+    return db.select().from(adminEventLogs).orderBy(desc(adminEventLogs.createdAt)).limit(limit);
   }
 }
 

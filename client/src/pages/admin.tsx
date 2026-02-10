@@ -1081,6 +1081,180 @@ function CalendarIntegrationTab() {
   );
 }
 
+function getAuthHeaders(): HeadersInit {
+  const headers: HeadersInit = {};
+  const token = localStorage.getItem('auth_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+function SaasOverviewTab() {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["/api/admin/stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/stats", { credentials: "include", headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to fetch stats");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!stats) return <div className="text-center py-8 text-gray-500">No data available</div>;
+
+  const statCards = [
+    { label: "Total Users", value: stats.totalUsers, icon: Users, color: "text-blue-600 bg-blue-50" },
+    { label: "Total Companies", value: stats.totalCompanies, icon: Building2, color: "text-purple-600 bg-purple-50" },
+    { label: "Active Subscriptions", value: stats.activeSubscriptions, icon: CheckCircle2, color: "text-green-600 bg-green-50" },
+    { label: "Trial Users", value: stats.trialUsers, icon: Calendar, color: "text-amber-600 bg-amber-50" },
+    { label: "Paid Users", value: stats.paidUsers, icon: Shield, color: "text-emerald-600 bg-emerald-50" },
+    { label: "Total Revenue", value: `₹${(stats.totalRevenue || 0).toLocaleString('en-IN')}`, icon: RefreshCw, color: "text-teal-600 bg-teal-50" },
+  ];
+
+  return (
+    <div className="space-y-6" data-testid="saas-overview-tab">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {statCards.map((stat) => (
+          <Card key={stat.label} className="border">
+            <CardContent className="p-4">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-2 ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
+              </div>
+              <p className="text-2xl font-bold">{stat.value}</p>
+              <p className="text-xs text-gray-500">{stat.label}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Signups</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats.recentSignups?.length === 0 && <p className="text-sm text-gray-500">No recent signups</p>}
+              {stats.recentSignups?.map((u: any) => (
+                <div key={u.id} className="flex items-center justify-between text-sm border-b pb-2">
+                  <div>
+                    <p className="font-medium">{u.name}</p>
+                    <p className="text-xs text-gray-500">{u.email}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge variant="outline" className="text-xs">{u.role}</Badge>
+                    {u.createdAt && <p className="text-xs text-gray-400 mt-1">{new Date(u.createdAt).toLocaleDateString('en-IN')}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">All Subscriptions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {stats.subscriptions?.length === 0 && <p className="text-sm text-gray-500">No subscriptions</p>}
+              {stats.subscriptions?.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between text-sm border-b pb-2">
+                  <div>
+                    <p className="font-medium">{s.planName || 'Unknown'}</p>
+                    <p className="text-xs text-gray-500">{s.companyId}</p>
+                  </div>
+                  <div className="text-right">
+                    <Badge className={s.status === 'active' ? 'bg-green-500' : s.status === 'failed' ? 'bg-red-500' : 'bg-gray-400'}>
+                      {s.status}
+                    </Badge>
+                    {s.endDate && <p className="text-xs text-gray-400 mt-1">Exp: {new Date(s.endDate).toLocaleDateString('en-IN')}</p>}
+                    {s.amountPaid && <p className="text-xs text-gray-400">₹{s.amountPaid.toLocaleString('en-IN')}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function EventLogsTab() {
+  const [filterType, setFilterType] = useState<string>('all');
+  
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ["/api/admin-event-logs", filterType],
+    queryFn: async () => {
+      const url = filterType === 'all' ? "/api/admin-event-logs?limit=100" : `/api/admin-event-logs?limit=100&eventType=${filterType}`;
+      const res = await fetch(url, { credentials: "include", headers: getAuthHeaders() });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const eventTypeColors: Record<string, string> = {
+    trial_signup: "bg-green-100 text-green-700",
+    payment_success: "bg-emerald-100 text-emerald-700",
+    payment_failed: "bg-red-100 text-red-700",
+    demo_booking: "bg-blue-100 text-blue-700",
+    enterprise_inquiry: "bg-purple-100 text-purple-700",
+  };
+
+  if (isLoading) return <div className="flex items-center justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+
+  return (
+    <div className="space-y-4" data-testid="event-logs-tab">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm font-medium">Filter:</span>
+        {['all', 'trial_signup', 'payment_success', 'payment_failed', 'demo_booking', 'enterprise_inquiry'].map(type => (
+          <Button
+            key={type}
+            size="sm"
+            variant={filterType === type ? 'default' : 'outline'}
+            className="text-xs"
+            onClick={() => setFilterType(type)}
+          >
+            {type === 'all' ? 'All' : type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+          </Button>
+        ))}
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="divide-y max-h-[600px] overflow-y-auto">
+            {logs.length === 0 && <p className="text-center text-gray-500 py-8">No events found</p>}
+            {(logs as any[]).map((log: any) => (
+              <div key={log.id} className="p-4 hover:bg-gray-50">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className={eventTypeColors[log.eventType] || "bg-gray-100 text-gray-700"}>
+                        {log.eventType?.replace(/_/g, ' ')}
+                      </Badge>
+                      <span className="font-medium text-sm">{log.title}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 truncate">{log.message}</p>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-400">
+                      {log.userName && <span>{log.userName}</span>}
+                      {log.userEmail && <span>{log.userEmail}</span>}
+                      {log.companyName && <span>{log.companyName}</span>}
+                      {log.amount && <span>₹{log.amount.toLocaleString('en-IN')}</span>}
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0">
+                    {log.createdAt ? new Date(log.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Admin() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -1781,9 +1955,10 @@ export default function Admin() {
         </div>
       </div>
 
-      <Tabs defaultValue="users" className="w-full">
+      <Tabs defaultValue={isSuperAdmin ? "saas-overview" : "users"} className="w-full">
         <div className="overflow-x-auto -mx-2 px-2 pb-2">
           <TabsList className="inline-flex w-auto min-w-full sm:w-full h-auto flex-wrap sm:flex-nowrap gap-1">
+            {isSuperAdmin && <TabsTrigger value="saas-overview" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-saas-overview">SaaS Overview</TabsTrigger>}
             <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-users">Users</TabsTrigger>
             {isSuperAdmin && <TabsTrigger value="employees" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-employees">Employees</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="roles" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-roles">Roles</TabsTrigger>}
@@ -1795,8 +1970,21 @@ export default function Admin() {
             {isSuperAdmin && <TabsTrigger value="templates" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-templates">Templates</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="notifications" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-notifications">Notifications</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="saas-revenue" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-saas-revenue">Revenue</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="event-logs" className="text-xs sm:text-sm px-2 sm:px-3" data-testid="tab-event-logs">Event Logs</TabsTrigger>}
           </TabsList>
         </div>
+
+        {isSuperAdmin && (
+          <TabsContent value="saas-overview" className="mt-4">
+            <SaasOverviewTab />
+          </TabsContent>
+        )}
+
+        {isSuperAdmin && (
+          <TabsContent value="event-logs" className="mt-4">
+            <EventLogsTab />
+          </TabsContent>
+        )}
 
         <TabsContent value="users" className="mt-4">
           <div className="flex justify-end mb-4">

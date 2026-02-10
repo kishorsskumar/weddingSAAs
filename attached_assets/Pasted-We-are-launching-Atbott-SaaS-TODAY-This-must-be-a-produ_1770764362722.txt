@@ -1,0 +1,233 @@
+We are launching Atbott SaaS TODAY.
+
+This must be a production-ready, zero-error SaaS website.
+Do NOT change UI, theme, color, layout, or design.
+Only ensure full functionality, stability, and production readiness.
+
+The system must be fully working end-to-end:
+
+• Trial flow
+• Signup
+• OTP authentication
+• Onboarding
+• Subscription payments
+• Plan assignment
+• Admin notifications
+• Admin dashboard
+• Multi-tenant safety
+• Plan restrictions
+• Error handling
+• Logging
+
+No mock logic.
+No incomplete flows.
+No TODO comments.
+
+--------------------------------------------------
+PART 1 — AUTH & TRIAL FLOW
+
+When user clicks "Start Free Trial":
+
+1. OTP email authentication must work.
+2. Create tenant workspace.
+3. Assign 14-day Growth trial.
+4. Store:
+   - plan_type
+   - plan_status
+   - trial_expiry_date
+   - is_trial = true
+5. Redirect to onboarding.
+6. After onboarding → dashboard.
+7. Show trial banner with days remaining.
+8. Restrict features after expiry.
+9. Enforce plan restrictions on backend (not only frontend).
+
+Test:
+• New signup
+• Expired trial
+• Refresh session
+• Logout/login again
+
+--------------------------------------------------
+PART 2 — PAYMENT SYSTEM (PRODUCTION READY)
+
+Use Razorpay (India market) OR Stripe (if already integrated).
+
+Implement:
+
+• Monthly subscription
+• Annual subscription
+• Webhook verification
+• Payment signature verification
+• Update plan only after successful verification
+
+When payment succeeds:
+
+1. Update tenant:
+   - plan_type
+   - plan_status = active
+   - is_trial = false
+2. Remove trial banner.
+3. Redirect to dashboard.
+4. Show "Subscription Active" confirmation.
+
+If payment fails:
+• Do NOT activate plan.
+• Show retry option.
+• Log failure.
+
+Implement secure webhook endpoint.
+Do not trust frontend success callback.
+
+--------------------------------------------------
+PART 3 — ADMIN NOTIFICATIONS
+
+Remove WhatsApp.
+
+All admin notifications must be sent to:
+
+atbottsaas@gmail.com
+
+Trigger email notifications for:
+
+• New trial signup
+• Demo booking
+• Successful subscription payment
+• Enterprise inquiry
+• Failed payment attempt
+
+Email must include:
+User name
+Email
+Plan
+Amount (if payment)
+Timestamp
+
+Log all notifications in database.
+
+Create table:
+admin_event_logs
+
+--------------------------------------------------
+PART 4 — ADMIN DASHBOARD
+
+Create separate Superadmin dashboard:
+
+Route:
+/admin
+
+Access:
+Only superadmin role.
+
+Features:
+
+1. Sales Overview
+   - Total Users
+   - Active Subscriptions
+   - Trial Users
+   - Monthly Revenue
+   - Annual Revenue
+
+2. Recent Activities
+   - New Signups
+   - New Payments
+   - Demo Requests
+   - Enterprise Inquiries
+
+3. Subscription Management
+   - View all tenants
+   - Plan type
+   - Status
+   - Trial expiry
+   - Payment history
+
+4. Customer Requests
+   - Contact messages
+   - Demo bookings
+   - Enterprise forms
+
+5. Notification Log Viewer
+
+Secure with role-based access.
+No public access.
+
+--------------------------------------------------
+PART 5 — MULTI-TENANT SAFETY
+
+Enforce row-level security in Supabase.
+
+Verify:
+
+• Tenant A cannot access Tenant B data.
+• Plan restrictions enforced server-side.
+• API routes protected.
+
+--------------------------------------------------
+PART 6 — ERROR HANDLING
+
+Ensure:
+
+• No console errors.
+• No unhandled promise rejections.
+• No crashing components.
+• Graceful error messages.
+• Retry logic where required.
+
+--------------------------------------------------
+PART 7 — PERFORMANCE
+
+Test:
+
+• 100 concurrent signups simulation
+• Multiple payment attempts
+• Fast navigation
+• No memory leaks
+
+Ensure:
+
+• Fast load time
+• Optimized queries
+• No blocking calls
+
+--------------------------------------------------
+PART 8 — SECURITY AUDIT
+
+Check:
+
+• No API keys exposed.
+• No ENV leaks.
+• SQL injection protection.
+• XSS protection.
+• CSRF protection on payments.
+• Webhook signature verification.
+
+--------------------------------------------------
+PART 9 — PRODUCTION CHECKLIST
+
+Verify:
+
+• All routes working
+• All forms submitting
+• Emails being sent
+• Webhooks verified
+• Dashboard loading
+• Plan restrictions enforced
+• Trial expiry working
+• Upgrade flow working
+• Admin dashboard accessible only to superadmin
+
+--------------------------------------------------
+FINAL REPORT REQUIRED
+
+After implementation, provide:
+
+1. Full flow test report
+2. Security audit summary
+3. Payment verification confirmation
+4. Email delivery confirmation
+5. Multi-tenant isolation confirmation
+6. Confirmation: "Production Ready for Launch"
+
+Do NOT give false confirmation.
+Be strict.
+Fix any errors before final confirmation.

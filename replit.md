@@ -107,6 +107,8 @@ Preferred communication style: Simple, everyday language.
 - **Calendar Integration:** Google Calendar (active, two-way sync).
 - **Automation:** Estimate-to-Production automation including timeline creation, push to production, and inventory finalization, with logging and WhatsApp notifications.
 - **Event Staff Assignment Automation:** WhatsApp notifications sent to staff when assigned to events, with supervisor summary messages and duplicate prevention via `notificationSent` flag.
+- **Multi-Tenant SaaS:** Company registration, trial management (14-day Growth trial), Razorpay subscription payments (Starter ₹499/mo or ₹4999/yr, Growth ₹1499/mo or ₹14999/yr), subscription enforcement middleware, admin event logging, payment notification emails.
+- **Admin SaaS Dashboard:** SaaS overview stats (users, companies, revenue), admin event logs viewer with filtering, subscription management.
 
 ### Critical Files & Components
 - **`client/src/components/layout.tsx`**: Main layout, sidebar navigation, mobile bottom nav.

@@ -7,7 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured, sendAdminWhatsAppNotification } from "./whatsapp-service";
-import { sendPasswordResetEmail, sendDemoConfirmationEmail, sendSignupWelcomeEmail, sendEnterpriseAcknowledgmentEmail, sendDemoAdminNotification, sendSignupAdminNotification, sendEnterpriseAdminNotification } from "./email-service";
+import { sendPasswordResetEmail, sendDemoConfirmationEmail, sendSignupWelcomeEmail, sendEnterpriseAcknowledgmentEmail, sendDemoAdminNotification, sendSignupAdminNotification, sendEnterpriseAdminNotification, sendPaymentSuccessAdminNotification, sendPaymentFailedAdminNotification } from "./email-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { createGitHubRepo, listUserRepos } from "./github-export";
 import { 
@@ -36,7 +36,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { sql, eq, and, gte, like, or, desc } from "drizzle-orm";
-import { customers, events, saasModules, companyModuleSubscriptions, aiAssistantSettings, aiUsage, inAppNotifications, billingEvents, rsvpFormTemplates } from "@shared/schema";
+import { customers, events, saasModules, companyModuleSubscriptions, aiAssistantSettings, aiUsage, inAppNotifications, billingEvents, rsvpFormTemplates, subscriptions, companies } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import session from "express-session";
@@ -45,6 +45,9 @@ import { pool } from "./db";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('SECURITY WARNING: JWT_SECRET not set in production environment!');
+}
 
 interface JWTPayload {
   userId: string;
@@ -118,7 +121,6 @@ async function getCompanyIdFromRequest(req: Request): Promise<string | undefined
   return undefined;
 }
 
-// Helper function to require companyId, returns null and sends 403 if missing
 async function requireCompanyId(req: Request, res: Response): Promise<string | null> {
   const companyId = await getCompanyIdFromRequest(req);
   if (!companyId) {
@@ -126,6 +128,37 @@ async function requireCompanyId(req: Request, res: Response): Promise<string | n
     return null;
   }
   return companyId;
+}
+
+async function checkSubscriptionActive(req: Request, res: Response): Promise<boolean> {
+  const companyId = await getCompanyIdFromRequest(req);
+  if (!companyId) return true;
+  
+  if (req.user?.role === 'superadmin') return true;
+  
+  try {
+    const subscription = await storage.getSubscriptionByCompanyId(companyId);
+    if (!subscription) return true;
+    
+    if (subscription.status !== 'active') {
+      res.status(403).json({ error: 'Subscription inactive. Please upgrade your plan.', code: 'SUBSCRIPTION_INACTIVE' });
+      return false;
+    }
+    
+    const isTrial = subscription.planName?.includes('trial');
+    if (isTrial && subscription.endDate) {
+      const now = new Date();
+      const endDate = new Date(subscription.endDate);
+      if (now > endDate) {
+        res.status(403).json({ error: 'Your trial has expired. Please upgrade to continue.', code: 'TRIAL_EXPIRED' });
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 // Helper function to escape XML special characters for TwiML responses
@@ -901,7 +934,47 @@ export async function registerRoutes(
     next();
   });
 
-  // Health check endpoint for debugging
+  const SUBSCRIPTION_EXEMPT_ROUTES = [
+    '/api/auth/', '/api/billing/', '/api/health', '/api/system-notifications',
+    '/api/admin', '/api/demo-bookings', '/api/enterprise-leads', '/api/contact',
+    '/api/email-logs', '/api/admin-event-logs', '/api/modules',
+  ];
+
+  app.use('/api/', async (req, res, next) => {
+    const isExempt = SUBSCRIPTION_EXEMPT_ROUTES.some(r => req.path.startsWith(r.replace('/api', '')));
+    if (isExempt || req.method === 'OPTIONS') return next();
+    
+    const companyId = await getCompanyIdFromRequest(req);
+    if (!companyId) return next();
+    
+    if (req.user?.role === 'superadmin') return next();
+    
+    try {
+      const subscription = await storage.getSubscriptionByCompanyId(companyId);
+      if (!subscription) return next();
+      
+      if (subscription.status === 'failed' || subscription.status === 'cancelled') {
+        return res.status(403).json({ error: 'Subscription inactive. Please upgrade your plan.', code: 'SUBSCRIPTION_INACTIVE' });
+      }
+      
+      if (subscription.endDate) {
+        const now = new Date();
+        const endDate = new Date(subscription.endDate);
+        if (now > endDate) {
+          const isTrial = subscription.planName?.includes('trial');
+          return res.status(403).json({
+            error: isTrial ? 'Your trial has expired. Please upgrade to continue.' : 'Your subscription has expired. Please renew.',
+            code: isTrial ? 'TRIAL_EXPIRED' : 'SUBSCRIPTION_EXPIRED',
+          });
+        }
+      }
+      
+      next();
+    } catch {
+      next();
+    }
+  });
+
   app.get('/api/health', async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -1061,7 +1134,6 @@ export async function registerRoutes(
         console.error('[Signup] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // System notification + welcome email (non-blocking)
       (async () => {
         try {
           const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
@@ -1073,9 +1145,22 @@ export async function registerRoutes(
             isRead: false,
             createdBy: 'system',
           });
-          console.log('[Signup] System notification created');
         } catch (err) {
           console.error('[Signup] System notification error (non-fatal):', err);
+        }
+
+        try {
+          await storage.createAdminEventLog({
+            eventType: 'trial_signup',
+            title: 'New Trial Signup',
+            message: `New trial signup by ${name} (${companyName}). Plan: ${isTrialPlan ? '14-Day Growth Trial' : planName}.`,
+            userName: name,
+            userEmail: email,
+            companyName,
+            planName: isTrialPlan ? '14-Day Growth Trial' : planName,
+          });
+        } catch (err) {
+          console.error('[Signup] Admin event log error (non-fatal):', err);
         }
 
         // Send welcome email
@@ -1209,7 +1294,6 @@ export async function registerRoutes(
         console.error('[Demo] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // System notification for admin (non-blocking)
       (async () => {
         try {
           await storage.createSystemNotification({
@@ -1220,9 +1304,21 @@ export async function registerRoutes(
             isRead: false,
             createdBy: 'system',
           });
-          console.log('[Demo] System notification created');
         } catch (err) {
           console.error('[Demo] System notification error (non-fatal):', err);
+        }
+
+        try {
+          await storage.createAdminEventLog({
+            eventType: 'demo_booking',
+            title: 'New Demo Request',
+            message: `Demo booked by ${name} from ${companyName}. Date: ${preferredDate || 'TBD'}, Time: ${preferredTime || 'TBD'}.`,
+            userName: name,
+            userEmail: email,
+            companyName,
+          });
+        } catch (err) {
+          console.error('[Demo] Admin event log error (non-fatal):', err);
         }
 
         // Send confirmation email (non-blocking)
@@ -1316,7 +1412,6 @@ export async function registerRoutes(
         console.error('[Enterprise] CRM lead creation error (non-fatal):', crmErr);
       }
 
-      // System notification + email (non-blocking)
       (async () => {
         try {
           await storage.createSystemNotification({
@@ -1327,9 +1422,21 @@ export async function registerRoutes(
             isRead: false,
             createdBy: 'system',
           });
-          console.log('[Enterprise] System notification created');
         } catch (err) {
           console.error('[Enterprise] System notification error (non-fatal):', err);
+        }
+
+        try {
+          await storage.createAdminEventLog({
+            eventType: 'enterprise_inquiry',
+            title: 'Enterprise Inquiry',
+            message: `Enterprise inquiry from ${contactName || companyName} (${companyName}). Team size: ${teamSize || 'N/A'}.`,
+            userName: contactName || undefined,
+            userEmail: contactEmail || undefined,
+            companyName,
+          });
+        } catch (err) {
+          console.error('[Enterprise] Admin event log error (non-fatal):', err);
         }
 
         // Send acknowledgment email
@@ -1443,7 +1550,69 @@ export async function registerRoutes(
     }
   });
 
-  // Email Logs API (Superadmin only)
+  app.get('/api/admin-event-logs', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const limit = parseInt(req.query.limit as string) || 100;
+      const eventType = req.query.eventType as string | undefined;
+      const logs = await storage.getAdminEventLogs(limit, eventType);
+      res.json(logs);
+    } catch (error) {
+      console.error('[Admin Event Logs] Get error:', error);
+      res.status(500).json({ error: 'Failed to fetch admin event logs' });
+    }
+  });
+
+  app.get('/api/admin/stats', verifyJWT, async (req, res) => {
+    try {
+      if (req.user?.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const allSubs = await db.select().from(subscriptions);
+      const allCompanies = await db.select().from(companies);
+      const allUsers = await db.select().from(users).where(sql`role != 'superadmin'`);
+      
+      const activeSubs = allSubs.filter(s => s.status === 'active');
+      const trialSubs = activeSubs.filter(s => s.planName?.includes('trial'));
+      const paidSubs = activeSubs.filter(s => !s.planName?.includes('trial'));
+      
+      const totalRevenue = allSubs
+        .filter(s => s.status === 'active' && s.amountPaid)
+        .reduce((sum, s) => sum + (s.amountPaid || 0), 0);
+      
+      res.json({
+        totalUsers: allUsers.length,
+        totalCompanies: allCompanies.length,
+        activeSubscriptions: activeSubs.length,
+        trialUsers: trialSubs.length,
+        paidUsers: paidSubs.length,
+        totalRevenue,
+        recentSignups: allUsers
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          .slice(0, 10)
+          .map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt })),
+        subscriptions: allSubs
+          .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+          .map(s => ({
+            id: s.id,
+            companyId: s.companyId,
+            planName: s.planName,
+            status: s.status,
+            startDate: s.startDate,
+            endDate: s.endDate,
+            amountPaid: s.amountPaid,
+            createdAt: s.createdAt,
+          })),
+      });
+    } catch (error) {
+      console.error('[Admin Stats] Error:', error);
+      res.status(500).json({ error: 'Failed to fetch admin stats' });
+    }
+  });
+
   app.get('/api/email-logs', verifyJWT, async (req, res) => {
     try {
       if (req.user?.role !== 'superadmin' && req.user?.role !== 'admin') {
@@ -1988,14 +2157,16 @@ export async function registerRoutes(
 
   // ============ Billing / Subscription Routes ============
   
-  // Server-side plan catalog with canonical pricing (prevents client-side tampering)
   const PLAN_CATALOG: Record<string, { name: string; amount: number; duration: number }> = {
-    basic: { name: 'Basic', amount: 999, duration: 30 },
-    pro: { name: 'Pro', amount: 2499, duration: 30 },
-    enterprise: { name: 'Enterprise', amount: 4999, duration: 30 },
+    starter_monthly: { name: 'Starter Monthly', amount: 499, duration: 30 },
+    starter_annual: { name: 'Starter Annual', amount: 4999, duration: 365 },
+    growth_monthly: { name: 'Growth Monthly', amount: 1499, duration: 30 },
+    growth_annual: { name: 'Growth Annual', amount: 14999, duration: 365 },
+    basic: { name: 'Starter Monthly', amount: 499, duration: 30 },
+    pro: { name: 'Growth Monthly', amount: 1499, duration: 30 },
+    enterprise: { name: 'Enterprise', amount: 0, duration: 365 },
   };
   
-  // Get subscription status for current company
   app.get('/api/billing/status', async (req, res) => {
     try {
       const companyId = await getCompanyIdFromRequest(req);
@@ -2006,11 +2177,33 @@ export async function registerRoutes(
       const subscription = await storage.getSubscriptionByCompanyId(companyId);
       const isConfigured = razorpayService.isRazorpayConfigured();
       
+      const isTrial = subscription?.planName?.includes('trial') || false;
+      const isActive = subscription?.status === 'active';
+      let trialDaysRemaining: number | null = null;
+      let isTrialExpired = false;
+      
+      if (isTrial && subscription?.endDate) {
+        const now = new Date();
+        const endDate = new Date(subscription.endDate);
+        const diffMs = endDate.getTime() - now.getTime();
+        trialDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        isTrialExpired = trialDaysRemaining <= 0;
+      }
+      
       res.json({
         subscription: subscription || null,
-        isActive: subscription?.status === 'active',
+        isActive: isActive && !isTrialExpired,
+        isTrial,
+        trialDaysRemaining,
+        isTrialExpired,
         razorpayConfigured: isConfigured,
         razorpayKeyId: razorpayService.getRazorpayKeyId(),
+        planCatalog: {
+          starter_monthly: { name: 'Starter Monthly', amount: 499 },
+          starter_annual: { name: 'Starter Annual', amount: 4999 },
+          growth_monthly: { name: 'Growth Monthly', amount: 1499 },
+          growth_annual: { name: 'Growth Annual', amount: 14999 },
+        },
       });
     } catch (error) {
       console.error('Error getting billing status:', error);
@@ -2101,7 +2294,6 @@ export async function registerRoutes(
       // Get plan duration from catalog
       const plan = PLAN_CATALOG[subscription.planName] || PLAN_CATALOG.basic;
       
-      // Update subscription to active
       await storage.updateSubscription(subscription.id, {
         status: 'active',
         razorpayPaymentId: razorpay_payment_id,
@@ -2109,6 +2301,37 @@ export async function registerRoutes(
         endDate: new Date(Date.now() + plan.duration * 24 * 60 * 60 * 1000),
         lastPaymentDate: new Date(),
       });
+      
+      // Non-blocking: admin notification + event log
+      (async () => {
+        try {
+          const company = await storage.getCompany(companyId);
+          const userId = (req.session as any)?.userId || (req as any).user?.userId;
+          const user = userId ? await storage.getUser(userId) : null;
+          
+          await storage.createAdminEventLog({
+            eventType: 'payment_success',
+            title: 'Payment Received',
+            message: `Payment of ₹${plan.amount} for ${plan.name} by ${user?.name || 'Unknown'} (${company?.name || companyId})`,
+            userName: user?.name || undefined,
+            userEmail: user?.email || undefined,
+            companyName: company?.name || undefined,
+            planName: subscription.planName,
+            amount: plan.amount,
+            metadata: { razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id },
+          });
+          
+          await sendPaymentSuccessAdminNotification(
+            user?.name || 'Unknown',
+            user?.email || 'unknown',
+            company?.name || companyId,
+            plan.name,
+            plan.amount
+          );
+        } catch (e) {
+          console.error('[Billing] Post-payment notification error (non-fatal):', e);
+        }
+      })();
       
       res.json({ success: true, message: 'Payment verified successfully' });
     } catch (error) {
@@ -2214,9 +2437,9 @@ export async function registerRoutes(
         }
         
         case 'payment.failed': {
-          // For failed payments, use order_id to find subscription - disables SaaS access
           const orderId = event.payload?.payment?.entity?.order_id;
           const errorDesc = event.payload?.payment?.entity?.error_description;
+          const failedAmount = event.payload?.payment?.entity?.amount;
           console.log(`[Webhook] payment.failed - Order: ${orderId}, Error: ${errorDesc}`);
           if (orderId) {
             const subscription = await storage.getSubscriptionByOrderId(orderId);
@@ -2225,7 +2448,32 @@ export async function registerRoutes(
                 status: 'failed',
                 failureReason: errorDesc,
               });
-              console.log(`[Webhook] Subscription ${subscription.id} marked as failed - SaaS access disabled`);
+              console.log(`[Webhook] Subscription ${subscription.id} marked as failed`);
+              
+              try {
+                const company = await storage.getCompany(subscription.companyId);
+                const plan = PLAN_CATALOG[subscription.planName] || PLAN_CATALOG.basic;
+                
+                await storage.createAdminEventLog({
+                  eventType: 'payment_failed',
+                  title: 'Payment Failed',
+                  message: `Payment failed for ${plan.name} by ${company?.name || subscription.companyId}. Error: ${errorDesc || 'Unknown'}`,
+                  companyName: company?.name || undefined,
+                  planName: subscription.planName,
+                  amount: failedAmount ? Math.round(failedAmount / 100) : plan.amount,
+                  metadata: { orderId, errorDesc },
+                });
+                
+                await sendPaymentFailedAdminNotification(
+                  'N/A', 'N/A',
+                  company?.name || subscription.companyId,
+                  plan.name,
+                  failedAmount ? Math.round(failedAmount / 100) : plan.amount,
+                  errorDesc
+                );
+              } catch (e) {
+                console.error('[Webhook] Failed payment notification error:', e);
+              }
             }
           }
           break;

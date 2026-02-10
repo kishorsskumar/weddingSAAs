@@ -286,6 +286,41 @@ export async function sendEnterpriseAdminNotification(companyName: string, conta
   return sendAdminNotificationEmail('🏢 Enterprise Inquiry - ' + companyName, bodyHtml);
 }
 
+export async function sendPaymentSuccessAdminNotification(userName: string, userEmail: string, companyName: string, planName: string, amount: number): Promise<{ success: boolean }> {
+  const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const bodyHtml = `
+    <h2 style="color: #333; margin-top: 0;">💰 Payment Received</h2>
+    <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+      <p style="margin: 4px 0;"><strong>Name:</strong> ${userName}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${userEmail}</p>
+      <p style="margin: 4px 0;"><strong>Company:</strong> ${companyName}</p>
+      <p style="margin: 4px 0;"><strong>Plan:</strong> ${planName}</p>
+      <p style="margin: 4px 0;"><strong>Amount:</strong> ₹${amount.toLocaleString('en-IN')}</p>
+      <p style="margin: 4px 0;"><strong>Time:</strong> ${timestamp}</p>
+    </div>
+    <p>A new subscription payment has been received and the plan has been activated.</p>
+  `;
+  return sendAdminNotificationEmail('💰 Payment Received - ' + companyName + ' (₹' + amount.toLocaleString('en-IN') + ')', bodyHtml);
+}
+
+export async function sendPaymentFailedAdminNotification(userName: string, userEmail: string, companyName: string, planName: string, amount: number, errorReason?: string): Promise<{ success: boolean }> {
+  const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const bodyHtml = `
+    <h2 style="color: #333; margin-top: 0;">❌ Payment Failed</h2>
+    <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+      <p style="margin: 4px 0;"><strong>Name:</strong> ${userName}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${userEmail}</p>
+      <p style="margin: 4px 0;"><strong>Company:</strong> ${companyName}</p>
+      <p style="margin: 4px 0;"><strong>Plan:</strong> ${planName}</p>
+      <p style="margin: 4px 0;"><strong>Amount:</strong> ₹${amount.toLocaleString('en-IN')}</p>
+      <p style="margin: 4px 0;"><strong>Error:</strong> ${errorReason || 'Unknown'}</p>
+      <p style="margin: 4px 0;"><strong>Time:</strong> ${timestamp}</p>
+    </div>
+    <p style="color: #dc2626; font-weight: 600;">Action required: Follow up with the customer about the failed payment.</p>
+  `;
+  return sendAdminNotificationEmail('❌ Payment Failed - ' + companyName, bodyHtml);
+}
+
 export async function sendEnterpriseAcknowledgmentEmail(toEmail: string, contactName: string, companyName: string): Promise<{ success: boolean }> {
   try {
     const { client, fromEmail } = await getResendClient();

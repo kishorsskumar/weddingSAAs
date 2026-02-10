@@ -4,6 +4,7 @@ import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Clock, ArrowUpRight } from "lucide-react";
 import {
   Calendar,
   Users,
@@ -506,6 +507,53 @@ function MobileBottomNav({ allowedPages, currentPath }: { allowedPages: string[]
   );
 }
 
+function TrialBanner() {
+  const { data } = useQuery({
+    queryKey: ["/api/billing/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/billing/status", { credentials: "include", headers: getAuthHeaders() });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
+  if (!data?.isTrial) return null;
+
+  const days = data.trialDaysRemaining ?? 0;
+  const isExpired = data.isTrialExpired;
+  const isUrgent = days <= 3;
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-2 px-4 py-2 text-sm font-medium",
+        isExpired
+          ? "bg-red-600 text-white"
+          : isUrgent
+          ? "bg-amber-500 text-white"
+          : "bg-[#2FA4BC] text-white"
+      )}
+      data-testid="trial-banner"
+    >
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 shrink-0" />
+        <span>
+          {isExpired
+            ? "Your trial has expired. Upgrade now to continue using all features."
+            : `${days} day${days !== 1 ? 's' : ''} left in your Growth Trial`}
+        </span>
+      </div>
+      <Link href="/billing">
+        <button className="shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-md px-3 py-1 text-sm font-semibold transition-colors" data-testid="button-upgrade-trial">
+          Upgrade Now <ArrowUpRight className="h-3.5 w-3.5" />
+        </button>
+      </Link>
+    </div>
+  );
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, allowedPages, logout } = useAuth();
   const [location, navigate] = useLocation();
@@ -737,6 +785,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   if (hasOwnSidebar) {
     return (
       <div className="min-h-screen md:min-h-screen min-h-[100dvh] bg-background pb-16 md:pb-0">
+        <TrialBanner />
         {children}
         <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
       </div>
@@ -744,7 +793,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen md:min-h-screen min-h-[100dvh] bg-background">
+    <div className="flex flex-col min-h-screen md:min-h-screen min-h-[100dvh] bg-background">
+      <TrialBanner />
+      <div className="flex flex-1">
       {/* Desktop Sidebar */}
       <aside className="hidden md:block w-64 shrink-0 border-r bg-sidebar">
         <NavContent />
@@ -792,6 +843,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
+      </div>
     </div>
   );
 }

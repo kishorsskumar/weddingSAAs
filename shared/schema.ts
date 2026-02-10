@@ -2973,3 +2973,21 @@ export const emailLogs = pgTable("email_logs", {
 export const insertEmailLogSchema = createInsertSchema(emailLogs).omit({ id: true, createdAt: true });
 export type InsertEmailLog = z.infer<typeof insertEmailLogSchema>;
 export type EmailLog = typeof emailLogs.$inferSelect;
+
+export const adminEventLogs = pgTable("admin_event_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventType: text("event_type").notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  userName: text("user_name"),
+  userEmail: text("user_email"),
+  companyName: text("company_name"),
+  planName: text("plan_name"),
+  amount: integer("amount"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAdminEventLogSchema = createInsertSchema(adminEventLogs).omit({ id: true, createdAt: true });
+export type InsertAdminEventLog = z.infer<typeof insertAdminEventLogSchema>;
+export type AdminEventLog = typeof adminEventLogs.$inferSelect;
