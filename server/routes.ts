@@ -7,7 +7,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
 import { parseTransactionScreenshot } from "./transaction-scanner";
 import { sendWhatsAppMessage, sendWhatsAppMediaMessage, isWhatsAppConfigured, sendAdminWhatsAppNotification } from "./whatsapp-service";
-import { sendPasswordResetEmail, sendDemoConfirmationEmail, sendSignupWelcomeEmail, sendEnterpriseAcknowledgmentEmail } from "./email-service";
+import { sendPasswordResetEmail, sendDemoConfirmationEmail, sendSignupWelcomeEmail, sendEnterpriseAcknowledgmentEmail, sendDemoAdminNotification, sendSignupAdminNotification, sendEnterpriseAdminNotification } from "./email-service";
 import { generateMonthlyPlanPDF } from "./monthlyPlanPdf";
 import { createGitHubRepo, listUserRepos } from "./github-export";
 import { 
@@ -1086,6 +1086,14 @@ export async function registerRoutes(
           console.error('[Signup] Email error (non-fatal):', emailErr);
         }
 
+        // Send admin notification email
+        try {
+          await sendSignupAdminNotification(name, companyName, email, phone || '', isTrialPlan ? '14-Day Growth Trial' : planName);
+          console.log('[Signup] Admin notification email sent');
+        } catch (adminEmailErr) {
+          console.error('[Signup] Admin notification email error (non-fatal):', adminEmailErr);
+        }
+
         // AI chatbot message for superadmin
         try {
           const superadmins = await db.select().from(users).where(eq(users.role, 'superadmin'));
@@ -1225,6 +1233,14 @@ export async function registerRoutes(
           console.error('[Demo] Email error (non-fatal):', emailErr);
         }
 
+        // Send admin notification email (non-blocking)
+        try {
+          await sendDemoAdminNotification(name, companyName, email, phone, businessType, preferredDate, preferredTime);
+          console.log('[Demo] Admin notification email sent');
+        } catch (adminEmailErr) {
+          console.error('[Demo] Admin notification email error (non-fatal):', adminEmailErr);
+        }
+
         // Create AI chatbot message for superadmin
         try {
           const superadmins = await db.select().from(users).where(eq(users.role, 'superadmin'));
@@ -1324,6 +1340,14 @@ export async function registerRoutes(
           } catch (emailErr) {
             console.error('[Enterprise] Email error (non-fatal):', emailErr);
           }
+        }
+
+        // Send admin notification email
+        try {
+          await sendEnterpriseAdminNotification(companyName, contactName || companyName, contactEmail || '', contactPhone || '', teamSize, eventsPerMonth);
+          console.log('[Enterprise] Admin notification email sent');
+        } catch (adminEmailErr) {
+          console.error('[Enterprise] Admin notification email error (non-fatal):', adminEmailErr);
         }
 
         // AI chatbot message for superadmin

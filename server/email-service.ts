@@ -196,6 +196,92 @@ export async function sendSignupWelcomeEmail(toEmail: string, name: string, comp
   }
 }
 
+const ADMIN_NOTIFICATION_EMAIL = 'atbottsaas@gmail.com';
+
+export async function sendAdminNotificationEmail(subject: string, bodyHtml: string): Promise<{ success: boolean }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+
+    const result = await client.emails.send({
+      from: fromEmail || 'noreply@resend.dev',
+      to: ADMIN_NOTIFICATION_EMAIL,
+      subject,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #2FA4BC 0%, #258da2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Atbott Admin Alert</h1>
+          </div>
+          <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+            ${bodyHtml}
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">This is an automated notification from Atbott SaaS Platform.</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log('[Email] Admin notification sent to:', ADMIN_NOTIFICATION_EMAIL, 'Result:', result);
+    await storage.createEmailLog({ recipient: ADMIN_NOTIFICATION_EMAIL, type: 'admin_notification', status: 'sent' });
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Email] Failed to send admin notification:', error);
+    try { await storage.createEmailLog({ recipient: ADMIN_NOTIFICATION_EMAIL, type: 'admin_notification', status: 'failed', errorMessage: error?.message }); } catch {}
+    return { success: false };
+  }
+}
+
+export async function sendDemoAdminNotification(name: string, companyName: string, email: string, phone: string, businessType?: string | null, preferredDate?: string | null, preferredTime?: string | null): Promise<{ success: boolean }> {
+  const bodyHtml = `
+    <h2 style="color: #333; margin-top: 0;">🚀 New Demo Request</h2>
+    <div style="background: #f8fafb; border-left: 4px solid #2FA4BC; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+      <p style="margin: 4px 0;"><strong>Name:</strong> ${name}</p>
+      <p style="margin: 4px 0;"><strong>Company:</strong> ${companyName}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+      <p style="margin: 4px 0;"><strong>Phone:</strong> ${phone}</p>
+      ${businessType ? `<p style="margin: 4px 0;"><strong>Business Type:</strong> ${businessType}</p>` : ''}
+      <p style="margin: 4px 0;"><strong>Preferred Date:</strong> ${preferredDate || 'Not specified'}</p>
+      <p style="margin: 4px 0;"><strong>Preferred Time:</strong> ${preferredTime || 'Not specified'}</p>
+    </div>
+    <p>Please follow up with this lead at the earliest.</p>
+  `;
+  return sendAdminNotificationEmail('🚀 New Demo Request - ' + companyName, bodyHtml);
+}
+
+export async function sendSignupAdminNotification(name: string, companyName: string, email: string, phone: string, plan: string): Promise<{ success: boolean }> {
+  const bodyHtml = `
+    <h2 style="color: #333; margin-top: 0;">🎉 New Signup</h2>
+    <div style="background: #f8fafb; border-left: 4px solid #2FA4BC; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+      <p style="margin: 4px 0;"><strong>Name:</strong> ${name}</p>
+      <p style="margin: 4px 0;"><strong>Company:</strong> ${companyName}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${email}</p>
+      <p style="margin: 4px 0;"><strong>Phone:</strong> ${phone}</p>
+      <p style="margin: 4px 0;"><strong>Plan:</strong> ${plan}</p>
+    </div>
+    <p>A new user has signed up. You may review and onboard them.</p>
+  `;
+  return sendAdminNotificationEmail('🎉 New Signup - ' + companyName, bodyHtml);
+}
+
+export async function sendEnterpriseAdminNotification(companyName: string, contactName: string, contactEmail: string, contactPhone: string, teamSize?: string | null, eventsPerMonth?: string | null): Promise<{ success: boolean }> {
+  const bodyHtml = `
+    <h2 style="color: #333; margin-top: 0;">🏢 New Enterprise Inquiry</h2>
+    <div style="background: #f8fafb; border-left: 4px solid #2FA4BC; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+      <p style="margin: 4px 0;"><strong>Company:</strong> ${companyName}</p>
+      <p style="margin: 4px 0;"><strong>Contact:</strong> ${contactName}</p>
+      <p style="margin: 4px 0;"><strong>Email:</strong> ${contactEmail}</p>
+      <p style="margin: 4px 0;"><strong>Phone:</strong> ${contactPhone}</p>
+      ${teamSize ? `<p style="margin: 4px 0;"><strong>Team Size:</strong> ${teamSize}</p>` : ''}
+      ${eventsPerMonth ? `<p style="margin: 4px 0;"><strong>Events/Month:</strong> ${eventsPerMonth}</p>` : ''}
+    </div>
+    <p>This is a high-value enterprise lead. Please prioritize follow-up.</p>
+  `;
+  return sendAdminNotificationEmail('🏢 Enterprise Inquiry - ' + companyName, bodyHtml);
+}
+
 export async function sendEnterpriseAcknowledgmentEmail(toEmail: string, contactName: string, companyName: string): Promise<{ success: boolean }> {
   try {
     const { client, fromEmail } = await getResendClient();
