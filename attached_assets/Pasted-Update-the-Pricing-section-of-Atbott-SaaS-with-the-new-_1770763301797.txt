@@ -1,0 +1,126 @@
+Update the Pricing section of Atbott SaaS with the new finalized pricing structure.
+
+IMPORTANT:
+Do NOT redesign layout.
+Do NOT change card structure.
+Only update pricing values, feature lists, highlighting, and supporting copy.
+Maintain Atbott teal + white branding.
+Keep Growth visually highlighted as “Most Popular”.
+
+--------------------------------------------------
+FINAL PRICING STRUCTURE
+
+--------------------------------------------------
+STARTER – ₹499/month
+
+Subtitle:
+Perfect for Solo Event Planners
+
+Features:
+• Up to 5 Active Events
+• Lead Management System
+• Basic Client Portal (Timeline + Documents)
+• Event Calendar
+• 1 Team Member
+• Email Support
+
+CTA Button:
+Start Free Trial
+
+--------------------------------------------------
+GROWTH – ₹1,499/month
+
+Badge:
+Most Popular
+
+Subtitle:
+Best for Growing Event Businesses
+
+Features:
+• Unlimited Events
+• Full Client Portal
+• Client Payment & Installment Tracking
+• Automated Follow-up Reminders
+• Revenue & Lead Analytics Dashboard
+• Custom Branding (Your Logo in Client Portal)
+• 5 Team Members
+• Priority Support
+
+Add reassurance text below features:
+
+✔ No setup fees  
+✔ Free onboarding support  
+✔ Cancel anytime  
+
+CTA Button:
+Start Free Trial
+
+Highlight this card with:
+• Slightly thicker border using brand color
+• Soft background tint (very light teal)
+• Slight scale or elevation effect
+
+--------------------------------------------------
+ENTERPRISE – Custom Pricing
+
+Subtitle:
+For Large Agencies & Multi-Branch Teams
+
+Features:
+• Everything in Growth
+• Unlimited Team Members
+• Vendor Management Module
+• API & Custom Integrations
+• Multi-Branch Access
+• Dedicated Account Manager
+• SLA Guarantee
+• WhatsApp Integration
+
+CTA Button:
+Contact Sales
+
+Route button to:
+/contact-enterprise
+
+--------------------------------------------------
+ANNUAL OPTION
+
+Add toggle above pricing cards:
+
+Monthly | Annual (Save 2 Months)
+
+Annual pricing:
+
+Starter:
+₹4,999/year
+
+Growth:
+₹14,999/year
+
+Show savings clearly under annual price.
+
+--------------------------------------------------
+TRIAL MESSAGE
+
+Add small note below pricing section:
+
+"All plans include a 14-day Growth Trial. No credit card required."
+
+--------------------------------------------------
+UX REQUIREMENTS
+
+• Keep Growth visually dominant.
+• Maintain spacing consistency.
+• Keep bullet alignment clean.
+• Ensure mobile stacking works properly.
+• Ensure CTA buttons route correctly:
+   - Starter & Growth → /auth/signup
+   - Enterprise → /contact-enterprise
+
+--------------------------------------------------
+OUTPUT REQUIREMENT
+
+Update pricing component only.
+Maintain React + Tailwind structure.
+Maintain brand consistency.
+Ensure production-ready UI.

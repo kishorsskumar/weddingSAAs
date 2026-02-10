@@ -98,13 +98,13 @@ const differentiators = [
 const pricingPlans = [
   {
     name: "Starter",
-    price: "₹999",
+    price: "₹499",
     period: "/month",
-    description: "Perfect for solo planners",
+    description: "Perfect for Solo Event Planners",
     features: [
-      "Up to 10 active events per month",
+      "Up to 5 Active Events",
       "Lead Management System",
-      "Basic Client Portal (view-only)",
+      "Basic Client Portal (Timeline + Documents)",
       "Event Calendar",
       "1 Team Member",
       "Email Support"
@@ -113,18 +113,16 @@ const pricingPlans = [
   },
   {
     name: "Growth",
-    price: "₹2,499",
+    price: "₹1,499",
     period: "/month",
-    description: "For growing businesses",
+    description: "Best for Growing Event Businesses",
     features: [
-      "Unlimited events",
-      "Full Lead Management System",
+      "Unlimited Events",
       "Full Client Portal",
-      "Event Calendar + Milestone Tracking",
       "Client Payment & Installment Tracking",
       "Automated Follow-up Reminders",
       "Revenue & Lead Analytics Dashboard",
-      "Custom Branding (Logo in portal)",
+      "Custom Branding (Your Logo in Client Portal)",
       "5 Team Members",
       "Priority Support"
     ],
@@ -134,18 +132,16 @@ const pricingPlans = [
     name: "Enterprise",
     price: "Custom",
     period: "",
-    description: "For large agencies",
+    description: "For Large Agencies & Multi-Branch Teams",
     features: [
       "Everything in Growth",
       "Unlimited Team Members",
-      "WhatsApp Integration",
-      "API Access & Custom Integrations",
       "Vendor Management Module",
-      "Multi-Branch Management",
-      "Advanced Reporting & Data Export",
+      "API & Custom Integrations",
+      "Multi-Branch Access",
       "Dedicated Account Manager",
       "SLA Guarantee",
-      "Data Migration Assistance"
+      "WhatsApp Integration"
     ],
     highlighted: false
   }
@@ -729,7 +725,7 @@ export default function HomePage() {
                     variant={plan.highlighted ? "default" : "outline"}
                     data-testid={`button-pricing-${plan.name.toLowerCase()}`}
                   >
-                    {plan.name === "Enterprise" ? "Contact Sales" : "Get Started"}
+                    {plan.name === "Enterprise" ? "Contact Sales" : "Start Free Trial"}
                   </Button>
                 </Link>
               </motion.div>
@@ -751,7 +747,10 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="text-center mt-8">
+          <div className="text-center mt-6">
+            <p className="text-sm text-slate-500 mb-4">
+              All plans include a <strong>14-day Growth Trial</strong>. No credit card required.
+            </p>
             <Link href="/pricing">
               <Button variant="link" className="text-[#2FA4BC] hover:text-[#2590a6] font-semibold">
                 View Full Pricing Details
