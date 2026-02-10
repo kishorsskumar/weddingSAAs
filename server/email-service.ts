@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import { storage } from './storage';
 
-const DEFAULT_FROM_EMAIL = 'Atbott <onboarding@resend.dev>';
+const DEFAULT_FROM_EMAIL = 'Atbott <noreply@atbottsolutions.com>';
 
 async function getCredentials() {
   if (process.env.RESEND_API_KEY) {
