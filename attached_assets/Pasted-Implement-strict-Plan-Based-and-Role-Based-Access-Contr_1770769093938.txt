@@ -1,0 +1,154 @@
+Implement strict Plan-Based and Role-Based Access Control in Atbott SaaS.
+
+IMPORTANT:
+Currently all modules are visible for trial users.
+This is incorrect.
+Implement proper access restriction immediately.
+No UI-only hiding.
+Backend must enforce restrictions.
+
+--------------------------------------------------
+STEP 1 — DEFINE ROLES
+
+Roles:
+
+1. superadmin
+2. tenant_admin
+3. team_member
+4. client_user
+
+Ensure role stored in user profile.
+
+--------------------------------------------------
+STEP 2 — DEFINE PLAN TYPES
+
+Plans:
+
+starter
+growth
+enterprise
+
+Trial:
+growth (is_trial = true)
+
+--------------------------------------------------
+STEP 3 — DEFINE FEATURE MATRIX
+
+Starter:
+- Dashboard
+- Sales
+- Event Hub
+- Client Portal
+- Limited Tools
+
+Growth:
+- Starter features
+- Payment Tracking
+- Analytics
+- Automation
+- Custom Branding
+
+Enterprise:
+- Everything in Growth
+- WhatsApp Integration
+- Vendor Management
+- API Access
+- Advanced Reporting
+
+Superadmin:
+- Admin Panel
+- Sales Monitoring
+- Tenant Management
+- Billing Control
+- Platform Analytics
+
+--------------------------------------------------
+STEP 4 — SIDEBAR MODULE FILTERING
+
+When rendering sidebar:
+
+Check:
+
+user.role
+tenant.plan_type
+tenant.plan_status
+
+Hide modules not allowed.
+
+Example:
+
+If role != superadmin:
+Hide Admin Panel.
+
+If plan != enterprise:
+Hide Vendor Management.
+Hide API Access.
+
+If plan = starter:
+Hide Payment Tracking.
+
+Sidebar must dynamically render based on permission.
+
+--------------------------------------------------
+STEP 5 — BACKEND ROUTE PROTECTION
+
+For every protected route:
+
+Before serving data:
+
+Check:
+
+user.role
+tenant.plan_type
+tenant.plan_status
+
+If unauthorized:
+Return 403 Forbidden.
+
+Do NOT rely only on frontend.
+
+--------------------------------------------------
+STEP 6 — TRIAL LOGIC
+
+If trial expired:
+
+Restrict:
+
+• Event creation
+• Lead creation
+• Advanced modules
+
+Show upgrade modal.
+
+--------------------------------------------------
+STEP 7 — DIRECT URL ACCESS TEST
+
+Test:
+
+Access /admin as trial user.
+Access /finance as starter.
+Access restricted module via direct URL.
+
+Must return:
+403 error or redirect to dashboard.
+
+--------------------------------------------------
+STEP 8 — PRODUCTION TESTING
+
+Simulate:
+
+Trial user
+Starter user
+Growth user
+Enterprise user
+Superadmin
+
+Verify each sees only allowed modules.
+
+--------------------------------------------------
+STEP 9 — FINAL REPORT
+
+Provide:
+
+1. Feature matrix confirmation
+2. Route pro

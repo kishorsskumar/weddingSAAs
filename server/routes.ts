@@ -43,6 +43,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { getAllowedPagesByPlanAndRole, isPageAllowedByPlan, normalizePlanName, getRouteToPageMapping, getApiRouteToPageMapping } from "@shared/plan-features";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -159,6 +160,31 @@ async function checkSubscriptionActive(req: Request, res: Response): Promise<boo
   } catch {
     return true;
   }
+}
+
+async function getPlanFilteredPermissions(userId: string, role: string, companyId: string | null): Promise<string[]> {
+  let subscription = null;
+  if (companyId) {
+    try {
+      subscription = await storage.getSubscriptionByCompanyId(companyId);
+    } catch {}
+  }
+  const planName = subscription?.planName || null;
+
+  if (role === 'superadmin') {
+    return getAllowedPagesByPlanAndRole(planName, 'superadmin');
+  }
+
+  const planAllowed = getAllowedPagesByPlanAndRole(planName, role);
+
+  if (role === 'admin' || role === 'tenant_admin') {
+    return planAllowed;
+  }
+
+  const userPermissions = await storage.getUserPermissions(userId);
+  const userPageIds = userPermissions.map(p => p.pageId);
+
+  return userPageIds.filter(pageId => planAllowed.includes(pageId));
 }
 
 // Helper function to escape XML special characters for TwiML responses
@@ -975,6 +1001,46 @@ export async function registerRoutes(
     }
   });
 
+  const API_ROUTE_TO_PAGE = getApiRouteToPageMapping();
+
+  app.use('/api/', async (req, res, next) => {
+    const isExempt = SUBSCRIPTION_EXEMPT_ROUTES.some(r => req.path.startsWith(r.replace('/api', '')));
+    if (isExempt || req.method === 'OPTIONS') return next();
+
+    if (req.user?.role === 'superadmin') return next();
+
+    const companyId = await getCompanyIdFromRequest(req);
+    if (!companyId) return next();
+
+    let subscription = null;
+    try {
+      subscription = await storage.getSubscriptionByCompanyId(companyId);
+    } catch {}
+    const planName = subscription?.planName || null;
+    const role = req.user?.role || 'team_member';
+
+    const apiPath = req.path;
+    let requiredPage: string | null = null;
+    for (const [prefix, pageId] of Object.entries(API_ROUTE_TO_PAGE)) {
+      if (apiPath.startsWith(prefix)) {
+        requiredPage = pageId;
+        break;
+      }
+    }
+
+    if (requiredPage && !isPageAllowedByPlan(requiredPage, planName, role)) {
+      const plan = normalizePlanName(planName);
+      return res.status(403).json({
+        error: 'This feature is not available on your current plan. Please upgrade.',
+        code: 'PLAN_RESTRICTED',
+        currentPlan: plan,
+        requiredFeature: requiredPage,
+      });
+    }
+
+    next();
+  });
+
   app.get('/api/health', async (req, res) => {
     try {
       const allUsers = await storage.getAllUsers();
@@ -1246,7 +1312,7 @@ export async function registerRoutes(
             id: company.id,
             name: company.name,
           },
-          permissions: ALL_PAGES,
+          permissions: getAllowedPagesByPlanAndRole(planName, user.role),
         });
       });
     } catch (error) {
@@ -1637,16 +1703,8 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      // Admin and superadmin get all pages automatically
-      let permissionsList: string[];
-      if (user.role === 'admin' || user.role === 'superadmin') {
-        permissionsList = ALL_PAGES;
-      } else {
-        const permissions = await storage.getUserPermissions(user.id);
-        permissionsList = permissions.map(p => p.pageId);
-      }
+      const permissionsList = await getPlanFilteredPermissions(user.id, user.role, user.companyId);
       
-      // Generate JWT token for new auth flow
       const token = jwt.sign(
         {
           userId: user.id,
@@ -1660,12 +1718,9 @@ export async function registerRoutes(
       
       (req.session as any).userId = user.id;
       
-      // Explicitly save session before sending response to prevent race conditions
-      // If session save fails, still return JWT token (primary auth method)
       req.session.save((err) => {
         if (err) {
           console.error('[Auth] Session save error (non-fatal, JWT still valid):', err);
-          // Don't block login - JWT is primary auth, session is backup
         }
         
         res.json({ 
@@ -1852,14 +1907,7 @@ export async function registerRoutes(
       company = await storage.getCompany(user.companyId);
     }
 
-    // Admin and superadmin get all pages automatically
-    let permissionsList: string[];
-    if (user.role === 'admin' || user.role === 'superadmin') {
-      permissionsList = ALL_PAGES;
-    } else {
-      const permissions = await storage.getUserPermissions(user.id);
-      permissionsList = permissions.map(p => p.pageId);
-    }
+    const permissionsList = await getPlanFilteredPermissions(user.id, user.role, user.companyId);
 
     res.json({ 
       user: {
@@ -2196,6 +2244,7 @@ export async function registerRoutes(
         isTrial,
         trialDaysRemaining,
         isTrialExpired,
+        currentPlan: normalizePlanName(subscription?.planName),
         razorpayConfigured: isConfigured,
         razorpayKeyId: razorpayService.getRazorpayKeyId(),
         planCatalog: {
@@ -10622,14 +10671,7 @@ export async function registerRoutes(
     const user = await storage.getUser(userId);
     if (!user) return { allowed: false };
     
-    // Only superadmin gets ALL_PAGES, everyone else (including admin) gets filtered by their permissions
-    let allowedPages: string[];
-    if (user.role === 'superadmin') {
-      allowedPages = ALL_PAGES;
-    } else {
-      const permissions = await storage.getUserPermissions(user.id);
-      allowedPages = permissions.map(p => p.pageId);
-    }
+    const allowedPages = await getPlanFilteredPermissions(user.id, user.role, user.companyId);
     
     const { canAccessOaksy } = await import('./oaksy-ai');
     return { allowed: canAccessOaksy(user.role, allowedPages), user, allowedPages };
@@ -10805,14 +10847,7 @@ export async function registerRoutes(
         return res.status(401).json({ error: 'User not found' });
       }
       
-      // Get user's allowed pages for permission filtering (only superadmin gets ALL_PAGES)
-      let allowedPages: string[];
-      if (user.role === 'superadmin') {
-        allowedPages = ALL_PAGES;
-      } else {
-        const permissions = await storage.getUserPermissions(user.id);
-        allowedPages = permissions.map(p => p.pageId);
-      }
+      const allowedPages = await getPlanFilteredPermissions(user.id, user.role, user.companyId);
       
       // Check if user can access Oaksy (exclude employee portal users)
       const { canAccessOaksy, generateOaksyResponse, generateConversationTitle } = await import('./oaksy-ai');

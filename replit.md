@@ -108,6 +108,7 @@ Preferred communication style: Simple, everyday language.
 - **Automation:** Estimate-to-Production automation including timeline creation, push to production, and inventory finalization, with logging and WhatsApp notifications.
 - **Event Staff Assignment Automation:** WhatsApp notifications sent to staff when assigned to events, with supervisor summary messages and duplicate prevention via `notificationSent` flag.
 - **Multi-Tenant SaaS:** Company registration, trial management (14-day Growth trial), Razorpay subscription payments (Starter ₹499/mo or ₹4999/yr, Growth ₹1499/mo or ₹14999/yr), subscription enforcement middleware, admin event logging, payment notification emails.
+- **Plan-Based Access Control:** Feature matrix in `shared/plan-features.ts` restricts modules by plan (Starter/Growth/Enterprise). Backend middleware enforces plan restrictions on all API routes. Frontend shows PlanRestrictedPage for direct URL access to blocked features. Roles: superadmin (all access), admin/tenant_admin (plan-limited), team_member (restricted subset), client_user (minimal access).
 - **Admin SaaS Dashboard:** SaaS overview stats (users, companies, revenue), admin event logs viewer with filtering, subscription management.
 
 ### Critical Files & Components

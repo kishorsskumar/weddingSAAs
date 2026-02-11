@@ -56,17 +56,49 @@ import ClientPortal from "@/pages/client-portal";
 import PortalLanding from "@/pages/portal-landing";
 import MyPortal from "@/pages/my-portal";
 import { AIChatbot } from "@/components/ai-chatbot";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { getRouteToPageMapping, getRequiredPlanForPage, PLAN_DISPLAY_NAMES, type PlanType } from "@shared/plan-features";
+import { Button } from "@/components/ui/button";
+import { Lock, ArrowUpRight } from "lucide-react";
 
 interface BillingStatus {
   subscription: { status: string } | null;
   isActive: boolean;
+  currentPlan?: string;
   razorpayConfigured: boolean;
 }
 
+const ROUTE_PAGE_MAP = getRouteToPageMapping();
+
+function PlanRestrictedPage({ requiredPlan }: { requiredPlan: string }) {
+  const [, setLocation] = useLocation();
+  const planLabel = PLAN_DISPLAY_NAMES[requiredPlan as PlanType] || requiredPlan;
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]" data-testid="plan-restricted-page">
+      <div className="text-center max-w-md mx-auto p-8">
+        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="h-8 w-8 text-amber-600" />
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Feature Not Available</h2>
+        <p className="text-gray-600 mb-6">
+          This feature requires the <strong>{planLabel}</strong> plan or above. Upgrade your plan to unlock this and more.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" onClick={() => setLocation("/dashboard")} data-testid="button-go-dashboard">
+            Go to Dashboard
+          </Button>
+          <Button className="bg-[#2FA4BC] hover:bg-[#2590a6]" onClick={() => setLocation("/billing")} data-testid="button-upgrade-plan">
+            Upgrade Plan <ArrowUpRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PrivateRoute({ component: Component, path, skipSubscriptionCheck = false }: { component: any; path: string; skipSubscriptionCheck?: boolean }) {
-  const { user, isLoading } = useAuth();
+  const { user, allowedPages, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
 
   const { data: billingStatus, isLoading: billingLoading } = useQuery<BillingStatus>({
@@ -88,6 +120,16 @@ function PrivateRoute({ component: Component, path, skipSubscriptionCheck = fals
 
   if (isLoading || !user) return null;
   if (!skipSubscriptionCheck && billingLoading) return null;
+
+  const pageId = ROUTE_PAGE_MAP[path];
+  if (pageId && allowedPages.length > 0 && !allowedPages.includes(pageId) && user.role !== 'superadmin') {
+    const requiredPlan = getRequiredPlanForPage(pageId);
+    if (requiredPlan) {
+      return <PlanRestrictedPage requiredPlan={requiredPlan} />;
+    }
+    setLocation("/dashboard");
+    return null;
+  }
 
   return <Component />;
 }
