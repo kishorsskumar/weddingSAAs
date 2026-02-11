@@ -1,0 +1,120 @@
+Fix incorrect trial redirect behavior in Atbott SaaS.
+
+Current problem:
+When a user clicks Start Free Trial and logs in,
+they are redirected to Billing & Settings page.
+This is incorrect.
+
+We have only ONE product.
+Trial users must immediately experience the product,
+not billing or module selection.
+
+--------------------------------------------------
+OBJECTIVE
+
+After trial signup:
+
+1. Assign 14-day Growth trial.
+2. Redirect to onboarding.
+3. After onboarding → redirect to dashboard.
+4. Never redirect trial users to billing page automatically.
+
+--------------------------------------------------
+STEP 1 — FIX AUTH REDIRECT LOGIC
+
+Check post-login redirect logic.
+
+If:
+
+user.plan_status = active
+AND user.is_trial = true
+AND onboarding_completed = false
+
+Redirect to:
+ /onboarding
+
+If onboarding_completed = true:
+Redirect to:
+ /dashboard
+
+Remove any default redirect to:
+ /billing
+ /settings
+ /subscriptions
+
+--------------------------------------------------
+STEP 2 — REMOVE ADD-ON MODULE PAGE FOR TRIAL USERS
+
+We have one product.
+Disable add-on module interface for trial users.
+
+Hide:
+• Add-on Modules section
+• AI Settings tab
+• Subscription toggle page
+
+Trial users should not manage modules.
+They should use product.
+
+--------------------------------------------------
+STEP 3 — CLEAN DASHBOARD EXPERIENCE
+
+After onboarding,
+trial user should see:
+
+Dashboard
+Sales
+Event Hub
+Client Portal
+Tools (basic)
+
+Do NOT show:
+Admin Panel
+Platform Billing
+Superadmin controls
+
+--------------------------------------------------
+STEP 4 — BILLING ACCESS RULE
+
+Billing page should only be accessible if:
+
+User manually clicks Upgrade
+OR
+User is Superadmin
+
+Direct access to /billing by trial user should:
+
+Redirect to /dashboard
+
+--------------------------------------------------
+STEP 5 — TRIAL EXPERIENCE
+
+Add trial banner on dashboard:
+
+"14-Day Growth Trial Active"
+Show days remaining.
+Show Upgrade button.
+
+Do NOT force billing view.
+
+--------------------------------------------------
+STEP 6 — TESTING
+
+Test:
+
+New signup
+Existing trial user login
+Expired trial user login
+Direct URL access to /billing
+Refresh after login
+
+Verify correct redirect every time.
+
+--------------------------------------------------
+FINAL REQUIREMENT
+
+This is a single-product SaaS.
+Remove multi-module mindset.
+Trial users must experience the product immediately.
+
+Provide final redirect flow confirmation.

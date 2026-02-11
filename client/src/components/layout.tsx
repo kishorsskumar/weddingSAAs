@@ -529,7 +529,7 @@ function TrialBanner() {
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-2 px-4 py-2 text-sm font-medium",
+        "flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium",
         isExpired
           ? "bg-red-600 text-white"
           : isUrgent
@@ -543,12 +543,12 @@ function TrialBanner() {
         <span>
           {isExpired
             ? "Your trial has expired. Upgrade now to continue using all features."
-            : `${days} day${days !== 1 ? 's' : ''} left in your Growth Trial`}
+            : `14-Day Growth Trial Active — ${days} day${days !== 1 ? 's' : ''} remaining`}
         </span>
       </div>
-      <Link href="/billing">
-        <button className="shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-md px-3 py-1 text-sm font-semibold transition-colors" data-testid="button-upgrade-trial">
-          Upgrade Now <ArrowUpRight className="h-3.5 w-3.5" />
+      <Link href="/billing?upgrade=true">
+        <button className="shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors" data-testid="button-upgrade-trial">
+          Upgrade <ArrowUpRight className="h-3.5 w-3.5" />
         </button>
       </Link>
     </div>
@@ -568,7 +568,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = user?.role === 'superadmin';
   const navItems = ALL_PAGES.filter((page) => {
     if ((page as any).superadminOnly && !isSuperAdmin) return false;
-    // Show parent page if user has access to parent OR any of its subpages
+    if (page.id === 'admin' && !isSuperAdmin) return false;
     if (allowedPages.includes(page.id)) return true;
     const subPages = (page as any).subPages || [];
     return subPages.some((sp: any) => allowedPages.includes(sp.id));

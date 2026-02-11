@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user.createdVia === 'employee_onboarding') {
         setLocation("/employee-portal");
       } else {
-        setLocation("/");
+        setLocation("/dashboard");
       }
     } catch (error: any) {
       alert(error.message || 'Login failed. Please check your credentials.');
@@ -153,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.company) setCompany(data.company);
       
       registerPushSubscription();
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (error: any) {
       alert(error.message || 'Signup failed. Please try again.');
       throw error;

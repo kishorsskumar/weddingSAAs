@@ -65,6 +65,9 @@ import { Lock, ArrowUpRight } from "lucide-react";
 interface BillingStatus {
   subscription: { status: string } | null;
   isActive: boolean;
+  isTrial?: boolean;
+  isTrialExpired?: boolean;
+  trialDaysRemaining?: number | null;
   currentPlan?: string;
   razorpayConfigured: boolean;
 }
@@ -88,7 +91,7 @@ function PlanRestrictedPage({ requiredPlan }: { requiredPlan: string }) {
           <Button variant="outline" onClick={() => setLocation("/dashboard")} data-testid="button-go-dashboard">
             Go to Dashboard
           </Button>
-          <Button className="bg-[#2FA4BC] hover:bg-[#2590a6]" onClick={() => setLocation("/billing")} data-testid="button-upgrade-plan">
+          <Button className="bg-[#2FA4BC] hover:bg-[#2590a6]" onClick={() => setLocation("/billing?upgrade=true")} data-testid="button-upgrade-plan">
             Upgrade Plan <ArrowUpRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
@@ -113,13 +116,25 @@ function PrivateRoute({ component: Component, path, skipSubscriptionCheck = fals
   }, [user, isLoading, setLocation]);
 
   useEffect(() => {
-    if (!skipSubscriptionCheck && !billingLoading && billingStatus && !billingStatus.isActive && location !== "/billing") {
-      setLocation("/billing");
+    if (!skipSubscriptionCheck && !billingLoading && billingStatus) {
+      if (!billingStatus.isActive && billingStatus.isTrialExpired) {
+        if (location !== "/billing") {
+          setLocation("/billing");
+        }
+      }
     }
   }, [billingStatus, billingLoading, skipSubscriptionCheck, setLocation, location]);
 
   if (isLoading || !user) return null;
   if (!skipSubscriptionCheck && billingLoading) return null;
+
+  if (path === "/billing") {
+    const hasUpgradeParam = window.location.search.includes('upgrade=true');
+    if (billingStatus?.isTrial && !billingStatus?.isTrialExpired && user.role !== 'superadmin' && !hasUpgradeParam) {
+      setLocation("/dashboard");
+      return null;
+    }
+  }
 
   const pageId = ROUTE_PAGE_MAP[path];
   if (pageId && allowedPages.length > 0 && !allowedPages.includes(pageId) && user.role !== 'superadmin') {
