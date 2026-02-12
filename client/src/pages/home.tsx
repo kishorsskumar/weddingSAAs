@@ -41,7 +41,8 @@ import {
   TrendingUp,
   DollarSign,
   Globe,
-  Loader2
+  Loader2,
+  X
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
@@ -160,6 +161,68 @@ const faqs = [
   { question: "Does it support multiple events?", answer: "Yes! You can manage unlimited events simultaneously with our calendar view, conflict detection, and team assignment features." },
   { question: "Do you provide onboarding help?", answer: "Every paid plan includes personalized onboarding sessions to help you set up your account, import data, and train your team." },
 ];
+
+function FullDemoSection() {
+  const [showFullDemo, setShowFullDemo] = useState(false);
+  const fullDemoRef = useRef<HTMLVideoElement>(null);
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
+        <Button
+          size="lg"
+          variant="outline"
+          className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50"
+          onClick={() => setShowFullDemo(true)}
+          data-testid="btn-watch-full-demo"
+        >
+          Watch Full Demo
+          <Play className="ml-2 h-4 w-4" />
+        </Button>
+        <Link href="/demo">
+          <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/20 text-white font-semibold">
+            Book Live Demo
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
+
+      {showFullDemo && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => {
+            setShowFullDemo(false);
+            if (fullDemoRef.current) fullDemoRef.current.pause();
+          }}
+        >
+          <div
+            className="relative w-full max-w-5xl aspect-video rounded-2xl overflow-hidden bg-black"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setShowFullDemo(false);
+                if (fullDemoRef.current) fullDemoRef.current.pause();
+              }}
+              className="absolute top-3 right-3 z-10 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors"
+              data-testid="btn-close-full-demo"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <video
+              ref={fullDemoRef}
+              src="/videos/atbott-full-demo.mp4"
+              className="w-full h-full object-contain"
+              controls
+              autoPlay
+              playsInline
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function DemoVideoPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -528,18 +591,7 @@ export default function HomePage() {
 
           <DemoVideoPlayer />
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-            <Button size="lg" variant="outline" className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50">
-              Watch Full Demo
-              <Play className="ml-2 h-4 w-4" />
-            </Button>
-            <Link href="/demo">
-              <Button size="lg" className="bg-[#2FA4BC] hover:bg-[#2590a6] shadow-lg shadow-[#2FA4BC]/20 text-white font-semibold">
-                Book Live Demo
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+          <FullDemoSection />
         </div>
       </section>
 
