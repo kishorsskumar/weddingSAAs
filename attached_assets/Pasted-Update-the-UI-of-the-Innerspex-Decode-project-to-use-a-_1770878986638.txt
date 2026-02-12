@@ -1,0 +1,90 @@
+Update the UI of the Innerspex Decode project to use a strict 2-color premium authority design system.
+
+Remove ALL gradients and multi-color elements.
+
+-------------------------------------------------
+COLOR SYSTEM
+
+Primary Purple:
+#5B3CC4
+
+Hover State:
+#4A2FA3
+
+Light Purple Background Tint:
+#F4F1FF
+
+Neutral Colors:
+Background: #FAFAFC
+Primary Text: #111111
+Secondary Text: #4B4B4B
+Borders: #E6E6EB
+
+-------------------------------------------------
+GLOBAL RULES
+
+1. Remove all gradient backgrounds.
+2. Remove blue, yellow, or any secondary accent colors.
+3. Use ONLY the primary purple for:
+   - Buttons
+   - Progress bars
+   - Icons
+   - Active states
+   - Links
+   - Highlights
+4. All other UI elements must use neutral tones.
+
+-------------------------------------------------
+HERO SECTION CHANGES
+
+- Make both lines of the headline black (#111111).
+- Do NOT color "Inner Potential" purple.
+- Add a subtle purple underline below the second line.
+- Change CTA button to solid #5B3CC4 background with white text.
+- Hover state should darken to #4A2FA3.
+- Remove purple gradient from button.
+
+-------------------------------------------------
+NAVBAR CHANGES
+
+- White background.
+- Black text.
+- Active menu item should have a thin purple underline.
+- “Get Started” button: solid #5B3CC4.
+- “Log In” button: bordered with #E6E6EB and black text.
+
+-------------------------------------------------
+ASSESSMENT PREVIEW CARD
+
+- White background.
+- Border: 1px solid #E6E6EB.
+- All progress bars:
+    Track: #E6E6EB
+    Fill: #5B3CC4
+- Percentage numbers colored #5B3CC4.
+- Remove multi-colored progress bars.
+
+-------------------------------------------------
+BADGE ("AI-Powered Personality Insights")
+
+- Remove filled purple background.
+- Make it transparent.
+- Border: 1px solid #5B3CC4.
+- Text color: #5B3CC4.
+- Icon color: #5B3CC4.
+
+-------------------------------------------------
+TYPOGRAPHY
+
+Primary text: #111111
+Secondary text: #4B4B4B
+
+-------------------------------------------------
+Ensure the entire UI feels:
+- Premium
+- Structured
+- Minimal
+- Psychological authority
+- Not startup flashy
+
+Do not introduce any new accent colors.
