@@ -3,7 +3,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 const TOKEN_KEY = 'auth_token';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem(TOKEN_KEY);
   const headers: HeadersInit = {};
   if (token) {

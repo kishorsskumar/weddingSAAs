@@ -5,11 +5,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, CreditCard, CheckCircle, AlertCircle, Crown, Package, Zap, Users, Calendar, DollarSign, Bot, Settings, XCircle } from "lucide-react";
+import { Loader2, CreditCard, CheckCircle, Crown, Zap, Rocket, Clock, ArrowRight, Shield, Star, Users, BarChart3, MessageSquare, Building2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AiSettingsPanel } from "@/components/ai-settings";
+import { useAuth } from "@/context/auth-context";
+import { getAuthHeaders } from "@/lib/queryClient";
 
 declare global {
   interface Window {
@@ -17,175 +16,213 @@ declare global {
   }
 }
 
-interface SaasModule {
-  id: string;
-  code: string;
-  name: string;
-  description: string;
-  monthlyPrice: number;
-  yearlyPrice: number;
-  features: string[];
-  isCore: boolean;
-  sortOrder: number;
+interface BillingStatus {
+  subscription: {
+    id: string;
+    planName: string;
+    status: string;
+    startDate: string | null;
+    endDate: string | null;
+    razorpayPaymentId: string | null;
+  } | null;
+  isActive: boolean;
+  isTrial: boolean;
+  trialDaysRemaining: number | null;
+  isTrialExpired: boolean;
+  currentPlan: string;
+  teamLimit: number;
+  teamCount: number;
+  razorpayConfigured: boolean;
+  razorpayKeyId: string;
+  planCatalog: Record<string, { name: string; amount: number }>;
 }
 
-interface ModuleSubscription {
-  id: string;
-  companyId: string;
-  moduleId: string;
-  moduleCode: string;
-  billingCycle: string;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  nextBillingDate: string | null;
-  module: SaasModule;
-}
-
-interface ModulesResponse {
-  subscriptions: ModuleSubscription[];
-  hasActiveCore: boolean;
-  activatedModules: string[];
-}
-
-const MODULE_ICONS: Record<string, React.ReactNode> = {
-  core: <Package className="h-6 w-6" />,
-  rsvp: <Users className="h-6 w-6" />,
-  crm: <Users className="h-6 w-6" />,
-  vendor: <Package className="h-6 w-6" />,
-  payments: <DollarSign className="h-6 w-6" />,
-  automation: <Zap className="h-6 w-6" />,
-  ai_assistant: <Bot className="h-6 w-6" />,
-};
+const PLANS = [
+  {
+    id: "starter",
+    name: "Starter",
+    description: "Perfect for solo wedding planners getting started",
+    monthlyPrice: 499,
+    annualPrice: 4999,
+    monthlyPlanKey: "starter_monthly",
+    annualPlanKey: "starter_annual",
+    teamLimit: "1 user",
+    icon: Zap,
+    color: "blue",
+    features: [
+      "Dashboard & Analytics",
+      "Sales CRM (Leads, Pipeline)",
+      "Event Hub (Calendar, Timeline)",
+      "Finance (Estimates, Invoices)",
+      "Client Portal",
+      "AI Assistant (Basic)",
+    ],
+    notIncluded: [
+      "Sales Reports",
+      "Payment Tracking",
+      "Operations & Inventory",
+      "KnotVite RSVP",
+      "HR & Employee Portal",
+      "WhatsApp Integration",
+    ],
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    description: "For growing teams that need more power and features",
+    monthlyPrice: 1499,
+    annualPrice: 14999,
+    monthlyPlanKey: "growth_monthly",
+    annualPlanKey: "growth_annual",
+    teamLimit: "Up to 5 users",
+    icon: Rocket,
+    color: "primary",
+    popular: true,
+    features: [
+      "Everything in Starter, plus:",
+      "Sales Reports & Analytics",
+      "Payment Tracking",
+      "Operations & Inventory",
+      "KnotVite RSVP System",
+      "Team Calendar",
+      "Creative Studio",
+      "Full AI Assistant",
+    ],
+    notIncluded: [
+      "HR Management",
+      "Employee Portal",
+      "Finance Masters",
+      "Day Book",
+      "WhatsApp Integration",
+      "Management MIS",
+    ],
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    description: "For large teams with custom needs and dedicated support",
+    monthlyPrice: 0,
+    annualPrice: 0,
+    monthlyPlanKey: "enterprise",
+    annualPlanKey: "enterprise",
+    teamLimit: "Unlimited users",
+    icon: Building2,
+    color: "purple",
+    features: [
+      "Everything in Growth, plus:",
+      "HR Management",
+      "Employee Portal",
+      "Finance Masters",
+      "Day Book",
+      "WhatsApp Integration",
+      "Management MIS Reports",
+      "Dedicated Support",
+      "Custom Integrations",
+    ],
+    notIncluded: [],
+  },
+];
 
 export default function BillingPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [moduleToCancel, setModuleToCancel] = useState<string | null>(null);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
-  const { data: modules, isLoading: modulesLoading } = useQuery<SaasModule[]>({
-    queryKey: ["/api/modules"],
-  });
-
-  const { data: subscriptionData, isLoading: subsLoading } = useQuery<ModulesResponse>({
-    queryKey: ["/api/modules/subscriptions"],
-  });
-
-  const subscribeMutation = useMutation({
-    mutationFn: async (data: { moduleCode: string; billingCycle: string }) => {
-      const response = await fetch("/api/modules/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to subscribe");
-      }
-      return response.json();
+  const { data: billing, isLoading } = useQuery<BillingStatus>({
+    queryKey: ["/api/billing/status"],
+    queryFn: async () => {
+      const res = await fetch("/api/billing/status", { credentials: "include", headers: getAuthHeaders() });
+      if (!res.ok) throw new Error("Failed to load billing");
+      return res.json();
     },
   });
 
-  const verifyPaymentMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch("/api/modules/verify-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Failed to verify payment");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modules/subscriptions"] });
+  const handleSubscribe = async (planKey: string) => {
+    if (!billing?.razorpayConfigured) {
       toast({
-        title: "Payment Successful!",
-        description: "Your module is now active.",
-      });
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: async (moduleCode: string) => {
-      const response = await fetch("/api/modules/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ moduleCode }),
-      });
-      if (!response.ok) throw new Error("Failed to cancel subscription");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modules/subscriptions"] });
-      toast({
-        title: "Subscription Cancelled",
-        description: "Your subscription has been cancelled.",
-      });
-      setCancelDialogOpen(false);
-      setModuleToCancel(null);
-    },
-  });
-
-  // List of modules that can be subscribed independently (without Core Platform)
-  const independentModules = ['rsvp'];
-
-  const handleSubscribe = async (module: SaasModule) => {
-    // Allow Core Platform and independent modules to be subscribed without Core
-    const canSubscribeIndependently = module.isCore || independentModules.includes(module.code);
-    
-    if (!subscriptionData?.hasActiveCore && !canSubscribeIndependently) {
-      toast({
-        title: "Core Platform Required",
-        description: "Please subscribe to Core Platform first before adding modules.",
+        title: "Payment Not Available",
+        description: "Payment system is being configured. Please contact support.",
         variant: "destructive",
       });
       return;
     }
 
     setIsProcessing(true);
-
     try {
-      const result = await subscribeMutation.mutateAsync({
-        moduleCode: module.code,
-        billingCycle,
+      const res = await fetch("/api/billing/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+        credentials: "include",
+        body: JSON.stringify({ planName: planKey }),
       });
 
-      if (result.type === 'order') {
-        const options = {
-          key: result.keyId,
-          amount: result.amount,
-          currency: result.currency,
-          name: "AtBott Wedding SaaS",
-          description: `${module.name} - ${billingCycle === 'yearly' ? 'Annual' : 'Monthly'}`,
-          order_id: result.orderId,
-          handler: async function (response: any) {
-            await verifyPaymentMutation.mutateAsync({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              moduleCode: module.code,
-            });
-          },
-          theme: {
-            color: "#2F6B3F",
-          },
-        };
-
-        const razorpay = new window.Razorpay(options);
-        razorpay.open();
-      } else if (result.shortUrl) {
-        window.location.href = result.shortUrl;
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create order");
       }
+
+      const order = await res.json();
+
+      const options = {
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency,
+        name: "AtBott",
+        description: `${billingCycle === "yearly" ? "Annual" : "Monthly"} Subscription`,
+        order_id: order.orderId,
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await fetch("/api/billing/verify-payment", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+              credentials: "include",
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+
+            if (!verifyRes.ok) throw new Error("Payment verification failed");
+
+            queryClient.invalidateQueries({ queryKey: ["/api/billing/status"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+            toast({
+              title: "Payment Successful!",
+              description: "Your subscription is now active. Enjoy all the features!",
+            });
+          } catch (err) {
+            toast({
+              title: "Verification Failed",
+              description: "Payment was received but verification failed. Please contact support.",
+              variant: "destructive",
+            });
+          }
+        },
+        prefill: {
+          name: user?.name || "",
+          email: user?.email || "",
+        },
+        theme: {
+          color: "#2FA4BC",
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on("payment.failed", function () {
+        toast({
+          title: "Payment Failed",
+          description: "Your payment could not be processed. Please try again.",
+          variant: "destructive",
+        });
+      });
+      razorpay.open();
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to initiate payment. Please try again.",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -193,332 +230,320 @@ export default function BillingPage() {
     }
   };
 
-  const handleCancelClick = (moduleCode: string) => {
-    setModuleToCancel(moduleCode);
-    setCancelDialogOpen(true);
-  };
-
-  const confirmCancel = () => {
-    if (moduleToCancel) {
-      cancelMutation.mutate(moduleToCancel);
-    }
-  };
-
-  const formatPrice = (price: number) => {
-    return `₹${(price / 100).toLocaleString('en-IN')}`;
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-green-500">Active</Badge>;
-      case "pending":
-        return <Badge variant="secondary">Pending</Badge>;
-      case "cancelled":
-        return <Badge variant="destructive">Cancelled</Badge>;
-      case "paused":
-        return <Badge className="bg-yellow-500">Paused</Badge>;
-      case "failed":
-        return <Badge variant="destructive">Failed</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  const isLoading = modulesLoading || subsLoading;
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
-  const coreModule = modules?.find(m => m.isCore);
-  const addonModules = modules?.filter(m => !m.isCore) || [];
-  const activeSubscriptions = subscriptionData?.subscriptions.filter(s => s.status === 'active') || [];
-
-  const hasAiSubscription = subscriptionData?.activatedModules.includes('ai_assistant');
+  const currentPlan = billing?.currentPlan || "starter";
+  const isTrial = billing?.isTrial || false;
+  const trialDays = billing?.trialDaysRemaining ?? 0;
+  const isTrialExpired = billing?.isTrialExpired || false;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4" data-testid="billing-page">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Billing & Settings</h1>
-          <p className="text-gray-600">
-            Manage your platform subscriptions, modules, and AI settings.
+    <div className="min-h-screen bg-gray-50/50" data-testid="billing-page">
+      <div className="max-w-6xl mx-auto px-4 py-6 sm:py-10">
+
+        <div className="mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1" data-testid="text-billing-title">
+            Subscription & Billing
+          </h1>
+          <p className="text-gray-500 text-sm sm:text-base">
+            Manage your plan, view usage, and upgrade anytime.
           </p>
         </div>
 
-        <Tabs defaultValue="subscriptions" className="space-y-6">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-            <TabsTrigger value="subscriptions" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Subscriptions
-            </TabsTrigger>
-            <TabsTrigger value="ai-settings" className="flex items-center gap-2" disabled={!hasAiSubscription}>
-              <Bot className="h-4 w-4" />
-              AI Settings
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="subscriptions" className="space-y-6">
-
-        {activeSubscriptions.length > 0 && (
-          <Card className="mb-8 border-primary/20 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Active Subscriptions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeSubscriptions.map((sub) => (
-                  <div key={sub.id} className="bg-white rounded-lg p-4 border">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {MODULE_ICONS[sub.moduleCode] || <Package className="h-5 w-5" />}
-                        <span className="font-medium">{sub.module.name}</span>
-                      </div>
-                      {getStatusBadge(sub.status)}
-                    </div>
-                    <p className="text-sm text-gray-500 mb-2">
-                      {sub.billingCycle === 'yearly' ? 'Annual' : 'Monthly'} billing
-                    </p>
-                    {sub.endDate && (
-                      <p className="text-xs text-gray-400">
-                        Renews: {new Date(sub.endDate).toLocaleDateString()}
-                      </p>
+        <Card className="mb-8 border-l-4 border-l-primary" data-testid="current-plan-card">
+          <CardContent className="py-5 px-5 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  {isTrial ? (
+                    <Clock className="h-6 w-6 text-primary" />
+                  ) : (
+                    <Crown className="h-6 w-6 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-lg text-gray-900">
+                      {isTrial ? "Free Trial" : `${currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)} Plan`}
+                    </h3>
+                    {isTrial && !isTrialExpired && (
+                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                        {trialDays} day{trialDays !== 1 ? "s" : ""} remaining
+                      </Badge>
                     )}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="mt-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleCancelClick(sub.moduleCode)}
-                    >
-                      Cancel
-                    </Button>
+                    {isTrialExpired && (
+                      <Badge variant="destructive">Expired</Badge>
+                    )}
+                    {!isTrial && billing?.subscription?.status === "active" && (
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+                    )}
                   </div>
-                ))}
+                  <p className="text-sm text-gray-500 mt-1">
+                    {isTrial
+                      ? `You're on a 14-day Growth Trial. Upgrade to keep all features after the trial ends.`
+                      : billing?.subscription?.endDate
+                      ? `Renews on ${new Date(billing.subscription.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}`
+                      : "Your subscription is active."}
+                  </p>
+                  <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5" />
+                      Team: {billing?.teamCount || 0}/{billing?.teamLimit === -1 ? "Unlimited" : billing?.teamLimit || 1}
+                    </span>
+                    {billing?.subscription?.razorpayPaymentId && (
+                      <span className="flex items-center gap-1">
+                        <CreditCard className="h-3.5 w-3.5" />
+                        Payment ID: {billing.subscription.razorpayPaymentId}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              {isTrial && (
+                <div className="sm:text-right">
+                  <div className="w-full sm:w-48 bg-gray-200 rounded-full h-2 mb-1.5">
+                    <div
+                      className={`h-2 rounded-full transition-all ${trialDays <= 3 ? "bg-red-500" : trialDays <= 7 ? "bg-amber-500" : "bg-primary"}`}
+                      style={{ width: `${Math.min(100, ((14 - trialDays) / 14) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">{14 - trialDays} of 14 days used</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="flex items-center justify-center gap-4 mb-8">
-          <Label htmlFor="billing-toggle" className={billingCycle === 'monthly' ? 'font-semibold' : 'text-gray-500'}>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <Label
+            htmlFor="billing-toggle"
+            className={`text-sm cursor-pointer ${billingCycle === "monthly" ? "font-semibold text-gray-900" : "text-gray-500"}`}
+          >
             Monthly
           </Label>
           <Switch
             id="billing-toggle"
-            checked={billingCycle === 'yearly'}
-            onCheckedChange={(checked) => setBillingCycle(checked ? 'yearly' : 'monthly')}
+            checked={billingCycle === "yearly"}
+            onCheckedChange={(checked) => setBillingCycle(checked ? "yearly" : "monthly")}
+            data-testid="billing-cycle-toggle"
           />
-          <Label htmlFor="billing-toggle" className={billingCycle === 'yearly' ? 'font-semibold' : 'text-gray-500'}>
+          <Label
+            htmlFor="billing-toggle"
+            className={`text-sm cursor-pointer flex items-center gap-1.5 ${billingCycle === "yearly" ? "font-semibold text-gray-900" : "text-gray-500"}`}
+          >
             Yearly
-            <Badge className="ml-2 bg-green-100 text-green-800">Save 17%</Badge>
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] px-1.5 py-0">Save 17%</Badge>
           </Label>
         </div>
 
-        {coreModule && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Crown className="h-5 w-5 text-yellow-500" />
-              Core Platform (Required)
-            </h2>
-            <Card className="border-primary border-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      {MODULE_ICONS.core}
-                      {coreModule.name}
-                    </CardTitle>
-                    <CardDescription className="mt-1">{coreModule.description}</CardDescription>
+        <div className="grid md:grid-cols-3 gap-5 mb-10">
+          {PLANS.map((plan) => {
+            const isCurrentPlan = currentPlan === plan.id && !isTrial;
+            const isTrialPlan = isTrial && plan.id === "growth";
+            const isEnterprise = plan.id === "enterprise";
+            const Icon = plan.icon;
+            const price = billingCycle === "yearly" ? plan.annualPrice : plan.monthlyPrice;
+            const planKey = billingCycle === "yearly" ? plan.annualPlanKey : plan.monthlyPlanKey;
+
+            return (
+              <Card
+                key={plan.id}
+                className={`relative flex flex-col ${
+                  plan.popular ? "border-primary border-2 shadow-lg" : "border"
+                } ${isCurrentPlan ? "ring-2 ring-primary/30" : ""}`}
+                data-testid={`plan-card-${plan.id}`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-primary text-white px-3 py-0.5 text-xs">
+                      <Star className="h-3 w-3 mr-1" /> Most Popular
+                    </Badge>
                   </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold">
-                      {formatPrice(billingCycle === 'yearly' ? coreModule.yearlyPrice : coreModule.monthlyPrice)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      /{billingCycle === 'yearly' ? 'year' : 'month'}
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {coreModule.features?.map((feature, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      {feature}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter>
-                {subscriptionData?.hasActiveCore ? (
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">Active</span>
-                  </div>
-                ) : (
-                  <Button
-                    onClick={() => handleSubscribe(coreModule)}
-                    disabled={isProcessing}
-                    className="w-full sm:w-auto"
-                  >
-                    {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Subscribe to Core Platform
-                  </Button>
                 )}
-              </CardFooter>
-            </Card>
-          </div>
-        )}
 
-        <div>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Add-on Modules
-          </h2>
-          
-          {!subscriptionData?.hasActiveCore && (
-            <Card className="mb-4 border-yellow-200 bg-yellow-50">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-2 text-yellow-800">
-                  <AlertCircle className="h-5 w-5" />
-                  <span>Subscribe to Core Platform to enable all add-on modules. KnotVite RSVP is available as a standalone service.</span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                <CardHeader className="pb-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                      plan.id === "starter" ? "bg-blue-100" : plan.id === "growth" ? "bg-primary/10" : "bg-purple-100"
+                    }`}>
+                      <Icon className={`h-5 w-5 ${
+                        plan.id === "starter" ? "text-blue-600" : plan.id === "growth" ? "text-primary" : "text-purple-600"
+                      }`} />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">{plan.name}</CardTitle>
+                    </div>
+                  </div>
+                  <CardDescription className="text-xs">{plan.description}</CardDescription>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {addonModules.map((module) => {
-              const isSubscribed = subscriptionData?.activatedModules.includes(module.code);
-              
-              return (
-                <Card
-                  key={module.id}
-                  className={`relative ${isSubscribed ? 'border-green-200 bg-green-50/30' : ''}`}
-                  data-testid={`module-card-${module.code}`}
-                >
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        {MODULE_ICONS[module.code] || <Package className="h-5 w-5" />}
-                        {module.name}
-                      </CardTitle>
-                      {isSubscribed && (
-                        <Badge className="bg-green-500">Active</Badge>
-                      )}
-                    </div>
-                    <CardDescription>{module.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4">
-                      <span className="text-2xl font-bold">
-                        {formatPrice(billingCycle === 'yearly' ? module.yearlyPrice : module.monthlyPrice)}
-                      </span>
-                      <span className="text-gray-500 text-sm">
-                        /{billingCycle === 'yearly' ? 'year' : 'month'}
-                      </span>
-                    </div>
-                    <ul className="space-y-2">
-                      {module.features?.slice(0, 4).map((feature, i) => (
-                        <li key={i} className="flex items-center gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                  <CardFooter>
-                    {isSubscribed ? (
-                      <Button
-                        variant="outline"
-                        className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                        onClick={() => handleCancelClick(module.code)}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Cancel Module
-                      </Button>
+                  <div className="mt-3">
+                    {isEnterprise ? (
+                      <div>
+                        <span className="text-3xl font-bold text-gray-900">Custom</span>
+                        <p className="text-xs text-gray-500 mt-1">Contact us for pricing</p>
+                      </div>
                     ) : (
-                      <Button
-                        className="w-full"
-                        onClick={() => handleSubscribe(module)}
-                        disabled={isProcessing || (!subscriptionData?.hasActiveCore && !independentModules.includes(module.code))}
-                      >
-                        {isProcessing ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Zap className="h-4 w-4 mr-2" />
+                      <div>
+                        <span className="text-3xl font-bold text-gray-900">
+                          ₹{price.toLocaleString("en-IN")}
+                        </span>
+                        <span className="text-gray-500 text-sm">
+                          /{billingCycle === "yearly" ? "year" : "month"}
+                        </span>
+                        {billingCycle === "yearly" && (
+                          <p className="text-xs text-green-600 mt-0.5">
+                            ₹{Math.round(price / 12).toLocaleString("en-IN")}/month effective
+                          </p>
                         )}
-                        Add Module
-                      </Button>
+                      </div>
                     )}
-                  </CardFooter>
-                </Card>
-              );
-            })}
-          </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
+                    <Users className="h-3.5 w-3.5" />
+                    {plan.teamLimit}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 pb-4">
+                  <div className="space-y-2.5">
+                    {plan.features.map((feature, i) => (
+                      <div key={i} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
+                        <span className={i === 0 && plan.id !== "starter" ? "font-medium text-gray-900" : "text-gray-700"}>
+                          {feature}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-0">
+                  {isCurrentPlan ? (
+                    <Button variant="outline" className="w-full" disabled data-testid={`btn-current-${plan.id}`}>
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                      Current Plan
+                    </Button>
+                  ) : isTrialPlan ? (
+                    <Button
+                      className="w-full bg-primary hover:bg-primary/90"
+                      onClick={() => handleSubscribe(planKey)}
+                      disabled={isProcessing}
+                      data-testid={`btn-subscribe-${plan.id}`}
+                    >
+                      {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
+                      Upgrade Now
+                    </Button>
+                  ) : isEnterprise ? (
+                    <a href="mailto:sales@atbott.com" className="w-full">
+                      <Button variant="outline" className="w-full" data-testid="btn-contact-enterprise">
+                        <Mail className="h-4 w-4 mr-2" />
+                        Contact Sales
+                      </Button>
+                    </a>
+                  ) : currentPlan === plan.id ? (
+                    <Button variant="outline" className="w-full" disabled>
+                      <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+                      Current Plan
+                    </Button>
+                  ) : (
+                    <Button
+                      className={`w-full ${plan.popular ? "bg-primary hover:bg-primary/90" : ""}`}
+                      variant={plan.popular ? "default" : "outline"}
+                      onClick={() => handleSubscribe(planKey)}
+                      disabled={isProcessing}
+                      data-testid={`btn-subscribe-${plan.id}`}
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                      )}
+                      {currentPlan === "starter" && plan.id === "growth" ? "Upgrade" : "Subscribe"}
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
 
-        <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Cancel Subscription</DialogTitle>
-              <DialogDescription>
-                {moduleToCancel === 'core' 
-                  ? 'Canceling Core Platform will also cancel all add-on modules. Are you sure you want to continue?'
-                  : 'Are you sure you want to cancel this module subscription?'}
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
-                Keep Subscription
-              </Button>
-              <Button 
-                variant="destructive" 
-                onClick={confirmCancel}
-                disabled={cancelMutation.isPending}
-              >
-                {cancelMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Cancel Subscription
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Card className="border-gray-200" data-testid="plan-comparison">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Shield className="h-5 w-5 text-gray-500" />
+              Plan Comparison
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-3 pr-4 font-medium text-gray-500">Feature</th>
+                    <th className="text-center py-3 px-3 font-medium text-gray-700">Starter</th>
+                    <th className="text-center py-3 px-3 font-medium text-primary">Growth</th>
+                    <th className="text-center py-3 px-3 font-medium text-purple-700">Enterprise</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {[
+                    { feature: "Team Members", starter: "1", growth: "5", enterprise: "Unlimited" },
+                    { feature: "Dashboard & Events", starter: true, growth: true, enterprise: true },
+                    { feature: "Sales CRM", starter: true, growth: true, enterprise: true },
+                    { feature: "Estimates & Invoices", starter: true, growth: true, enterprise: true },
+                    { feature: "Client Portal", starter: true, growth: true, enterprise: true },
+                    { feature: "Sales Reports", starter: false, growth: true, enterprise: true },
+                    { feature: "Payment Tracking", starter: false, growth: true, enterprise: true },
+                    { feature: "Operations & Inventory", starter: false, growth: true, enterprise: true },
+                    { feature: "KnotVite RSVP", starter: false, growth: true, enterprise: true },
+                    { feature: "Team Calendar", starter: false, growth: true, enterprise: true },
+                    { feature: "HR Management", starter: false, growth: false, enterprise: true },
+                    { feature: "Employee Portal", starter: false, growth: false, enterprise: true },
+                    { feature: "Day Book", starter: false, growth: false, enterprise: true },
+                    { feature: "WhatsApp Integration", starter: false, growth: false, enterprise: true },
+                    { feature: "Management MIS", starter: false, growth: false, enterprise: true },
+                    { feature: "Dedicated Support", starter: false, growth: false, enterprise: true },
+                  ].map((row) => (
+                    <tr key={row.feature}>
+                      <td className="py-2.5 pr-4 text-gray-700">{row.feature}</td>
+                      {(["starter", "growth", "enterprise"] as const).map((plan) => (
+                        <td key={plan} className="text-center py-2.5 px-3">
+                          {typeof row[plan] === "string" ? (
+                            <span className="font-medium text-gray-900">{row[plan]}</span>
+                          ) : row[plan] ? (
+                            <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
 
-          </TabsContent>
-
-          <TabsContent value="ai-settings">
-            {hasAiSubscription ? (
-              <AiSettingsPanel />
-            ) : (
-              <Card className="border-yellow-200 bg-yellow-50">
-                <CardContent className="py-8 text-center">
-                  <Bot className="h-12 w-12 mx-auto text-yellow-600 mb-4" />
-                  <h3 className="text-lg font-semibold text-yellow-800 mb-2">
-                    AI Assistant Not Subscribed
-                  </h3>
-                  <p className="text-yellow-700 mb-4">
-                    Subscribe to the AI Assistant module to customize your white-label AI.
-                  </p>
-                  <Button onClick={() => {
-                    const el = document.querySelector('[data-testid="module-card-ai_assistant"]');
-                    el?.scrollIntoView({ behavior: 'smooth' });
-                  }}>
-                    View AI Module
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
+        <div className="mt-8 text-center text-sm text-gray-500">
+          <p>
+            Need help choosing?{" "}
+            <a href="mailto:sales@atbott.com" className="text-primary hover:underline">
+              Contact our team
+            </a>{" "}
+            for a personalized recommendation.
+          </p>
+          <p className="mt-2">
+            All plans include SSL, daily backups, and 99.9% uptime guarantee.
+          </p>
+        </div>
       </div>
     </div>
   );
