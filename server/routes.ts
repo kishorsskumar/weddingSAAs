@@ -43,7 +43,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { getAllowedPagesByPlanAndRole, isPageAllowedByPlan, normalizePlanName, getRouteToPageMapping, getApiRouteToPageMapping } from "@shared/plan-features";
+import { getAllowedPagesByPlanAndRole, isPageAllowedByPlan, normalizePlanName, getRouteToPageMapping, getApiRouteToPageMapping, PLAN_TEAM_LIMITS } from "@shared/plan-features";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
@@ -959,6 +959,15 @@ export async function registerRoutes(
     }
     next();
   });
+
+  async function checkTeamMemberLimit(companyId: string): Promise<{ allowed: boolean; limit: number; current: number; plan: string }> {
+    const subscription = await storage.getSubscriptionByCompanyId(companyId);
+    const plan = normalizePlanName(subscription?.planName);
+    const limit = PLAN_TEAM_LIMITS[plan];
+    const existingEmployees = await storage.getAllEmployees(companyId);
+    const current = existingEmployees.length;
+    return { allowed: current < limit, limit: limit === Infinity ? -1 : limit, current, plan };
+  }
 
   const SUBSCRIPTION_EXEMPT_ROUTES = [
     '/api/auth/', '/api/billing/', '/api/health', '/api/system-notifications',
@@ -2031,9 +2040,24 @@ export async function registerRoutes(
 
       const data = insertUserSchema.parse(req.body);
       
-      // Prevent non-superadmin from creating superadmin users
       if (data.role === 'superadmin' && auth.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Only Super Admin can create Super Admin users' });
+      }
+
+      if (auth.user.role !== 'superadmin') {
+        const companyId = await getCompanyIdFromRequest(req);
+        if (companyId) {
+          const limitCheck = await checkTeamMemberLimit(companyId);
+          if (!limitCheck.allowed) {
+            return res.status(403).json({
+              error: `Team member limit reached. Your ${limitCheck.plan} plan allows ${limitCheck.limit} team member${limitCheck.limit !== 1 ? 's' : ''}. Please upgrade to add more.`,
+              code: 'TEAM_LIMIT_REACHED',
+              currentCount: limitCheck.current,
+              limit: limitCheck.limit,
+              plan: limitCheck.plan,
+            });
+          }
+        }
       }
 
       const hashedPassword = await bcrypt.hash(data.password, 10);
@@ -2238,13 +2262,19 @@ export async function registerRoutes(
         isTrialExpired = trialDaysRemaining <= 0;
       }
       
+      const plan = normalizePlanName(subscription?.planName);
+      const teamLimit = PLAN_TEAM_LIMITS[plan];
+      const existingEmployees = await storage.getAllEmployees(companyId);
+      
       res.json({
         subscription: subscription || null,
         isActive: isActive && !isTrialExpired,
         isTrial,
         trialDaysRemaining,
         isTrialExpired,
-        currentPlan: normalizePlanName(subscription?.planName),
+        currentPlan: plan,
+        teamLimit: teamLimit === Infinity ? -1 : teamLimit,
+        teamCount: existingEmployees.length,
         razorpayConfigured: isConfigured,
         razorpayKeyId: razorpayService.getRazorpayKeyId(),
         planCatalog: {
@@ -3320,6 +3350,20 @@ export async function registerRoutes(
       const data = insertEmployeeSchema.parse(req.body);
       const companyId = await requireCompanyId(req, res);
       if (!companyId) return;
+      
+      if (req.user?.role !== 'superadmin') {
+        const limitCheck = await checkTeamMemberLimit(companyId);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({
+            error: `Team member limit reached. Your ${limitCheck.plan} plan allows ${limitCheck.limit} team member${limitCheck.limit !== 1 ? 's' : ''}. Please upgrade to add more.`,
+            code: 'TEAM_LIMIT_REACHED',
+            currentCount: limitCheck.current,
+            limit: limitCheck.limit,
+            plan: limitCheck.plan,
+          });
+        }
+      }
+      
       const employee = await storage.createEmployee({ ...data, companyId });
       res.json(employee);
     } catch (error) {
@@ -3352,19 +3396,30 @@ export async function registerRoutes(
     }
   });
 
-  // Create employee with auto-generated credentials
   app.post('/api/employees/with-credentials', async (req, res) => {
     const auth = await verifyAdminAccess(req, res);
     if (!auth) return;
     
     try {
-      // Make employeeId optional since it will be auto-generated
+      const companyId = await getCompanyIdFromRequest(req);
+      if (companyId && req.user?.role !== 'superadmin') {
+        const limitCheck = await checkTeamMemberLimit(companyId);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({
+            error: `Team member limit reached. Your ${limitCheck.plan} plan allows ${limitCheck.limit} team member${limitCheck.limit !== 1 ? 's' : ''}. Please upgrade to add more.`,
+            code: 'TEAM_LIMIT_REACHED',
+            currentCount: limitCheck.current,
+            limit: limitCheck.limit,
+            plan: limitCheck.plan,
+          });
+        }
+      }
+      
       const createEmployeeSchema = insertEmployeeSchema.extend({
         employeeId: insertEmployeeSchema.shape.employeeId.optional(),
       });
       const data = createEmployeeSchema.parse(req.body);
       
-      // Generate employee code if not provided
       const employeeId = data.employeeId || await storage.generateEmployeeCode();
       
       // Generate a temporary password
@@ -6246,6 +6301,20 @@ export async function registerRoutes(
         const validManagerRoles = ['admin', 'superadmin', 'manager'];
         if (!validManagerRoles.includes(manager.role)) {
           return res.status(400).json({ error: 'Selected user is not a valid manager' });
+        }
+      }
+      
+      const companyId = await getCompanyIdFromRequest(req);
+      if (companyId && req.user?.role !== 'superadmin') {
+        const limitCheck = await checkTeamMemberLimit(companyId);
+        if (!limitCheck.allowed) {
+          return res.status(403).json({
+            error: `Team member limit reached. Your ${limitCheck.plan} plan allows ${limitCheck.limit} team member${limitCheck.limit !== 1 ? 's' : ''}. Please upgrade to add more.`,
+            code: 'TEAM_LIMIT_REACHED',
+            currentCount: limitCheck.current,
+            limit: limitCheck.limit,
+            plan: limitCheck.plan,
+          });
         }
       }
       

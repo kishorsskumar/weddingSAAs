@@ -10,25 +10,29 @@ export function normalizePlanName(planName: string | null | undefined): PlanType
 
 const STARTER_PAGES = [
   'dashboard',
-  'sales', 'sales-leads', 'sales-pipeline', 'sales-estimates', 'sales-reports', 'sales-settings',
+  'sales', 'sales-leads', 'sales-pipeline', 'sales-estimates', 'sales-settings',
   'event-hub', 'event-calendar', 'event-milestones', 'execution-plan',
-  'finance', 'finance-masters', 'finance-customers', 'finance-estimates', 'finance-invoices', 'finance-settings',
+  'finance', 'finance-customers', 'finance-estimates', 'finance-invoices', 'finance-settings',
   'client-portal', 'portal-admin', 'portfolio-admin',
-  'people', 'hr', 'employee-portal', 'team-calendar',
+  'people',
   'tools', 'oaksy',
-  'daybook',
 ];
 
 const GROWTH_ADDITIONS = [
-  'finance-vendors', 'finance-payments', 'finance-reports',
+  'sales-reports',
+  'finance-payments', 'finance-reports', 'finance-vendors',
+  'team-calendar',
+  'knotvite', 'knotvite-dashboard', 'knotvite-forms', 'knotvite-submissions',
+  'oak-rsvp', 'oak-creative',
   'operations', 'ops-items', 'ops-purchase-orders', 'ops-templates',
   'ops-event-inventory', 'ops-rentals', 'ops-production', 'ops-execution',
   'ops-transportation', 'ops-manpower',
-  'knotvite', 'knotvite-dashboard', 'knotvite-forms', 'knotvite-submissions',
-  'oak-rsvp', 'oak-creative',
 ];
 
 const ENTERPRISE_ADDITIONS = [
+  'hr', 'employee-portal',
+  'finance-masters',
+  'daybook',
   'whatsapp-inbox',
   'management-mis', 'mis-overview', 'event-database', 'mis-financial', 'mis-sales', 'mis-operations',
 ];
@@ -36,12 +40,12 @@ const ENTERPRISE_ADDITIONS = [
 const SUPERADMIN_PAGES = ['admin'];
 
 const CLIENT_USER_PAGES = [
-  'dashboard', 'employee-portal', 'client-portal',
+  'dashboard', 'client-portal',
 ];
 
 const TEAM_MEMBER_PAGES = [
   'dashboard', 'event-hub', 'event-calendar', 'event-milestones', 'execution-plan',
-  'employee-portal', 'team-calendar', 'daybook', 'tools', 'oaksy',
+  'employee-portal', 'team-calendar', 'tools', 'oaksy',
 ];
 
 const GROWTH_PAGES = [...STARTER_PAGES, ...GROWTH_ADDITIONS];
@@ -52,6 +56,12 @@ export const PLAN_FEATURE_MATRIX: Record<PlanType, string[]> = {
   starter: STARTER_PAGES,
   growth: GROWTH_PAGES,
   enterprise: ENTERPRISE_PAGES,
+};
+
+export const PLAN_TEAM_LIMITS: Record<PlanType, number> = {
+  starter: 1,
+  growth: 5,
+  enterprise: Infinity,
 };
 
 export function getAllowedPagesByPlanAndRole(
@@ -152,6 +162,7 @@ export function getApiRouteToPageMapping(): Record<string, string> {
     '/leave': 'hr',
     '/leave-categories': 'hr',
     '/attendance': 'hr',
+    '/hr': 'hr',
     '/inventory': 'operations',
     '/purchase-orders': 'operations',
     '/production-plan': 'operations',
@@ -170,5 +181,6 @@ export function getApiRouteToPageMapping(): Record<string, string> {
     '/portal': 'portal-admin',
     '/event-guests': 'oak-rsvp',
     '/guest': 'oak-rsvp',
+    '/sales-reports': 'sales-reports',
   };
 }

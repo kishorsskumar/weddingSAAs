@@ -77,12 +77,19 @@ const getIndianFiscalYear = (date: Date = new Date()): string => {
 };
 
 export default function OakSales() {
-  // Read initial section from URL query params (only on mount)
+  const { allowedPages } = useAuth();
+  
+  const isSalesSectionAllowed = (sectionId: string): boolean => {
+    if (sectionId === 'reports') return allowedPages.includes('sales-reports');
+    return true;
+  };
+  
   const getInitialSection = (): Section => {
     const params = new URLSearchParams(window.location.search);
     const section = params.get('section');
     if (section && ['dashboard', 'pipeline', 'contacts', 'companies', 'activities', 'pipeline-setup', 'automations', 'reports', 'settings', 'estimates'].includes(section)) {
-      return section as Section;
+      if (isSalesSectionAllowed(section)) return section as Section;
+      return 'dashboard';
     }
     return 'dashboard';
   };
@@ -91,6 +98,12 @@ export default function OakSales() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarManuallyToggled, setSidebarManuallyToggled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  useEffect(() => {
+    if (!isSalesSectionAllowed(activeSection)) {
+      setActiveSection('dashboard');
+    }
+  }, [allowedPages]);
   
   // Auto-collapse sidebar when viewing Pipeline for more kanban space
   useEffect(() => {
@@ -198,7 +211,7 @@ export default function OakSales() {
     { id: 'automations', label: 'Automations', icon: Settings },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  ].filter(item => isSalesSectionAllowed(item.id));
 
   const SidebarContent = ({ onNavClick }: { onNavClick?: () => void }) => (
     <>

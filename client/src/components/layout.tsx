@@ -105,12 +105,12 @@ const ALL_PAGES = [
     { id: "portal-admin", label: "Portal Dashboard", path: "/portal-admin" },
     { id: "portfolio-admin", label: "Portfolio Manager", path: "/portfolio-admin" },
   ] },
-  { id: "management-mis", label: "Management MIS", path: "/management-mis", superadminOnly: true, subPages: [
+  { id: "management-mis", label: "Management MIS", path: "/management-mis", subPages: [
     { id: "mis-overview", label: "Overview Dashboard", path: "/management-mis" },
-    { id: "event-database", label: "Event Database", path: "/database", superadminOnly: true },
-    { id: "mis-financial", label: "Financial Summary", path: "/management-mis?tab=financial", superadminOnly: true },
-    { id: "mis-sales", label: "Sales Performance", path: "/management-mis?tab=sales", superadminOnly: true },
-    { id: "mis-operations", label: "Operations Snapshot", path: "/management-mis?tab=operations", superadminOnly: true },
+    { id: "event-database", label: "Event Database", path: "/database" },
+    { id: "mis-financial", label: "Financial Summary", path: "/management-mis?tab=financial" },
+    { id: "mis-sales", label: "Sales Performance", path: "/management-mis?tab=sales" },
+    { id: "mis-operations", label: "Operations Snapshot", path: "/management-mis?tab=operations" },
   ] },
   { id: "admin", label: "Admin Panel", path: "/admin" },
 ];
@@ -567,8 +567,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const hasOwnSidebar = PAGES_WITH_OWN_SIDEBAR.includes(location);
   const isSuperAdmin = user?.role === 'superadmin';
   const navItems = ALL_PAGES.filter((page) => {
-    if ((page as any).superadminOnly && !isSuperAdmin) return false;
     if (page.id === 'admin' && !isSuperAdmin) return false;
+    if (isSuperAdmin) return true;
     if (allowedPages.includes(page.id)) return true;
     const subPages = (page as any).subPages || [];
     return subPages.some((sp: any) => allowedPages.includes(sp.id));
@@ -650,7 +650,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           const SubIcon = ICONS[subPage.id] || Calendar;
                           const isSubActive = currentFullUrl === subPage.path || 
                             (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
-                          const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
+                          const hasAccess = isSuperAdmin || allowedPages.includes(subPage.id);
                           if (!hasAccess) return null;
                           
                           const showGroupHeader = subPage.group && subPage.group !== lastGroup;
@@ -726,7 +726,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 const SubIcon = ICONS[subPage.id] || Calendar;
                 const isSubActive = currentFullUrl === subPage.path || 
                   (subPage.path.includes('?') && location === subPage.path.split('?')[0] && window.location.search === '?' + subPage.path.split('?')[1]);
-                const hasAccess = allowedPages.includes(subPage.id) && (!((subPage as any).superadminOnly) || isSuperAdmin);
+                const hasAccess = isSuperAdmin || allowedPages.includes(subPage.id);
                 if (!hasAccess) return null;
                 return (
                   <div 

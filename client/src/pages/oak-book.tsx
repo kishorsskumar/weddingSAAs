@@ -283,32 +283,49 @@ type DeliveryChallan = {
   createdAt: string;
 };
 
+const SECTION_TO_PAGE_MAP: Record<string, string> = {
+  'customers': 'finance-customers',
+  'vendors': 'finance-vendors',
+  'payments-received': 'finance-payments',
+  'reports': 'finance-reports',
+};
+
 export default function OakBook() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, allowedPages } = useAuth();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const searchString = useSearch();
   
-  // Parse section from URL query parameter
+  const isSectionAllowed = (sectionId: string): boolean => {
+    if (user?.role === 'superadmin') return true;
+    const pageId = SECTION_TO_PAGE_MAP[sectionId];
+    if (!pageId) return true;
+    return allowedPages.includes(pageId);
+  };
+  
   const getInitialSection = () => {
     const params = new URLSearchParams(searchString);
-    return params.get("section") || "standard-estimates";
+    const section = params.get("section") || "standard-estimates";
+    if (isSectionAllowed(section)) return section;
+    return "standard-estimates";
   };
   
   const [activeSection, setActiveSection] = useState(getInitialSection);
   const [expandedMenus, setExpandedMenus] = useState<string[]>(["masters", "sales", "estimates"]);
   const [searchQuery, setSearchQuery] = useState("");
   
-  // Sync activeSection from URL when search string changes
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const sectionFromUrl = params.get("section");
     if (sectionFromUrl && sectionFromUrl !== activeSection) {
-      setActiveSection(sectionFromUrl);
-      // Expand the parent menu if needed
-      if (sectionFromUrl === "customers" || sectionFromUrl === "vendors") {
-        setExpandedMenus(prev => prev.includes("masters") ? prev : [...prev, "masters"]);
+      if (isSectionAllowed(sectionFromUrl)) {
+        setActiveSection(sectionFromUrl);
+        if (sectionFromUrl === "customers" || sectionFromUrl === "vendors") {
+          setExpandedMenus(prev => prev.includes("masters") ? prev : [...prev, "masters"]);
+        }
+      } else {
+        setActiveSection("standard-estimates");
       }
     }
   }, [searchString]);
@@ -880,25 +897,19 @@ export default function OakBook() {
   };
 
   // Filter sidebar sections based on user role
-  // Payments Received is only visible to superadmin and accountant
-  const canViewPaymentsReceived = user?.role === 'superadmin' || user?.role === 'accountant';
-  
   const filteredSidebarSections = useMemo(() => {
-    return SIDEBAR_SECTIONS.map(section => {
-      if (section.id === 'sales' && section.children) {
-        return {
-          ...section,
-          children: section.children.filter(child => {
-            if (child.id === 'payments-received') {
-              return canViewPaymentsReceived;
-            }
-            return true;
-          })
-        };
-      }
-      return section;
-    });
-  }, [canViewPaymentsReceived]);
+    return SIDEBAR_SECTIONS
+      .filter(section => isSectionAllowed(section.id))
+      .map(section => {
+        if (section.children) {
+          const filteredChildren = section.children.filter(child => isSectionAllowed(child.id));
+          if (filteredChildren.length === 0) return null;
+          return { ...section, children: filteredChildren };
+        }
+        return section;
+      })
+      .filter((section): section is SidebarSection => section !== null);
+  }, [allowedPages, user?.role]);
 
   const totalIncome = useMemo(() => {
     return payments.reduce((sum, p) => sum + parseFloat(p.amount || "0"), 0);
