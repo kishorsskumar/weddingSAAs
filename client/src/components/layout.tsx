@@ -51,7 +51,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow, format } from "date-fns";
 
 const ALL_PAGES = [
-  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "sales", label: "Sales", path: "/oak-sales", subPages: [
     { id: "sales-leads", label: "Leads", path: "/oak-sales?section=dashboard" },
     { id: "sales-pipeline", label: "Pipeline", path: "/oak-sales?section=pipeline" },

@@ -22,7 +22,6 @@ const GROWTH_ADDITIONS = [
   'sales-reports',
   'finance-payments', 'finance-reports', 'finance-vendors',
   'team-calendar',
-  'knotvite', 'knotvite-dashboard', 'knotvite-forms', 'knotvite-submissions',
   'oak-rsvp', 'oak-creative',
   'operations', 'ops-items', 'ops-purchase-orders', 'ops-templates',
   'ops-event-inventory', 'ops-rentals', 'ops-production', 'ops-execution',
@@ -30,6 +29,7 @@ const GROWTH_ADDITIONS = [
 ];
 
 const ENTERPRISE_ADDITIONS = [
+  'knotvite', 'knotvite-dashboard', 'knotvite-forms', 'knotvite-submissions',
   'hr', 'employee-portal',
   'finance-masters',
   'daybook',

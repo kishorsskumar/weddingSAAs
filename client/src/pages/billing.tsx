@@ -83,12 +83,12 @@ const PLANS = [
       "Sales Reports & Analytics",
       "Payment Tracking",
       "Operations & Inventory",
-      "KnotVite RSVP System",
       "Team Calendar",
       "Creative Studio",
       "Full AI Assistant",
     ],
     notIncluded: [
+      "KnotVite RSVP",
       "HR Management",
       "Employee Portal",
       "Finance Masters",
@@ -110,6 +110,7 @@ const PLANS = [
     color: "purple",
     features: [
       "Everything in Growth, plus:",
+      "KnotVite RSVP System",
       "HR Management",
       "Employee Portal",
       "Finance Masters",
@@ -367,7 +368,7 @@ export default function BillingPage() {
                   </div>
                 )}
 
-                <CardHeader className="pb-4">
+                <CardHeader className={`pb-4 ${plan.popular ? "pt-6" : "pt-8"}`}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                       plan.id === "starter" ? "bg-blue-100" : plan.id === "growth" ? "bg-primary/10" : "bg-purple-100"
@@ -502,7 +503,7 @@ export default function BillingPage() {
                     { feature: "Sales Reports", starter: false, growth: true, enterprise: true },
                     { feature: "Payment Tracking", starter: false, growth: true, enterprise: true },
                     { feature: "Operations & Inventory", starter: false, growth: true, enterprise: true },
-                    { feature: "KnotVite RSVP", starter: false, growth: true, enterprise: true },
+                    { feature: "KnotVite RSVP", starter: false, growth: false, enterprise: true },
                     { feature: "Team Calendar", starter: false, growth: true, enterprise: true },
                     { feature: "HR Management", starter: false, growth: false, enterprise: true },
                     { feature: "Employee Portal", starter: false, growth: false, enterprise: true },
