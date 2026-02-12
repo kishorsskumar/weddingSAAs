@@ -211,7 +211,7 @@ function FullDemoSection() {
             </button>
             <video
               ref={fullDemoRef}
-              src="/videos/atbott-full-demo.mp4"
+              src="/videos/atbott-full-demo-final.mp4"
               className="w-full h-full object-contain"
               controls
               autoPlay
