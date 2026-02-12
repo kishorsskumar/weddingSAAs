@@ -524,31 +524,69 @@ function TrialBanner() {
 
   const days = data.trialDaysRemaining ?? 0;
   const isExpired = data.isTrialExpired;
-  const isUrgent = days <= 3;
+  const totalTrialDays = 14;
+  const daysUsed = totalTrialDays - days;
+  const progress = Math.min(100, Math.max(0, (daysUsed / totalTrialDays) * 100));
+
+  if (isExpired) {
+    return (
+      <div
+        className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 bg-red-50 border-b border-red-200"
+        data-testid="trial-banner"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="shrink-0 w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+            <Clock className="h-4 w-4 text-red-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-red-800">Trial Expired</p>
+            <p className="text-xs text-red-600 truncate">Subscribe to continue using all features</p>
+          </div>
+        </div>
+        <Link href="/billing?upgrade=true">
+          <button className="shrink-0 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors" data-testid="button-upgrade-trial">
+            Subscribe Now
+          </button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={cn(
-        "flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-medium",
-        isExpired
-          ? "bg-red-600 text-white"
-          : isUrgent
-          ? "bg-amber-500 text-white"
-          : "bg-[#2FA4BC] text-white"
-      )}
+      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-3 bg-amber-50 border-b border-amber-200"
       data-testid="trial-banner"
     >
-      <div className="flex items-center gap-2">
-        <Clock className="h-4 w-4 shrink-0" />
-        <span>
-          {isExpired
-            ? "Your trial has expired. Upgrade now to continue using all features."
-            : `14-Day Growth Trial Active — ${days} day${days !== 1 ? 's' : ''} remaining`}
-        </span>
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+          <Clock className="h-4 w-4 text-amber-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-amber-900">
+              Free Trial
+              <span className="font-normal text-amber-700 ml-1.5">
+                — {days} day{days !== 1 ? 's' : ''} remaining
+              </span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="h-1.5 flex-1 max-w-[180px] bg-amber-200 rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  days <= 3 ? "bg-red-500" : days <= 7 ? "bg-amber-500" : "bg-amber-400"
+                )}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="text-[11px] text-amber-600 whitespace-nowrap">{daysUsed}/{totalTrialDays} days</span>
+          </div>
+        </div>
       </div>
       <Link href="/billing?upgrade=true">
-        <button className="shrink-0 flex items-center gap-1 bg-white/20 hover:bg-white/30 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors" data-testid="button-upgrade-trial">
-          Upgrade <ArrowUpRight className="h-3.5 w-3.5" />
+        <button className="shrink-0 bg-primary hover:bg-primary/90 text-white text-sm font-semibold px-4 py-2 rounded-md transition-colors flex items-center gap-1.5" data-testid="button-upgrade-trial">
+          Subscribe <ArrowUpRight className="h-3.5 w-3.5" />
         </button>
       </Link>
     </div>
