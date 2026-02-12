@@ -4,8 +4,9 @@ import { useAuth } from "@/context/auth-context";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, ArrowUpRight } from "lucide-react";
+import { Clock, ArrowUpRight, CreditCard, HelpCircle, ExternalLink, Mail, Phone } from "lucide-react";
 import { InteractiveTutorial, TutorialTriggerButton, useTutorial } from "@/components/interactive-tutorial";
+import { AIChatbot } from "@/components/ai-chatbot";
 import {
   Calendar,
   Users,
@@ -508,6 +509,63 @@ function MobileBottomNav({ allowedPages, currentPath }: { allowedPages: string[]
   );
 }
 
+function HelpSupportPopover() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          data-testid="nav-help-support"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Help & Support
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent side="right" align="end" className="w-64 p-0" sideOffset={8}>
+        <div className="p-3 border-b">
+          <h4 className="font-semibold text-sm">Help & Support</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">We're here to help you</p>
+        </div>
+        <div className="p-2 space-y-1">
+          <a
+            href="mailto:support@atbott.com"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
+            data-testid="link-email-support"
+          >
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="font-medium text-sm">Email Support</p>
+              <p className="text-xs text-muted-foreground">support@atbott.com</p>
+            </div>
+          </a>
+          <a
+            href="tel:+919876543210"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted transition-colors"
+            data-testid="link-phone-support"
+          >
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="font-medium text-sm">Phone Support</p>
+              <p className="text-xs text-muted-foreground">Mon-Sat, 10am-6pm</p>
+            </div>
+          </a>
+          <Link href="/contact">
+            <div className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted transition-colors cursor-pointer">
+              <ExternalLink className="h-4 w-4 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-sm">Contact Us</p>
+                <p className="text-xs text-muted-foreground">Send us a message</p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function TrialBanner() {
   const { data } = useQuery({
     queryKey: ["/api/billing/status"],
@@ -808,6 +866,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </p>
           </div>
         </div>
+        <Link href="/billing">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start gap-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            data-testid="nav-account-billing"
+          >
+            <CreditCard className="h-4 w-4" />
+            Subscription & Billing
+          </Button>
+        </Link>
+        <HelpSupportPopover />
         <TutorialTriggerButton onClick={tutorial.startTutorial} />
         <Button
           variant="ghost"
@@ -829,6 +899,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <TrialBanner />
         {children}
         <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
+        <AIChatbot />
         <InteractiveTutorial isActive={tutorial.isActive} onComplete={tutorial.completeTutorial} onDismiss={tutorial.dismissTutorial} />
       </div>
     );
@@ -886,6 +957,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav allowedPages={allowedPages} currentPath={location} />
       </div>
+      <AIChatbot />
       <InteractiveTutorial isActive={tutorial.isActive} onComplete={tutorial.completeTutorial} onDismiss={tutorial.dismissTutorial} />
     </div>
   );
