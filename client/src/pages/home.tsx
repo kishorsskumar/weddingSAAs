@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { PublicLayout } from "@/components/public-layout";
@@ -160,6 +160,50 @@ const faqs = [
   { question: "Does it support multiple events?", answer: "Yes! You can manage unlimited events simultaneously with our calendar view, conflict detection, and team assignment features." },
   { question: "Do you provide onboarding help?", answer: "Every paid plan includes personalized onboarding sessions to help you set up your account, import data, and train your team." },
 ];
+
+function DemoVideoPlayer() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        videoRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      className="relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 shadow-lg shadow-slate-200/50 cursor-pointer group"
+      onClick={handlePlay}
+      data-testid="demo-video-player"
+    >
+      <video
+        ref={videoRef}
+        src="/videos/atbott-demo.mp4"
+        className="w-full h-full object-cover"
+        onEnded={() => setIsPlaying(false)}
+        playsInline
+      />
+      {!isPlaying && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/5">
+          <div className="w-20 h-20 bg-[#2FA4BC] rounded-full flex items-center justify-center shadow-xl shadow-[#2FA4BC]/30 group-hover:scale-110 transition-transform">
+            <Play className="h-8 w-8 text-white ml-1" />
+          </div>
+          <p className="mt-4 text-slate-400 text-sm">Click to watch demo video</p>
+        </div>
+      )}
+    </motion.div>
+  );
+}
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -482,17 +526,7 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group cursor-pointer shadow-lg shadow-slate-200/50"
-          >
-            <div className="relative z-10 w-20 h-20 bg-[#2FA4BC] rounded-full flex items-center justify-center shadow-xl shadow-[#2FA4BC]/30 group-hover:scale-110 transition-transform">
-              <Play className="h-8 w-8 text-white ml-1" />
-            </div>
-            <p className="absolute bottom-6 text-slate-400 text-sm">Click to watch demo video</p>
-          </motion.div>
+          <DemoVideoPlayer />
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <Button size="lg" variant="outline" className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50">
