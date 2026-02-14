@@ -726,8 +726,105 @@ export default function OakBook() {
     setMobilePreviewOpen(false);
   };
 
-  const handleDownloadPdf = (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => {
-    window.open(`/print/${type}/${id}?download=true`, '_blank');
+  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => {
+    try {
+      toast({ title: "Generating PDF...", description: "Please wait" });
+
+      let docNumber = 'document';
+      if (type === 'quote') {
+        const estimate = estimates.find(e => e.id === id);
+        docNumber = estimate?.number || 'estimate';
+      } else if (type === 'invoice') {
+        const invoice = invoices.find(i => i.id === id);
+        docNumber = invoice?.number || 'invoice';
+      } else if (type === 'receipt') {
+        const payment = payments.find(p => p.id === id);
+        docNumber = payment?.number || 'receipt';
+      } else if (type === 'delivery-challan') {
+        const challan = deliveryChallans.find(c => c.id === id);
+        docNumber = challan?.challanNumber || 'delivery-challan';
+      }
+
+      const res = await apiRequest("GET", `/api/print-data/${type}/${id}`);
+      if (!res.ok) throw new Error('Failed to fetch document data');
+      const printData = await res.json();
+
+      const container = document.createElement('div');
+      container.id = 'pdf-render-container';
+      container.style.position = 'fixed';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '794px';
+      container.style.backgroundColor = '#ffffff';
+      container.style.zIndex = '-1';
+      document.body.appendChild(container);
+
+      const { createRoot } = await import('react-dom/client');
+      const { default: PrintDocument } = await import('@/pages/print-document');
+      const React = await import('react');
+
+      const root = createRoot(container);
+      root.render(
+        React.createElement(PrintDocument, { injectedData: printData, injectedType: type })
+      );
+
+      await new Promise<void>((resolve) => {
+        const check = setInterval(() => {
+          const docEl = container.querySelector('.document');
+          if (docEl) {
+            clearInterval(check);
+            setTimeout(resolve, 1500);
+          }
+        }, 200);
+        setTimeout(() => { clearInterval(check); resolve(); }, 10000);
+      });
+
+      const docElement = container.querySelector('.document') as HTMLElement;
+      if (!docElement) {
+        root.unmount();
+        document.body.removeChild(container);
+        throw new Error('Document element not found');
+      }
+
+      const html2canvas = (await import('html2canvas')).default;
+      const { default: jsPDF } = await import('jspdf');
+
+      const canvas = await html2canvas(docElement, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      if (pdfHeight <= pageHeight) {
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+      } else {
+        let yPos = 0;
+        let remaining = pdfHeight;
+        while (remaining > 0) {
+          if (yPos > 0) pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, -yPos, pdfWidth, pdfHeight);
+          yPos += pageHeight;
+          remaining -= pageHeight;
+        }
+      }
+
+      pdf.save(`${docNumber}.pdf`);
+      root.unmount();
+      document.body.removeChild(container);
+      toast({ title: "PDF downloaded!" });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({ title: "Download failed", description: String(error), variant: "destructive" });
+    }
   };
 
   const handleCloneInvoice = (invoice: Invoice) => {

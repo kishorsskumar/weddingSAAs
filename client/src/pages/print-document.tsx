@@ -88,17 +88,20 @@ function formatIndianCurrency(amount: number): string {
   return formatted;
 }
 
-export default function PrintDocument() {
+export default function PrintDocument({ injectedData, injectedType }: { injectedData?: DocumentData; injectedType?: string } = {}) {
   const params = useParams<{ type: string; id: string }>();
-  const [data, setData] = useState<DocumentData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DocumentData | null>(injectedData || null);
+  const [loading, setLoading] = useState(!injectedData);
   const [error, setError] = useState<string | null>(null);
   
   const searchParams = new URLSearchParams(window.location.search);
   const hideHeader = searchParams.get('noHeader') === 'true';
-  const autoDownload = searchParams.get('download') === 'true';
+
+  const docType = injectedType || params.type;
 
   useEffect(() => {
+    if (injectedData) return;
+
     async function fetchData() {
       try {
         const type = params.type;
@@ -110,7 +113,7 @@ export default function PrintDocument() {
             if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.status}`);
             return r.json();
           };
-          const safeArray = (data: any) => Array.isArray(data) ? data : [];
+          const safeArray = (d: any) => Array.isArray(d) ? d : [];
           const settingsRes = await fetch('/api/company-settings', { credentials: 'include' });
           const companySettings = await settingsRes.json();
           const [plans, checklist, events] = await Promise.all([
@@ -136,9 +139,6 @@ export default function PrintDocument() {
         setLoading(false);
         setTimeout(() => {
           (window as any).printReady = true;
-          if (new URLSearchParams(window.location.search).get('download') === 'true') {
-            setTimeout(() => window.print(), 500);
-          }
         }, 500);
       } catch (err) {
         setError(String(err));
@@ -147,7 +147,7 @@ export default function PrintDocument() {
     }
 
     fetchData();
-  }, [params.type, params.id]);
+  }, [params.type, params.id, injectedData]);
 
   if (loading) {
     return <div className="p-8 text-center">Loading...</div>;
@@ -159,23 +159,23 @@ export default function PrintDocument() {
 
   const { estimate, invoice, payment, customer, bank, companySettings } = data!;
 
-  if (params.type === 'quote' && estimate) {
+  if (docType === 'quote' && estimate) {
     return <QuotePrint estimate={estimate} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (params.type === 'invoice' && invoice) {
+  if (docType === 'invoice' && invoice) {
     return <InvoicePrint invoice={invoice} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (params.type === 'receipt' && payment) {
+  if (docType === 'receipt' && payment) {
     return <ReceiptPrint payment={payment} customer={customer} invoice={invoice} bank={bank} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (params.type === 'checklist' && data?.checklist) {
+  if (docType === 'checklist' && data?.checklist) {
     return <ChecklistPrint checklist={data.checklist} plan={data.plan} event={data.event} companySettings={companySettings} />;
   }
 
-  if (params.type === 'delivery-challan' && data?.deliveryChallan) {
+  if (docType === 'delivery-challan' && data?.deliveryChallan) {
     return <DeliveryChallanPrint challan={data.deliveryChallan} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
