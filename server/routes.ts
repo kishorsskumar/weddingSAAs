@@ -8254,55 +8254,53 @@ export async function registerRoutes(
     }
   });
 
-  // PDF Generation endpoint
-  app.get('/api/pdf/:type/:id', async (req, res) => {
+  app.get('/api/print-data/:type/:id', async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
       const { type, id } = req.params;
-      
-      if (!['quote', 'invoice', 'receipt'].includes(type)) {
+      const user = await storage.getUser(req.session.userId);
+      const companyId = user?.companyId;
+      const companySettings = await storage.getCompanySettings();
+      const result: any = { companySettings };
+
+      if (type === 'quote') {
+        const estimate = await storage.getEstimate(id);
+        result.estimate = estimate;
+        if (estimate?.customerId) {
+          result.customer = await storage.getCustomer(estimate.customerId);
+        }
+      } else if (type === 'invoice') {
+        const invoice = await storage.getInvoice(id);
+        result.invoice = invoice;
+        if (invoice?.customerId) {
+          result.customer = await storage.getCustomer(invoice.customerId);
+        }
+      } else if (type === 'receipt') {
+        const payments = await storage.getAllCustomerPayments();
+        const payment = payments.find((p: any) => p.id === id);
+        result.payment = payment;
+        if (payment?.customerId) {
+          result.customer = await storage.getCustomer(payment.customerId);
+        }
+        if (payment?.invoiceId) {
+          result.invoice = await storage.getInvoice(payment.invoiceId);
+        }
+        if (payment?.bankId) {
+          result.bank = await storage.getBank(payment.bankId);
+        }
+      } else if (type === 'delivery-challan') {
+        const challan = await storage.getDeliveryChallan(id);
+        result.deliveryChallan = challan;
+      } else {
         return res.status(400).json({ error: 'Invalid document type' });
       }
 
-      const puppeteer = await import('puppeteer');
-      const browser = await puppeteer.default.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      });
-
-      try {
-        const page = await browser.newPage();
-        
-        const baseUrl = `http://localhost:5000`;
-        const printUrl = `${baseUrl}/print/${type}/${id}`;
-        
-        await page.goto(printUrl, { 
-          waitUntil: 'networkidle0',
-          timeout: 30000,
-        });
-
-        await page.waitForFunction(() => (window as any).printReady === true, { timeout: 15000 });
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const pdf = await page.pdf({
-          format: 'A4',
-          printBackground: true,
-          margin: {
-            top: '10mm',
-            bottom: '10mm',
-            left: '10mm',
-            right: '10mm',
-          },
-        });
-
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${type}-${id}.pdf"`);
-        res.send(pdf);
-      } finally {
-        await browser.close();
-      }
+      res.json(result);
     } catch (error) {
-      console.error('PDF generation error:', error);
-      res.status(500).json({ error: 'Failed to generate PDF' });
+      console.error('Print data error:', error);
+      res.status(500).json({ error: 'Failed to get print data' });
     }
   });
 

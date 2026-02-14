@@ -104,66 +104,36 @@ export default function PrintDocument() {
         const type = params.type;
         const id = params.id;
 
-        const settingsRes = await fetch('/api/company-settings', { credentials: 'include' });
-        const companySettings = await settingsRes.json();
-
-        let docData: DocumentData = { companySettings };
-
-        const safeFetch = async (url: string) => {
-          const r = await fetch(url, { credentials: 'include' });
-          if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.status}`);
-          return r.json();
-        };
-        const safeArray = (data: any) => Array.isArray(data) ? data : [];
-
-        if (type === 'quote') {
-          const [estimate, customers] = await Promise.all([
-            safeFetch(`/api/estimates/${id}`),
-            safeFetch('/api/customers'),
-          ]);
-          docData.estimate = estimate;
-          docData.customer = safeArray(customers).find((c: any) => c.id === estimate.customerId);
-        } else if (type === 'invoice') {
-          const [invoice, customers] = await Promise.all([
-            safeFetch(`/api/invoices/${id}`),
-            safeFetch('/api/customers'),
-          ]);
-          docData.invoice = invoice;
-          docData.customer = safeArray(customers).find((c: any) => c.id === invoice.customerId);
-        } else if (type === 'receipt') {
-          const [payments, customers, invoices, banks] = await Promise.all([
-            safeFetch('/api/customer-payments'),
-            safeFetch('/api/customers'),
-            safeFetch('/api/invoices'),
-            safeFetch('/api/banks'),
-          ]);
-          const payment = safeArray(payments).find((p: any) => p.id === id);
-          if (payment) {
-            docData.payment = payment;
-            docData.customer = safeArray(customers).find((c: any) => c.id === payment.customerId);
-            docData.invoice = safeArray(invoices).find((i: any) => i.id === payment.invoiceId);
-            docData.bank = safeArray(banks).find((b: any) => b.id === payment.bankId);
-          }
-        } else if (type === 'checklist') {
+        if (type === 'checklist') {
+          const safeFetch = async (url: string) => {
+            const r = await fetch(url, { credentials: 'include' });
+            if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.status}`);
+            return r.json();
+          };
+          const safeArray = (data: any) => Array.isArray(data) ? data : [];
+          const settingsRes = await fetch('/api/company-settings', { credentials: 'include' });
+          const companySettings = await settingsRes.json();
           const [plans, checklist, events] = await Promise.all([
             safeFetch(`/api/execution-plans`),
             safeFetch(`/api/execution-plans/${id}/checklist`),
             safeFetch('/api/events'),
           ]);
           const plan = safeArray(plans).find((p: any) => p.id === id);
+          const docData: DocumentData = { companySettings };
           if (plan) {
             docData.plan = plan;
             docData.checklist = checklist;
             docData.event = safeArray(events).find((e: any) => e.id === plan.eventId);
           }
-        } else if (type === 'delivery-challan') {
-          const deliveryChallan = await safeFetch(`/api/delivery-challans/${id}`);
-          docData.deliveryChallan = deliveryChallan;
+          setData(docData);
+        } else {
+          const res = await fetch(`/api/print-data/${type}/${id}`, { credentials: 'include' });
+          if (!res.ok) throw new Error(`Failed to load document data: ${res.status}`);
+          const docData = await res.json();
+          setData(docData);
         }
 
-        setData(docData);
         setLoading(false);
-
         setTimeout(() => {
           (window as any).printReady = true;
           if (new URLSearchParams(window.location.search).get('download') === 'true') {
