@@ -24,6 +24,7 @@ import {
   Target,
   Users,
   Building2,
+  CheckCircle,
   CheckSquare,
   Phone,
   Calendar,
@@ -2314,8 +2315,49 @@ function PipelineSetupSection({
   const [isAddPipelineOpen, setIsAddPipelineOpen] = useState(false);
   const [isAddStageOpen, setIsAddStageOpen] = useState(false);
   const [selectedPipeline, setSelectedPipeline] = useState<SalesPipeline | null>(null);
+  const [editingStageId, setEditingStageId] = useState<string | null>(null);
+  const [editStageName, setEditStageName] = useState('');
+  const [editStageColor, setEditStageColor] = useState('#6B7280');
+  const [editStageProbability, setEditStageProbability] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const updateStageMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      return apiRequest('PATCH', `/api/sales/stages/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/stages'] });
+      setEditingStageId(null);
+      toast({ title: 'Stage updated successfully' });
+    },
+  });
+
+  const deleteStageMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest('DELETE', `/api/sales/stages/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/stages'] });
+      toast({ title: 'Stage deleted successfully' });
+    },
+  });
+
+  const handleEditStage = (stage: SalesStage) => {
+    setEditingStageId(stage.id);
+    setEditStageName(stage.name);
+    setEditStageColor(stage.color || '#6B7280');
+    setEditStageProbability(stage.probability || 0);
+  };
+
+  const handleSaveStage = () => {
+    if (editingStageId && editStageName.trim()) {
+      updateStageMutation.mutate({
+        id: editingStageId,
+        data: { name: editStageName.trim(), color: editStageColor, probability: editStageProbability },
+      });
+    }
+  };
 
   const createPipelineMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -2430,22 +2472,74 @@ function PipelineSetupSection({
               </CardHeader>
               <CardContent>
                 {pipelineStages.length > 0 ? (
-                  <div className="flex gap-2 overflow-x-auto pb-2">
+                  <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap">
                     {pipelineStages.map((stage, i) => (
                       <div key={stage.id} className="flex items-center gap-2">
-                        <div 
-                          className="px-4 py-2 rounded-lg border flex items-center gap-2 min-w-max"
-                          style={{ borderColor: stage.color || '#6B7280' }}
-                        >
+                        {editingStageId === stage.id ? (
+                          <div className="flex items-center gap-2 p-2 rounded-lg border-2 border-primary bg-primary/5 min-w-max">
+                            <input
+                              type="color"
+                              value={editStageColor}
+                              onChange={(e) => setEditStageColor(e.target.value)}
+                              className="w-6 h-6 rounded cursor-pointer border-0 p-0"
+                            />
+                            <Input
+                              value={editStageName}
+                              onChange={(e) => setEditStageName(e.target.value)}
+                              className="h-7 w-32 text-sm"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveStage();
+                                if (e.key === 'Escape') setEditingStageId(null);
+                              }}
+                            />
+                            <Input
+                              type="number"
+                              value={editStageProbability}
+                              onChange={(e) => setEditStageProbability(parseInt(e.target.value) || 0)}
+                              className="h-7 w-16 text-sm"
+                              min={0}
+                              max={100}
+                              placeholder="%"
+                            />
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" onClick={handleSaveStage}>
+                              <CheckCircle className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400" onClick={() => setEditingStageId(null)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                              onClick={() => {
+                                if (confirm(`Delete stage "${stage.name}"? Deals in this stage will lose their stage assignment.`)) {
+                                  deleteStageMutation.mutate(stage.id);
+                                  setEditingStageId(null);
+                                }
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
                           <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: stage.color || '#6B7280' }}
-                          />
-                          <span className="font-medium text-sm">{stage.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {stage.probability}%
-                          </span>
-                        </div>
+                            className="px-4 py-2 rounded-lg border flex items-center gap-2 min-w-max cursor-pointer hover:shadow-md hover:border-primary/50 transition-all group"
+                            style={{ borderColor: stage.color || '#6B7280' }}
+                            onClick={() => handleEditStage(stage)}
+                            title="Click to edit stage"
+                          >
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: stage.color || '#6B7280' }}
+                            />
+                            <span className="font-medium text-sm">{stage.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {stage.probability}%
+                            </span>
+                            <Edit className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </div>
+                        )}
                         {i < pipelineStages.length - 1 && (
                           <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         )}
