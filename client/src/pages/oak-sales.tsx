@@ -367,6 +367,7 @@ export default function OakSales() {
                 users={users}
                 weddingPlanners={weddingPlanners}
                 isSuperAdmin={isSuperAdmin}
+                onNewDeal={() => setActiveSection('pipeline')}
               />
             )}
             {activeSection === 'contacts' && (
@@ -434,7 +435,8 @@ function DashboardSection({
   targets,
   users,
   weddingPlanners,
-  isSuperAdmin
+  isSuperAdmin,
+  onNewDeal
 }: { 
   deals: SalesDeal[]; 
   contacts: SalesContact[]; 
@@ -445,6 +447,7 @@ function DashboardSection({
   users: User[];
   weddingPlanners: User[];
   isSuperAdmin: boolean;
+  onNewDeal: () => void;
 }) {
   const openDeals = deals.filter(d => d.status === 'open');
   const wonDeals = deals.filter(d => d.status === 'won');
@@ -486,7 +489,7 @@ function DashboardSection({
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">{currentFY} Overview</p>
         </div>
-        <Button data-testid="button-new-deal">
+        <Button data-testid="button-new-deal" onClick={onNewDeal}>
           <Plus className="w-4 h-4 mr-2" />
           New Deal
         </Button>
