@@ -335,6 +335,17 @@ export const lineItemSchema = z.object({
 
 export type LineItem = z.infer<typeof lineItemSchema>;
 
+export type LeadFormFieldConfig = {
+  fieldKey: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'textarea' | 'date' | 'phone';
+  enabled: boolean;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  order: number;
+};
+
 // Estimates
 export const estimates = pgTable("estimates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -521,6 +532,7 @@ export const companySettings = pgTable("company_settings", {
   bankBranch: text("bank_branch"),
   defaultTerms: text("default_terms"),
   defaultThankYouMessage: text("default_thank_you_message").default('Looking forward to your business.'),
+  leadFormConfig: jsonb("lead_form_config").$type<LeadFormFieldConfig[]>(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -775,6 +787,8 @@ export const salesDeals = pgTable("sales_deals", {
   eventType: text("event_type"), // 'wedding', 'corporate', 'birthday', 'other'
   eventDate: date("event_date"),
   venue: text("venue"),
+  contactNumber: text("contact_number"),
+  address: text("address"),
   advancePaymentReceived: boolean("advance_payment_received").default(false),
   advancePaymentDate: timestamp("advance_payment_date"),
   convertedToCustomer: boolean("converted_to_customer").default(false),

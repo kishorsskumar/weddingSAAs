@@ -48,6 +48,7 @@ import {
   FileText,
 } from "lucide-react";
 import { ZohoQuotes } from "@/components/oak-book/zoho-quotes";
+import { Switch } from "@/components/ui/switch";
 import type { 
   SalesPipeline, 
   SalesStage, 
@@ -57,10 +58,33 @@ import type {
   SalesActivity,
   SalesTarget,
   SalesAutomation,
-  User
+  User,
+  LeadFormFieldConfig,
+  CompanySettings,
 } from "@shared/schema";
 
 type Section = 'dashboard' | 'pipeline' | 'contacts' | 'companies' | 'activities' | 'pipeline-setup' | 'automations' | 'reports' | 'settings' | 'estimates';
+
+const DEFAULT_LEAD_FORM_CONFIG: LeadFormFieldConfig[] = [
+  { fieldKey: 'title', label: 'Lead Title', type: 'text', enabled: true, required: true, order: 1 },
+  { fieldKey: 'value', label: 'Value (₹)', type: 'number', enabled: true, required: false, order: 2 },
+  { fieldKey: 'eventType', label: 'Event Type', type: 'select', enabled: true, required: false, options: ['Wedding', 'Corporate', 'Birthday', 'Other'], order: 3 },
+  { fieldKey: 'contactNumber', label: 'Contact Number', type: 'phone', enabled: true, required: true, placeholder: '+91 9876543210', order: 4 },
+  { fieldKey: 'companyId', label: 'Company', type: 'select', enabled: true, required: false, order: 5 },
+  { fieldKey: 'expectedCloseDate', label: 'Expected Close Date', type: 'date', enabled: true, required: false, order: 6 },
+  { fieldKey: 'source', label: 'Lead Source', type: 'select', enabled: true, required: true, options: ['Website', 'Referral', 'Social Media', 'Walk-in', 'WhatsApp', 'Google', 'JustDial', 'Wedding Wire', 'Other'], order: 7 },
+  { fieldKey: 'address', label: 'Address', type: 'textarea', enabled: true, required: false, placeholder: 'Enter billing/event address', order: 8 },
+  { fieldKey: 'notes', label: 'Notes', type: 'textarea', enabled: true, required: false, order: 9 },
+];
+
+const SIDE_BY_SIDE_PAIRS: Record<string, string> = {
+  'value': 'eventType',
+  'eventType': 'value',
+  'contactNumber': 'companyId',
+  'companyId': 'contactNumber',
+  'expectedCloseDate': 'source',
+  'source': 'expectedCloseDate',
+};
 
 const formatCurrency = (amount: string | number | null) => {
   if (!amount) return '₹0';
@@ -705,6 +729,17 @@ function PipelineSection({
   const [advancePaymentConfirm, setAdvancePaymentConfirm] = useState<{ dealId: string; stageId: string; dealTitle: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const { data: companySettingsData } = useQuery<CompanySettings>({
+    queryKey: ['/api/company-settings'],
+  });
+
+  const leadFormConfig = useMemo(() => {
+    if (companySettingsData?.leadFormConfig && Array.isArray(companySettingsData.leadFormConfig)) {
+      return [...companySettingsData.leadFormConfig].sort((a, b) => a.order - b.order);
+    }
+    return DEFAULT_LEAD_FORM_CONFIG;
+  }, [companySettingsData]);
   
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
   
@@ -882,12 +917,84 @@ function PipelineSection({
       value: formData.get('value') || '0',
       pipelineId: selectedPipelineId,
       stageId: firstStage.id,
-      contactId: formData.get('contactId') || null,
       companyId: formData.get('companyId') || null,
       eventType: formData.get('eventType') || null,
       expectedCloseDate: formData.get('expectedCloseDate') || null,
+      contactNumber: formData.get('contactNumber') || null,
+      source: formData.get('source') || null,
+      address: formData.get('address') || null,
       notes: formData.get('notes') || null,
     });
+  };
+
+  const renderLeadFormField = (field: LeadFormFieldConfig) => {
+    if (!field.enabled) return null;
+    const labelSuffix = field.required ? ' *' : '';
+
+    if (field.fieldKey === 'companyId') {
+      return (
+        <div className="space-y-2" key={field.fieldKey}>
+          <Label htmlFor={field.fieldKey}>{field.label}{labelSuffix}</Label>
+          <Select name="companyId">
+            <SelectTrigger data-testid="select-company">
+              <SelectValue placeholder="Select company" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (field.type === 'select' && field.options) {
+      return (
+        <div className="space-y-2" key={field.fieldKey}>
+          <Label htmlFor={field.fieldKey}>{field.label}{labelSuffix}</Label>
+          <Select name={field.fieldKey} required={field.required}>
+            <SelectTrigger data-testid={`select-${field.fieldKey}`}>
+              <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {field.options.map(opt => (
+                <SelectItem key={opt} value={opt.toLowerCase()}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <div className="space-y-2" key={field.fieldKey}>
+          <Label htmlFor={field.fieldKey}>{field.label}{labelSuffix}</Label>
+          <Textarea
+            id={field.fieldKey}
+            name={field.fieldKey}
+            required={field.required}
+            placeholder={field.placeholder}
+            data-testid={`input-${field.fieldKey}`}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2" key={field.fieldKey}>
+        <Label htmlFor={field.fieldKey}>{field.label}{labelSuffix}</Label>
+        <Input
+          id={field.fieldKey}
+          name={field.fieldKey}
+          type={field.type === 'phone' ? 'tel' : field.type === 'number' ? 'number' : field.type}
+          required={field.required}
+          placeholder={field.placeholder}
+          data-testid={`input-${field.fieldKey}`}
+        />
+      </div>
+    );
   };
 
   return (
@@ -1053,68 +1160,33 @@ function PipelineSection({
                 <DialogTitle>Add New Lead</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleAddLead} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Lead Title *</Label>
-                  <Input id="title" name="title" required data-testid="input-lead-title" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="value">Value (₹)</Label>
-                    <Input id="value" name="value" type="number" data-testid="input-deal-value" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="eventType">Event Type</Label>
-                    <Select name="eventType">
-                      <SelectTrigger data-testid="select-event-type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="wedding">Wedding</SelectItem>
-                        <SelectItem value="corporate">Corporate</SelectItem>
-                        <SelectItem value="birthday">Birthday</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contactId">Contact</Label>
-                    <Select name="contactId">
-                      <SelectTrigger data-testid="select-contact">
-                        <SelectValue placeholder="Select contact" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {contacts.map(c => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.firstName} {c.lastName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyId">Company</Label>
-                    <Select name="companyId">
-                      <SelectTrigger data-testid="select-company">
-                        <SelectValue placeholder="Select company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map(c => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expectedCloseDate">Expected Close Date</Label>
-                  <Input id="expectedCloseDate" name="expectedCloseDate" type="date" data-testid="input-expected-close" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" name="notes" data-testid="input-deal-notes" />
-                </div>
+                {(() => {
+                  const enabledFields = leadFormConfig.filter(f => f.enabled);
+                  const rendered = new Set<string>();
+                  const elements: React.ReactNode[] = [];
+
+                  enabledFields.forEach(field => {
+                    if (rendered.has(field.fieldKey)) return;
+                    rendered.add(field.fieldKey);
+
+                    const pairKey = SIDE_BY_SIDE_PAIRS[field.fieldKey];
+                    const pairField = pairKey ? enabledFields.find(f => f.fieldKey === pairKey) : null;
+
+                    if (pairField && !rendered.has(pairField.fieldKey)) {
+                      rendered.add(pairField.fieldKey);
+                      elements.push(
+                        <div className="grid grid-cols-2 gap-4" key={`pair-${field.fieldKey}`}>
+                          {renderLeadFormField(field)}
+                          {renderLeadFormField(pairField)}
+                        </div>
+                      );
+                    } else {
+                      elements.push(renderLeadFormField(field));
+                    }
+                  });
+
+                  return elements;
+                })()}
                 <div className="flex justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setIsAddLeadOpen(false)}>
                     Cancel
@@ -2805,9 +2877,49 @@ function SettingsSection({
   isSuperAdmin: boolean;
 }) {
   const [isSetTargetOpen, setIsSetTargetOpen] = useState(false);
+  const [leadFieldsConfig, setLeadFieldsConfig] = useState<LeadFormFieldConfig[]>(DEFAULT_LEAD_FORM_CONFIG);
+  const [leadFieldsLoaded, setLeadFieldsLoaded] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const currentFY = getIndianFiscalYear();
+
+  const { data: companySettingsData } = useQuery<CompanySettings>({
+    queryKey: ['/api/company-settings'],
+  });
+
+  useEffect(() => {
+    if (companySettingsData && !leadFieldsLoaded) {
+      if (companySettingsData.leadFormConfig && Array.isArray(companySettingsData.leadFormConfig)) {
+        setLeadFieldsConfig([...companySettingsData.leadFormConfig].sort((a, b) => a.order - b.order));
+      }
+      setLeadFieldsLoaded(true);
+    }
+  }, [companySettingsData, leadFieldsLoaded]);
+
+  const saveLeadFormConfigMutation = useMutation({
+    mutationFn: async (config: LeadFormFieldConfig[]) => {
+      return apiRequest('PATCH', '/api/company-settings', { leadFormConfig: config });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/company-settings'] });
+      toast({ title: 'Lead form configuration saved' });
+    },
+    onError: () => {
+      toast({ title: 'Failed to save lead form configuration', variant: 'destructive' });
+    },
+  });
+
+  const handleToggleFieldEnabled = (fieldKey: string, enabled: boolean) => {
+    setLeadFieldsConfig(prev => prev.map(f =>
+      f.fieldKey === fieldKey ? { ...f, enabled, required: enabled ? f.required : false } : f
+    ));
+  };
+
+  const handleToggleFieldRequired = (fieldKey: string, required: boolean) => {
+    setLeadFieldsConfig(prev => prev.map(f =>
+      f.fieldKey === fieldKey ? { ...f, required } : f
+    ));
+  };
 
   const createTargetMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -2991,6 +3103,59 @@ function SettingsSection({
                 No wedding planners found. Add users with the "Wedding Planner" role to set targets.
               </p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Lead Form Fields</CardTitle>
+              <CardDescription>Configure which fields appear in the Add New Lead form</CardDescription>
+            </div>
+            <Button
+              onClick={() => saveLeadFormConfigMutation.mutate(leadFieldsConfig)}
+              disabled={saveLeadFormConfigMutation.isPending}
+              data-testid="button-save-lead-form-config"
+            >
+              {saveLeadFormConfigMutation.isPending ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-lg">
+              <div className="grid grid-cols-3 gap-4 px-4 py-3 bg-muted/50 border-b font-medium text-sm">
+                <span>Field Name</span>
+                <span className="text-center">Enabled</span>
+                <span className="text-center">Required</span>
+              </div>
+              <div className="divide-y">
+                {leadFieldsConfig.map(field => {
+                  const isTitleField = field.fieldKey === 'title';
+                  return (
+                    <div key={field.fieldKey} className="grid grid-cols-3 gap-4 px-4 py-3 items-center" data-testid={`lead-field-row-${field.fieldKey}`}>
+                      <span className="text-sm font-medium">{field.label}</span>
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={field.enabled}
+                          onCheckedChange={(checked) => handleToggleFieldEnabled(field.fieldKey, checked)}
+                          disabled={isTitleField}
+                          data-testid={`switch-enabled-${field.fieldKey}`}
+                        />
+                      </div>
+                      <div className="flex justify-center">
+                        <Switch
+                          checked={field.required}
+                          onCheckedChange={(checked) => handleToggleFieldRequired(field.fieldKey, checked)}
+                          disabled={isTitleField || !field.enabled}
+                          data-testid={`switch-required-${field.fieldKey}`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
