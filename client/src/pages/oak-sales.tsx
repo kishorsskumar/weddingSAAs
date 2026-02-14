@@ -183,8 +183,8 @@ export default function OakSales() {
   const isWeddingPlanner = user?.role === 'wedding_planner';
   const weddingPlanners = users.filter(u => u.role === 'wedding_planner');
 
-  const handleDownloadPdf = (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader: boolean = false) => {
-    const url = `/print/${type}/${id}?download=true${hideHeader ? '&hideHeader=true' : ''}`;
+  const handleDownloadPdf = (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => {
+    const url = `/print/${type}/${id}?download=true`;
     window.open(url, '_blank');
   };
   

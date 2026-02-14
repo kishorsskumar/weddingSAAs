@@ -94,7 +94,7 @@ type Event = {
 
 interface ZohoQuotesProps {
   filterType?: "standard" | "tax";
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
 }
 
 export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuotesProps) {
@@ -402,21 +402,9 @@ export function ZohoQuotes({ filterType = "standard", onDownloadPdf }: ZohoQuote
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingQuote(quote); setIsCreateModalOpen(true); }} title="Edit">
                           <Edit className="h-3.5 w-3.5" />
                         </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => e.stopPropagation()} title="Download PDF">
-                              <Download className="h-3.5 w-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, false)}>
-                              With Header
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, true)}>
-                              Without Header
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onDownloadPdf?.("quote", quote.id); }} title="Download PDF">
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={(e) => { e.stopPropagation(); deleteEstimate.mutate(quote.id); }} title="Delete">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -489,7 +477,7 @@ interface QuoteDetailPanelProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
   onConvert?: () => void;
 }
 
@@ -556,14 +544,11 @@ function QuoteDetailPanel({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, false)}>
-              Download with Header
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id, true)}>
-              Download without Header
+            <DropdownMenuItem onClick={() => onDownloadPdf?.("quote", quote.id)}>
+              Download
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Print</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => window.open(`/print/quote/${quote.id}`, '_blank')}>Print</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <DropdownMenu>

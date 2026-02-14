@@ -84,7 +84,7 @@ type Event = {
 
 interface ZohoInvoicesProps {
   filterType?: "standard" | "tax";
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
 }
 
 export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInvoicesProps) {
@@ -492,7 +492,7 @@ function InvoiceDetailPanel({
   onDelete: () => void;
   onSend: () => void;
   onRecordPayment: () => void;
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState("details");
 
