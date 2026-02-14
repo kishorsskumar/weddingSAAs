@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import { format } from "date-fns";
 import type { MonthlyProductionPlan } from "@shared/schema";
+import { config } from "../shared/config";
 
 export function generateMonthlyPlanPDF(
   entries: MonthlyProductionPlan[],
@@ -22,7 +23,7 @@ export function generateMonthlyPlanPDF(
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
-  doc.text("Oakstreet Events", 14, 15);
+  doc.text(config.company.name, 14, 15);
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");

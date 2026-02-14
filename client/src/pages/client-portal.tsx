@@ -167,9 +167,9 @@ export default function ClientPortal() {
       <header className="bg-white border-b shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="flex items-center gap-3">
-            <img src="/oak-street-logo.png" alt="Oakstreet Events" className="h-10 w-10 object-contain" />
+            <img src="/oak-street-logo.png" alt="Event Planner" className="h-10 w-10 object-contain" />
             <div>
-              <h1 className="text-xl font-semibold text-[#4b7c29]">Oakstreet Events</h1>
+              <h1 className="text-xl font-semibold text-[#4b7c29]">Event Planner</h1>
               <p className="text-sm text-gray-500">Client Portal</p>
             </div>
           </div>
@@ -475,8 +475,8 @@ export default function ClientPortal() {
 
       <footer className="border-t bg-white mt-12">
         <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-gray-500">
-          <p>&copy; {new Date().getFullYear()} Oakstreet Events. All rights reserved.</p>
-          <p className="mt-1">Questions? Contact your wedding planner or email us at hello@oakstreetevent.com</p>
+          <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
+          <p className="mt-1">Questions? Contact your wedding planner.</p>
         </div>
       </footer>
     </div>

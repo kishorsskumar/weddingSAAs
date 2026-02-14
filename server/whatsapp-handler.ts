@@ -1,6 +1,7 @@
 import { storage } from './storage';
 import { sendWhatsAppMessage, isWhatsAppConfigured } from './whatsapp-service';
 import type { WhatsappConversation, InsertExpenseReimbursement, InsertLeaveRequest } from '@shared/schema';
+import { config } from '../shared/config';
 
 interface PendingData {
   purpose?: string;
@@ -11,7 +12,7 @@ interface PendingData {
   reason?: string;
 }
 
-const MENU_MESSAGE = `🌳 *Welcome to Oakstreet Events!*
+const MENU_MESSAGE = `🌳 *Welcome to ${config.company.name}!*
 ━━━━━━━━━━━━━━━━━━━━━
 
 How can we help you today?

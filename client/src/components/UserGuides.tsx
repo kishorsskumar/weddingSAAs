@@ -25,7 +25,7 @@ function addHeader(doc: jsPDF, title: string) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events', 20, 22);
+  doc.text('Employee Portal', 20, 22);
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
@@ -49,7 +49,7 @@ function addFooter(doc: jsPDF, pageNum: number) {
   doc.setTextColor(45, 58, 31);
   doc.setFontSize(8);
   doc.text(`Page ${pageNum}`, pageWidth / 2, pageHeight - 6, { align: 'center' });
-  doc.text('Oak Street Events - Confidential', 20, pageHeight - 6);
+  doc.text('Confidential', 20, pageHeight - 6);
 }
 
 function addSection(doc: jsPDF, y: number, title: string, content: string[]): number {
@@ -126,14 +126,14 @@ function generateInstallGuide(): jsPDF {
   let y = addHeader(doc, 'How to Install the Web App on Your Mobile');
   
   y = addSection(doc, y, 'Overview', [
-    'The Oak Street Events Employee Portal can be installed on your mobile phone as a web app (PWA). This allows you to access the portal quickly from your home screen, just like a regular app.',
+    'The Employee Portal can be installed on your mobile phone as a web app (PWA). This allows you to access the portal quickly from your home screen, just like a regular app.',
     '',
     'This guide covers installation on both Android and iPhone devices.'
   ]);
   
   y = addSection(doc, y, 'Installing on Android (Chrome Browser)', [
     '[STEP] Open Chrome browser on your Android phone',
-    '[STEP] Navigate to www.oakstreetevent.com',
+    '[STEP] Navigate to the portal website',
     '[STEP] Log in with your employee credentials',
     '[STEP] Tap the three-dot menu icon in the top-right corner',
     '[STEP] Select "Add to Home screen" or "Install app"',
@@ -145,7 +145,7 @@ function generateInstallGuide(): jsPDF {
   
   y = addSection(doc, y, 'Installing on iPhone (Safari Browser)', [
     '[STEP] Open Safari browser on your iPhone',
-    '[STEP] Navigate to www.oakstreetevent.com',
+    '[STEP] Navigate to the portal website',
     '[STEP] Log in with your employee credentials',
     '[STEP] Tap the Share button (square with arrow pointing up)',
     '[STEP] Scroll down and tap "Add to Home Screen"',
@@ -163,7 +163,7 @@ function generateInstallGuide(): jsPDF {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events - Web App Installation Guide', 20, 13);
+  doc.text('Web App Installation Guide', 20, 13);
   y = 35;
   
   y = addSection(doc, y, 'Benefits of Installing the Web App', [
@@ -184,7 +184,7 @@ function generateInstallGuide(): jsPDF {
     'For technical issues or questions:',
     '• Contact your manager',
     '• Reach out to HR department',
-    '• Email: support@oakstreetevent.com'
+    '• Email your support team'
   ]);
   
   addFooter(doc, 2);
@@ -206,7 +206,7 @@ function generatePortalGuide(): jsPDF {
   ]);
   
   y = addSection(doc, y, 'Logging In', [
-    '[STEP] Open your browser and go to www.oakstreetevent.com',
+    '[STEP] Open your browser and go to the portal website',
     '[STEP] Enter your registered email address',
     '[STEP] Enter your password (provided by HR during onboarding)',
     '[STEP] Click the "Sign In" button',
@@ -244,7 +244,7 @@ function generatePortalGuide(): jsPDF {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events - Employee Portal Guide', 20, 13);
+  doc.text('Employee Portal Guide', 20, 13);
   y = 35;
   
   y = addSection(doc, y, 'Viewing Payroll & Salary Slips', [
@@ -287,7 +287,7 @@ function generatePortalGuide(): jsPDF {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oak Street Events - Employee Portal Guide', 20, 13);
+  doc.text('Employee Portal Guide', 20, 13);
   y = 35;
   
   y = addSection(doc, y, 'Updating Your Profile', [
@@ -304,7 +304,7 @@ function generatePortalGuide(): jsPDF {
     'For technical issues or questions about the portal:',
     '• Contact your manager',
     '• Reach out to HR department',
-    '• Email: support@oakstreetevent.com'
+    '• Email your support team'
   ]);
   
   addFooter(doc, 3);

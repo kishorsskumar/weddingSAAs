@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import crypto from "crypto";
+import { config } from "../shared/config";
 import { storage } from "./storage";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import * as razorpayService from "./razorpay-service";
@@ -8012,23 +8013,26 @@ export async function registerRoutes(
       
       console.log(`[Automation] Pushed ${created.length} items from estimate ${estimate.number} to production for event ${event?.title}`);
       
-      // Send WhatsApp notification to warehouse (Kishor) if configured
+      // Send WhatsApp notification to warehouse manager if configured
       if (isWhatsAppConfigured()) {
-        const KISHOR_PHONE = '+917902373354';
         try {
-          const eventDate = event?.date ? new Date(event.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'TBD';
-          const warehouseMessage = `📦 *Production Request*\n\n*${event?.title}* has ${created.length} items pushed to production.\n\nEvent Date: ${eventDate}\nEstimate: ${estimate.number}\n\nPlease review and assign fulfillment types (warehouse/purchase/rent) for each item.`;
-          await sendWhatsAppMessage(KISHOR_PHONE, warehouseMessage);
-          
-          // Log notification
-          await storage.createAutomationLog({
-            eventId: estimate.eventId,
-            actionType: 'notification_sent',
-            status: 'success',
-            metadata: { type: 'push_production', recipient: KISHOR_PHONE, eventTitle: event?.title }
-          });
-          
-          console.log(`[Automation] Sent WhatsApp notification to warehouse for event ${event?.title}`);
+          const allUsers = await storage.getAllUsers();
+          const superadmin = allUsers.find(u => (u.designation || u.role || '').toLowerCase() === 'superadmin' && u.phone);
+          const warehousePhone = superadmin?.phone;
+          if (warehousePhone) {
+            const eventDate = event?.date ? new Date(event.date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'TBD';
+            const warehouseMessage = `📦 *Production Request*\n\n*${event?.title}* has ${created.length} items pushed to production.\n\nEvent Date: ${eventDate}\nEstimate: ${estimate.number}\n\nPlease review and assign fulfillment types (warehouse/purchase/rent) for each item.`;
+            await sendWhatsAppMessage(warehousePhone, warehouseMessage);
+            
+            await storage.createAutomationLog({
+              eventId: estimate.eventId,
+              actionType: 'notification_sent',
+              status: 'success',
+              metadata: { type: 'push_production', recipient: warehousePhone, eventTitle: event?.title }
+            });
+            
+            console.log(`[Automation] Sent WhatsApp notification to warehouse for event ${event?.title}`);
+          }
         } catch (waError) {
           console.error('[Automation] Failed to send WhatsApp notification:', waError);
         }
@@ -8126,25 +8130,15 @@ export async function registerRoutes(
       
       // Send WhatsApp notification to wedding planner if configured
       if (isWhatsAppConfigured()) {
-        const PLANNER_PHONES: Record<string, string> = {
-          'fida fathima': '+919895810975',
-          'fida': '+919895810975',
-          'femina km': '+917306687284',
-          'femina': '+917306687284',
-          'kishor': '+917902373354',
-        };
-        
         try {
           const plannerName = event.planner?.toLowerCase() || '';
-          let plannerPhone = PLANNER_PHONES['kishor']; // Default to Kishor
+          const allUsers = await storage.getAllUsers();
+          const plannerUser = allUsers.find(u => u.phone && u.name.toLowerCase() === plannerName);
+          const plannerPhone = plannerUser?.phone;
           
-          for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
-            if (plannerName.includes(key)) {
-              plannerPhone = phone;
-              break;
-            }
-          }
-          
+          if (!plannerPhone) {
+            console.log(`[Automation] No phone found for planner "${event.planner}" - skipping notification`);
+          } else {
           const warehouseBreakdown = items.filter(i => i.fulfillmentType === 'warehouse').length;
           const purchaseBreakdown = items.filter(i => i.fulfillmentType === 'purchase').length;
           const rentBreakdown = items.filter(i => i.fulfillmentType === 'rent').length;
@@ -8161,6 +8155,7 @@ export async function registerRoutes(
           });
           
           console.log(`[Automation] Sent inventory finalization notification to planner ${event.planner}`);
+          }
         } catch (waError) {
           console.error('[Automation] Failed to send WhatsApp notification:', waError);
         }
@@ -9127,15 +9122,7 @@ export async function registerRoutes(
         try {
           const owner = await storage.getUser(deal.ownerId);
           if (owner && (owner.role === 'wedding_planner' || owner.role === 'admin')) {
-            // Map owner name to phone number
-            const plannerPhones: Record<string, string> = {
-              'fida fathima': '+919895810975',
-              'fida': '+919895810975',
-              'femina km': '+917306687284',
-              'femina': '+917306687284',
-            };
-            
-            const plannerPhone = plannerPhones[owner.name.toLowerCase()];
+            const plannerPhone = owner.phone;
             if (plannerPhone) {
               const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
               if (isWhatsAppConfigured()) {
@@ -9200,11 +9187,13 @@ export async function registerRoutes(
             
             console.log(`[Advance Payment] Deal "${existingDeal.title}" marked as advance received. Customer: ${customerName}. Planner: ${owner?.name || 'N/A'}. Sending WhatsApp to accountant...`);
             
-            // Send WhatsApp notification to accountant (Sabitha)
+            // Send WhatsApp notification to accountant
             try {
               const { sendWhatsAppMessage, isWhatsAppConfigured } = await import('./whatsapp-service');
               if (isWhatsAppConfigured()) {
-                const accountantPhone = '+919895810975'; // Sabitha's number for accountant notifications
+                const allUsersForNotif = await storage.getAllUsers();
+                const accountantUser = allUsersForNotif.find(u => (u.designation || u.role || '').toLowerCase().includes('accountant') && u.phone);
+                const accountantPhone = accountantUser?.phone;
                 const message = `🎉 *Advance Payment Received*\n\n` +
                   `A new customer has made an advance payment and needs to be created in the system.\n\n` +
                   `📋 *Lead Details:*\n` +
@@ -9216,8 +9205,10 @@ export async function registerRoutes(
                   `• Wedding Planner: ${owner?.name || 'N/A'}\n\n` +
                   `Please create the customer record and invoice in Oak Book.`;
                 
-                await sendWhatsAppMessage(accountantPhone, message);
-                console.log(`[Advance Payment] WhatsApp notification sent to accountant for ${customerName}`);
+                if (accountantPhone) {
+                  await sendWhatsAppMessage(accountantPhone, message);
+                  console.log(`[Advance Payment] WhatsApp notification sent to accountant for ${customerName}`);
+                }
               }
             } catch (whatsappError) {
               console.error('[Advance Payment] Failed to send WhatsApp notification:', whatsappError);
@@ -10447,24 +10438,14 @@ export async function registerRoutes(
         
         if (successfulNotifications > 0) {
           try {
-            const PLANNER_PHONES: Record<string, string> = {
-              'fida fathima': '+919895810975',
-              'fida': '+919895810975',
-              'femina km': '+917306687284',
-              'femina': '+917306687284',
-              'kishor': '+917902373354',
-            };
-            
             const plannerName = event.planner?.toLowerCase() || '';
-            let plannerPhone = PLANNER_PHONES['kishor']; // Default
+            const allUsersForPlanner = await storage.getAllUsers();
+            const plannerUser = allUsersForPlanner.find(u => u.phone && u.name.toLowerCase() === plannerName);
+            const plannerPhone = plannerUser?.phone;
             
-            for (const [key, phone] of Object.entries(PLANNER_PHONES)) {
-              if (plannerName.includes(key)) {
-                plannerPhone = phone;
-                break;
-              }
-            }
-            
+            if (!plannerPhone) {
+              console.log(`[Automation] No phone found for planner "${event.planner}" - skipping summary notification`);
+            } else {
             let summaryStatus = `Notified: ${successfulNotifications}`;
             if (failedNotifications > 0) summaryStatus += `, Failed: ${failedNotifications}`;
             if (skippedNotifications > 0) summaryStatus += `, Skipped: ${skippedNotifications}`;
@@ -10486,6 +10467,7 @@ export async function registerRoutes(
             });
             
             console.log(`[Automation] Sent staff assignment summary to planner ${event.planner}`);
+            }
           } catch (summaryError) {
             console.error('[Automation] Failed to send summary to planner:', summaryError);
           }
@@ -11006,7 +10988,7 @@ export async function registerRoutes(
       const OpenAI = (await import('openai')).default;
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-      const systemPrompt = `You are an expert wedding and event presentation designer for Oakstreet Events. 
+      const systemPrompt = `You are an expert wedding and event presentation designer for ${config.company.name}. 
 Generate a structured JSON array of slides for a wedding/event presentation based on the user's request.
 
 Each slide should have:
@@ -11181,7 +11163,7 @@ Respond with a JSON array only, no markdown formatting.`;
     }
     // Remove whatsapp: prefix and + if present
     const cleanNumber = fromNumber.replace(/^whatsapp:/i, '').replace(/^\+/, '');
-    const optInMessage = encodeURIComponent('Hi, I would like to opt-in to receive WhatsApp messages from Oakstreet Events.');
+    const optInMessage = encodeURIComponent(`Hi, I would like to opt-in to receive WhatsApp messages from ${config.company.name}.`);
     const clickToChatLink = `https://wa.me/${cleanNumber}?text=${optInMessage}`;
     const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(clickToChatLink)}`;
     res.json({
@@ -12512,7 +12494,8 @@ Respond with a JSON array only, no markdown formatting.`;
       
       const objectStorage = new ObjectStorageService();
       const timestamp = Date.now();
-      const filename = `monthly-plan/Oakstreet_Production_Plan_${year}_${month}_${timestamp}.pdf`;
+      const companySlug = config.company.name.replace(/\s+/g, '_');
+      const filename = `monthly-plan/${companySlug}_Production_Plan_${year}_${month}_${timestamp}.pdf`;
       const pdfUrl = await objectStorage.uploadPublicBuffer(pdfBuffer, filename, 'application/pdf');
 
       const allEmployees = await storage.getAllEmployees();
@@ -12526,7 +12509,7 @@ Respond with a JSON array only, no markdown formatting.`;
 
       const results: { employeeId: string; name: string; success: boolean; error?: string }[] = [];
       const monthName = new Date(year, month - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-      const messageCaption = caption || `Oakstreet Events - Monthly Production Plan for ${monthName}`;
+      const messageCaption = caption || `${config.company.name} - Monthly Production Plan for ${monthName}`;
 
       for (const employee of selectedEmployees) {
         const result = await sendWhatsAppMediaMessage(

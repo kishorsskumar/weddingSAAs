@@ -2540,7 +2540,7 @@ export default function Daybook() {
           <div className="space-y-6" id="daybook-preview-content">
             {/* Header for print */}
             <div className="text-center border-b pb-4">
-              <h1 className="text-2xl font-bold font-serif text-[#7C8B5D]">Oakstreet Events</h1>
+              <h1 className="text-2xl font-bold font-serif text-[#7C8B5D]">Daybook</h1>
               <h2 className="text-lg font-medium mt-1">Daybook Report</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {format(periodDateRange.start, "dd MMM yyyy")} - {format(periodDateRange.end, "dd MMM yyyy")}
@@ -2669,7 +2669,7 @@ export default function Daybook() {
             {/* Footer */}
             <div className="border-t pt-4 text-center text-xs text-muted-foreground">
               <p>Generated on {format(new Date(), "dd MMM yyyy 'at' hh:mm a")}</p>
-              <p className="mt-1">Oakstreet Events - Daybook Report</p>
+              <p className="mt-1">Daybook Report</p>
             </div>
           </div>
 

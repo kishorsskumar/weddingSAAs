@@ -4826,7 +4826,7 @@ function BillForm({ bill, vendors, onSubmit, onCancel }: {
 
 function SettingsSection({ companySettings, updateCompanySettings }: { companySettings: any; updateCompanySettings: any }) {
   const [settingsForm, setSettingsForm] = useState({
-    companyName: companySettings?.companyName || 'Oakstreet Events',
+    companyName: companySettings?.companyName || 'Your Company',
     address: companySettings?.address || '',
     phone: companySettings?.phone || '',
     email: companySettings?.email || '',
@@ -4845,7 +4845,7 @@ function SettingsSection({ companySettings, updateCompanySettings }: { companySe
   useEffect(() => {
     if (companySettings) {
       setSettingsForm({
-        companyName: companySettings.companyName || 'Oakstreet Events',
+        companyName: companySettings.companyName || 'Your Company',
         address: companySettings.address || '',
         phone: companySettings.phone || '',
         email: companySettings.email || '',
@@ -4900,7 +4900,7 @@ function SettingsSection({ companySettings, updateCompanySettings }: { companySe
                   <Input 
                     value={settingsForm.companyName} 
                     onChange={(e) => setSettingsForm({...settingsForm, companyName: e.target.value})}
-                    placeholder="Oakstreet Events" 
+                    placeholder="Your Company Name" 
                   />
                 </div>
                 <div>
@@ -4908,7 +4908,7 @@ function SettingsSection({ companySettings, updateCompanySettings }: { companySe
                   <Input 
                     value={settingsForm.website} 
                     onChange={(e) => setSettingsForm({...settingsForm, website: e.target.value})}
-                    placeholder="www.oakstreetevents.com" 
+                    placeholder="www.yourcompany.com" 
                   />
                 </div>
                 <div className="md:col-span-2">

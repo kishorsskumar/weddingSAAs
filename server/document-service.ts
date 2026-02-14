@@ -3,6 +3,7 @@ import { autoTable } from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { storage } from './storage';
 import { randomUUID } from 'crypto';
+import { config } from '../shared/config';
 
 interface GeneratedDocument {
   id: string;
@@ -113,7 +114,7 @@ export async function generateSalesReportPdf(options: {
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
+  doc.text(config.company.name, 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
@@ -202,7 +203,7 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
+  doc.text(config.company.name, 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('INVOICE', 105, 30, { align: 'center' });
@@ -261,8 +262,8 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text('Thank you for choosing Oakstreet Events!', 105, 270, { align: 'center' });
-  doc.text('For queries, please contact us at events@oakstreet.in', 105, 276, { align: 'center' });
+  doc.text(`Thank you for choosing ${config.company.name}!`, 105, 270, { align: 'center' });
+  doc.text(`For queries, please contact us at ${config.company.email}`, 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const filename = `invoice-${invoiceNumber}.pdf`;
@@ -291,7 +292,7 @@ export async function generateQuotePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
+  doc.text(config.company.name, 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('QUOTATION', 105, 30, { align: 'center' });
@@ -341,7 +342,7 @@ export async function generateQuotePdf(options: {
   
   doc.setFontSize(9);
   doc.text('Terms & Conditions apply. This quote is valid for 30 days.', 105, 270, { align: 'center' });
-  doc.text('Thank you for considering Oakstreet Events!', 105, 276, { align: 'center' });
+  doc.text(`Thank you for considering ${config.company.name}!`, 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const filename = `quote-${quoteNumber}.pdf`;
@@ -451,7 +452,7 @@ export async function generateEmployeeReportPdf(): Promise<{ documentId: string;
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
+  doc.text(config.company.name, 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
@@ -520,8 +521,8 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
-  doc.text('2nd floor, above Devas Studio, Deshabhimani Road, Kaloor, Kochi-682017', 14, 27);
-  doc.text('Ph: +91 9895810975 | GSTIN: 32AALCS5678K1Z5', 14, 32);
+  doc.text(config.company.address || '', 14, 27);
+  doc.text(`Ph: ${config.company.phone} | GSTIN: 32AALCS5678K1Z5`, 14, 32);
   
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -557,8 +558,11 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(11);
   doc.text('Yepman International', 17, 68);
   doc.setFontSize(9);
-  doc.text('2nd floor, above Devas Studio,', 17, 74);
-  doc.text('Deshabhimani Road, Kaloor, Kochi-682017', 17, 79);
+  const addressParts = (config.company.address || '').split(',').map(s => s.trim());
+  const addressLine1 = addressParts.slice(0, Math.ceil(addressParts.length / 2)).join(', ');
+  const addressLine2 = addressParts.slice(Math.ceil(addressParts.length / 2)).join(', ');
+  doc.text(addressLine1, 17, 74);
+  doc.text(addressLine2, 17, 79);
   
   doc.setFillColor(248, 249, 250);
   doc.rect(105, 55, 91, 40, 'F');

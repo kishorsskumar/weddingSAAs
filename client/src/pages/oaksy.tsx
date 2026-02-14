@@ -464,7 +464,7 @@ export default function OaksyPage() {
                 <TreeDeciduous className="h-16 w-16 text-[#9AAF6C] mb-4" />
                 <h3 className="text-xl font-semibold mb-2" data-testid="text-welcome-title">Welcome to Oaksy!</h3>
                 <p className="text-muted-foreground mb-4 max-w-md" data-testid="text-welcome-description">
-                  I'm your AI assistant for Oak Street Events. Ask me anything about events, 
+                  I'm your AI assistant. Ask me anything about events, 
                   financials, team management, or get help with your daily tasks.
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-sm" data-testid="container-suggestions">

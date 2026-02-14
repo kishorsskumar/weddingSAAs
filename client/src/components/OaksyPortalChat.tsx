@@ -119,7 +119,7 @@ export function OaksyPortalChat({ chatType, portalToken, clientName }: OaksyPort
     if (chatType === 'portal' && clientName) {
       return `Hi ${clientName}! I'm Oaksy, your wedding planning assistant. How can I help you with your event today?`;
     }
-    return "Hi there! I'm Oaksy, your friendly wedding planning assistant at Oakstreet Events. How can I help you today?";
+    return "Hi there! I'm Oaksy, your friendly wedding planning assistant. How can I help you today?";
   };
 
   return (

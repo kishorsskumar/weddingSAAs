@@ -3,19 +3,12 @@ import { sendWhatsAppMessage } from "./whatsapp-service";
 
 let schedulerInterval: NodeJS.Timeout | null = null;
 
-const WEDDING_PLANNER_PHONES: Record<string, string> = {
-  'fida fathima': '+919895810975',
-  'fida': '+919895810975',
-  'fida fathima pk': '+919895810975',
-  'femina km': '+917306687284',
-  'femina': '+917306687284',
-};
-
-function getWeddingPlannerPhone(plannerName: string): string | null {
+async function getWeddingPlannerPhone(plannerName: string): Promise<string | null> {
   const normalized = plannerName.toLowerCase().trim();
-  for (const [key, phone] of Object.entries(WEDDING_PLANNER_PHONES)) {
-    if (normalized.includes(key) || key.includes(normalized)) {
-      return phone;
+  const allUsers = await storage.getAllUsers();
+  for (const user of allUsers) {
+    if (user.phone && (user.name.toLowerCase().includes(normalized) || normalized.includes(user.name.toLowerCase()))) {
+      return user.phone;
     }
   }
   return null;
@@ -52,7 +45,7 @@ export async function process60DayPaymentReminders(): Promise<void> {
     
     for (const event of eventsDue) {
       try {
-        const plannerPhone = getWeddingPlannerPhone(event.planner);
+        const plannerPhone = await getWeddingPlannerPhone(event.planner);
         
         if (!plannerPhone) {
           console.log(`[60-Day Reminder] No phone found for planner: ${event.planner} - skipping event ${event.id}`);

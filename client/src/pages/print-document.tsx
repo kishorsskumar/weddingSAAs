@@ -5,7 +5,7 @@ import logo from "@assets/OAK_1_1766646679471.jpg";
 import yepmanLogo from "@assets/Yepman_1767319118647.png";
 
 // Brand colors
-const BRAND_COLOR = '#6b9937';  // Oakstreet brand color
+const BRAND_COLOR = '#6b9937';
 const YEPMAN_BRAND_COLOR = '#9d2966';  // Yepman brand color (maroon/magenta)
 
 interface LineItem {
@@ -335,10 +335,10 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
               <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
             <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
-              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events')}
+              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company')}
             </div>
             <div className="company-address">
-              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -589,10 +589,10 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
               <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
             </div>
             <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
-              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events')}
+              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company')}
             </div>
             <div className="company-address">
-              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -844,7 +844,7 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
   // Determine if this is a tax document based on invoice or customer company
   const isTaxDocument = invoice?.isTaxDocument === true || customer?.company === 'yepman';
   const brandColor = isTaxDocument ? YEPMAN_BRAND_COLOR : '#6b9937';
-  const companyName = isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Oakstreet Events');
+  const companyName = isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company');
   const companyLogo = isTaxDocument ? yepmanLogo : logo;
   
   const receiptStyles = baseStyles;
@@ -862,7 +862,7 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
             </div>
             <div className="company-name" style={{ color: brandColor }}>{companyName}</div>
             <div className="company-address">
-              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -1011,9 +1011,9 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Oakstreet Events'}</div>
+          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Your Company'}</div>
           <div className="company-address">
-            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
+            {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
             ))}
           </div>
@@ -1113,7 +1113,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
       </div>
 
       {/* Footer */}
-      <div className="footer">Oakstreet Events</div>
+      <div className="footer">{companySettings?.companyName || 'Your Company'}</div>
     </div>
   );
 }

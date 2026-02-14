@@ -79,10 +79,10 @@ import type {
 } from "@shared/schema";
 
 const COMPANY_DEFAULTS = {
-  companyName: 'Oakstreet Events',
-  address: '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia',
-  phone: '7902373354',
-  email: 'oakstreetevents18@gmail.com',
+  companyName: 'Your Company',
+  address: '',
+  phone: '',
+  email: '',
   gstNumber: '',
 };
 

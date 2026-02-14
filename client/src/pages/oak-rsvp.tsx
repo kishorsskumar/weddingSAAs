@@ -752,12 +752,12 @@ function OutreachTab({ eventId, guests, responses }: {
                 name="messageContent"
                 defaultValue={editingTemplate?.messageContent || `Namaste {{guestName}},
 
-Welcome to the celebration! We are Oakstreet Events, and we're delighted to assist with your RSVP for {{eventName}} on {{eventDate}} at {{venue}}.
+Welcome to the celebration! We're delighted to assist with your RSVP for {{eventName}} on {{eventDate}} at {{venue}}.
 
 Please let us know if you'll be joining us. We look forward to seeing you!
 
 Warm regards,
-Oakstreet Events Team`}
+The Events Team`}
                 required
                 rows={8}
                 placeholder="Use {{guestName}}, {{eventName}}, {{eventDate}}, {{venue}} for personalization"

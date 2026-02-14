@@ -532,7 +532,7 @@ export default function MonthlyPlan() {
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
-      doc.text("Oakstreet Events", 14, 15);
+      doc.text("Production Plan", 14, 15);
     }
     
     doc.setTextColor(255, 255, 255);
@@ -641,7 +641,7 @@ export default function MonthlyPlan() {
       );
     }
 
-    doc.save(`Oakstreet_Production_Plan_${monthName.replace(" ", "_")}.pdf`);
+    doc.save(`Production_Plan_${monthName.replace(" ", "_")}.pdf`);
     toast({ title: "PDF downloaded successfully" });
   };
 

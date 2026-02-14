@@ -113,7 +113,7 @@ async function seed() {
       joinDate: "2023-01-15",
       designation: "Senior Planner",
       salary: "45000",
-      address: "123 Oak Street, Mumbai",
+      address: "123 Main Street",
       emergencyContact: "9876543210",
     },
     {

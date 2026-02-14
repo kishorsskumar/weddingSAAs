@@ -49,7 +49,7 @@ export default function DownloadPage() {
     <div className="min-h-screen bg-white">
       <div className="container mx-auto px-4 py-8 md:py-16">
         <div className="text-center mb-12">
-          <img src={logo} alt="Oakstreet Events" className="h-24 md:h-32 mx-auto mb-8" />
+          <img src={logo} alt="App" className="h-24 md:h-32 mx-auto mb-8" />
           <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
             Install the app on your device for quick access anytime
           </p>
@@ -106,7 +106,7 @@ export default function DownloadPage() {
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Chrome or Edge</span>
+                  <span>Open this website in Chrome or Edge</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
@@ -136,7 +136,7 @@ export default function DownloadPage() {
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Safari</span>
+                  <span>Open this website in Safari</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
@@ -170,7 +170,7 @@ export default function DownloadPage() {
               <ol className="space-y-3 text-gray-600">
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">1</span>
-                  <span>Open <a href="https://www.oakstreetevent.com" target="_blank" rel="noopener noreferrer" className="text-[#2FA4BC] underline font-semibold">www.oakstreetevent.com</a> in Chrome</span>
+                  <span>Open this website in Chrome</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="flex-shrink-0 w-6 h-6 bg-[#2FA4BC] text-white rounded-full flex items-center justify-center text-sm font-medium">2</span>
@@ -203,7 +203,7 @@ export default function DownloadPage() {
         </div>
 
         <div className="text-center mt-16 text-gray-400 text-sm">
-          <p>&copy; 2025 Oakstreet Events. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
         </div>
       </div>
     </div>

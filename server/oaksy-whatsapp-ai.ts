@@ -6,6 +6,7 @@ import { objectStorageClient } from './objectStorage';
 import { randomUUID } from 'crypto';
 import { analyzeImageFromUrl } from './transaction-scanner';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
+import { config } from '../shared/config';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -99,22 +100,20 @@ function autoAdjustPastTimeToTomorrow(dueAt: Date): Date {
   return dueAt;
 }
 
-// Allowed employees for expense/income submission (normalized phone numbers)
-// Only these employees can submit expenses or income via WhatsApp
-const ALLOWED_EXPENSE_SUBMITTERS = [
-  '+917025063335',  // Test Employee
-  '+919895810975',  // Fida Fathima PK (Wedding Planner)
-  '+917306687284',  // Femina KM (Wedding Planner)
-  '+917558841046',  // Sabitha MA (Accountant)
-];
-
-function isAllowedExpenseSubmitter(phone: string): boolean {
+async function isAllowedExpenseSubmitter(phone: string): Promise<boolean> {
   const normalized = normalizePhoneNumber(phone);
-  return ALLOWED_EXPENSE_SUBMITTERS.some(allowed => {
-    const normalizedAllowed = normalizePhoneNumber(allowed);
-    // Match last 10 digits to handle format differences
-    return normalized.slice(-10) === normalizedAllowed.slice(-10);
-  });
+  try {
+    const allUsers = await storage.getAllUsers();
+    const matchingUser = allUsers.find(u => {
+      if (!u.phone) return false;
+      return normalizePhoneNumber(u.phone).slice(-10) === normalized.slice(-10);
+    });
+    if (!matchingUser) return false;
+    const role = (matchingUser.designation || matchingUser.role || '').toLowerCase();
+    return role === 'superadmin' || role === 'admin' || role === 'accountant' || role === 'wedding_planner' || role === 'wedding planner';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -474,13 +473,13 @@ function parseConflictResponse(message: string): 'replace' | 'keep_both' | 'canc
   return null;
 }
 
-const OAKSY_SYSTEM_PROMPT = `You are Oaksy AI, the intelligent companion for Oakstreet Events. You are a versatile assistant who adapts to each user's role and needs.
+const OAKSY_SYSTEM_PROMPT = `You are Oaksy AI, the intelligent companion for ${config.company.name}. You are a versatile assistant who adapts to each user's role and needs.
 
 YOUR ROLES (based on who you're talking to):
 - For EMPLOYEES: HR assistant, expense helper, leave manager
-- For WEDDING PLANNERS (Fida, Femina): Event coordinator, vendor liaison, production assistant
+- For WEDDING PLANNERS: Event coordinator, vendor liaison, production assistant
 - For ACCOUNTANTS: Financial assistant, daybook helper, payment tracker
-- For SUPERADMIN (Kishor): Full business assistant with complete access to all data
+- For SUPERADMIN: Full business assistant with complete access to all data
 
 PERSONALITY:
 - Warm, friendly, and professional like a trusted colleague
@@ -559,12 +558,12 @@ REMINDER DETECTION RULES:
 - EXPLICIT: "remind me tomorrow at 9am to pay vendor" = reminder with reminderDateTime and reminderMessage
 - EXPLICIT: "set a reminder for 5pm to call client" = reminder
 - EXPLICIT: "remind me at 3:30pm to check deliveries" = reminder
-- EXPLICIT: "remind me after 5 minutes to call Kishor" = reminder (relative time)
+- EXPLICIT: "remind me after 5 minutes to call John" = reminder (relative time)
 - EXPLICIT: "remind me in 10 minutes" = reminder (relative time)
-- EXPLICIT: "can you remind me to call Kishor after 5 minutes" = reminder
-- EXPLICIT: "create a reminder to call Kishor at 5.10am today" = reminder (dot notation for time)
-- EXPLICIT: "create a reminder to call Kishor at 5pm" = reminder
-- IMPLICIT: "call Kishor at 4.45 am today" = reminder (action + time = reminder)
+- EXPLICIT: "can you remind me to call John after 5 minutes" = reminder
+- EXPLICIT: "create a reminder to call John at 5.10am today" = reminder (dot notation for time)
+- EXPLICIT: "create a reminder to call John at 5pm" = reminder
+- IMPLICIT: "call John at 4.45 am today" = reminder (action + time = reminder)
 - IMPLICIT: "pay vendor at 3pm" = reminder (task with specific time = reminder)
 - IMPLICIT: "check flowers at 10am tomorrow" = reminder
 - IMPLICIT: "send invoice to client at 5pm" = reminder
@@ -572,7 +571,7 @@ REMINDER DETECTION RULES:
 - RELATIVE TIMES: "after X minutes", "in X hours", "in X minutes" are VALID reminder times - calculate from current time
 - Parse time naturally: "9am", "5:30 PM", "4.45am", "10:00", "morning" (default 9am), "evening" (default 5pm)
 - Parse date naturally: "tomorrow", "today", "Monday", "next week" (default next Monday), "in 2 hours", "after 30 mins"
-- The reminderMessage should be a clean task description (what to do), e.g., "call Kishor" not the full sentence with time
+- The reminderMessage should be a clean task description (what to do), e.g., "call John" not the full sentence with time
 - If no date/time specified but a clear task is mentioned, ask "When should I remind you?"
 - Use Indian timezone (Asia/Kolkata) for all times
 - For relative times like "in 5 minutes" or "after 10 mins", add that duration to the CURRENT time in IST
@@ -824,12 +823,12 @@ function detectIncomeSubmission(text: string): { isIncome: boolean; clientName?:
     }
   }
   
-  // Extract bank name from message - patterns like "bank Kishor", "to Kishor bank", "Kishor account"
+  // Extract bank name from message - patterns like "bank HDFC", "to HDFC bank", "savings account"
   let bankName: string | undefined;
   const bankPatterns = [
-    /bank\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i,  // "bank Kishor" or "bank HDFC"
-    /(?:to|in)\s+([a-zA-Z]+)\s+(?:bank|account)/i,  // "to Kishor bank" or "in Kishor account"
-    /([a-zA-Z]+)\s+(?:bank|account)\b/i,  // "Kishor bank" or "HDFC account"
+    /bank\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)/i,  // "bank HDFC" or "bank SBI"
+    /(?:to|in)\s+([a-zA-Z]+)\s+(?:bank|account)/i,  // "to HDFC bank" or "in savings account"
+    /([a-zA-Z]+)\s+(?:bank|account)\b/i,  // "HDFC bank" or "savings account"
   ];
   
   for (const pattern of bankPatterns) {
@@ -956,7 +955,7 @@ interface AIParseResult {
   userConfirmed: boolean;
 }
 
-const AI_ORCHESTRATOR_PROMPT = `You are Oaksy AI, the intelligent WhatsApp assistant for Oakstreet Events. Your job is to understand what employees want to do and help them accomplish it naturally.
+const AI_ORCHESTRATOR_PROMPT = `You are Oaksy AI, the intelligent WhatsApp assistant for ${config.company.name}. Your job is to understand what employees want to do and help them accomplish it naturally.
 
 ROLE: You're a friendly, smart assistant that understands natural language. You don't require specific formats - you figure out what people mean.
 
@@ -1008,7 +1007,7 @@ AMOUNT UNDERSTANDING:
 - "Rs 5000", "₹5000", "5000/-" = 5000
 
 CONFIRMATION FLOW:
-- For SUPERADMIN (Kishor): Auto-execute without asking for confirmation. Set readyToExecute=true immediately when all required info is available.
+- For SUPERADMIN: Auto-execute without asking for confirmation. Set readyToExecute=true immediately when all required info is available.
 - For OTHER EMPLOYEES: Summarize the request and ask for confirmation before executing
 - Only set readyToExecute=true for non-superadmin when they explicitly confirm (yes, ok, confirm, sure, go ahead, do it)
 - REMINDERS for Superadmin: Auto-create immediately without asking "Should I set this?" - just create it and confirm it's done
@@ -1126,7 +1125,7 @@ If the user corrects something, update the slots and ask for confirmation again.
     }
 
     // Determine if this is superadmin - if so, tell AI to auto-execute
-    const isSuperadmin = employeeRole === 'superadmin' || employeeName.toLowerCase().includes('kishor');
+    const isSuperadmin = employeeRole === 'superadmin';
     const roleInfo = isSuperadmin 
       ? `\n\nUSER: ${employeeName} (SUPERADMIN - auto-execute all requests immediately, no confirmation needed)`
       : `\n\nEmployee: ${employeeName} (${employeeRole})`;
@@ -1651,11 +1650,11 @@ async function getMonthlySummary(year?: number, month?: number): Promise<string>
   return `📊 *${monthName} Summary:*\n\n📅 Events: ${monthEvents.length}\n📥 Income: ₹${totalIncome.toLocaleString('en-IN')}\n📤 Expenses: ₹${totalExpense.toLocaleString('en-IN')}\n\n━━━━━━━━━━━━━━\n💰 *Net:* ₹${(totalIncome - totalExpense).toLocaleString('en-IN')}`;
 }
 
-// Check if user is superadmin (by phone)
-function isSuperadminPhone(phone: string): boolean {
+async function isSuperadminPhone(phone: string): Promise<boolean> {
   const normalized = normalizePhoneNumber(phone);
-  // Kishor's number
-  return normalized.slice(-10) === '7902373354';
+  const superadminPhone = await getSuperadminPhone();
+  if (!superadminPhone) return false;
+  return normalized.slice(-10) === superadminPhone.replace(/\D/g, '').slice(-10);
 }
 
 // Get RSVP status for an event
@@ -1752,7 +1751,7 @@ async function analyzeWithAI(
   let roleContext = 'Employee';
   if (userRole === 'superadmin') {
     roleContext = 'Superadmin (full access to all data)';
-  } else if (userRole === 'wedding_planner' || userName?.toLowerCase().includes('fida') || userName?.toLowerCase().includes('femina')) {
+  } else if (userRole === 'wedding_planner') {
     roleContext = 'Wedding Planner (can manage events, vendors, production)';
   } else if (userRole === 'accountant') {
     roleContext = 'Accountant (can manage finances, daybook)';
@@ -1815,7 +1814,7 @@ Understand the intent flexibly - don't require specific formats. Be helpful and 
       extractedData: {},
       needsMoreInfo: [],
       isComplete: false,
-      message: content || "Hi! I'm Oaksy, your companion at Oakstreet Events. How can I help you today? 🌳"
+      message: content || "Hi! I'm Oaksy, your companion. How can I help you today? 🌳"
     };
   } catch (error: any) {
     console.error('[Oaksy AI] Error:', error.message);
@@ -1824,93 +1823,93 @@ Understand the intent flexibly - don't require specific formats. Be helpful and 
       extractedData: {},
       needsMoreInfo: [],
       isComplete: false,
-      message: "Hi! I'm Oaksy, your companion at Oakstreet Events. How can I help you? 🌳"
+      message: "Hi! I'm Oaksy, your companion. How can I help you? 🌳"
     };
   }
 }
 
-// Superadmin WhatsApp number for approval notifications
-const SUPERADMIN_WHATSAPP = '+917902373354';
-
-// Authorized lead submitters (can add leads to Oak Sales via WhatsApp)
-const AUTHORIZED_LEAD_SUBMITTERS: Record<string, string> = {
-  'kishor': '+917902373354',
-  'anjana saji': '+918281569046',
-};
-
-// Wedding Planner phone numbers for lead notifications
-const WEDDING_PLANNER_PHONES: Record<string, string> = {
-  'fida fathima': '+919895810975',
-  'fida': '+919895810975',
-  'femina km': '+917306687284',
-  'femina': '+917306687284',
-};
-
-// Authorized DC creators (can create Delivery Challans via WhatsApp)
-const AUTHORIZED_DC_CREATORS: Record<string, string> = {
-  'kishor': '+917902373354',           // Superadmin
-  'fida fathima': '+919895810975',     // Wedding Planner
-  'femina km': '+917306687284',        // Wedding Planner
-  'sabitha': '+917558841046',          // Accountant (Sabitha MA)
-  'praveen': '+917736126539',          // Employee (Praveen P V)
-  'test employee': '+917025063335',    // Test Employee
-};
-
-// Authorized Inventory creators (can add inventory items via WhatsApp)
-const AUTHORIZED_INVENTORY_CREATORS: Record<string, string> = {
-  'kishor': '+917902373354',           // Superadmin
-  'praveen': '+917736126539',          // Employee (Praveen P V)
-  'test employee': '+917025063335',    // Test Employee
-};
+let _cachedSuperadminPhone: string | null = null;
 
 async function getSuperadminPhone(): Promise<string> {
-  return SUPERADMIN_WHATSAPP;
+  if (_cachedSuperadminPhone) return _cachedSuperadminPhone;
+  const allUsers = await storage.getAllUsers();
+  const superadmin = allUsers.find(u => u.role === 'superadmin' && u.phone);
+  if (superadmin?.phone) {
+    _cachedSuperadminPhone = superadmin.phone;
+    return superadmin.phone;
+  }
+  const admin = allUsers.find(u => u.role === 'admin' && u.phone);
+  if (admin?.phone) {
+    _cachedSuperadminPhone = admin.phone;
+    return admin.phone;
+  }
+  return '';
 }
 
-function isAuthorizedLeadSubmitter(phone: string): boolean {
-  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-  return Object.values(AUTHORIZED_LEAD_SUBMITTERS).some(authPhone => {
-    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
-    return normalizedPhone === normalizedAuthPhone;
-  });
+async function getSuperadminWhatsApp(): Promise<string> {
+  return await getSuperadminPhone();
 }
 
-function getLeadSubmitterName(phone: string): string {
-  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-  for (const [name, authPhone] of Object.entries(AUTHORIZED_LEAD_SUBMITTERS)) {
-    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
-    if (normalizedPhone === normalizedAuthPhone) {
-      return name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+async function getAuthorizedUserPhones(roles: string[]): Promise<Record<string, string>> {
+  const allUsers = await storage.getAllUsers();
+  const result: Record<string, string> = {};
+  for (const user of allUsers) {
+    if (user.phone && roles.some(r => user.role === r || user.designation?.toLowerCase().includes(r))) {
+      result[user.name.toLowerCase()] = user.phone;
     }
   }
-  return 'Unknown';
+  return result;
 }
 
-function getWeddingPlannerPhone(plannerName: string): string | null {
+async function isAuthorizedLeadSubmitter(phone: string): Promise<boolean> {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  const superadminPhone = await getSuperadminPhone();
+  if (superadminPhone && normalizedPhone === superadminPhone.replace(/\D/g, '').slice(-10)) return true;
+  const employee = await storage.getEmployeeByPhone(phone);
+  if (!employee) return false;
+  const allUsers = await storage.getAllUsers();
+  const user = allUsers.find(u => u.phone && u.phone.replace(/\D/g, '').slice(-10) === normalizedPhone);
+  return !!(user && (user.role === 'superadmin' || user.role === 'admin' || user.role === 'wedding_planner'));
+}
+
+async function getLeadSubmitterName(phone: string): Promise<string> {
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  const employee = await storage.getEmployeeByPhone(phone);
+  if (employee) return employee.name;
+  const allUsers = await storage.getAllUsers();
+  const user = allUsers.find(u => u.phone && u.phone.replace(/\D/g, '').slice(-10) === normalizedPhone);
+  return user?.name || 'Unknown';
+}
+
+async function getWeddingPlannerPhone(plannerName: string): Promise<string | null> {
   const normalized = plannerName.toLowerCase().trim();
-  for (const [key, phone] of Object.entries(WEDDING_PLANNER_PHONES)) {
-    // Check both directions: planner name matches key OR key contains planner name
-    if (normalized.includes(key) || key.includes(normalized)) {
-      return phone;
+  const allUsers = await storage.getAllUsers();
+  for (const user of allUsers) {
+    if (user.phone && (user.name.toLowerCase().includes(normalized) || normalized.includes(user.name.toLowerCase()))) {
+      return user.phone;
     }
   }
   return null;
 }
 
-function isAuthorizedDcCreator(phone: string): boolean {
+async function isAuthorizedDcCreator(phone: string): Promise<boolean> {
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-  return Object.values(AUTHORIZED_DC_CREATORS).some(authPhone => {
-    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
-    return normalizedPhone === normalizedAuthPhone;
-  });
+  const superadminPhone = await getSuperadminPhone();
+  if (superadminPhone && normalizedPhone === superadminPhone.replace(/\D/g, '').slice(-10)) return true;
+  const employee = await storage.getEmployeeByPhone(phone);
+  if (!employee) return false;
+  const designation = employee.designation?.toLowerCase() || '';
+  return designation.includes('planner') || designation.includes('accountant') || designation.includes('superadmin');
 }
 
-function isAuthorizedInventoryCreator(phone: string): boolean {
+async function isAuthorizedInventoryCreator(phone: string): Promise<boolean> {
   const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
-  return Object.values(AUTHORIZED_INVENTORY_CREATORS).some(authPhone => {
-    const normalizedAuthPhone = authPhone.replace(/\D/g, '').slice(-10);
-    return normalizedPhone === normalizedAuthPhone;
-  });
+  const superadminPhone = await getSuperadminPhone();
+  if (superadminPhone && normalizedPhone === superadminPhone.replace(/\D/g, '').slice(-10)) return true;
+  const employee = await storage.getEmployeeByPhone(phone);
+  if (!employee) return false;
+  const designation = employee.designation?.toLowerCase() || '';
+  return designation.includes('superadmin') || designation.includes('warehouse') || designation.includes('inventory');
 }
 
 async function downloadAndUploadInventoryPhoto(
@@ -2054,11 +2053,12 @@ async function saveSuperadminPendingContext(pendingContext: {
 }): Promise<void> {
   try {
     // Get or create superadmin's conversation
-    let superadminConvo = await storage.getWhatsappConversationByPhone(SUPERADMIN_WHATSAPP);
+    const superadminWhatsApp = await getSuperadminWhatsApp();
+    let superadminConvo = await storage.getWhatsappConversationByPhone(superadminWhatsApp);
     
     if (!superadminConvo) {
       superadminConvo = await storage.createWhatsappConversation({
-        phoneNumber: SUPERADMIN_WHATSAPP,
+        phoneNumber: superadminWhatsApp,
         currentState: 'idle',
       });
     }
@@ -2211,14 +2211,14 @@ async function notifySuperadmin(
 }
 
 // Superadmin Lead System Prompt
-const SUPERADMIN_LEAD_PROMPT = `You are Oaksy AI, helping the Superadmin of Oakstreet Events add leads to Oak Sales via WhatsApp.
+const SUPERADMIN_LEAD_PROMPT = `You are Oaksy AI, helping the Superadmin of ${config.company.name} add leads to Oak Sales via WhatsApp.
 
 When the superadmin sends a message about a potential client/lead, extract:
 1. Customer Name (required)
 2. Customer Phone (if available) 
 3. Event Date (if available)
 4. Venue (if available)
-5. Assigned Wedding Planner - must be either "Fida Fathima" or "Femina KM"
+5. Assigned Wedding Planner - the name of the assigned wedding planner
 
 PERSONALITY:
 - Professional and efficient
@@ -2233,7 +2233,7 @@ RESPONSE FORMAT - Always respond with valid JSON:
     "customerPhone": string or null,
     "eventDate": "YYYY-MM-DD" or null,
     "venue": string or null,
-    "weddingPlanner": "Fida Fathima" | "Femina KM" | null
+    "weddingPlanner": string | null
   },
   "needsMoreInfo": ["customerName", "weddingPlanner"] or [],
   "isComplete": boolean,
@@ -2438,9 +2438,9 @@ async function notifyWeddingPlanner(
   submitterName?: string
 ): Promise<boolean> {
   console.log('[Oaksy] Attempting to notify wedding planner:', plannerName);
-  const plannerPhone = getWeddingPlannerPhone(plannerName);
+  const plannerPhone = await getWeddingPlannerPhone(plannerName);
   if (!plannerPhone) {
-    console.log('[Oaksy] No phone number found for planner:', plannerName, '- Available planners:', Object.keys(WEDDING_PLANNER_PHONES).join(', '));
+    console.log('[Oaksy] No phone number found for planner:', plannerName);
     return false;
   }
   
@@ -2519,7 +2519,7 @@ async function handleSuperadminLeadMessage(
       const { dealId } = await createLeadInOakSales(leadContext, 'superadmin');
       
       // Notify the wedding planner
-      const submitterName = getLeadSubmitterName(fromNumber);
+      const submitterName = await getLeadSubmitterName(fromNumber);
       await notifyWeddingPlanner(leadContext.weddingPlanner, leadContext, submitterName);
       
       // Reset context
@@ -2692,12 +2692,12 @@ export async function handleOaksyWhatsAppMessage(
     }
   }
   
-  // Check if this is from the superadmin FIRST (before employee check)
-  const isSuperadminByPhone = normalizedPhone === SUPERADMIN_WHATSAPP || 
-                              normalizedPhone.endsWith(SUPERADMIN_WHATSAPP.slice(-10)) ||
-                              SUPERADMIN_WHATSAPP.endsWith(normalizedPhone.slice(-10));
+  const _superadminPhone = await getSuperadminWhatsApp();
+  const isSuperadminByPhone = _superadminPhone ? (normalizedPhone === _superadminPhone || 
+                              normalizedPhone.endsWith(_superadminPhone.replace(/\D/g, '').slice(-10)) ||
+                              _superadminPhone.replace(/\D/g, '').slice(-10) === normalizedPhone.slice(-10)) : false;
   
-  // Handle superadmin (Kishor) messages directly
+  // Handle superadmin messages directly
   if (isSuperadminByPhone) {
     // Handle approval commands (A/R for expenses/leave)
     if (lowerMessage.match(/^(a|approve)\s+([a-z]{2,3}\d+)/i) || 
@@ -2791,25 +2791,25 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Check if Kishor is in a QR payment flow (awaiting screenshot or event)
-    if (conversation.activeIntent === 'kishor_qr_payment') {
-      let kishorContext: any = {};
+    // Check if superadmin is in a QR payment flow (awaiting screenshot or event)
+    if (conversation.activeIntent === 'superadmin_qr_payment') {
+      let adminContext: any = {};
       try {
         if (typeof conversation.intentContext === 'string') {
-          kishorContext = JSON.parse(conversation.intentContext) || {};
+          adminContext = JSON.parse(conversation.intentContext) || {};
         } else if (conversation.intentContext) {
-          kishorContext = conversation.intentContext;
+          adminContext = conversation.intentContext;
         }
-      } catch { kishorContext = {}; }
+      } catch { adminContext = {}; }
       
       // Waiting for screenshot
       if (conversation.currentState === 'awaiting_payment_screenshot') {
         if (mediaUrl) {
           // Got screenshot, now ask for event assignment
-          kishorContext.paymentScreenshotUrl = mediaUrl;
+          adminContext.paymentScreenshotUrl = mediaUrl;
           
           await storage.updateWhatsappConversation(conversation.id, {
-            intentContext: kishorContext,
+            intentContext: adminContext,
             currentState: 'awaiting_event_assignment',
           });
           
@@ -2822,8 +2822,8 @@ export async function handleOaksyWhatsAppMessage(
       // Waiting for event assignment
       if (conversation.currentState === 'awaiting_event_assignment') {
         const eventName = messageText.trim();
-        const qrCode = kishorContext.qrCode;
-        const paymentScreenshotUrl = kishorContext.paymentScreenshotUrl;
+        const qrCode = adminContext.qrCode;
+        const paymentScreenshotUrl = adminContext.paymentScreenshotUrl;
         
         // Reject empty/whitespace input or media-only messages
         if (!eventName || eventName.length === 0) {
@@ -2833,7 +2833,7 @@ export async function handleOaksyWhatsAppMessage(
         // Complete the QR payment with screenshot and event
         const result = await handleQrPaymentComplete(qrCode, eventName, paymentScreenshotUrl);
         
-        // Reset Kishor's conversation
+        // Reset superadmin's conversation
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: null,
           intentContext: null,
@@ -2844,21 +2844,21 @@ export async function handleOaksyWhatsAppMessage(
       }
     }
     
-    // Check if Kishor is in income approval flow (awaiting event assignment)
-    if (conversation.activeIntent === 'kishor_income_approval') {
-      let kishorContext: any = {};
+    // Check if superadmin is in income approval flow (awaiting event assignment)
+    if (conversation.activeIntent === 'superadmin_income_approval') {
+      let adminContext: any = {};
       try {
         if (typeof conversation.intentContext === 'string') {
-          kishorContext = JSON.parse(conversation.intentContext) || {};
+          adminContext = JSON.parse(conversation.intentContext) || {};
         } else if (conversation.intentContext) {
-          kishorContext = conversation.intentContext;
+          adminContext = conversation.intentContext;
         }
-      } catch { kishorContext = {}; }
+      } catch { adminContext = {}; }
       
       // Waiting for event assignment
       if (conversation.currentState === 'awaiting_income_event') {
         const eventName = messageText.trim();
-        const incCode = kishorContext.incCode;
+        const incCode = adminContext.incCode;
         
         if (!eventName || eventName.length === 0) {
           return `Please type the event/customer name, or "general" for general income.`;
@@ -2867,7 +2867,7 @@ export async function handleOaksyWhatsAppMessage(
         // Complete the income approval with event
         const result = await handleIncomeApprovalComplete(incCode, eventName);
         
-        // Reset Kishor's conversation
+        // Reset superadmin's conversation
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: null,
           intentContext: null,
@@ -2907,7 +2907,7 @@ export async function handleOaksyWhatsAppMessage(
         date: new Date().toISOString().split('T')[0],
         type: 'income',
         category: incomeSubmission.type === 'bank_transfer' ? 'bank_transfer' : 'client_payment',
-        description: `[${incCode}] ${incomeSubmission.description} - ${incomeSubmission.clientName} (Approved by Kishor)`,
+        description: `[${incCode}] ${incomeSubmission.description} - ${incomeSubmission.clientName} (Approved by Admin)`,
         amount: amount.toString(),
         eventName: eventName === 'General' ? 'General' : eventName,
         bankId: (incomeSubmission as any).bankId || null,
@@ -2931,7 +2931,7 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     // Handle QR payment PAID command - simple one-message flow
-    // Format: "PAID Fida" or "PAID Fida EventName" (uses employee first name)
+    // Format: "PAID [name]" or "PAID [name] EventName" (uses employee first name)
     const paidMatch = lowerMessage.match(/^paid\s+(\w+)(?:\s+(.+))?/i);
     const rejectQrMatch = lowerMessage.match(/^reject\s+(qr\d+)(?:\s+(.+))?/i);
     
@@ -2965,10 +2965,10 @@ export async function handleOaksyWhatsAppMessage(
         paidAt: new Date(),
       });
       
-      // If Kishor attached a screenshot, save it and ask for event
+      // If superadmin attached a screenshot, save it and ask for event
       if (mediaUrl) {
         await storage.updateWhatsappConversation(conversation.id, {
-          activeIntent: 'kishor_qr_payment',
+          activeIntent: 'superadmin_qr_payment',
           intentContext: { 
             qrCode: qrCode,
             paymentScreenshotUrl: mediaUrl,
@@ -2981,7 +2981,7 @@ export async function handleOaksyWhatsAppMessage(
       
       // No screenshot attached - ask for it first
       await storage.updateWhatsappConversation(conversation.id, {
-        activeIntent: 'kishor_qr_payment',
+        activeIntent: 'superadmin_qr_payment',
         intentContext: { qrCode: qrCode },
         currentState: 'awaiting_payment_screenshot',
       });
@@ -3014,7 +3014,7 @@ export async function handleOaksyWhatsAppMessage(
     
     // Handle lead submissions
     const isInLeadFlow = conversation.activeIntent === 'lead';
-    const looksLikeLead = /lead|customer|client|enquiry|assign|fida|femina|\d{10}/i.test(messageText);
+    const looksLikeLead = /lead|customer|client|enquiry|assign|\d{10}/i.test(messageText);
     
     if (isInLeadFlow || looksLikeLead) {
       const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
@@ -3046,20 +3046,20 @@ export async function handleOaksyWhatsAppMessage(
       // Don't return greeting - continue to employee section
       console.log('[Oaksy] Superadmin inventory message detected, passing to AI...');
     } else {
-      // Default Kishor greeting - only show if NOT in DC/inventory flow
-      return `👋 Hi Kishor!\n\n*Quick Commands:*\n• PAID Fida → Mark paid\n• PAID Fida EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n• DC to [name] [amount] → Create Delivery Challan\n• Create Inventory + photo → Add to warehouse\n\n_Send lead info or ask anything!_ 🌳`;
+      // Default superadmin greeting - only show if NOT in DC/inventory flow
+      return `👋 Hi Admin!\n\n*Quick Commands:*\n• PAID [name] → Mark paid\n• PAID [name] EventName → Paid + assign event\n• A INC001 → Approve income\n• R CODE reason → Reject\n• DC to [name] [amount] → Create Delivery Challan\n• Create Inventory + photo → Add to warehouse\n\n_Send lead info or ask anything!_ 🌳`;
     }
   }
   
   // Check if this is from an authorized lead submitter (non-superadmin like Anjana)
-  const isLeadSubmitter = isAuthorizedLeadSubmitter(normalizedPhone) && !isSuperadminByPhone;
+  const isLeadSubmitter = (await isAuthorizedLeadSubmitter(normalizedPhone)) && !isSuperadminByPhone;
   
   if (isLeadSubmitter) {
-    const submitterName = getLeadSubmitterName(normalizedPhone);
+    const submitterName = await getLeadSubmitterName(normalizedPhone);
     
     // Handle lead submissions for authorized submitters
     const isInLeadFlow = conversation.activeIntent === 'lead';
-    const looksLikeLead = /lead|customer|client|enquiry|assign|fida|femina|\d{10}/i.test(messageText);
+    const looksLikeLead = /lead|customer|client|enquiry|assign|\d{10}/i.test(messageText);
     
     if (isInLeadFlow || looksLikeLead) {
       const leadResponse = await handleSuperadminLeadMessage(messageText, normalizedPhone);
@@ -3069,7 +3069,7 @@ export async function handleOaksyWhatsAppMessage(
     }
     
     // Default greeting for lead submitters
-    return `👋 Hi ${submitterName}!\n\nI'm *Oaksy AI* from Oakstreet Events 🌳\n\n*I can help you add leads to Oak Sales:*\n• Just send the client details (name, phone, event type)\n• Or forward any enquiry message\n\n_Example: "Lead: John 9876543210 wedding Dec 2025"_`;
+    return `👋 Hi ${submitterName}!\n\nI'm *Oaksy AI* 🌳\n\n*I can help you add leads to Oak Sales:*\n• Just send the client details (name, phone, event type)\n• Or forward any enquiry message\n\n_Example: "Lead: John 9876543210 wedding Dec 2025"_`;
   }
   
   // Try to get employee from conversation first, then fall back to phone lookup
@@ -3083,7 +3083,7 @@ export async function handleOaksyWhatsAppMessage(
   }
 
   if (!employee) {
-    return `👋 Hi! I'm Oaksy, your AI companion at Oakstreet Events.\n\n❌ I couldn't find your employee record. Please contact HR to ensure your phone number is registered.\n\n_Once registered, I can help you submit expenses and apply for leave!_ 🌳`;
+    return `👋 Hi! I'm Oaksy, your AI companion.\n\n❌ I couldn't find your employee record. Please contact HR to ensure your phone number is registered.\n\n_Once registered, I can help you submit expenses and apply for leave!_ 🌳`;
   }
   
   let context: IntentContext = {};
@@ -3210,13 +3210,13 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
       
-      // Notify Kishor
+      // Notify superadmin
       const startDateObj = parseAIDate(context.startDate as string);
       const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : context.startDate;
       
       try {
         const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "approved" or "rejected"_`;
-        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+        await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
         
         // Save pending approval context for superadmin's natural language approval
         await saveSuperadminPendingContext({
@@ -3235,7 +3235,7 @@ export async function handleOaksyWhatsAppMessage(
       }
       
       const dayText = days === 1 ? 'day' : 'days';
-      return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
+      return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for admin approval_ 🌳`;
     } catch (directExecError) {
       console.error('[Direct Confirm] FAILED:', directExecError);
       return `❌ Sorry, there was a problem submitting your leave request. Please try again.`;
@@ -3276,13 +3276,13 @@ export async function handleOaksyWhatsAppMessage(
       // Notify superadmin about new DC (DC doesn't need approval, just notification)
       try {
         const notifyMsg = `📦 *Delivery Challan Created*\n\n👤 By: ${employee.name}\n📋 Items: ${dcItems}\n📍 To: ${dcDestination}\n${dcVehicle ? `🚗 Vehicle: ${dcVehicle}\n` : ''}${dcDriver ? `👨‍✈️ Driver: ${dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}`;
-        await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+        await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
         console.log('[Direct DC Confirm] Notification sent to superadmin');
       } catch (notifyError) {
         console.error('[Direct DC Confirm] Failed to notify superadmin:', notifyError);
       }
       
-      return `✅ *Delivery Challan Created!*\n\n📦 Items: ${dcItems}\n📍 Destination: ${dcDestination}\n${dcVehicle ? `🚗 Vehicle: ${dcVehicle}\n` : ''}${dcDriver ? `👨‍✈️ Driver: ${dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}\n\n_Kishor has been notified_ 🌳`;
+      return `✅ *Delivery Challan Created!*\n\n📦 Items: ${dcItems}\n📍 Destination: ${dcDestination}\n${dcVehicle ? `🚗 Vehicle: ${dcVehicle}\n` : ''}${dcDriver ? `👨‍✈️ Driver: ${dcDriver}\n` : ''}\n🔑 DC#: ${dcNumber}\n\n_Admin has been notified_ 🌳`;
     } catch (directDcError) {
       console.error('[Direct DC Confirm] FAILED:', directDcError);
       return `❌ Sorry, there was a problem creating the delivery challan. Please try again.`;
@@ -3424,13 +3424,13 @@ export async function handleOaksyWhatsAppMessage(
               conversationHistory: [],
             });
             
-            // Notify Kishor
+            // Notify superadmin
             const startDateObj = parseAIDate(slots.startDate);
             const formattedDate = startDateObj ? startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : slots.startDate;
             
             try {
               const notifyMsg = `📅 *Leave Request*\n\n👤 ${employee.name}\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} days)` : ''}\n💬 ${reason}\n\n_Reply "approved" or "rejected"_`;
-              await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+              await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
               
               // Save pending approval context for natural language approval
               await saveSuperadminPendingContext({
@@ -3447,10 +3447,10 @@ export async function handleOaksyWhatsAppMessage(
             }
             
             const dayText = days === 1 ? 'day' : 'days';
-            return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for Kishor's approval_ 🌳`;
+            return `✅ *Leave Request Submitted!*\n\n📋 ${leaveType.charAt(0).toUpperCase() + leaveType.slice(1)} Leave\n📆 ${formattedDate}${days > 1 ? ` (${days} ${dayText})` : ''}\n💬 ${reason}\n\n_Waiting for admin approval_ 🌳`;
           } catch (execError) {
             console.error('[AI Leave] EXECUTION FAILED:', execError);
-            return `❌ Sorry, there was a problem submitting your leave request. Please try again or contact Kishor directly.`;
+            return `❌ Sorry, there was a problem submitting your leave request. Please try again or contact your admin directly.`;
           }
         }
         
@@ -3514,8 +3514,8 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       if (aiResult.intent === 'expense' || conversation.activeIntent === 'ai_expense') {
         // Role check - only allowed submitters can create expenses
-        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
-          return `❌ Sorry ${employee.name}, expense submission is only available for Wedding Planners and Accountants.\n\n_Contact Kishor if you need to submit an expense._ 🌳`;
+        if (!await isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, expense submission is only available for Wedding Planners and Accountants.\n\n_Contact your admin if you need to submit an expense._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
@@ -3611,9 +3611,9 @@ export async function handleOaksyWhatsAppMessage(
               conversationHistory: [],
             });
             
-            // Notify Kishor for approval
+            // Notify superadmin for approval
             const notifyMsg = `💰 *Expense Request*\n\n👤 ${employee.name}\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${approvalCode}\n\n_Reply "approved" or "rejected"_`;
-            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
             
             // Save pending approval context for natural language approval
             await saveSuperadminPendingContext({
@@ -3628,7 +3628,7 @@ export async function handleOaksyWhatsAppMessage(
               eventName: slots.eventName,
             });
             
-            return `✅ *Expense Submitted!*\n\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n🔑 Code: ${approvalCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+            return `✅ *Expense Submitted!*\n\n📋 ${slots.purpose}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n🔑 Code: ${approvalCode}\n\n_Waiting for admin approval_ 🌳`;
           } catch (execError) {
             console.error('[AI Expense] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem submitting your expense. Please try again.`;
@@ -3660,13 +3660,13 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       if (aiResult.intent === 'delivery_challan' || conversation.activeIntent === 'ai_delivery_challan') {
         // Role check - only authorized DC creators can create DCs
-        const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
+        const isAuthorizedByPhone = await isAuthorizedDcCreator(normalizedPhone);
         const isAccountant = employee.designation?.toLowerCase().includes('accountant');
-        const isSuperadminUser = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+        const isSuperadminUser = employee.designation?.toLowerCase().includes('superadmin');
         const isTestEmployee = employee.name.toLowerCase().includes('test');
         
         if (!isAuthorizedByPhone && !isAccountant && !isSuperadminUser && !isTestEmployee) {
-          return `❌ Sorry ${employee.name}, delivery challan creation is only available for authorized staff.\n\n_Contact Kishor for DC requests._ 🌳`;
+          return `❌ Sorry ${employee.name}, delivery challan creation is only available for authorized staff.\n\n_Contact your admin for DC requests._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
@@ -3680,7 +3680,7 @@ export async function handleOaksyWhatsAppMessage(
         const hasAllInfo = slots.dcItems && slots.dcDestination && slots.dcAmount;
         const shouldExecute = (aiResult.readyToExecute && aiResult.userConfirmed) || 
                               (isSimpleConfirm && isInAwaitingState && hasAllInfo) ||
-                              (isSuperadminPhone(normalizedPhone) && hasAllInfo);
+                              (await isSuperadminPhone(normalizedPhone) && hasAllInfo);
         
         console.log('[AI DC] Check:', { shouldExecute, isSimpleConfirm, isInAwaitingState, hasAllInfo, slots });
         
@@ -3787,9 +3787,9 @@ export async function handleOaksyWhatsAppMessage(
               await sendWhatsAppMediaMessage(normalizedPhone, pdfUrl, caption);
               
               // Notify superadmin
-              if (!isSuperadminPhone(normalizedPhone)) {
+              if (!await isSuperadminPhone(normalizedPhone)) {
                 const notifyMsg = `📦 *DC Created*\n\n👤 By: ${employee.name}\n📋 ${challanNumber}\n📍 To: ${deliverTo}\n💵 ₹${totalAmount.toLocaleString('en-IN')}`;
-                await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+                await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
               }
               
               return `✅ *Delivery Challan Created!*\n\n📋 Number: *${challanNumber}*\n📍 To: ${deliverTo}\n📦 Items: ${itemDescription}\n💵 Total: ₹${totalAmount.toLocaleString('en-IN')}\n\n📄 _PDF sent!_`;
@@ -3824,7 +3824,7 @@ export async function handleOaksyWhatsAppMessage(
           });
           
           // For non-superadmin, ask for confirmation
-          if (!isSuperadminPhone(normalizedPhone)) {
+          if (!await isSuperadminPhone(normalizedPhone)) {
             return `📦 *DC Ready*\n\n📋 Items: ${slots.dcItems}\n📍 To: ${slots.dcDestination}\n💵 Amount: ₹${slots.dcAmount.toLocaleString('en-IN')}\n\n_Say "yes" to create DC and get PDF_`;
           }
         } else if (Object.keys(aiResult.slots).length > 0) {
@@ -3844,8 +3844,8 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       if (aiResult.intent === 'vendor_payment' || conversation.activeIntent === 'ai_vendor_payment') {
         // Role check - only allowed submitters can request vendor payments
-        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
-          return `❌ Sorry ${employee.name}, vendor payment requests are only available for Wedding Planners and Accountants.\n\n_Contact Kishor for vendor payments._ 🌳`;
+        if (!await isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, vendor payment requests are only available for Wedding Planners and Accountants.\n\n_Contact your admin for vendor payments._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
@@ -3937,9 +3937,9 @@ export async function handleOaksyWhatsAppMessage(
               conversationHistory: [],
             });
             
-            // Notify Kishor for approval
+            // Notify superadmin for approval
             const notifyMsg = `💸 *Vendor Payment Request*\n\n👤 From: ${employee.name}\n🏪 Vendor: ${slots.vendorName}\n💵 Amount: ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}${slots.eventName ? `🎪 Event: ${slots.eventName}\n` : ''}\n🔑 Code: ${approvalCode}\n\n_Reply "approved" or "rejected"_`;
-            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
             
             // Save pending approval context for natural language approval
             await saveSuperadminPendingContext({
@@ -3955,7 +3955,7 @@ export async function handleOaksyWhatsAppMessage(
               eventName: slots.eventName,
             });
             
-            return `✅ *Vendor Payment Submitted!*\n\n🏪 ${slots.vendorName}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}🔑 Code: ${approvalCode}\n\n_Waiting for Kishor's approval_ 🌳`;
+            return `✅ *Vendor Payment Submitted!*\n\n🏪 ${slots.vendorName}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n${slots.purpose ? `📋 For: ${slots.purpose}\n` : ''}🔑 Code: ${approvalCode}\n\n_Waiting for admin approval_ 🌳`;
           } catch (execError) {
             console.error('[AI Vendor] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem submitting the vendor payment. Please try again.`;
@@ -3987,8 +3987,8 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       if (aiResult.intent === 'daybook_entry' || conversation.activeIntent === 'ai_daybook_entry') {
         // Role check - only allowed submitters can create daybook entries
-        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
-          return `❌ Sorry ${employee.name}, daybook entries are only available for Wedding Planners and Accountants.\n\n_Contact Kishor for daybook entries._ 🌳`;
+        if (!await isAllowedExpenseSubmitter(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, daybook entries are only available for Wedding Planners and Accountants.\n\n_Contact your admin for daybook entries._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
@@ -4092,9 +4092,9 @@ export async function handleOaksyWhatsAppMessage(
             // Notify superadmin
             const typeEmoji = slots.daybookType === 'income' ? '💚' : '💸';
             const notifyMsg = `${typeEmoji} *Daybook Entry*\n\n👤 By: ${employee.name}\n📋 Type: ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n${slots.daybookCategory ? `📁 Category: ${slots.daybookCategory}\n` : ''}\n🔑 ID: ${daybookEntry.id}`;
-            await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, notifyMsg);
+            await sendWhatsAppMessage(await getSuperadminWhatsApp(), notifyMsg);
             
-            return `✅ *Daybook Entry Recorded!*\n\n${typeEmoji} ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n🔑 ID: ${daybookEntry.id}\n\n_Kishor has been notified_ 🌳`;
+            return `✅ *Daybook Entry Recorded!*\n\n${typeEmoji} ${slots.daybookType.toUpperCase()}\n💵 ₹${slots.amount.toLocaleString('en-IN')}\n📝 ${description}\n🔑 ID: ${daybookEntry.id}\n\n_Admin has been notified_ 🌳`;
           } catch (execError) {
             console.error('[AI Daybook] EXECUTION FAILED:', execError);
             return `❌ Sorry, there was a problem creating the daybook entry. Please try again.`;
@@ -4126,8 +4126,8 @@ export async function handleOaksyWhatsAppMessage(
       // ============================================================================
       if (aiResult.intent === 'inventory_item' || conversation.activeIntent === 'ai_inventory_item') {
         // Role check - only authorized creators can add inventory items
-        if (!isAuthorizedInventoryCreator(normalizedPhone)) {
-          return `❌ Sorry ${employee.name}, inventory management is only available for authorized users.\n\n_Contact Kishor for inventory updates._ 🌳`;
+        if (!await isAuthorizedInventoryCreator(normalizedPhone)) {
+          return `❌ Sorry ${employee.name}, inventory management is only available for authorized users.\n\n_Contact your admin for inventory updates._ 🌳`;
         }
         
         const slots = { ...context, ...aiResult.slots };
@@ -4169,9 +4169,9 @@ export async function handleOaksyWhatsAppMessage(
             console.log('[AI Inventory] Extracted unit cost from follow-up:', slots.inventoryItemUnitCost);
             
             // Now we have all required data - execute for Superadmin, or confirm for others
-            const isSuperadminPhone = normalizedPhone === '917902373354';
+            const isSuperadminUser = await isSuperadminPhone(normalizedPhone);
             
-            if (isSuperadminPhone && slots.inventoryItemName && slots.inventoryItemQuantity) {
+            if (isSuperadminUser && slots.inventoryItemName && slots.inventoryItemQuantity) {
               // Auto-execute for Superadmin
               try {
                 const result = await handleInventoryItemCreation(
@@ -4210,8 +4210,8 @@ export async function handleOaksyWhatsAppMessage(
         // AUTO-EXECUTE for Superadmin: If we have name, quantity, AND unit cost - execute immediately
         const hasBasicData = slots.inventoryItemName && slots.inventoryItemQuantity && slots.inventoryItemQuantity > 0;
         const hasAllRequiredData = hasBasicData && slots.inventoryItemUnitCost !== undefined && slots.inventoryItemUnitCost !== null;
-        const isSuperadminPhone = normalizedPhone === '917902373354';
-        const shouldAutoExecute = hasAllRequiredData && isSuperadminPhone;
+        const isSuperadminUser = await isSuperadminPhone(normalizedPhone);
+        const shouldAutoExecute = hasAllRequiredData && isSuperadminUser;
         
         const shouldExecute = shouldAutoExecute || 
                               (aiResult.readyToExecute && aiResult.userConfirmed && hasAllRequiredData) || 
@@ -4314,7 +4314,7 @@ export async function handleOaksyWhatsAppMessage(
         
         // If we have all info and user confirmed (or Superadmin auto-execute)
         const shouldExecute = reminderMessage && reminderDateTime && 
-          (isConfirmation || isSuperadminPhone(normalizedPhone) || aiResult.readyToExecute);
+          (isConfirmation || await isSuperadminPhone(normalizedPhone) || aiResult.readyToExecute);
         
         if (shouldExecute) {
           try {
@@ -4358,12 +4358,12 @@ export async function handleOaksyWhatsAppMessage(
         }
         
         // For Superadmin, auto-execute if we have all info (no confirmation needed)
-        if (isSuperadminPhone(normalizedPhone) && reminderMessage && reminderDateTime) {
+        if (await isSuperadminPhone(normalizedPhone) && reminderMessage && reminderDateTime) {
           // Already handled above with shouldExecute
         }
         
         // Have all info but need confirmation (for non-superadmin)
-        if (reminderMessage && reminderDateTime && !isSuperadminPhone(normalizedPhone)) {
+        if (reminderMessage && reminderDateTime && !await isSuperadminPhone(normalizedPhone)) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'ai_reminder',
             intentContext: slots,
@@ -4451,7 +4451,7 @@ export async function handleOaksyWhatsAppMessage(
           currentState: 'idle',
           conversationHistory: [],
         });
-        return `✅ *Confirmed!* Vendor payment ${lastCode} has been recorded.\n\n_Kishor will be notified._ 🌳`;
+        return `✅ *Confirmed!* Vendor payment ${lastCode} has been recorded.\n\n_Admin will be notified._ 🌳`;
       }
       
       // Check for correction - "no", "change to X", "make it X", or just a new amount
@@ -4541,8 +4541,8 @@ export async function handleOaksyWhatsAppMessage(
           status: 'pending',
         });
 
-        // Notify Kishor for approval
-        await notifyKishorIncomeSubmission(
+        // Notify superadmin for approval
+        await notifySuperadminIncomeSubmission(
           requestCode,
           employee.name,
           incomeType,
@@ -4560,7 +4560,7 @@ export async function handleOaksyWhatsAppMessage(
         });
 
         const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
-        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
+        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Admin will review and record this in the daybook._ 🌳`;
       } else {
         // No amount - ask for amount
         await storage.updateWhatsappConversation(conversation.id, {
@@ -4628,8 +4628,8 @@ export async function handleOaksyWhatsAppMessage(
           status: 'pending',
         });
 
-        // Notify Kishor for approval
-        await notifyKishorIncomeSubmission(
+        // Notify superadmin for approval
+        await notifySuperadminIncomeSubmission(
           requestCode,
           employee.name,
           incomeType,
@@ -4649,7 +4649,7 @@ export async function handleOaksyWhatsAppMessage(
 
         const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
         const bankLabel = resolvedBankName ? `\n🏦 Bank: ${resolvedBankName}` : '';
-        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}${bankLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
+        return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${providedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}${bankLabel}\n\n_Admin will review and record this in the daybook._ 🌳`;
       } else {
         // No amount - ask for amount
         await storage.updateWhatsappConversation(conversation.id, {
@@ -4706,8 +4706,8 @@ export async function handleOaksyWhatsAppMessage(
         status: 'pending',
       });
 
-      // Notify Kishor about the pending vendor payment
-      await notifyKishorPendingVendorPayment(
+      // Notify superadmin about the pending vendor payment
+      await notifySuperadminPendingVendorPayment(
         requestCode,
         employee.name,
         vendorName,
@@ -4762,7 +4762,7 @@ export async function handleOaksyWhatsAppMessage(
     // Skip the expense flow and let the AI handle it for inventory processing
     const looksLikeInventoryEarly = /inventory|warehouse|stock|create inventory|add item|new item|item\s*:/i.test(lowerText);
     const hasQuantityPatternEarly = /quantity\s*[:]\s*\d+|\d+\s*(nos|pcs|pieces|units)/i.test(lowerText);
-    const isAuthorizedForInventoryEarly = isAuthorizedInventoryCreator(normalizedPhone);
+    const isAuthorizedForInventoryEarly = await isAuthorizedInventoryCreator(normalizedPhone);
     
     if (isAuthorizedForInventoryEarly && (looksLikeInventoryEarly || hasQuantityPatternEarly)) {
       console.log('[Oaksy] Early inventory detection triggered, skipping expense flow for AI processing');
@@ -4817,7 +4817,7 @@ export async function handleOaksyWhatsAppMessage(
         'petty'
       );
 
-      await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
+      await notifySuperadminQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
 
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: null,
@@ -4826,16 +4826,16 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+      return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to admin for approval_ 🌳`;
     }
     
     // If user says "event income/expense" but is not authorized, deny
-    if (isEventExpenseInMessage && !isAllowedExpenseSubmitter(normalizedPhone)) {
-      return `👋 Hi ${employee.name}!\n\n❌ Event income and vendor payments can only be submitted by authorized team members (Fida, Femina, or the Accountant).\n\n💡 For *personal expenses* (taxi, food, etc.), send the receipt and say "petty expense".\n\n🌳 Oaksy`;
+    if (isEventExpenseInMessage && !await isAllowedExpenseSubmitter(normalizedPhone)) {
+      return `👋 Hi ${employee.name}!\n\n❌ Event income and vendor payments can only be submitted by authorized team members.\n\n💡 For *personal expenses* (taxi, food, etc.), send the receipt and say "petty expense".\n\n🌳 Oaksy`;
     }
     
     // If authorized user says event income/expense + amount, complete immediately
-    if (detectedAmount && isEventExpenseInMessage && isAllowedExpenseSubmitter(normalizedPhone)) {
+    if (detectedAmount && isEventExpenseInMessage && await isAllowedExpenseSubmitter(normalizedPhone)) {
       const description = descriptionInMessage || detectedCounterparty || 'Event Payment';
       
       if (/\b(income|received|credited|payment\s+from)\b/i.test(lowerText)) {
@@ -4854,7 +4854,7 @@ export async function handleOaksyWhatsAppMessage(
           status: 'pending',
         });
 
-        await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', description, `Income from ${description}`, detectedAmount, mediaUrl);
+        await notifySuperadminIncomeSubmission(requestCode, employee.name, 'client_payment', description, `Income from ${description}`, detectedAmount, mediaUrl);
 
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: null,
@@ -4863,7 +4863,7 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: [],
         });
 
-        return `✅ *Thank you!*\n\nEvent income recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n👤 From: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+        return `✅ *Thank you!*\n\nEvent income recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n👤 From: ${description}\n\n_Sent to admin for approval_ 🌳`;
       } else {
         // Event vendor expense
         const { requestCode } = await createQrPaymentRequest(
@@ -4877,7 +4877,7 @@ export async function handleOaksyWhatsAppMessage(
           'event'
         );
 
-        await notifyKishorQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
+        await notifySuperadminQrPayment(requestCode, employee.name, description, detectedAmount, mediaUrl);
 
         await storage.updateWhatsappConversation(conversation.id, {
           activeIntent: null,
@@ -4886,13 +4886,13 @@ export async function handleOaksyWhatsAppMessage(
           conversationHistory: [],
         });
 
-        return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+        return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${detectedAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to admin for approval_ 🌳`;
       }
     }
     
     // NEW FLOW: Different paths for authorized vs non-authorized users
     const providedAmount = detectedAmount;
-    const isAuthorized = isAllowedExpenseSubmitter(normalizedPhone);
+    const isAuthorized = await isAllowedExpenseSubmitter(normalizedPhone);
     
     let imageResponse: string;
     
@@ -4988,7 +4988,7 @@ export async function handleOaksyWhatsAppMessage(
             'petty'
           );
           
-          await notifyKishorQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
+          await notifySuperadminQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
           
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -4997,7 +4997,7 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
           
-          return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+          return `✅ *Thank you!*\n\nPetty expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to admin for approval_ 🌳`;
         } else if (finalAmount) {
           // Have amount, need description
           await storage.updateWhatsappConversation(conversation.id, {
@@ -5021,14 +5021,14 @@ export async function handleOaksyWhatsAppMessage(
       
       if (isEventChoice) {
         // User chose event payment - check authorization
-        if (!isAllowedExpenseSubmitter(normalizedPhone)) {
+        if (!await isAllowedExpenseSubmitter(normalizedPhone)) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
             intentContext: null,
             currentState: 'idle',
             conversationHistory: [],
           });
-          return `❌ Event income and vendor payments can only be submitted by authorized team members (Fida, Femina, or the Accountant).\n\n💡 For *personal expenses*, send the receipt again and choose option 1.\n\n🌳 Oaksy`;
+          return `❌ Event income and vendor payments can only be submitted by authorized team members.\n\n💡 For *personal expenses*, send the receipt again and choose option 1.\n\n🌳 Oaksy`;
         }
         
         // Authorized user - ask if it's expense or income
@@ -5078,7 +5078,7 @@ export async function handleOaksyWhatsAppMessage(
             'event'
           );
           
-          await notifyKishorQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
+          await notifySuperadminQrPayment(requestCode, employee.name, descriptionFromMessage, finalAmount, imageUrl);
           
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -5087,7 +5087,7 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
           
-          return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+          return `✅ *Thank you!*\n\nVendor expense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${descriptionFromMessage}\n\n_Sent to admin for approval_ 🌳`;
         } else if (finalAmount) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'qr_payment',
@@ -5124,7 +5124,7 @@ export async function handleOaksyWhatsAppMessage(
             status: 'pending',
           });
           
-          await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', descriptionFromMessage, `Income from ${descriptionFromMessage}`, finalAmount, imageUrl);
+          await notifySuperadminIncomeSubmission(requestCode, employee.name, 'client_payment', descriptionFromMessage, `Income from ${descriptionFromMessage}`, finalAmount, imageUrl);
           
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -5133,7 +5133,7 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
           
-          return `✅ *Thank you!*\n\nClient income recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${descriptionFromMessage}\n\n_Sent to Kishor for approval_ 🌳`;
+          return `✅ *Thank you!*\n\nClient income recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${descriptionFromMessage}\n\n_Sent to admin for approval_ 🌳`;
         } else if (finalAmount) {
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: 'income_submission',
@@ -5195,7 +5195,7 @@ export async function handleOaksyWhatsAppMessage(
             imageUrl
           );
 
-          await notifyKishorQrPayment(requestCode, employee.name, description, finalAmount, imageUrl);
+          await notifySuperadminQrPayment(requestCode, employee.name, description, finalAmount, imageUrl);
 
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -5204,7 +5204,7 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
 
-          return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to Kishor for approval_ 🌳`;
+          return `✅ *Thank you!*\n\nExpense recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_Sent to admin for approval_ 🌳`;
         } else if (finalAmount) {
           // Have amount, need description - ask what it's for
           const expenseContext: IntentContext = { qrImageUrl: imageUrl, amount: finalAmount };
@@ -5248,7 +5248,7 @@ export async function handleOaksyWhatsAppMessage(
             status: 'pending',
           });
 
-          await notifyKishorIncomeSubmission(requestCode, employee.name, 'client_payment', clientName, `Income from ${clientName}`, finalAmount, imageUrl);
+          await notifySuperadminIncomeSubmission(requestCode, employee.name, 'client_payment', clientName, `Income from ${clientName}`, finalAmount, imageUrl);
 
           await storage.updateWhatsappConversation(conversation.id, {
             activeIntent: null,
@@ -5257,7 +5257,7 @@ export async function handleOaksyWhatsAppMessage(
             conversationHistory: [],
           });
 
-          return `✅ *Thank you!*\n\nIncome recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Sent to Kishor for approval_ 🌳`;
+          return `✅ *Thank you!*\n\nIncome recorded:\n💰 Amount: ₹${finalAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Sent to admin for approval_ 🌳`;
         } else if (finalAmount) {
           // Have amount, need client name - ask who it's from
           const incomeContext: IntentContext = { 
@@ -5298,7 +5298,7 @@ export async function handleOaksyWhatsAppMessage(
     // EARLY EXIT: If authorized user sends inventory keywords, reset and let AI handle it
     const lowerMsgForInventoryCheck = messageText.toLowerCase();
     const hasInventoryKeywordsInQr = /inventory|warehouse|stock|create inventory|add item|new item|item\s*:/i.test(lowerMsgForInventoryCheck);
-    if (hasInventoryKeywordsInQr && isAuthorizedInventoryCreator(normalizedPhone)) {
+    if (hasInventoryKeywordsInQr && await isAuthorizedInventoryCreator(normalizedPhone)) {
       console.log('[Oaksy] Inventory keywords detected in QR flow - resetting to let AI handle inventory');
       await storage.updateWhatsappConversation(conversation.id, {
         activeIntent: null,
@@ -5323,19 +5323,19 @@ export async function handleOaksyWhatsAppMessage(
         context.amount || 0,
         context.qrImageUrl || ''
       );
-      console.log(`[QR Purpose] Created request ${requestCode}, now sending notification to Kishor...`);
+      console.log(`[QR Purpose] Created request ${requestCode}, now sending notification to superadmin...`);
 
       try {
-        await notifyKishorQrPayment(
+        await notifySuperadminQrPayment(
           requestCode,
           employee.name,
           messageText,
           context.amount || 0,
           context.qrImageUrl || ''
         );
-        console.log(`[QR Purpose] Notification to Kishor completed for ${requestCode}`);
+        console.log(`[QR Purpose] Notification to superadmin completed for ${requestCode}`);
       } catch (notifyError: any) {
-        console.error(`[QR Purpose] FAILED to notify Kishor for ${requestCode}:`, notifyError.message);
+        console.error(`[QR Purpose] FAILED to notify superadmin for ${requestCode}:`, notifyError.message);
       }
 
       await storage.updateWhatsappConversation(conversation.id, {
@@ -5345,7 +5345,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${context.amount?.toLocaleString('en-IN')}\n📝 For: ${messageText}\n\n_You'll be notified once payment is done!_ 🌳`;
+      return `✅ *Sent to admin!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${context.amount?.toLocaleString('en-IN')}\n📝 For: ${messageText}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
     // Waiting for both amount and purpose
@@ -5391,7 +5391,7 @@ export async function handleOaksyWhatsAppMessage(
         context.qrImageUrl || ''
       );
 
-      await notifyKishorQrPayment(
+      await notifySuperadminQrPayment(
         requestCode,
         employee.name,
         description,
@@ -5406,7 +5406,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
+      return `✅ *Sent to admin!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
     // Waiting for just amount (description already provided)
@@ -5428,7 +5428,7 @@ export async function handleOaksyWhatsAppMessage(
         context.qrImageUrl || ''
       );
 
-      await notifyKishorQrPayment(
+      await notifySuperadminQrPayment(
         requestCode,
         employee.name,
         description,
@@ -5443,7 +5443,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Sent to Kishor!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
+      return `✅ *Sent to admin!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n📝 For: ${description}\n\n_You'll be notified once payment is done!_ 🌳`;
     }
     
     // Legacy states - reset and ask to start over
@@ -5489,7 +5489,7 @@ export async function handleOaksyWhatsAppMessage(
         status: 'pending',
       });
 
-      await notifyKishorIncomeSubmission(
+      await notifySuperadminIncomeSubmission(
         requestCode,
         employee.name,
         'client_payment',
@@ -5506,7 +5506,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${savedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for approval from Kishor_ 🌳`;
+      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${savedAmount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for admin approval_ 🌳`;
     }
     
     // Waiting for both amount and client name (from image classification)
@@ -5539,7 +5539,7 @@ export async function handleOaksyWhatsAppMessage(
         status: 'pending',
       });
 
-      await notifyKishorIncomeSubmission(
+      await notifySuperadminIncomeSubmission(
         requestCode,
         employee.name,
         'client_payment',
@@ -5556,7 +5556,7 @@ export async function handleOaksyWhatsAppMessage(
         conversationHistory: [],
       });
 
-      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for approval from Kishor_ 🌳`;
+      return `✅ *Income Submitted!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n\n_Waiting for admin approval_ 🌳`;
     }
     
     // Waiting for amount after sending income screenshot
@@ -5589,8 +5589,8 @@ export async function handleOaksyWhatsAppMessage(
         status: 'pending',
       });
 
-      // Notify Kishor for approval
-      await notifyKishorIncomeSubmission(
+      // Notify superadmin for approval
+      await notifySuperadminIncomeSubmission(
         requestCode,
         employee.name,
         incomeType,
@@ -5608,7 +5608,7 @@ export async function handleOaksyWhatsAppMessage(
       });
 
       const typeLabel = incomeType === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
-      return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Kishor will review and record this in the daybook._ 🌳`;
+      return `✅ *Income Submitted for Approval!*\n\n📋 Code: *${requestCode}*\n💰 Amount: ₹${amount.toLocaleString('en-IN')}\n👤 From: ${clientName}\n📁 Type: ${typeLabel}\n\n_Admin will review and record this in the daybook._ 🌳`;
     }
   }
 
@@ -5838,8 +5838,8 @@ Return "INVALID" if you cannot parse the input.`;
       status: 'pending',
     });
 
-    // Notify Kishor
-    await notifyKishorPendingVendorPayment(
+    // Notify superadmin
+    await notifySuperadminPendingVendorPayment(
       requestCode,
       employee.name,
       vendorName,
@@ -5935,8 +5935,8 @@ Return "INVALID" if you cannot parse the input.`;
       status: 'pending',
     });
 
-    // Notify Kishor
-    await notifyKishorPendingVendorPayment(
+    // Notify superadmin
+    await notifySuperadminPendingVendorPayment(
       requestCode,
       employee.name,
       vendorName,
@@ -6682,24 +6682,24 @@ Return "INVALID" if you cannot parse the input.`;
     });
 
     // Role-aware greeting - check if authorized for DC creation
-    const canCreateDc = isAuthorizedDcCreator(normalizedPhone) || employee.designation?.toLowerCase().includes('accountant');
-    const isSuperadmin = isSuperadminPhone(normalizedPhone);
+    const canCreateDc = await isAuthorizedDcCreator(normalizedPhone) || employee.designation?.toLowerCase().includes('accountant');
+    const isSuperadmin = await isSuperadminPhone(normalizedPhone);
     
     if (isSuperadmin) {
-      return `👋 Hi Kishor! I'm *Oaksy AI*, your business assistant 🌳\n\n*Quick commands:*\n\n📅 "events this week" - See upcoming events\n🏦 "bank balance" - Check all balances\n📊 "monthly summary" - Business overview\n💳 "pending payments" - Client dues\n👥 "who's on leave" - Team status\n🏪 "vendor history [name]" - Payment records\n📈 "profit on [event]" - Event profitability\n\n_What would you like to know?_`;
+      return `👋 Hi Admin! I'm *Oaksy AI*, your business assistant 🌳\n\n*Quick commands:*\n\n📅 "events this week" - See upcoming events\n🏦 "bank balance" - Check all balances\n📊 "monthly summary" - Business overview\n💳 "pending payments" - Client dues\n👥 "who's on leave" - Team status\n🏪 "vendor history [name]" - Payment records\n📈 "profit on [event]" - Event profitability\n\n_What would you like to know?_`;
     }
     
     if (canCreateDc) {
-      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant at Oakstreet Events 🌳\n\n*I can help you with:*\n\n📅 *Events* - "events this week" or "countdown to [event]"\n🏪 *Vendor Payments* - "vendor payment [name] [amount]"\n📋 *Delivery Challan* - "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send amount or receipt\n💳 *QR Payment* - Send QR code for payment\n📅 *Leave Requests* - Say "leave"\n💳 *Pending Payments* - "how much does [client] owe"\n\n_Tell me what you need!_`;
+      return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your assistant 🌳\n\n*I can help you with:*\n\n📅 *Events* - "events this week" or "countdown to [event]"\n🏪 *Vendor Payments* - "vendor payment [name] [amount]"\n📋 *Delivery Challan* - "DC to [venue] [amount]"\n💰 *Submit Expenses* - Send amount or receipt\n💳 *QR Payment* - Send QR code for payment\n📅 *Leave Requests* - Say "leave"\n💳 *Pending Payments* - "how much does [client] owe"\n\n_Tell me what you need!_`;
     }
 
-    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion at Oakstreet Events 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n📅 *Events* - Ask "events this week"\n👥 *Team* - Ask "who's on leave today"\n\n_Just tell me what you need!_`;
+    return `👋 Hi ${employee.name}! I'm *Oaksy AI*, your companion 🌳\n\n*Here's what I can help with:*\n\n💰 *Submit Expenses* - Just send the amount or a receipt photo\n💳 *QR Payment* - Send QR code with "pay" for direct payment\n📅 *Apply for Leave* - Say "sick leave" or "vacation"\n📋 *Check Status* - Type "status" to see your requests\n📅 *Events* - Ask "events this week"\n👥 *Team* - Ask "who's on leave today"\n\n_Just tell me what you need!_`;
   }
 
   // Use AI to understand the message when no pattern matches
   // Determine employee role based on name or job title
   let employeeRole = 'employee';
-  if (employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina')) {
+  if (employee.designation?.toLowerCase().includes('wedding') || employee.designation?.toLowerCase().includes('planner')) {
     employeeRole = 'wedding_planner';
   } else if (employee.designation?.toLowerCase().includes('accountant')) {
     employeeRole = 'accountant';
@@ -6913,7 +6913,7 @@ Return "INVALID" if you cannot parse the input.`;
   // FORCE INVENTORY INTENT: For Superadmin/Praveen when photo + quantity pattern detected
   // This is a safety net because AI sometimes fails to detect inventory intent
   const lowerMsgForInventory = messageText.toLowerCase();
-  const isAuthorizedForInventory = isAuthorizedInventoryCreator(normalizedPhone);
+  const isAuthorizedForInventory = await isAuthorizedInventoryCreator(normalizedPhone);
   const hasInventoryKeywords = 
     lowerMsgForInventory.includes('inventory') || 
     lowerMsgForInventory.includes('warehouse') || 
@@ -7010,11 +7010,11 @@ Return "INVALID" if you cannot parse the input.`;
     console.log('[Oaksy] Inventory intent handler - name:', itemName, 'qty:', quantity, 'colour:', colour, 'unitCost:', unitCost);
     
     // If we have name, quantity, and unit rate - execute
-    const isSuperadminPhone = normalizedPhone === '917902373354' || normalizedPhone === '+917902373354';
+    const isSuperadminUser = await isSuperadminPhone(normalizedPhone);
     const hasBasicData = itemName && quantity && quantity > 0;
     const hasAllData = hasBasicData && unitCost !== undefined && unitCost !== null;
     
-    if (hasAllData && isSuperadminPhone) {
+    if (hasAllData && isSuperadminUser) {
       // Auto-execute for Superadmin with full data
       try {
         const result = await handleInventoryItemCreation(
@@ -7149,7 +7149,7 @@ Return "INVALID" if you cannot parse the input.`;
         status: 'pending',
       });
 
-      await notifyKishorPendingVendorPayment(
+      await notifySuperadminPendingVendorPayment(
         requestCode,
         employee.name,
         vendorName,
@@ -7192,13 +7192,13 @@ Return "INVALID" if you cannot parse the input.`;
   // Handle AI-detected delivery challan intent (authorized DC creators only)
   if (aiAnalysis.intent === 'delivery_challan') {
     // Check if authorized by phone number or by role
-    const isAuthorizedByPhone = isAuthorizedDcCreator(normalizedPhone);
+    const isAuthorizedByPhone = await isAuthorizedDcCreator(normalizedPhone);
     const isAccountant = employee.designation?.toLowerCase().includes('accountant');
-    const isSuperadmin = employee.designation?.toLowerCase().includes('superadmin') || employee.name.toLowerCase().includes('kishor');
+    const isSuperadmin = employee.designation?.toLowerCase().includes('superadmin');
     const isTestEmployee = employee.name.toLowerCase().includes('test');
     
     if (!isAuthorizedByPhone && !isAccountant && !isSuperadmin && !isTestEmployee) {
-      return `❌ Sorry ${employee.name}, delivery challans can only be created by authorized staff.\n\n_Need to create one? Please contact Fida, Femina, or Sabitha._`;
+      return `❌ Sorry ${employee.name}, delivery challans can only be created by authorized staff.\n\n_Need to create one? Please contact your admin or wedding planner._`;
     }
     
     // Parse comprehensive DC message format ourselves (more reliable than AI for this format):
@@ -7409,8 +7409,8 @@ Return "INVALID" if you cannot parse the input.`;
 
   // Handle AI-detected bank query intent (superadmin only)
   if (aiAnalysis.intent === 'bank_query') {
-    if (!isSuperadminPhone(normalizedPhone)) {
-      return `🔒 Bank balances are only available to management.\n\n_Please contact Kishor for financial information._`;
+    if (!await isSuperadminPhone(normalizedPhone)) {
+      return `🔒 Bank balances are only available to management.\n\n_Please contact your admin for financial information._`;
     }
     const bankName = aiAnalysis.extractedData.bankName;
     const result = await getBankBalances(bankName);
@@ -7440,13 +7440,13 @@ Return "INVALID" if you cannot parse the input.`;
     const customerName = aiAnalysis.extractedData.customerName;
     
     if (queryType === 'daily_summary') {
-      if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant') {
-        return `🔒 Daily summaries are only available to management and accounts.\n\n_Please contact Kishor or Sabitha._`;
+      if (!await isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant') {
+        return `🔒 Daily summaries are only available to management and accounts.\n\n_Please contact your admin._`;
       }
       const result = await getDailySummary();
       return result;
     } else if (queryType === 'pending' || queryType === 'client_dues') {
-      if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant' && employeeRole !== 'wedding_planner') {
+      if (!await isSuperadminPhone(normalizedPhone) && employeeRole !== 'accountant' && employeeRole !== 'wedding_planner') {
         return `🔒 Payment information is only available to authorized staff.`;
       }
       const result = await getPendingPayments(customerName);
@@ -7458,8 +7458,8 @@ Return "INVALID" if you cannot parse the input.`;
 
   // Handle AI-detected report query intent (superadmin only)
   if (aiAnalysis.intent === 'report_query') {
-    if (!isSuperadminPhone(normalizedPhone)) {
-      return `🔒 Reports are only available to management.\n\n_Please contact Kishor for business reports._`;
+    if (!await isSuperadminPhone(normalizedPhone)) {
+      return `🔒 Reports are only available to management.\n\n_Please contact your admin for business reports._`;
     }
     
     const queryType = aiAnalysis.extractedData.queryType || 'monthly';
@@ -7478,8 +7478,8 @@ Return "INVALID" if you cannot parse the input.`;
 
   // Handle AI-detected RSVP query intent
   if (aiAnalysis.intent === 'rsvp_query') {
-    if (!isSuperadminPhone(normalizedPhone) && employeeRole !== 'wedding_planner') {
-      return `🔒 RSVP tracking is only available to wedding planners and management.\n\n_Contact Fida or Femina for guest list details._`;
+    if (!await isSuperadminPhone(normalizedPhone) && employeeRole !== 'wedding_planner') {
+      return `🔒 RSVP tracking is only available to wedding planners and management.\n\n_Contact your wedding planner for guest list details._`;
     }
     
     const queryType = aiAnalysis.extractedData.queryType || 'status';
@@ -7587,7 +7587,7 @@ Return "INVALID" if you cannot parse the input.`;
   }
 
   // Default greeting with role-aware tips
-  const isWeddingPlanner = employee.name.toLowerCase().includes('fida') || employee.name.toLowerCase().includes('femina');
+  const isWeddingPlanner = employee.designation?.toLowerCase().includes('wedding') || employee.designation?.toLowerCase().includes('planner');
   
   if (isWeddingPlanner) {
     return `👋 Hi ${employee.name}! I'm Oaksy 🌳\n\n*Quick tips:*\n• "vendor payment [name] [amount]" for payments\n• Send receipt photo for expenses\n• Say "leave" to apply for time off\n\n_How can I help?_`;
@@ -7687,7 +7687,7 @@ async function handleSuperadminApproval(message: string, fromPhone: string): Pro
       if (approval.type === 'expense') {
         notifyMessage = `ℹ️ *Update on your expense request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`;
       } else if (approval.type === 'vendor_payment') {
-        notifyMessage = `ℹ️ *Update on your vendor payment request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please contact Kishor._`;
+        notifyMessage = `ℹ️ *Update on your vendor payment request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please contact your admin._`;
       } else {
         notifyMessage = `ℹ️ *Update on your leave request*\n\nUnfortunately, your request was not approved.\n\n*Reason:* ${reason}\n\n_If you have questions, please reach out to HR._`;
       }
@@ -7906,56 +7906,52 @@ async function createQrPaymentRequest(
   return { requestCode };
 }
 
-async function notifyKishorQrPayment(
+async function notifySuperadminQrPayment(
   requestCode: string,
   employeeName: string,
   description: string,
   amount: number,
   qrImageUrl: string
 ): Promise<void> {
-  console.log(`[QR Payment] START notifyKishorQrPayment - requestCode: ${requestCode}, employee: ${employeeName}, amount: ${amount}, imageUrl: ${qrImageUrl ? 'present' : 'none'}`);
-  console.log(`[QR Payment] SUPERADMIN_WHATSAPP: ${SUPERADMIN_WHATSAPP}`);
+  const superadminPhone = await getSuperadminWhatsApp();
+  console.log(`[QR Payment] START notifySuperadminQrPayment - requestCode: ${requestCode}, employee: ${employeeName}, amount: ${amount}, imageUrl: ${qrImageUrl ? 'present' : 'none'}`);
   
-  // Extract first name for the command
   const firstName = employeeName.split(' ')[0];
   
   try {
     if (qrImageUrl) {
       try {
-        // Convert Twilio authenticated URL to public URL
         const publicUrl = getPublicMediaUrl(qrImageUrl);
         console.log('[QR Payment] Using public URL:', publicUrl);
         
         const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
         console.log('[QR Payment] Calling sendWhatsAppMediaMessage...');
         const mediaResult = await sendWhatsAppMediaMessage(
-          SUPERADMIN_WHATSAPP, 
+          superadminPhone, 
           publicUrl,
           `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n_Reply "PAID ${firstName}" after payment_`
         );
         console.log(`[QR Payment] Media message result:`, mediaResult);
       } catch (mediaError: any) {
-        // Fallback to text-only if media fails
         console.error('[QR Payment] Failed to send media, falling back to text:', mediaError.message);
         const message = `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n📷 QR: ${qrImageUrl}\n\n_Reply "PAID ${firstName}" after payment_`;
         console.log('[QR Payment] Sending fallback text message...');
-        const textResult = await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+        const textResult = await sendWhatsAppMessage(superadminPhone, message);
         console.log('[QR Payment] Text fallback result:', textResult);
       }
     } else {
       const message = `💳 *${firstName}* needs *₹${amount.toLocaleString('en-IN')}*\n📝 ${description}\n\n_Reply "PAID ${firstName}" after payment_`;
       console.log('[QR Payment] No image, sending text-only notification...');
-      const textResult = await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+      const textResult = await sendWhatsAppMessage(superadminPhone, message);
       console.log(`[QR Payment] Text notification result for ${requestCode}:`, textResult);
     }
-    console.log(`[QR Payment] END notifyKishorQrPayment - SUCCESS for ${requestCode}`);
+    console.log(`[QR Payment] END notifySuperadminQrPayment - SUCCESS for ${requestCode}`);
   } catch (error: any) {
-    console.error(`[QR Payment] CRITICAL: Failed to notify Kishor about ${requestCode}:`, error.message);
-    // Try one more time with just text
+    console.error(`[QR Payment] CRITICAL: Failed to notify superadmin about ${requestCode}:`, error.message);
     try {
       const fallbackMessage = `💳 ${firstName} needs ₹${amount} for ${description}. Reply PAID ${firstName} after payment.`;
       console.log('[QR Payment] Attempting final fallback...');
-      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, fallbackMessage);
+      await sendWhatsAppMessage(superadminPhone, fallbackMessage);
       console.log('[QR Payment] Final fallback succeeded');
     } catch (fallbackError: any) {
       console.error('[QR Payment] Even fallback failed:', fallbackError.message);
@@ -7963,8 +7959,7 @@ async function notifyKishorQrPayment(
   }
 }
 
-// Income submission notification to Kishor
-async function notifyKishorIncomeSubmission(
+async function notifySuperadminIncomeSubmission(
   requestCode: string,
   employeeName: string,
   type: 'client_payment' | 'bank_transfer',
@@ -7974,42 +7969,42 @@ async function notifyKishorIncomeSubmission(
   screenshotUrl?: string,
   bankName?: string
 ): Promise<void> {
+  const superadminPhone = await getSuperadminWhatsApp();
   const typeLabel = type === 'bank_transfer' ? 'Bank Transfer' : 'Client Payment';
   const bankLabel = bankName ? `\n🏦 *Bank:* ${bankName}` : '';
   
   if (screenshotUrl) {
     try {
-      // Convert Twilio authenticated URL to public URL
       const publicUrl = await getPublicMediaUrl(screenshotUrl);
       console.log('[Income] Using public URL:', publicUrl);
       
       const { sendWhatsAppMediaMessage } = await import('./whatsapp-service');
       await sendWhatsAppMediaMessage(
-        SUPERADMIN_WHATSAPP, 
+        superadminPhone, 
         publicUrl,
         `📥 *Income Submission ${requestCode}*\n\n👤 From: ${employeeName}\n📁 Type: ${typeLabel}\n👥 Client: ${clientName}\n💰 Amount: *₹${amount.toLocaleString('en-IN')}*${bankLabel}\n\n_Reply "A ${requestCode}" to approve_`
       );
     } catch (mediaError) {
       console.error('[Income] Failed to send media, falling back to text:', mediaError);
       const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}${bankLabel}\n\n📷 Screenshot: ${screenshotUrl}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
-      await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+      await sendWhatsAppMessage(superadminPhone, message);
     }
   } else {
     const message = `📥 *Income Submission ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *From:* ${employeeName}\n📁 *Type:* ${typeLabel}\n👥 *Client:* ${clientName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}${bankLabel}\n\n_Reply "A ${requestCode}" to approve_\n_Reply "R ${requestCode} reason" to reject_\n\n🌳 Oaksy`;
-    await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+    await sendWhatsAppMessage(superadminPhone, message);
   }
 }
 
-// Notify Kishor about a new pending vendor payment
-async function notifyKishorPendingVendorPayment(
+async function notifySuperadminPendingVendorPayment(
   requestCode: string,
   employeeName: string,
   vendorName: string,
   amount: number,
   eventName: string
 ): Promise<void> {
+  const superadminPhone = await getSuperadminWhatsApp();
   const message = `🏪 *Pending Vendor Payment ${requestCode}*\n━━━━━━━━━━━━━━━━━━\n\n👤 *Submitted by:* ${employeeName}\n🏢 *Vendor:* ${vendorName}\n💰 *Amount:* ₹${amount.toLocaleString('en-IN')}\n📅 *Event:* ${eventName}\n\n_Reply "PAID ${requestCode}" when payment is made_\n\n🌳 Oaksy`;
-  await sendWhatsAppMessage(SUPERADMIN_WHATSAPP, message);
+  await sendWhatsAppMessage(superadminPhone, message);
 }
 
 // Mark vendor payment as paid and record in daybook

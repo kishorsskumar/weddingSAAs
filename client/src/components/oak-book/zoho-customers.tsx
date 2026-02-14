@@ -652,13 +652,13 @@ function CustomerFormModal({
                 <SelectValue placeholder="Select company" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="oakstreet">Oakstreet Events</SelectItem>
+                <SelectItem value="oakstreet">Default Company</SelectItem>
                 <SelectItem value="yepman">Yepman International</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-gray-500 mt-1">
               {formData.company === 'oakstreet' 
-                ? 'Documents will be without tax, with Oakstreet branding' 
+                ? 'Documents will be without tax, with default branding' 
                 : 'Documents will include GST, with Yepman branding'}
             </p>
           </div>

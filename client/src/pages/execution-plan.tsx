@@ -849,7 +849,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
   const [editingData, setEditingData] = useState<{ itemDescription: string; quantity: number; vendorName: string }>({ itemDescription: "", quantity: 1, vendorName: "" });
   const [isEditingHeader, setIsEditingHeader] = useState(false);
   const [headerTitle, setHeaderTitle] = useState("Production Checklist");
-  const [headerSubtitle, setHeaderSubtitle] = useState("Oakstreet Events");
+  const [headerSubtitle, setHeaderSubtitle] = useState("Production Plan");
   const [editHeaderTitle, setEditHeaderTitle] = useState("");
   const [editHeaderSubtitle, setEditHeaderSubtitle] = useState("");
   const [newItem, setNewItem] = useState({ 
@@ -1171,7 +1171,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
       <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 rounded-xl p-4 border border-amber-200/50 dark:border-amber-800/30">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <img src={oakstreetLogo} alt="Oakstreet Events" className="h-12 w-12 rounded-lg object-cover shadow-lg" />
+            <img src={oakstreetLogo} alt="Logo" className="h-12 w-12 rounded-lg object-cover shadow-lg" />
             {isEditingHeader ? (
               <div className="flex items-center gap-2">
                 <div className="space-y-1">
@@ -1195,7 +1195,7 @@ function ChecklistSection({ planId, employees, eventTitle }: { planId: string; e
                   className="h-8 w-8 bg-green-600 hover:bg-green-700"
                   onClick={() => {
                     setHeaderTitle(editHeaderTitle || "Production Checklist");
-                    setHeaderSubtitle(editHeaderSubtitle || "Oakstreet Events");
+                    setHeaderSubtitle(editHeaderSubtitle || "Production Plan");
                     setIsEditingHeader(false);
                   }}
                   data-testid="button-save-header"

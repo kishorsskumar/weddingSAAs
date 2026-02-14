@@ -251,12 +251,12 @@ export default function OakCreative() {
       const pptx = new pptxgen.default();
       
       // Set presentation properties
-      pptx.author = "Oakstreet Events";
+      pptx.author = "Event Planner";
       pptx.title = presentationFull.title;
       pptx.subject = `Wedding Proposal for ${presentationFull.clientName || "Client"}`;
-      pptx.company = "Oakstreet Events";
+      pptx.company = "Event Planner";
       
-      // Oakstreet brand colors
+      // Brand colors
       const oakGreen = "6B9937";
       const darkGreen = "4A7A25";
       const gold = "C9A961";
@@ -288,7 +288,7 @@ export default function OakCreative() {
       }
       
       // Branding
-      coverSlide.addText("Oakstreet Events", {
+      coverSlide.addText("", {
         x: 0, y: 4.8, w: "100%", h: 0.4,
         fontSize: 14, color: "FFFFFF",
         align: "center", valign: "middle"
@@ -299,7 +299,7 @@ export default function OakCreative() {
         const pptSlide = pptx.addSlide();
         pptSlide.background = { color: "FFFFFF" };
         
-        // Header with Oakstreet green
+        // Header with brand green
         pptSlide.addShape("rect", {
           x: 0, y: 0, w: "100%", h: 1.2,
           fill: { color: oakGreen }
@@ -319,7 +319,7 @@ export default function OakCreative() {
         });
         
         // Branding in corner
-        pptSlide.addText("Oakstreet Events", {
+        pptSlide.addText("", {
           x: 8, y: 0.1, w: 2, h: 0.3,
           fontSize: 10, color: "FFFFFF",
           align: "right"
@@ -409,7 +409,7 @@ export default function OakCreative() {
         fill: { color: gold }
       });
       
-      thankYouSlide.addText("Oakstreet Events", {
+      thankYouSlide.addText("", {
         x: 0, y: 3.2, w: "100%", h: 0.6,
         fontSize: 24, color: "FFFFFF",
         align: "center", valign: "middle"
@@ -835,7 +835,6 @@ export default function OakCreative() {
                       <p className="text-white/80 relative z-10">{currentSlide.subtitle}</p>
                     )}
                     <div className="absolute bottom-2 right-4 text-white/50 text-xs font-medium">
-                      Oakstreet Events
                     </div>
                   </div>
                   
