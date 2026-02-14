@@ -94,9 +94,9 @@ export default function PrintDocument() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Check for noHeader query parameter
   const searchParams = new URLSearchParams(window.location.search);
   const hideHeader = searchParams.get('noHeader') === 'true';
+  const autoDownload = searchParams.get('download') === 'true';
 
   useEffect(() => {
     async function fetchData() {
@@ -104,67 +104,60 @@ export default function PrintDocument() {
         const type = params.type;
         const id = params.id;
 
-        const [settingsRes] = await Promise.all([
-          fetch('/api/company-settings'),
-        ]);
+        const settingsRes = await fetch('/api/company-settings', { credentials: 'include' });
         const companySettings = await settingsRes.json();
 
         let docData: DocumentData = { companySettings };
 
+        const safeFetch = async (url: string) => {
+          const r = await fetch(url, { credentials: 'include' });
+          if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.status}`);
+          return r.json();
+        };
+        const safeArray = (data: any) => Array.isArray(data) ? data : [];
+
         if (type === 'quote') {
-          const [estimateRes, customersRes] = await Promise.all([
-            fetch(`/api/estimates/${id}`),
-            fetch('/api/customers'),
+          const [estimate, customers] = await Promise.all([
+            safeFetch(`/api/estimates/${id}`),
+            safeFetch('/api/customers'),
           ]);
-          const estimate = await estimateRes.json();
-          const customers = await customersRes.json();
           docData.estimate = estimate;
-          docData.customer = customers.find((c: any) => c.id === estimate.customerId);
+          docData.customer = safeArray(customers).find((c: any) => c.id === estimate.customerId);
         } else if (type === 'invoice') {
-          const [invoiceRes, customersRes] = await Promise.all([
-            fetch(`/api/invoices/${id}`),
-            fetch('/api/customers'),
+          const [invoice, customers] = await Promise.all([
+            safeFetch(`/api/invoices/${id}`),
+            safeFetch('/api/customers'),
           ]);
-          const invoice = await invoiceRes.json();
-          const customers = await customersRes.json();
           docData.invoice = invoice;
-          docData.customer = customers.find((c: any) => c.id === invoice.customerId);
+          docData.customer = safeArray(customers).find((c: any) => c.id === invoice.customerId);
         } else if (type === 'receipt') {
-          const [paymentsRes, customersRes, invoicesRes, banksRes] = await Promise.all([
-            fetch('/api/customer-payments'),
-            fetch('/api/customers'),
-            fetch('/api/invoices'),
-            fetch('/api/banks'),
+          const [payments, customers, invoices, banks] = await Promise.all([
+            safeFetch('/api/customer-payments'),
+            safeFetch('/api/customers'),
+            safeFetch('/api/invoices'),
+            safeFetch('/api/banks'),
           ]);
-          const payments = await paymentsRes.json();
-          const customers = await customersRes.json();
-          const invoices = await invoicesRes.json();
-          const banks = await banksRes.json();
-          const payment = payments.find((p: any) => p.id === id);
+          const payment = safeArray(payments).find((p: any) => p.id === id);
           if (payment) {
             docData.payment = payment;
-            docData.customer = customers.find((c: any) => c.id === payment.customerId);
-            docData.invoice = invoices.find((i: any) => i.id === payment.invoiceId);
-            docData.bank = banks.find((b: any) => b.id === payment.bankId);
+            docData.customer = safeArray(customers).find((c: any) => c.id === payment.customerId);
+            docData.invoice = safeArray(invoices).find((i: any) => i.id === payment.invoiceId);
+            docData.bank = safeArray(banks).find((b: any) => b.id === payment.bankId);
           }
         } else if (type === 'checklist') {
-          const [planRes, checklistRes, eventsRes] = await Promise.all([
-            fetch(`/api/execution-plans`),
-            fetch(`/api/execution-plans/${id}/checklist`),
-            fetch('/api/events'),
+          const [plans, checklist, events] = await Promise.all([
+            safeFetch(`/api/execution-plans`),
+            safeFetch(`/api/execution-plans/${id}/checklist`),
+            safeFetch('/api/events'),
           ]);
-          const plans = await planRes.json();
-          const checklist = await checklistRes.json();
-          const events = await eventsRes.json();
-          const plan = plans.find((p: any) => p.id === id);
+          const plan = safeArray(plans).find((p: any) => p.id === id);
           if (plan) {
             docData.plan = plan;
             docData.checklist = checklist;
-            docData.event = events.find((e: any) => e.id === plan.eventId);
+            docData.event = safeArray(events).find((e: any) => e.id === plan.eventId);
           }
         } else if (type === 'delivery-challan') {
-          const challanRes = await fetch(`/api/delivery-challans/${id}`);
-          const deliveryChallan = await challanRes.json();
+          const deliveryChallan = await safeFetch(`/api/delivery-challans/${id}`);
           docData.deliveryChallan = deliveryChallan;
         }
 
@@ -173,6 +166,9 @@ export default function PrintDocument() {
 
         setTimeout(() => {
           (window as any).printReady = true;
+          if (new URLSearchParams(window.location.search).get('download') === 'true') {
+            setTimeout(() => window.print(), 500);
+          }
         }, 500);
       } catch (err) {
         setError(String(err));

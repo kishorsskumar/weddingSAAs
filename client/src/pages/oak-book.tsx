@@ -14,8 +14,6 @@ import { ZohoDeliveryChallans } from "@/components/oak-book/zoho-delivery-challa
 import { ZohoBanks } from "@/components/oak-book/zoho-banks";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -728,119 +726,8 @@ export default function OakBook() {
     setMobilePreviewOpen(false);
   };
 
-  const handleDownloadPdf = async (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => {
-    try {
-      toast({ title: "Generating PDF...", description: "Please wait" });
-      
-      let docNumber = 'document';
-      if (type === 'quote') {
-        const estimate = estimates.find(e => e.id === id);
-        docNumber = estimate?.number || 'estimate';
-      } else if (type === 'invoice') {
-        const invoice = invoices.find(i => i.id === id);
-        docNumber = invoice?.number || 'invoice';
-      } else if (type === 'receipt') {
-        const payment = payments.find(p => p.id === id);
-        docNumber = payment?.number || 'receipt';
-      } else if (type === 'delivery-challan') {
-        const challan = deliveryChallans.find(c => c.id === id);
-        docNumber = challan?.challanNumber || 'delivery-challan';
-      }
-
-      const printUrl = `${window.location.origin}/print/${type}/${id}`;
-      
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.left = '-9999px';
-      iframe.style.top = '0';
-      iframe.style.width = '794px';
-      iframe.style.height = '1123px';
-      iframe.style.border = 'none';
-      iframe.style.backgroundColor = '#ffffff';
-      document.body.appendChild(iframe);
-      
-      iframe.src = printUrl;
-      
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Timeout waiting for document to load'));
-        }, 30000);
-        
-        iframe.onload = () => {
-          const checkReady = setInterval(() => {
-            try {
-              const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-              const docElement = iframeDoc?.querySelector('.document');
-              if (docElement) {
-                clearInterval(checkReady);
-                clearTimeout(timeout);
-                setTimeout(resolve, 2000);
-              }
-            } catch (e) {
-              // Cross-origin issues - continue waiting
-            }
-          }, 300);
-        };
-        
-        iframe.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error('Failed to load document'));
-        };
-      });
-      
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      const docElement = iframeDoc?.querySelector('.document') as HTMLElement;
-      
-      if (!docElement) {
-        throw new Error('Document element not found');
-      }
-      
-      const canvas = await html2canvas(docElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: 794,
-        windowWidth: 794,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      if (pdfHeight <= pageHeight) {
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-      } else {
-        let yPos = 0;
-        let remainingHeight = pdfHeight;
-        
-        while (remainingHeight > 0) {
-          if (yPos > 0) pdf.addPage();
-          pdf.addImage(imgData, 'JPEG', 0, -yPos, pdfWidth, pdfHeight);
-          yPos += pageHeight;
-          remainingHeight -= pageHeight;
-        }
-      }
-
-      pdf.save(`${docNumber}.pdf`);
-      document.body.removeChild(iframe);
-      toast({ title: "PDF downloaded!" });
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast({ 
-        title: "Download failed", 
-        description: "Opening print page instead...",
-        variant: "destructive" 
-      });
-      window.open(`/print/${type}/${id}`, '_blank');
-    }
+  const handleDownloadPdf = (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => {
+    window.open(`/print/${type}/${id}?download=true`, '_blank');
   };
 
   const handleCloneInvoice = (invoice: Invoice) => {
