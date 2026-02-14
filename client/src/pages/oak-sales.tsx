@@ -912,6 +912,15 @@ function PipelineSection({
     const firstStage = pipelineStages[0];
     if (!firstStage || !selectedPipelineId) return;
 
+    const enabledFields = leadFormConfig.filter(f => f.enabled);
+    const missingRequired = enabledFields
+      .filter(f => f.required && !formData.get(f.fieldKey)?.toString().trim())
+      .map(f => f.label);
+    if (missingRequired.length > 0) {
+      toast({ title: `Please fill required fields: ${missingRequired.join(', ')}`, variant: 'destructive' });
+      return;
+    }
+
     createDealMutation.mutate({
       title: formData.get('title'),
       value: formData.get('value') || '0',
