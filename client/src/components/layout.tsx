@@ -48,6 +48,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import atbottLogo from "../assets/atbott-logo-dark.png";
 import { formatDistanceToNow, format } from "date-fns";
 
 const ALL_PAGES = [
@@ -684,16 +685,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   const NavContent = () => (
     <div className="flex h-full flex-col bg-sidebar border-r border-sidebar-border">
-      {/* Zoho-style clean header */}
-      <div className="p-4 border-b border-sidebar-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">W</span>
-          </div>
-          <div>
-            <h1 className="font-semibold text-base text-sidebar-foreground">Wedding SaaS</h1>
-            <p className="text-xs text-sidebar-foreground/60">Event Management</p>
-          </div>
+      {/* Clean header with logo */}
+      <div className="p-4 border-b border-sidebar-border bg-white">
+        <div className="flex items-center justify-center">
+          <img src={atbottLogo} alt="atBott" className="h-9 w-auto object-contain" />
         </div>
       </div>
 
@@ -934,9 +929,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <NavContent />
           </SheetContent>
         </Sheet>
-        <div className="flex items-center gap-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">Wedding SaaS</span>
+        <div className="flex items-center">
+          <img src={atbottLogo} alt="atBott" className="h-7 w-auto object-contain" />
         </div>
         <NotificationBell />
       </div>
