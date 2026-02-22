@@ -55,14 +55,15 @@ const STEPS = [
 const PLANS = [
   {
     name: "Basic",
-    price: "Free",
-    period: "14-day trial",
-    description: "Perfect for trying out KnotVite with your first event",
+    price: "₹4,999",
+    originalPrice: "₹9,999",
+    period: "per event",
+    description: "Perfect for intimate weddings and small celebrations",
     highlight: false,
     trial: true,
     features: [
       { text: "1 Event", included: true },
-      { text: "Up to 100 Guests", included: true },
+      { text: "Up to 200 Guests", included: true },
       { text: "Basic RSVP Form", included: true },
       { text: "Guest Dashboard", included: true },
       { text: "Mobile-Friendly Pages", included: true },
@@ -72,19 +73,20 @@ const PLANS = [
       { text: "Excel Import/Export", included: false },
       { text: "QR Check-in", included: false },
     ],
-    cta: "Start Free Trial",
+    cta: "Start 14-Day Free Trial",
     ctaVariant: "outline" as const,
   },
   {
     name: "Pro",
-    price: "₹2,999",
+    price: "₹14,999",
+    originalPrice: "₹24,999",
     period: "per event",
     description: "For couples who want the complete RSVP experience",
     highlight: true,
     trial: false,
     features: [
-      { text: "Unlimited Events", included: true },
-      { text: "Up to 500 Guests", included: true },
+      { text: "Up to 5 Events", included: true },
+      { text: "Up to 400 Guests", included: true },
       { text: "Custom RSVP Fields", included: true },
       { text: "Guest Dashboard", included: true },
       { text: "Mobile-Friendly Pages", included: true },
@@ -99,7 +101,8 @@ const PLANS = [
   },
   {
     name: "Premium",
-    price: "₹7,999",
+    price: "₹24,999",
+    originalPrice: "₹39,999",
     period: "per event",
     description: "Full-service RSVP with wedding page, QR check-in & automation",
     highlight: false,
@@ -116,7 +119,7 @@ const PLANS = [
       { text: "Dedicated Support", included: true },
       { text: "Custom Domain", included: true },
     ],
-    cta: "Contact Sales",
+    cta: "Get Started",
     ctaVariant: "outline" as const,
   },
 ];
@@ -573,7 +576,7 @@ export default function KnotViteLanding() {
           
           <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
             {PLANS.map((plan, index) => (
-              <Card 
+              <Card
                 key={index} 
                 className={`relative overflow-hidden transition-all duration-300 hover:shadow-xl ${plan.highlight ? 'border-2 shadow-xl scale-[1.02]' : 'border hover:border-gray-300'}`}
                 style={plan.highlight ? { borderColor: BRAND } : {}}
@@ -600,10 +603,16 @@ export default function KnotViteLanding() {
                   <div className="mb-6">
                     <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">{plan.name}</h3>
                     <p className="text-sm text-gray-500 mb-4">{plan.description}</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-3xl sm:text-4xl font-bold" style={plan.highlight ? { color: BRAND } : { color: '#111' }}>{plan.price}</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-base text-gray-400 line-through">{plan.originalPrice}</span>
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-1">
+                      <span className="text-3xl sm:text-4xl font-bold" style={plan.highlight ? { color: BRAND } : { color: '#111' }}>{plan.price}<span className="text-xs font-normal align-super">*</span></span>
                       <span className="text-sm text-gray-500">/{plan.period}</span>
                     </div>
+                    {plan.trial && (
+                      <p className="text-xs mt-2 font-medium" style={{ color: BRAND }}>14-day free trial included</p>
+                    )}
                   </div>
                   
                   <ul className="space-y-2.5 mb-8">
@@ -634,6 +643,7 @@ export default function KnotViteLanding() {
               </Card>
             ))}
           </div>
+          <p className="text-[10px] text-gray-400 text-center mt-6">*Prices exclusive of 18% GST</p>
         </div>
       </section>
 
