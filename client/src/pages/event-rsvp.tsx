@@ -12,9 +12,9 @@ import { format, parseISO } from "date-fns";
 import { Calendar, MapPin, Users, UtensilsCrossed, Check, X, HelpCircle, Loader2, Download, Plane, Hotel, Car, Compass, Search, ArrowLeft, User, UserPlus, ArrowRight, MessageSquare } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const OAK_GREEN = "#4b7c29";
-const OAK_GREEN_DARK = "#3d6622";
-const OAK_GREEN_LIGHT = "#e8f0e0";
+const OAK_GREEN = "#2FA4BC";
+const OAK_GREEN_DARK = "#1a8a9e";
+const OAK_GREEN_LIGHT = "#e0f4f8";
 const GOLD_ACCENT = "#c9a84c";
 
 interface FormPageSettings {

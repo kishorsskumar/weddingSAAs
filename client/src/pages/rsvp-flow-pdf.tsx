@@ -12,7 +12,7 @@ export default function RsvpFlowPdf() {
       if (contentRef.current) {
         const opt = {
           margin: 10,
-          filename: 'Oak-RSVP-Customer-Flow.pdf',
+          filename: 'RSVP-Customer-Flow.pdf',
           image: { type: 'jpeg' as const, quality: 0.98 },
           html2canvas: { scale: 2, useCORS: true },
           jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
