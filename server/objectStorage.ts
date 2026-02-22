@@ -228,9 +228,64 @@ export class ObjectStorageService {
     
     return signedUrl;
   }
+
+  async getPublicObjectPath(filename: string): string {
+    const publicPaths = this.getPublicObjectSearchPaths();
+    if (publicPaths.length === 0) {
+      throw new Error("No public object search paths configured");
+    }
+    return `${publicPaths[0]}/${filename}`;
+  }
+
+  async refreshSignedUrl(objectPath: string): Promise<string> {
+    const { bucketName, objectName } = parseObjectPath(objectPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "GET",
+      ttlSec: 86400 * 7,
+    });
+  }
+
+
+  async uploadPortfolioImage(
+    buffer: Buffer,
+    originalFilename: string,
+    contentType: string
+  ): Promise<string> {
+    const publicPaths = this.getPublicObjectSearchPaths();
+    if (publicPaths.length === 0) {
+      throw new Error("No public object search paths configured");
+    }
+    const publicDir = publicPaths[0];
+    const ext = originalFilename.split('.').pop() || 'jpg';
+    const uniqueFilename = `portfolio/${Date.now()}_${randomUUID().slice(0, 8)}.${ext}`;
+    const fullPath = `${publicDir}/${uniqueFilename}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    await file.save(buffer, {
+      contentType,
+      resumable: false,
+      metadata: {
+        cacheControl: 'public, max-age=31536000',
+      },
+    });
+    
+    // Return a proxy URL through our own server instead of signed URL
+    // This avoids issues with Replit's signing service
+    return `/api/objects/public/${uniqueFilename}`;
+  }
 }
 
-function parseObjectPath(path: string): {
+export function parseObjectPath(path: string): {
   bucketName: string;
   objectName: string;
 } {

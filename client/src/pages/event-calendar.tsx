@@ -1,30 +1,70 @@
-import { useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from "date-fns";
+import { useState, Component, ErrorInfo, ReactNode } from "react";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, setMonth, setYear } from "date-fns";
 import type { Event } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, Plus, X, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function EventCalendar() {
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('EventCalendar Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 text-center p-4">
+          <p className="text-red-500 mb-2 font-semibold">Something went wrong loading the calendar</p>
+          <p className="text-sm text-muted-foreground mb-4">{this.state.error?.message}</p>
+          <Button onClick={() => window.location.reload()}>Reload Page</Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const YEARS = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 2 + i);
+
+function EventCalendarContent() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const { toast } = useToast();
+  const canAddEvents = user?.role === 'superadmin' || user?.role === 'accountant';
+  const canEditEvents = user?.role === 'superadmin' || user?.role === 'accountant';
 
-  const { data: events = [] } = useQuery<Event[]>({
+  const { data: events = [], isLoading, error } = useQuery<Event[]>({
     queryKey: ['/api/events'],
     queryFn: async () => {
-      const res = await fetch('/api/events');
+      const res = await fetch('/api/events', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch events');
       return res.json();
     },
@@ -48,12 +88,44 @@ export default function EventCalendar() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/events/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete event');
+      const res = await fetch(`/api/events/${id}`, { 
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error || 'Failed to delete event');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setSelectedDay(null);
+    },
+    onError: (error) => {
+      console.error('Delete failed:', error);
+      alert('Failed to delete event: ' + error.message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Event> }) => {
+      const res = await fetch(`/api/events/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to update event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      setEditingEvent(null);
+      toast({ title: 'Event updated successfully' });
+    },
+    onError: (error) => {
+      toast({ title: 'Failed to update event', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -63,6 +135,26 @@ export default function EventCalendar() {
       deleteMutation.mutate(id);
     }
   };
+
+  // Render loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="ml-3 text-muted-foreground">Loading calendar...</span>
+      </div>
+    );
+  }
+
+  // Render error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <p className="text-red-500 mb-2">Failed to load calendar</p>
+        <p className="text-sm text-muted-foreground">{(error as Error).message}</p>
+      </div>
+    );
+  }
 
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -159,6 +251,93 @@ export default function EventCalendar() {
     );
   };
 
+  const EditEventForm = ({ event }: { event: Event }) => {
+    const { register, handleSubmit } = useForm({
+      defaultValues: {
+        customer: event.customer || '',
+        date: event.date || '',
+        time: event.time || '',
+        type: event.type || '',
+        venue: event.venue || '',
+        planner: event.planner || '',
+        salesValue: event.salesValue || '0',
+        paymentReceived: event.paymentReceived || '0',
+        cost: event.cost || '0',
+      },
+    });
+
+    const onSubmit = (data: any) => {
+      const customer = data.customer || '';
+      const venue = data.venue || '';
+      const dateStr = data.date || '';
+      let title = event.title;
+      if (customer && venue && dateStr) {
+        const firstName = customer.split(' ')[0];
+        const venueShort = venue.split(' ')[0];
+        const dateFormatted = format(new Date(dateStr), "ddMMM");
+        title = `${firstName}-${venueShort}-${dateFormatted}`.toUpperCase();
+      }
+      updateMutation.mutate({ id: event.id, data: { ...data, title } });
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="bg-muted/50 rounded-lg p-3 text-center">
+          <p className="text-xs text-muted-foreground mb-1">Event Code</p>
+          <p className="text-sm font-bold font-mono">{event.eventCode || event.id}</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Customer Name</Label>
+          <Input {...register("customer")} required data-testid="input-edit-customer" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Event Date</Label>
+            <Input type="date" {...register("date")} required data-testid="input-edit-date" />
+          </div>
+          <div className="space-y-2">
+            <Label>Event Time</Label>
+            <Input type="time" {...register("time")} data-testid="input-edit-time" />
+          </div>
+          <div className="space-y-2">
+            <Label>Type of Event</Label>
+            <Input {...register("type")} required data-testid="input-edit-type" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Venue</Label>
+          <Input {...register("venue")} required data-testid="input-edit-venue" />
+        </div>
+        <div className="space-y-2">
+          <Label>Wedding Planner</Label>
+          <Input {...register("planner")} required data-testid="input-edit-planner" />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label>Sales Value</Label>
+            <Input {...register("salesValue")} data-testid="input-edit-sales" />
+          </div>
+          <div className="space-y-2">
+            <Label>Payment Received</Label>
+            <Input {...register("paymentReceived")} data-testid="input-edit-payment" />
+          </div>
+          <div className="space-y-2">
+            <Label>Cost</Label>
+            <Input {...register("cost")} data-testid="input-edit-cost" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={() => setEditingEvent(null)}>
+            Cancel
+          </Button>
+          <Button type="submit" className="flex-1" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
   const selectedDayEvents = selectedDay ? events.filter((e) => isSameDay(new Date(e.date), selectedDay)) : [];
 
   return (
@@ -171,46 +350,62 @@ export default function EventCalendar() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <h1 className="text-xl sm:text-3xl font-bold font-serif text-primary">Event Calendar</h1>
-          <div className="flex items-center gap-2 bg-card border rounded-md p-1 w-fit">
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </motion.div>
-            <AnimatePresence mode="wait">
-              <motion.span 
-                key={format(currentDate, "MMMM yyyy")}
-                className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[120px] text-center"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                {format(currentDate, "MMMM yyyy")}
-              </motion.span>
-            </AnimatePresence>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-              <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </motion.div>
+          <div className="flex items-center gap-1 bg-card border rounded-md p-1 w-fit">
+            <Button variant="outline" size="sm" onClick={prevMonth} className="h-10 w-10 sm:h-9 sm:w-9 p-0">
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Select
+              value={currentDate.getMonth().toString()}
+              onValueChange={(value) => setCurrentDate(setMonth(currentDate, parseInt(value)))}
+            >
+              <SelectTrigger className="w-[110px] sm:w-[130px] h-9 border-0 bg-transparent font-semibold">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((month, index) => (
+                  <SelectItem key={month} value={index.toString()}>
+                    {month}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={currentDate.getFullYear().toString()}
+              onValueChange={(value) => setCurrentDate(setYear(currentDate, parseInt(value)))}
+            >
+              <SelectTrigger className="w-[80px] h-9 border-0 bg-transparent font-semibold">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={nextMonth} className="h-10 w-10 sm:h-9 sm:w-9 p-0">
+              <ChevronRight className="h-5 w-5" />
+            </Button>
           </div>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-event">
-                <Plus className="h-4 w-4" /> New Event
-              </Button>
-            </motion.div>
-          </DialogTrigger>
-          <DialogContent className="max-w-[95vw] sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add New Event</DialogTitle>
-            </DialogHeader>
-            <AddEventForm />
-          </DialogContent>
-        </Dialog>
+        {canAddEvents && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button className="gap-2 w-full sm:w-auto" data-testid="button-add-event">
+                  <Plus className="h-4 w-4" /> New Event
+                </Button>
+              </motion.div>
+            </DialogTrigger>
+            <DialogContent className="max-w-[95vw] sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add New Event</DialogTitle>
+              </DialogHeader>
+              <AddEventForm />
+            </DialogContent>
+          </Dialog>
+        )}
       </motion.div>
 
       <motion.div 
@@ -305,7 +500,7 @@ export default function EventCalendar() {
                       className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-800 border border-green-200 truncate group flex items-center justify-between"
                     >
                       <span className="truncate font-medium">{event.title}</span>
-                      {isAdmin && (
+                      {canEditEvents && (
                         <button
                           onClick={(e) => handleDelete(e, event.id, event.title)}
                           className="opacity-0 group-hover:opacity-100 hover:text-red-600 transition-opacity ml-1 flex-shrink-0"
@@ -332,7 +527,7 @@ export default function EventCalendar() {
         </Card>
       </motion.div>
 
-      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
+      <Dialog open={!!selectedDay && !editingEvent} onOpenChange={(open) => !open && setSelectedDay(null)}>
         <DialogContent className="max-w-[95vw] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
@@ -350,15 +545,26 @@ export default function EventCalendar() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-semibold text-green-900">{event.title}</h4>
-                    {isAdmin && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        onClick={(e) => handleDelete(e, event.id, event.title)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                    {canEditEvents && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-primary hover:text-primary hover:bg-primary/10"
+                          onClick={(e) => { e.stopPropagation(); setEditingEvent(event); }}
+                          data-testid={`button-edit-event-${event.id}`}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => handleDelete(e, event.id, event.title)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                   <div className="text-sm text-green-800 space-y-0.5">
@@ -366,6 +572,7 @@ export default function EventCalendar() {
                     <p><span className="font-medium">Type:</span> {event.type}</p>
                     <p><span className="font-medium">Venue:</span> {event.venue}</p>
                     <p><span className="font-medium">Planner:</span> {event.planner}</p>
+                    {event.time && <p><span className="font-medium">Time:</span> {event.time}</p>}
                   </div>
                 </div>
               ))
@@ -373,6 +580,23 @@ export default function EventCalendar() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!editingEvent} onOpenChange={(open) => { if (!open) setEditingEvent(null); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          {editingEvent && <EditEventForm event={editingEvent} />}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+export default function EventCalendarPage() {
+  return (
+    <ErrorBoundary>
+      <EventCalendarContent />
+    </ErrorBoundary>
   );
 }

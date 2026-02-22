@@ -109,6 +109,66 @@ export const events = pgTable("events", {
   timelineCreated: boolean("timeline_created").default(false), // Auto-created event timeline
   productionContainerCreated: boolean("production_container_created").default(false), // Production container exists
   inventoryFinalized: boolean("inventory_finalized").default(false), // Warehouse has finalized sourcing
+  rsvpCode: varchar("rsvp_code", { length: 8 }).unique(),
+  rsvpTitle: text("rsvp_title"),
+  rsvpFunctions: jsonb("rsvp_functions").$type<string[]>().default(['Wedding', 'Engagement / Reception']),
+  rsvpSettings: jsonb("rsvp_settings").$type<{
+    hideTourSection?: boolean;
+    showDepartureDetails?: boolean;
+    showSecondaryContact?: boolean;
+    showHotelAllocation?: boolean;
+    hotelOptions?: string[];
+    localTransportContactName?: string;
+    localTransportContactPhone?: string;
+    landingImageUrl?: string;
+    reminderEnabled?: boolean;
+    reminderDays?: number;
+    lastReminderRun?: string;
+    landingPage?: {
+      heroImageUrl?: string;
+      groomName?: string;
+      brideName?: string;
+      tagline?: string;
+      welcomeTitle?: string;
+      welcomeMessage?: string;
+      venueImageUrl?: string;
+      footerMessage?: string;
+      primaryColor?: string;
+      accentColor?: string;
+      rsvpButtonText?: string;
+      showCountdown?: boolean;
+      showCeremonies?: boolean;
+      customMessage?: string;
+      backgroundOverlayOpacity?: number;
+    };
+    formPage?: {
+      headerTopLine?: string;
+      headerInvitationText?: string;
+      confirmationPrompt?: string;
+      searchPrompt?: string;
+      thankYouAttending?: string;
+      thankYouNotAttending?: string;
+      functionDetails?: Record<string, { date?: string; time?: string; venue?: string }>;
+      showEventsSection?: boolean;
+      showGuestCount?: boolean;
+      showMealPreference?: boolean;
+      showPickupSection?: boolean;
+      hidePickupContactPerson?: boolean;
+      showAccommodationSection?: boolean;
+      hideRoomsNeeded?: boolean;
+      showTransportSection?: boolean;
+      showTourSection?: boolean;
+      showDepartureSection?: boolean;
+      showSecondaryContactSection?: boolean;
+      hideAlternateContactName?: boolean;
+      showHotelAllocationSection?: boolean;
+      showSpecialNotes?: boolean;
+      showDressCode?: boolean;
+      dressCodeText?: string;
+      showDietaryRestrictions?: boolean;
+      showWhatsAppField?: boolean;
+    };
+  }>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -273,6 +333,30 @@ export const eventMilestones = pgTable("event_milestones", {
   status: text("status").notNull().default('pending'), // 'pending' | 'completed'
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Leads (for estimate phase before becoming customers)
+export const leads = pgTable("leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => companies.id),
+  leadCode: text("lead_code").unique(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  company: text("company"),
+  source: text("source"),
+  leadSource: text("lead_source"),
+  status: text("status").notNull().default('new'),
+  notes: text("notes"),
+  ownerUserId: varchar("owner_user_id").references(() => users.id),
+  convertedCustomerId: varchar("converted_customer_id"),
+  convertedAt: timestamp("converted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type Lead = typeof leads.$inferSelect;
 
 // Customers
 export const customers = pgTable("customers", {
@@ -985,17 +1069,45 @@ export const insertInventoryItemSchema = createInsertSchema(inventoryItems).omit
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
 export type InventoryItem = typeof inventoryItems.$inferSelect;
 
-// Inventory Transactions - Detailed entry logs for stock movements
+// Inventory Purchases
+export const inventoryPurchases = pgTable("inventory_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  itemId: varchar("item_id").notNull().references(() => inventoryItems.id, { onDelete: 'cascade' }),
+  quantity: integer("quantity").notNull(),
+  unitCost: decimal("unit_cost", { precision: 12, scale: 2 }).notNull(),
+  totalCost: decimal("total_cost", { precision: 12, scale: 2 }).notNull(),
+  purchaseDate: date("purchase_date").notNull(),
+  vendorId: varchar("vendor_id").references(() => vendors.id),
+  vendorName: text("vendor_name"),
+  invoiceNumber: text("invoice_number"),
+  invoiceDate: date("invoice_date"),
+  notes: text("notes"),
+  performedBy: varchar("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInventoryPurchaseSchema = createInsertSchema(inventoryPurchases).omit({ id: true, createdAt: true });
+export type InsertInventoryPurchase = z.infer<typeof insertInventoryPurchaseSchema>;
+export type InventoryPurchase = typeof inventoryPurchases.$inferSelect;
+
+// Inventory Transactions - Detailed entry logs for stock movements (Immutable Ledger)
 export const inventoryTransactions = pgTable("inventory_transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   itemId: varchar("item_id").notNull().references(() => inventoryItems.id, { onDelete: 'cascade' }),
-  type: text("type").notNull(), // 'in' | 'out' | 'adjustment' | 'damage' | 'return'
+  type: text("type").notNull(), // 'in' | 'out' | 'return' | 'damage' | 'loss' | 'adjustment' | 'opening'
+  actionType: text("action_type"), // 'purchase' | 'issue' | 'return_good' | 'return_damaged' | 'return_lost' | 'adjustment'
   quantity: integer("quantity").notNull(),
+  unitCost: decimal("unit_cost", { precision: 12, scale: 2 }),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }),
   previousStock: integer("previous_stock").notNull(),
   newStock: integer("new_stock").notNull(),
   eventId: varchar("event_id").references(() => events.id),
+  eventName: text("event_name"),
+  purchaseId: varchar("purchase_id").references(() => inventoryPurchases.id),
+  condition: text("condition"), // 'good' | 'damaged' | 'lost' (for returns)
   notes: text("notes"),
   performedBy: varchar("performed_by").references(() => users.id),
+  performedByName: text("performed_by_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1531,6 +1643,26 @@ export const oaksyMessages = pgTable("oaksy_messages", {
 export const insertOaksyMessageSchema = createInsertSchema(oaksyMessages).omit({ id: true, createdAt: true });
 export type InsertOaksyMessage = z.infer<typeof insertOaksyMessageSchema>;
 export type OaksyMessage = typeof oaksyMessages.$inferSelect;
+
+// Oaksy Action Logs
+export const oaksyActionLogs = pgTable("oaksy_action_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  userRole: text("user_role").notNull(),
+  conversationId: varchar("conversation_id"),
+  prompt: text("prompt").notNull(),
+  aiOutput: text("ai_output"),
+  actionType: text("action_type"),
+  actionData: jsonb("action_data"),
+  executedAction: text("executed_action"),
+  status: text("status").notNull().default('success'),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOaksyActionLogSchema = createInsertSchema(oaksyActionLogs).omit({ id: true, createdAt: true });
+export type InsertOaksyActionLog = z.infer<typeof insertOaksyActionLogSchema>;
+export type OaksyActionLog = typeof oaksyActionLogs.$inferSelect;
 
 // WhatsApp Message Templates
 export const whatsappMessageTemplates = pgTable("whatsapp_message_templates", {
@@ -3005,3 +3137,110 @@ export const adminEventLogs = pgTable("admin_event_logs", {
 export const insertAdminEventLogSchema = createInsertSchema(adminEventLogs).omit({ id: true, createdAt: true });
 export type InsertAdminEventLog = z.infer<typeof insertAdminEventLogSchema>;
 export type AdminEventLog = typeof adminEventLogs.$inferSelect;
+
+export const portalLeadContacts = pgTable("portal_lead_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  role: text("role"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortalLeadContactSchema = createInsertSchema(portalLeadContacts).omit({ id: true, createdAt: true });
+export type InsertPortalLeadContact = z.infer<typeof insertPortalLeadContactSchema>;
+export type PortalLeadContact = typeof portalLeadContacts.$inferSelect;
+
+export const cashFlowEntries = pgTable("cash_flow_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  type: text("type").notNull(),
+  category: text("category"),
+  date: date("date"),
+  dueDate: date("due_date"),
+  month: text("month"),
+  status: text("status").default("pending"),
+  notes: text("notes"),
+  name: text("name"),
+  isPaid: boolean("is_paid").default(false),
+  isRecurring: boolean("is_recurring").default(false),
+  recurringActive: boolean("recurring_active").default(false),
+  recurringFrequency: text("recurring_frequency"),
+  eventId: varchar("event_id"),
+  vendorId: varchar("vendor_id"),
+  companyId: varchar("company_id"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCashFlowEntrySchema = createInsertSchema(cashFlowEntries).omit({ id: true, createdAt: true });
+export type InsertCashFlowEntry = z.infer<typeof insertCashFlowEntrySchema>;
+export type CashFlowEntry = typeof cashFlowEntries.$inferSelect;
+
+export const cashflowEntries = cashFlowEntries;
+export const insertCashflowEntrySchema = insertCashFlowEntrySchema;
+
+export const budgetPlanEntries = pgTable("budget_plan_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  description: text("description").notNull(),
+  category: text("category"),
+  estimatedAmount: decimal("estimated_amount", { precision: 12, scale: 2 }),
+  actualAmount: decimal("actual_amount", { precision: 12, scale: 2 }),
+  status: text("status").default("planned"),
+  month: text("month"),
+  eventId: varchar("event_id"),
+  vendorId: varchar("vendor_id"),
+  notes: text("notes"),
+  companyId: varchar("company_id"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBudgetPlanEntrySchema = createInsertSchema(budgetPlanEntries).omit({ id: true, createdAt: true });
+export type InsertBudgetPlanEntry = z.infer<typeof insertBudgetPlanEntrySchema>;
+export type BudgetPlanEntry = typeof budgetPlanEntries.$inferSelect;
+
+export const liabilities = pgTable("liabilities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  type: text("type"),
+  category: text("category"),
+  creditorName: text("creditor_name"),
+  dueDate: date("due_date"),
+  isPaid: boolean("is_paid").default(false),
+  status: text("status").default("pending"),
+  notes: text("notes"),
+  eventId: varchar("event_id"),
+  companyId: varchar("company_id"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLiabilitySchema = createInsertSchema(liabilities).omit({ id: true, createdAt: true });
+export type InsertLiability = z.infer<typeof insertLiabilitySchema>;
+export type Liability = typeof liabilities.$inferSelect;
+
+export const cashflowVendorPayments = pgTable("cashflow_vendor_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  vendorId: varchar("vendor_id"),
+  vendorName: text("vendor_name"),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: date("due_date"),
+  paidDate: date("paid_date"),
+  status: text("status").default("pending"),
+  paymentMode: text("payment_mode"),
+  referenceNumber: text("reference_number"),
+  notes: text("notes"),
+  eventId: varchar("event_id"),
+  companyId: varchar("company_id"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCashflowVendorPaymentSchema = createInsertSchema(cashflowVendorPayments).omit({ id: true, createdAt: true });
+export type InsertCashflowVendorPayment = z.infer<typeof insertCashflowVendorPaymentSchema>;
+export type CashflowVendorPayment = typeof cashflowVendorPayments.$inferSelect;

@@ -38,13 +38,142 @@ import {
   FileText,
   Calendar,
   Users,
-  Download
+  Download,
+  ArrowLeft,
+  ChevronRight,
+  Eye,
+  PlusCircle,
+  Pencil,
+  BarChart3,
+  IndianRupee,
+  Building2,
+  UserCheck,
+  ClipboardList,
+  Receipt,
+  Image,
+  MessageCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { ArrowLeft } from "lucide-react";
+
+interface CapabilityCategory {
+  title: string;
+  icon: React.ReactNode;
+  color: string;
+  items: string[];
+  suggestions: string[];
+  roles?: string[];
+}
+
+const OAKSY_CAPABILITIES: CapabilityCategory[] = [
+  {
+    title: "Events & Calendar",
+    icon: <Calendar className="w-4 h-4" />,
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+    items: [
+      "View, search, and filter events",
+      "Create new event bookings",
+      "Update event details and status",
+      "Check upcoming schedule",
+    ],
+    suggestions: [
+      "What events do we have this month?",
+      "Create a wedding event for next Saturday",
+      "Show me all corporate events",
+      "What's coming up this week?",
+    ],
+  },
+  {
+    title: "Finance & Daybook",
+    icon: <IndianRupee className="w-4 h-4" />,
+    color: "bg-green-50 text-green-700 border-green-200",
+    items: [
+      "Record income and expense entries",
+      "Transfer between bank accounts",
+      "View financial summaries",
+      "Track sales figures and revenue",
+    ],
+    suggestions: [
+      "Record an expense of ₹5000 for flowers",
+      "What's our total income this month?",
+      "Transfer ₹10000 from SBI to HDFC",
+      "Show me today's daybook entries",
+    ],
+  },
+  {
+    title: "Estimates & Invoices",
+    icon: <Receipt className="w-4 h-4" />,
+    color: "bg-purple-50 text-purple-700 border-purple-200",
+    items: [
+      "Generate smart estimates from event details",
+      "Create detailed estimates and invoices",
+      "View sales pipeline and summaries",
+    ],
+    suggestions: [
+      "Generate an estimate for a 200-guest wedding",
+      "What's our total booked sales this year?",
+      "Show sales summary by planner",
+    ],
+  },
+  {
+    title: "Team & Meetings",
+    icon: <Users className="w-4 h-4" />,
+    color: "bg-orange-50 text-orange-700 border-orange-200",
+    items: [
+      "Schedule and manage meetings",
+      "View team calendar",
+      "Update meeting details",
+    ],
+    suggestions: [
+      "Schedule a client meeting tomorrow at 3 PM",
+      "What meetings do we have this week?",
+      "Create a team sync meeting",
+    ],
+  },
+  {
+    title: "HR & Leave",
+    icon: <UserCheck className="w-4 h-4" />,
+    color: "bg-pink-50 text-pink-700 border-pink-200",
+    items: [
+      "Check employee leave balances",
+      "View and manage leave requests",
+      "Add new employees",
+      "Send salary slips via WhatsApp",
+    ],
+    suggestions: [
+      "Check leave balance for all employees",
+      "Show pending leave requests",
+      "How many leaves does Femina have left?",
+    ],
+    roles: ["superadmin", "admin", "manager"],
+  },
+  {
+    title: "Admin & Users",
+    icon: <Building2 className="w-4 h-4" />,
+    color: "bg-gray-50 text-gray-700 border-gray-200",
+    items: [
+      "View and manage system users",
+      "Create new user accounts",
+      "View overall system data",
+    ],
+    suggestions: [
+      "Show all system users",
+      "Create a new user account",
+    ],
+    roles: ["superadmin", "admin"],
+  },
+];
+
+const QUICK_START_SUGGESTIONS: { text: string; icon: React.ReactNode; roles?: string[] }[] = [
+  { text: "What can you help me with?", icon: <Sparkles className="w-3.5 h-3.5" /> },
+  { text: "Show upcoming events this month", icon: <Calendar className="w-3.5 h-3.5" /> },
+  { text: "What's our financial summary?", icon: <BarChart3 className="w-3.5 h-3.5" /> },
+  { text: "Check pending leave requests", icon: <ClipboardList className="w-3.5 h-3.5" />, roles: ["superadmin", "admin", "manager"] },
+  { text: "Create a new event booking", icon: <PlusCircle className="w-3.5 h-3.5" /> },
+  { text: "Show sales summary by planner", icon: <IndianRupee className="w-3.5 h-3.5" />, roles: ["superadmin", "admin", "wedding_planner"] },
+];
 
 interface OaksyAction {
   type: string;
@@ -228,6 +357,24 @@ export default function OaksyPage() {
     }
   };
 
+  const handleSuggestionClick = async (text: string) => {
+    setInputMessage("");
+    if (!activeConversationId) {
+      const newConv = await createConversationMutation.mutateAsync(selectedDepartment);
+      await sendMessageMutation.mutateAsync({
+        conversationId: newConv.id,
+        content: text,
+        inputType: "text",
+      });
+    } else {
+      await sendMessageMutation.mutateAsync({
+        conversationId: activeConversationId,
+        content: text,
+        inputType: "text",
+      });
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -289,7 +436,7 @@ export default function OaksyPage() {
   const isLoading = sendMessageMutation.isPending || createConversationMutation.isPending;
 
   return (
-    <div className="h-[100dvh] md:h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 md:gap-4 md:p-4" data-testid="oaksy-page">
+    <div className="h-[calc(100dvh-8rem)] md:h-[calc(100vh-4rem)] flex flex-col md:flex-row gap-0 md:gap-4 md:p-4 -mx-4 -mt-2 md:mx-0 md:mt-0" data-testid="oaksy-page">
       <Card className={cn(
         "w-full md:w-80 flex-shrink-0 flex flex-col rounded-none md:rounded-lg border-0 md:border",
         activeConversationId && "hidden md:flex"
@@ -407,7 +554,7 @@ export default function OaksyPage() {
 
       <Card className={cn(
         "flex-1 flex flex-col rounded-none md:rounded-lg border-0 md:border",
-        activeConversationId ? "fixed inset-0 z-50 md:relative md:z-auto" : "hidden md:flex"
+        activeConversationId ? "fixed inset-0 bottom-16 z-40 md:relative md:inset-auto md:bottom-auto md:z-auto" : "hidden md:flex"
       )} data-testid="card-chat-main">
         <CardHeader className="pb-3 border-b p-3 sm:p-6 sm:pb-3">
           <div className="flex items-center justify-between gap-2">
@@ -460,22 +607,86 @@ export default function OaksyPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-[#7C8B5D]" />
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center px-8" data-testid="container-welcome">
-                <TreeDeciduous className="h-16 w-16 text-[#9AAF6C] mb-4" />
-                <h3 className="text-xl font-semibold mb-2" data-testid="text-welcome-title">Welcome to Oaksy!</h3>
-                <p className="text-muted-foreground mb-4 max-w-md" data-testid="text-welcome-description">
-                  I'm your AI assistant. Ask me anything about events, 
-                  financials, team management, or get help with your daily tasks.
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-sm" data-testid="container-suggestions">
-                  <div className="p-3 bg-muted rounded-lg text-left" data-testid="card-suggestion-1">
-                    <span className="font-medium">Try asking:</span>
-                    <p className="text-muted-foreground">"What events do we have this month?"</p>
+              <div className="flex flex-col px-4 sm:px-8 py-4" data-testid="container-welcome">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 rounded-full bg-[#4b7c29]/10 flex items-center justify-center mx-auto mb-3">
+                    <TreeDeciduous className="h-8 w-8 text-[#4b7c29]" />
                   </div>
-                  <div className="p-3 bg-muted rounded-lg text-left" data-testid="card-suggestion-2">
-                    <span className="font-medium">Or:</span>
-                    <p className="text-muted-foreground">"Help me plan a wedding timeline"</p>
+                  <h3 className="text-xl font-semibold mb-1" data-testid="text-welcome-title">Welcome to Oaksy!</h3>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto" data-testid="text-welcome-description">
+                    I'm your AI assistant. I can help you manage events, finances, team, and more. Tap any suggestion below to get started!
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Quick Start</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2" data-testid="container-quick-start">
+                    {QUICK_START_SUGGESTIONS.filter(item => !item.roles || item.roles.includes(user?.role || '')).map((item, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSuggestionClick(item.text)}
+                        disabled={isLoading}
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-white border border-gray-200 hover:border-[#4b7c29]/40 hover:bg-[#4b7c29]/5 transition-all text-sm text-left group disabled:opacity-50"
+                        data-testid={`quick-start-${i}`}
+                      >
+                        <span className="text-gray-400 group-hover:text-[#4b7c29] transition-colors flex-shrink-0">{item.icon}</span>
+                        <span className="text-gray-700 truncate">{item.text}</span>
+                      </button>
+                    ))}
                   </div>
+                </div>
+
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">What I Can Help With</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="container-capabilities">
+                    {OAKSY_CAPABILITIES
+                      .filter(cat => !cat.roles || cat.roles.includes(user?.role || ''))
+                      .map((category, catIdx) => (
+                        <div
+                          key={catIdx}
+                          className={`rounded-lg border p-3 ${category.color}`}
+                          data-testid={`capability-card-${catIdx}`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            {category.icon}
+                            <span className="text-sm font-semibold">{category.title}</span>
+                          </div>
+                          <ul className="space-y-1 mb-3">
+                            {category.items.map((item, itemIdx) => (
+                              <li key={itemIdx} className="text-xs flex items-start gap-1.5 opacity-80">
+                                <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-medium uppercase tracking-wider opacity-60">Try saying:</p>
+                            {category.suggestions.slice(0, 2).map((suggestion, sIdx) => (
+                              <button
+                                key={sIdx}
+                                onClick={() => handleSuggestionClick(suggestion)}
+                                disabled={isLoading}
+                                className="w-full text-left text-xs px-2 py-1.5 rounded-md bg-white/60 hover:bg-white transition-colors flex items-center gap-1.5 group disabled:opacity-50"
+                                data-testid={`capability-suggestion-${catIdx}-${sIdx}`}
+                              >
+                                <ChevronRight className="w-3 h-3 opacity-40 group-hover:opacity-100 flex-shrink-0" />
+                                <span className="truncate">"{suggestion}"</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+
+                <div className="text-center mt-2 space-y-1">
+                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Mic className="w-3 h-3" /> Voice input</span>
+                    <span className="flex items-center gap-1"><MessageCircle className="w-3 h-3" /> Natural language</span>
+                    <span className="flex items-center gap-1"><Image className="w-3 h-3" /> Image analysis</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/60">Just type or speak naturally — Oaksy understands everyday language</p>
                 </div>
               </div>
             ) : (
@@ -496,7 +707,7 @@ export default function OaksyPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div
-                      className={`max-w-[75%] rounded-lg p-3 ${
+                      className={`max-w-[85%] sm:max-w-[75%] rounded-lg p-3 ${
                         msg.role === "user"
                           ? "bg-[#7C8B5D] text-white"
                           : "bg-muted"
@@ -596,7 +807,7 @@ export default function OaksyPage() {
             <Button
               onClick={handleSendMessage}
               disabled={isLoading || !inputMessage.trim()}
-              className="bg-[#7C8B5D] hover:bg-[#6a7950]"
+              className="bg-[#7C8B5D] hover:bg-[#6a7950] min-h-[44px] min-w-[44px]"
               data-testid="button-send"
             >
               {isLoading ? (

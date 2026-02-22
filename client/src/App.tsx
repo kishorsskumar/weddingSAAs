@@ -55,6 +55,10 @@ import PortfolioPage from "@/pages/portfolio-page";
 import ClientPortal from "@/pages/client-portal";
 import PortalLanding from "@/pages/portal-landing";
 import MyPortal from "@/pages/my-portal";
+import Attendance from "@/pages/attendance";
+import AttendanceAdmin from "@/pages/attendance-admin";
+import OakIncentives from "@/pages/oak-incentives";
+import OaksyHelp from "@/pages/oaksy-help";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -227,6 +231,18 @@ function AppRoutes() {
         </Route>
         <Route path="/portal-admin">
           <PrivateRoute component={PortalAdmin} path="/portal-admin" />
+        </Route>
+        <Route path="/attendance">
+          <PrivateRoute component={Attendance} path="/attendance" />
+        </Route>
+        <Route path="/attendance-admin">
+          <PrivateRoute component={AttendanceAdmin} path="/attendance-admin" />
+        </Route>
+        <Route path="/oak-incentives">
+          <PrivateRoute component={OakIncentives} path="/oak-incentives" />
+        </Route>
+        <Route path="/oaksy-help">
+          <PrivateRoute component={OaksyHelp} path="/oaksy-help" />
         </Route>
         <Route component={NotFound} />
       </Switch>

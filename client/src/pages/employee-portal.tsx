@@ -798,6 +798,416 @@ function QuickEntryTab() {
   );
 }
 
+// Attendance Tab Component
+function AttendanceTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  
+  const [cameraActive, setCameraActive] = React.useState(false);
+  const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
+  const [location, setLocation] = React.useState<{ latitude: number; longitude: number; address?: string } | null>(null);
+  const [locationLoading, setLocationLoading] = React.useState(false);
+  const [locationError, setLocationError] = React.useState<string | null>(null);
+
+  const { data: statusData, isLoading: statusLoading } = useQuery<{
+    employee: any;
+    todayAttendance: any;
+    status: string;
+  }>({
+    queryKey: ["/api/attendance/my-status"],
+  });
+
+  const startCamera = React.useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: "user", width: 640, height: 480 } 
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setCameraActive(true);
+      }
+    } catch (error) {
+      console.error("Error accessing camera:", error);
+      toast({
+        title: "Camera Error",
+        description: "Could not access your camera. Please grant permission.",
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  const stopCamera = React.useCallback(() => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+      setCameraActive(false);
+    }
+  }, []);
+
+  const capturePhoto = React.useCallback(() => {
+    if (videoRef.current && canvasRef.current) {
+      const context = canvasRef.current.getContext("2d");
+      if (context) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        context.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.8);
+        setCapturedImage(dataUrl);
+        stopCamera();
+      }
+    }
+  }, [stopCamera]);
+
+  const getLocation = React.useCallback(async () => {
+    setLocationLoading(true);
+    setLocationError(null);
+    
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+      
+      const { latitude, longitude } = position.coords;
+      setLocation({ latitude, longitude });
+      
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+        );
+        const data = await response.json();
+        if (data.display_name) {
+          setLocation(prev => prev ? { ...prev, address: data.display_name } : null);
+        }
+      } catch (e) {
+        console.log("Could not get address");
+      }
+    } catch (error: any) {
+      console.error("Error getting location:", error);
+      setLocationError(error.message || "Could not get your location");
+    } finally {
+      setLocationLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    getLocation();
+    return () => {
+      stopCamera();
+    };
+  }, [getLocation, stopCamera]);
+
+  const uploadSelfieMutation = useMutation({
+    mutationFn: async (imageData: string) => {
+      const blob = await fetch(imageData).then(r => r.blob());
+      const formData = new FormData();
+      formData.append("selfie", blob, "selfie.jpg");
+      
+      const response = await fetch("/api/attendance/upload-selfie", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload selfie");
+      }
+      
+      return response.json();
+    }
+  });
+
+  const checkInMutation = useMutation({
+    mutationFn: async (data: { latitude?: number; longitude?: number; address?: string; selfieUrl: string }) => {
+      const response = await fetch("/api/attendance/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to check in");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/attendance/my-status"] });
+      toast({
+        title: "Checked In",
+        description: "You have successfully checked in for today.",
+      });
+      setCapturedImage(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Check-in Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const checkOutMutation = useMutation({
+    mutationFn: async (data: { latitude?: number; longitude?: number; address?: string }) => {
+      const response = await fetch("/api/attendance/check-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to check out");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/attendance/my-status"] });
+      toast({
+        title: "Checked Out",
+        description: "You have successfully checked out. Have a great day!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Check-out Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleCheckIn = async () => {
+    if (!capturedImage) {
+      toast({
+        title: "Photo Required",
+        description: "Please take a selfie before checking in.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const uploadResult = await uploadSelfieMutation.mutateAsync(capturedImage);
+      await checkInMutation.mutateAsync({
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        address: location?.address,
+        selfieUrl: uploadResult.selfieUrl
+      });
+    } catch (error) {
+      console.error("Check-in error:", error);
+    }
+  };
+
+  const handleCheckOut = async () => {
+    await checkOutMutation.mutateAsync({
+      latitude: location?.latitude,
+      longitude: location?.longitude,
+      address: location?.address
+    });
+  };
+
+  if (statusLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="w-8 h-8 animate-spin text-[#4b7c29]" />
+      </div>
+    );
+  }
+
+  const isCheckedIn = statusData?.status === "checked_in";
+  const isCheckedOut = statusData?.status === "checked_out";
+  const notCheckedIn = statusData?.status === "not_checked_in";
+
+  return (
+    <motion.div 
+      className="space-y-4"
+      variants={staggerContainer}
+      initial="initial"
+      animate="animate"
+    >
+      <motion.div variants={staggerItem}>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-[#4b7c29]" />
+              Daily Attendance - {format(new Date(), "EEEE, MMMM d, yyyy")}
+            </CardTitle>
+            <CardDescription>Check in and out for your daily attendance</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Status Card */}
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1">
+                <span className="text-sm text-muted-foreground">Current Status: </span>
+                {isCheckedOut && (
+                  <Badge className="bg-green-100 text-green-800">
+                    <CheckCircle2 className="w-3 h-3 mr-1" /> Checked Out
+                  </Badge>
+                )}
+                {isCheckedIn && (
+                  <Badge className="bg-blue-100 text-blue-800">
+                    <Clock className="w-3 h-3 mr-1" /> Checked In
+                  </Badge>
+                )}
+                {notCheckedIn && (
+                  <Badge className="bg-gray-100 text-gray-800">
+                    Not Checked In
+                  </Badge>
+                )}
+              </div>
+            </div>
+            
+            {/* Today's attendance info */}
+            {statusData?.todayAttendance && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                {statusData.todayAttendance.checkInTime && (
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <p className="text-muted-foreground">Check-in</p>
+                    <p className="font-medium">{format(new Date(statusData.todayAttendance.checkInTime), "hh:mm a")}</p>
+                  </div>
+                )}
+                {statusData.todayAttendance.checkOutTime && (
+                  <div className="p-3 bg-red-50 rounded-lg">
+                    <p className="text-muted-foreground">Check-out</p>
+                    <p className="font-medium">{format(new Date(statusData.todayAttendance.checkOutTime), "hh:mm a")}</p>
+                  </div>
+                )}
+                {statusData.todayAttendance.totalHours && (
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-muted-foreground">Total Hours</p>
+                    <p className="font-medium">{parseFloat(statusData.todayAttendance.totalHours).toFixed(2)} hrs</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Location */}
+            <div className="p-3 border rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4 text-[#4b7c29]" />
+                <span className="font-medium text-sm">Your Location</span>
+                {locationLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+              </div>
+              {locationError && (
+                <p className="text-red-600 text-xs">{locationError}
+                  <Button variant="link" size="sm" onClick={getLocation} className="ml-2 p-0 h-auto text-xs">
+                    Retry
+                  </Button>
+                </p>
+              )}
+              {location && !locationLoading && (
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
+                </p>
+              )}
+            </div>
+
+            {/* Check-in Camera */}
+            {notCheckedIn && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Take Selfie for Check-in</Label>
+                {!capturedImage ? (
+                  <>
+                    <div className="relative bg-black rounded-lg overflow-hidden aspect-video max-h-[200px]">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover"
+                      />
+                      {!cameraActive && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                          <Button onClick={startCamera} className="bg-[#4b7c29] hover:bg-[#3d6622]">
+                            <Eye className="w-4 h-4 mr-2" /> Start Camera
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    {cameraActive && (
+                      <Button onClick={capturePhoto} className="w-full bg-[#4b7c29] hover:bg-[#3d6622]">
+                        Capture Photo
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="relative bg-black rounded-lg overflow-hidden aspect-video max-h-[200px]">
+                      <img src={capturedImage} alt="Captured selfie" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => {
+                          setCapturedImage(null);
+                          startCamera();
+                        }}
+                        className="flex-1"
+                      >
+                        Retake
+                      </Button>
+                      <Button 
+                        onClick={handleCheckIn}
+                        disabled={uploadSelfieMutation.isPending || checkInMutation.isPending || !location}
+                        className="flex-1 bg-[#4b7c29] hover:bg-[#3d6622]"
+                      >
+                        {(uploadSelfieMutation.isPending || checkInMutation.isPending) ? (
+                          <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking In...</>
+                        ) : (
+                          "Check In"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <canvas ref={canvasRef} className="hidden" />
+              </div>
+            )}
+
+            {/* Check-out Button */}
+            {isCheckedIn && (
+              <Button 
+                onClick={handleCheckOut}
+                disabled={checkOutMutation.isPending || locationLoading}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+                size="lg"
+              >
+                {checkOutMutation.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Checking Out...</>
+                ) : (
+                  "Check Out"
+                )}
+              </Button>
+            )}
+
+            {/* Completed Message */}
+            {isCheckedOut && (
+              <div className="text-center py-4 bg-green-50 rounded-lg">
+                <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto mb-2" />
+                <p className="text-green-800 font-medium">You're done for today!</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // Employee Salary Slips Section
 interface SalarySlip {
   id: string;
@@ -2009,54 +2419,252 @@ export default function EmployeePortal() {
       </Dialog>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-        <TabsList className="flex overflow-x-auto gap-1 h-auto flex-wrap md:flex-nowrap pb-2 md:pb-0">
-          <TabsTrigger value="overview" className="text-xs md:text-sm" data-testid="tab-overview">
-            <User className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Overview</span>
+        {/* Desktop Tab List - Hidden on Mobile */}
+        <TabsList className="hidden md:flex overflow-x-auto gap-1 h-auto flex-wrap md:flex-nowrap pb-2 md:pb-0">
+          <TabsTrigger value="overview" className="text-sm" data-testid="tab-overview">
+            <User className="h-4 w-4 mr-2" />
+            Overview
           </TabsTrigger>
-          <TabsTrigger value="quick-entry" className="text-xs md:text-sm" data-testid="tab-quick-entry">
-            <Upload className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Quick Entry</span>
+          <TabsTrigger value="quick-entry" className="text-sm" data-testid="tab-quick-entry">
+            <Upload className="h-4 w-4 mr-2" />
+            Quick Entry
           </TabsTrigger>
-          <TabsTrigger value="leaves" className="text-xs md:text-sm" data-testid="tab-leaves">
-            <CalendarDays className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Leaves</span>
+          <TabsTrigger value="attendance" className="text-sm" data-testid="tab-attendance">
+            <Clock className="h-4 w-4 mr-2" />
+            Attendance
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="text-xs md:text-sm" data-testid="tab-expenses">
-            <Receipt className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Expenses</span>
+          <TabsTrigger value="leaves" className="text-sm" data-testid="tab-leaves">
+            <CalendarDays className="h-4 w-4 mr-2" />
+            Leaves
           </TabsTrigger>
-          <TabsTrigger value="payroll" className="text-xs md:text-sm" data-testid="tab-payroll">
-            <DollarSign className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Payroll</span>
+          <TabsTrigger value="expenses" className="text-sm" data-testid="tab-expenses">
+            <Receipt className="h-4 w-4 mr-2" />
+            Expenses
           </TabsTrigger>
-          <TabsTrigger value="salary-slips" className="text-xs md:text-sm" data-testid="tab-salary-slips">
-            <Receipt className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Salary Slips</span>
+          <TabsTrigger value="payroll" className="text-sm" data-testid="tab-payroll">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Payroll
           </TabsTrigger>
-          <TabsTrigger value="increments" className="text-xs md:text-sm" data-testid="tab-increments">
-            <TrendingUp className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Increments</span>
+          <TabsTrigger value="salary-slips" className="text-sm" data-testid="tab-salary-slips">
+            <Receipt className="h-4 w-4 mr-2" />
+            Salary Slips
           </TabsTrigger>
-          <TabsTrigger value="appraisals" className="text-xs md:text-sm" data-testid="tab-appraisals">
-            <Star className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Appraisals</span>
+          <TabsTrigger value="increments" className="text-sm" data-testid="tab-increments">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Increments
           </TabsTrigger>
-          <TabsTrigger value="advances" className="text-xs md:text-sm" data-testid="tab-advances">
-            <CreditCard className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Advances</span>
+          <TabsTrigger value="appraisals" className="text-sm" data-testid="tab-appraisals">
+            <Star className="h-4 w-4 mr-2" />
+            Appraisals
           </TabsTrigger>
-          <TabsTrigger value="holidays" className="text-xs md:text-sm" data-testid="tab-holidays">
-            <PartyPopper className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Holidays</span>
+          <TabsTrigger value="advances" className="text-sm" data-testid="tab-advances">
+            <CreditCard className="h-4 w-4 mr-2" />
+            Advances
           </TabsTrigger>
-          <TabsTrigger value="duties" className="text-xs md:text-sm" data-testid="tab-duties">
-            <ClipboardList className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden md:inline">Duties</span>
+          <TabsTrigger value="holidays" className="text-sm" data-testid="tab-holidays">
+            <PartyPopper className="h-4 w-4 mr-2" />
+            Holidays
+          </TabsTrigger>
+          <TabsTrigger value="duties" className="text-sm" data-testid="tab-duties">
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Duties
           </TabsTrigger>
         </TabsList>
 
+        {/* Mobile Tab Navigation - Scrollable with Labels */}
+        <div className="md:hidden overflow-x-auto pb-2 -mx-4 px-4">
+          <TabsList className="inline-flex gap-2 h-auto bg-transparent p-0">
+            <TabsTrigger 
+              value="overview" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-overview-mobile"
+            >
+              <User className="h-5 w-5" />
+              <span>Home</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="quick-entry" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-quick-entry-mobile"
+            >
+              <Upload className="h-5 w-5" />
+              <span>Upload</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="attendance" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-attendance-mobile"
+            >
+              <Clock className="h-5 w-5" />
+              <span>Clock In</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="leaves" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-leaves-mobile"
+            >
+              <CalendarDays className="h-5 w-5" />
+              <span>Leaves</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="expenses" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-expenses-mobile"
+            >
+              <Receipt className="h-5 w-5" />
+              <span>Expenses</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="payroll" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-payroll-mobile"
+            >
+              <DollarSign className="h-5 w-5" />
+              <span>Salary</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="salary-slips" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-salary-slips-mobile"
+            >
+              <Receipt className="h-5 w-5" />
+              <span>Slips</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="increments" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-increments-mobile"
+            >
+              <TrendingUp className="h-5 w-5" />
+              <span>Hikes</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="appraisals" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-appraisals-mobile"
+            >
+              <Star className="h-5 w-5" />
+              <span>Reviews</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="advances" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-advances-mobile"
+            >
+              <CreditCard className="h-5 w-5" />
+              <span>Advance</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="holidays" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-holidays-mobile"
+            >
+              <PartyPopper className="h-5 w-5" />
+              <span>Holidays</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="duties" 
+              className="flex-col gap-1 h-auto py-2 px-3 min-w-[60px] text-[10px] data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg"
+              data-testid="tab-duties-mobile"
+            >
+              <ClipboardList className="h-5 w-5" />
+              <span>Duties</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
         <TabsContent value="overview">
+          {/* Mobile Quick Actions - 2 Column Grid */}
+          <motion.div 
+            className="md:hidden mb-6"
+            variants={staggerContainer}
+            initial="initial"
+            animate="animate"
+          >
+            <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-1">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Primary Actions - Highlighted */}
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('attendance')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-primary/10 border-2 border-primary/20 hover:bg-primary/15 active:scale-95 transition-all min-h-[100px]"
+                aria-label="Mark Attendance"
+                data-testid="quick-action-attendance"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Clock className="h-6 w-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-primary">Attendance</span>
+              </motion.button>
+
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('quick-entry')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-primary/10 border-2 border-primary/20 hover:bg-primary/15 active:scale-95 transition-all min-h-[100px]"
+                aria-label="Upload Bill or Receipt"
+                data-testid="quick-action-upload"
+              >
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Upload className="h-6 w-6 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-primary">Upload Bill</span>
+              </motion.button>
+
+              {/* Secondary Actions */}
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('leaves')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-card border border-border hover:bg-accent/50 active:scale-95 transition-all min-h-[100px]"
+                aria-label="Request Leave"
+                data-testid="quick-action-leaves"
+              >
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <CalendarDays className="h-6 w-6 text-foreground/70" />
+                </div>
+                <span className="text-sm font-medium text-foreground/80">Leaves</span>
+              </motion.button>
+
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('payroll')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-card border border-border hover:bg-accent/50 active:scale-95 transition-all min-h-[100px]"
+                aria-label="View Salary Details"
+                data-testid="quick-action-salary"
+              >
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-foreground/70" />
+                </div>
+                <span className="text-sm font-medium text-foreground/80">Salary</span>
+              </motion.button>
+
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('expenses')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-card border border-border hover:bg-accent/50 active:scale-95 transition-all min-h-[100px]"
+                aria-label="Submit Expense Claim"
+                data-testid="quick-action-expenses"
+              >
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <Receipt className="h-6 w-6 text-foreground/70" />
+                </div>
+                <span className="text-sm font-medium text-foreground/80">Expenses</span>
+              </motion.button>
+
+              <motion.button
+                variants={staggerItem}
+                onClick={() => handleTabChange('duties')}
+                className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-card border border-border hover:bg-accent/50 active:scale-95 transition-all min-h-[100px]"
+                aria-label="View My Duties"
+                data-testid="quick-action-duties"
+              >
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <ClipboardList className="h-6 w-6 text-foreground/70" />
+                </div>
+                <span className="text-sm font-medium text-foreground/80">My Duties</span>
+              </motion.button>
+            </div>
+          </motion.div>
+
           <motion.div 
             className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
             variants={staggerContainer}
@@ -2248,6 +2856,10 @@ export default function EmployeePortal() {
 
         <TabsContent value="quick-entry">
           <QuickEntryTab />
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          <AttendanceTab />
         </TabsContent>
 
         <TabsContent value="leaves">

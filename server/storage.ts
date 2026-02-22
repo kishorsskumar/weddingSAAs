@@ -18,6 +18,7 @@ import {
   leaveRequests,
   eventMilestones,
   customers,
+  leads,
   vendors,
   estimates,
   invoices,
@@ -42,6 +43,7 @@ import {
   salesTargets,
   salesAutomations,
   inventoryItems,
+  inventoryPurchases,
   inventoryTransactions,
   eventInventorySessions,
   eventInventoryItems,
@@ -104,6 +106,8 @@ import {
   type InsertEventMilestone,
   type Customer,
   type InsertCustomer,
+  type Lead,
+  type InsertLead,
   type Vendor,
   type InsertVendor,
   type Estimate,
@@ -152,6 +156,8 @@ import {
   type InsertSalesAutomation,
   type InventoryItem,
   type InsertInventoryItem,
+  type InventoryPurchase,
+  type InsertInventoryPurchase,
   type InventoryTransaction,
   type InsertInventoryTransaction,
   type EventInventorySession,
@@ -348,6 +354,15 @@ import {
   type RsvpBulkImport,
   type InsertRsvpBulkImport,
   portalLeads,
+  portalLeadContacts,
+  type PortalLeadContact,
+  type InsertPortalLeadContact,
+  cashFlowEntries,
+  type CashFlowEntry,
+  type InsertCashFlowEntry,
+  budgetPlanEntries,
+  type BudgetPlanEntry,
+  type InsertBudgetPlanEntry,
   portfolioAlbums,
   portfolioSets,
   portfolioPhotos,
@@ -1127,6 +1142,56 @@ export interface IStorage {
   // Admin Event Logs
   createAdminEventLog(log: InsertAdminEventLog): Promise<AdminEventLog>;
   getAdminEventLogs(limit?: number, eventType?: string): Promise<AdminEventLog[]>;
+
+  // Leads
+  getAllLeads(): Promise<Lead[]>;
+  getLead(id: string): Promise<Lead | undefined>;
+  createLead(lead: InsertLead): Promise<Lead>;
+  updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
+  deleteLead(id: string): Promise<void>;
+
+  // Inventory Purchases
+  getAllInventoryPurchases(): Promise<InventoryPurchase[]>;
+  getInventoryPurchasesByItemId(itemId: string): Promise<InventoryPurchase[]>;
+  getInventoryPurchase(id: string): Promise<InventoryPurchase | undefined>;
+  createInventoryPurchase(purchase: InsertInventoryPurchase): Promise<InventoryPurchase>;
+  deleteInventoryPurchase(id: string): Promise<void>;
+  calculateAverageCost(itemId: string): Promise<{ avgCost: number; totalValue: number; totalQty: number }>;
+
+  // Enhanced Inventory Operations
+  getAllInventoryTransactions(): Promise<InventoryTransaction[]>;
+  getInventoryLedger(filters?: { itemId?: string; eventId?: string; type?: string; startDate?: string; endDate?: string }): Promise<InventoryTransaction[]>;
+  issueInventoryToEvent(itemId: string, eventId: string, quantity: number, issuedBy: string, purpose?: string): Promise<void>;
+  returnInventoryFromEvent(itemId: string, eventId: string, quantity: number, condition: 'good' | 'damaged' | 'lost', returnedBy: string, notes?: string): Promise<void>;
+  getLowStockItems(): Promise<InventoryItem[]>;
+
+  // Notification Logs by Type
+  getNotificationLogsByType(type: string): Promise<NotificationLog[]>;
+
+  // Automation Logs - Delete
+  deleteAutomationLogsByEventId(eventId: string): Promise<void>;
+
+  // Portal Lead Contacts
+  getPortalLeadContacts(portalLeadId: string): Promise<PortalLeadContact[]>;
+  getPortalLeadContact(id: string): Promise<PortalLeadContact | undefined>;
+  createPortalLeadContact(contact: InsertPortalLeadContact): Promise<PortalLeadContact>;
+  updatePortalLeadContact(id: string, data: Partial<InsertPortalLeadContact>): Promise<PortalLeadContact | undefined>;
+  deletePortalLeadContact(id: string): Promise<void>;
+
+  // Cash Flow
+  getCashFlowEntries(startDate?: string, endDate?: string): Promise<CashFlowEntry[]>;
+  getCashFlowEntry(id: string): Promise<CashFlowEntry | undefined>;
+  createCashFlowEntry(entry: InsertCashFlowEntry): Promise<CashFlowEntry>;
+  updateCashFlowEntry(id: string, entry: Partial<InsertCashFlowEntry>): Promise<CashFlowEntry | undefined>;
+  deleteCashFlowEntry(id: string): Promise<void>;
+
+  // Budget Plan
+  getBudgetPlanEntries(startDate?: string, endDate?: string): Promise<BudgetPlanEntry[]>;
+  getBudgetPlanEntry(id: string): Promise<BudgetPlanEntry | undefined>;
+  createBudgetPlanEntry(entry: InsertBudgetPlanEntry): Promise<BudgetPlanEntry>;
+  updateBudgetPlanEntry(id: string, entry: Partial<InsertBudgetPlanEntry>): Promise<BudgetPlanEntry | undefined>;
+  deleteBudgetPlanEntry(id: string): Promise<void>;
+  getDueBudgetPlanEntries(daysBefore: number): Promise<BudgetPlanEntry[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5954,6 +6019,338 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(adminEventLogs.createdAt)).limit(limit);
     }
     return db.select().from(adminEventLogs).orderBy(desc(adminEventLogs.createdAt)).limit(limit);
+  }
+
+  // Leads
+  async getAllLeads(): Promise<Lead[]> {
+    return await db.select().from(leads).orderBy(desc(leads.createdAt));
+  }
+
+  async getLead(id: string): Promise<Lead | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.id, id));
+    return lead || undefined;
+  }
+
+  async createLead(insertLead: InsertLead): Promise<Lead> {
+    const [lead] = await db.insert(leads).values(insertLead).returning();
+    return lead;
+  }
+
+  async updateLead(id: string, updateData: Partial<InsertLead>): Promise<Lead | undefined> {
+    const [lead] = await db.update(leads).set(updateData).where(eq(leads.id, id)).returning();
+    return lead || undefined;
+  }
+
+  async deleteLead(id: string): Promise<void> {
+    await db.delete(leads).where(eq(leads.id, id));
+  }
+
+  // Inventory Purchases
+  async getAllInventoryPurchases(): Promise<InventoryPurchase[]> {
+    return await db.select().from(inventoryPurchases).orderBy(desc(inventoryPurchases.createdAt));
+  }
+
+  async getInventoryPurchasesByItemId(itemId: string): Promise<InventoryPurchase[]> {
+    return await db.select().from(inventoryPurchases)
+      .where(eq(inventoryPurchases.itemId, itemId))
+      .orderBy(desc(inventoryPurchases.purchaseDate));
+  }
+
+  async getInventoryPurchase(id: string): Promise<InventoryPurchase | undefined> {
+    const [purchase] = await db.select().from(inventoryPurchases).where(eq(inventoryPurchases.id, id));
+    return purchase || undefined;
+  }
+
+  async createInventoryPurchase(purchase: InsertInventoryPurchase): Promise<InventoryPurchase> {
+    const [created] = await db.insert(inventoryPurchases).values(purchase).returning();
+    
+    const item = await this.getInventoryItem(purchase.itemId);
+    if (item) {
+      const previousStock = item.stockQuantity;
+      const newStock = previousStock + purchase.quantity;
+      
+      await this.updateInventoryItem(purchase.itemId, {
+        stockQuantity: newStock,
+        unitCost: purchase.unitCost,
+      });
+      
+      await this.createInventoryTransaction({
+        itemId: purchase.itemId,
+        type: 'in',
+        actionType: 'purchase',
+        quantity: purchase.quantity,
+        unitCost: purchase.unitCost,
+        totalValue: purchase.totalCost,
+        previousStock,
+        newStock,
+        purchaseId: created.id,
+        notes: purchase.notes || `Purchase from ${purchase.vendorName || 'Unknown'} - Invoice: ${purchase.invoiceNumber || 'N/A'}`,
+        performedBy: purchase.performedBy,
+      });
+    }
+    
+    return created;
+  }
+
+  async deleteInventoryPurchase(id: string): Promise<void> {
+    await db.delete(inventoryPurchases).where(eq(inventoryPurchases.id, id));
+  }
+
+  async calculateAverageCost(itemId: string): Promise<{ avgCost: number; totalValue: number; totalQty: number }> {
+    const purchases = await this.getInventoryPurchasesByItemId(itemId);
+    
+    let totalValue = 0;
+    let totalQty = 0;
+    
+    for (const p of purchases) {
+      totalValue += parseFloat(p.totalCost as string);
+      totalQty += p.quantity;
+    }
+    
+    const avgCost = totalQty > 0 ? totalValue / totalQty : 0;
+    
+    return { avgCost, totalValue, totalQty };
+  }
+
+  // Enhanced Inventory Operations
+  async getAllInventoryTransactions(): Promise<InventoryTransaction[]> {
+    return await db.select().from(inventoryTransactions).orderBy(desc(inventoryTransactions.createdAt));
+  }
+
+  async getInventoryLedger(filters?: { itemId?: string; eventId?: string; type?: string; startDate?: string; endDate?: string }): Promise<InventoryTransaction[]> {
+    let query = db.select().from(inventoryTransactions);
+    
+    const conditions = [];
+    if (filters?.itemId) {
+      conditions.push(eq(inventoryTransactions.itemId, filters.itemId));
+    }
+    if (filters?.eventId) {
+      conditions.push(eq(inventoryTransactions.eventId, filters.eventId));
+    }
+    if (filters?.type) {
+      conditions.push(eq(inventoryTransactions.type, filters.type));
+    }
+    
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+    
+    return await query.orderBy(desc(inventoryTransactions.createdAt));
+  }
+
+  async issueInventoryToEvent(itemId: string, eventId: string, quantity: number, issuedBy: string, purpose?: string): Promise<void> {
+    const item = await this.getInventoryItem(itemId);
+    const event = await this.getEvent(eventId);
+    
+    if (!item) throw new Error('Inventory item not found');
+    if (!event) throw new Error('Event not found');
+    
+    if (quantity > item.stockQuantity) throw new Error('Insufficient available stock');
+    
+    const previousStock = item.stockQuantity;
+    const newStock = item.stockQuantity - quantity;
+    
+    await this.updateInventoryItem(itemId, {
+      stockQuantity: newStock,
+    });
+    
+    await this.createInventoryTransaction({
+      itemId,
+      type: 'out',
+      actionType: 'issue',
+      quantity,
+      previousStock,
+      newStock,
+      eventId,
+      eventName: event.customer || event.title,
+      notes: purpose || `Issued to event: ${event.customer || event.title}`,
+      performedBy: issuedBy,
+    });
+  }
+
+  async returnInventoryFromEvent(itemId: string, eventId: string, quantity: number, condition: 'good' | 'damaged' | 'lost', returnedBy: string, notes?: string): Promise<void> {
+    const item = await this.getInventoryItem(itemId);
+    const event = await this.getEvent(eventId);
+    
+    if (!item) throw new Error('Inventory item not found');
+    if (!event) throw new Error('Event not found');
+    
+    const previousStock = item.stockQuantity;
+    
+    if (condition === 'good') {
+      const newStock = item.stockQuantity + quantity;
+      await this.updateInventoryItem(itemId, {
+        stockQuantity: newStock,
+      });
+      
+      await this.createInventoryTransaction({
+        itemId,
+        type: 'return',
+        actionType: 'return_good',
+        quantity,
+        previousStock,
+        newStock,
+        eventId,
+        eventName: event.customer || event.title,
+        condition: 'good',
+        notes: notes || `Returned in good condition from: ${event.customer || event.title}`,
+        performedBy: returnedBy,
+      });
+    } else if (condition === 'damaged') {
+      await this.createInventoryTransaction({
+        itemId,
+        type: 'damage',
+        actionType: 'return_damaged',
+        quantity,
+        previousStock,
+        newStock: previousStock,
+        eventId,
+        eventName: event.customer || event.title,
+        condition: 'damaged',
+        notes: notes || `Returned damaged from: ${event.customer || event.title}`,
+        performedBy: returnedBy,
+      });
+    } else if (condition === 'lost') {
+      const newStock = item.stockQuantity - quantity;
+      await this.updateInventoryItem(itemId, {
+        stockQuantity: newStock,
+      });
+      
+      await this.createInventoryTransaction({
+        itemId,
+        type: 'loss',
+        actionType: 'return_lost',
+        quantity,
+        previousStock,
+        newStock,
+        eventId,
+        eventName: event.customer || event.title,
+        condition: 'lost',
+        notes: notes || `Marked as lost from: ${event.customer || event.title}`,
+        performedBy: returnedBy,
+      });
+    }
+  }
+
+  async getLowStockItems(): Promise<InventoryItem[]> {
+    const items = await db.select().from(inventoryItems)
+      .where(eq(inventoryItems.isActive, true));
+    
+    return items.filter(item => {
+      return item.stockQuantity <= (item.minStockLevel || 0);
+    });
+  }
+
+  // Notification Logs by Type
+  async getNotificationLogsByType(type: string): Promise<NotificationLog[]> {
+    return await db.select().from(notificationLogs)
+      .where(eq(notificationLogs.type, type))
+      .orderBy(desc(notificationLogs.createdAt));
+  }
+
+  // Automation Logs - Delete
+  async deleteAutomationLogsByEventId(eventId: string): Promise<void> {
+    await db.delete(automationLogs).where(eq(automationLogs.eventId, eventId));
+  }
+
+  // Portal Lead Contacts
+  async getPortalLeadContacts(portalLeadId: string): Promise<PortalLeadContact[]> {
+    return await db.select().from(portalLeadContacts)
+      .where(eq(portalLeadContacts.leadId, portalLeadId))
+      .orderBy(portalLeadContacts.createdAt);
+  }
+
+  async getPortalLeadContact(id: string): Promise<PortalLeadContact | undefined> {
+    const [contact] = await db.select().from(portalLeadContacts).where(eq(portalLeadContacts.id, id));
+    return contact || undefined;
+  }
+
+  async createPortalLeadContact(contact: InsertPortalLeadContact): Promise<PortalLeadContact> {
+    const [created] = await db.insert(portalLeadContacts).values(contact).returning();
+    return created;
+  }
+
+  async updatePortalLeadContact(id: string, data: Partial<InsertPortalLeadContact>): Promise<PortalLeadContact | undefined> {
+    const [updated] = await db.update(portalLeadContacts)
+      .set(data)
+      .where(eq(portalLeadContacts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortalLeadContact(id: string): Promise<void> {
+    await db.delete(portalLeadContacts).where(eq(portalLeadContacts.id, id));
+  }
+
+  // Cash Flow
+  async getCashFlowEntries(startDate?: string, endDate?: string): Promise<CashFlowEntry[]> {
+    const conditions = [];
+    if (startDate) conditions.push(gte(cashFlowEntries.date, startDate));
+    if (endDate) conditions.push(lte(cashFlowEntries.date, endDate));
+    if (conditions.length > 0) {
+      return await db.select().from(cashFlowEntries).where(and(...conditions)).orderBy(cashFlowEntries.date);
+    }
+    return await db.select().from(cashFlowEntries).orderBy(cashFlowEntries.date);
+  }
+
+  async getCashFlowEntry(id: string): Promise<CashFlowEntry | undefined> {
+    const [entry] = await db.select().from(cashFlowEntries).where(eq(cashFlowEntries.id, id));
+    return entry || undefined;
+  }
+
+  async createCashFlowEntry(entry: InsertCashFlowEntry): Promise<CashFlowEntry> {
+    const [created] = await db.insert(cashFlowEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateCashFlowEntry(id: string, entry: Partial<InsertCashFlowEntry>): Promise<CashFlowEntry | undefined> {
+    const [updated] = await db.update(cashFlowEntries)
+      .set(entry)
+      .where(eq(cashFlowEntries.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteCashFlowEntry(id: string): Promise<void> {
+    await db.delete(cashFlowEntries).where(eq(cashFlowEntries.id, id));
+  }
+
+  // Budget Plan
+  async getBudgetPlanEntries(startDate?: string, endDate?: string): Promise<BudgetPlanEntry[]> {
+    return await db.select().from(budgetPlanEntries).orderBy(budgetPlanEntries.createdAt);
+  }
+
+  async getBudgetPlanEntry(id: string): Promise<BudgetPlanEntry | undefined> {
+    const [entry] = await db.select().from(budgetPlanEntries).where(eq(budgetPlanEntries.id, id));
+    return entry || undefined;
+  }
+
+  async createBudgetPlanEntry(entry: InsertBudgetPlanEntry): Promise<BudgetPlanEntry> {
+    const [created] = await db.insert(budgetPlanEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateBudgetPlanEntry(id: string, entry: Partial<InsertBudgetPlanEntry>): Promise<BudgetPlanEntry | undefined> {
+    const [updated] = await db.update(budgetPlanEntries)
+      .set(entry)
+      .where(eq(budgetPlanEntries.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteBudgetPlanEntry(id: string): Promise<void> {
+    await db.delete(budgetPlanEntries).where(eq(budgetPlanEntries.id, id));
+  }
+
+  async getDueBudgetPlanEntries(daysBefore: number): Promise<BudgetPlanEntry[]> {
+    return await db.select().from(budgetPlanEntries)
+      .where(
+        or(
+          eq(budgetPlanEntries.status, 'planned'),
+          eq(budgetPlanEntries.status, 'pending')
+        )
+      )
+      .orderBy(budgetPlanEntries.createdAt);
   }
 }
 

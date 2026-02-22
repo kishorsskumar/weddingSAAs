@@ -79,14 +79,14 @@ import type {
 } from "@shared/schema";
 
 const COMPANY_DEFAULTS = {
-  companyName: 'Your Company',
-  address: '',
-  phone: '',
-  email: '',
+  companyName: 'Oakstreet Events',
+  address: '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia',
+  phone: '7902373354',
+  email: 'oakstreetevents18@gmail.com',
   gstNumber: '',
 };
 
-type Section = 'items' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans' | 'decor-planning' | 'transportation' | 'manpower';
+type Section = 'items' | 'ledger' | 'event-inventory' | 'rentals' | 'templates' | 'purchase-orders' | 'production-plans' | 'decor-planning' | 'transportation' | 'manpower';
 
 const DEFAULT_CATEGORIES = ["Décor", "Furniture", "Lighting", "Linens", "Props", "Florals", "Electronics", "Other"];
 const EVENT_TYPES = ["Wedding Stage Décor", "Reception Setup", "Corporate Event", "Birthday Party", "Other"];
@@ -114,6 +114,7 @@ const sidebarGroups = [
     label: 'Stock & Assets',
     items: [
       { id: 'items', label: 'Inventory Items', icon: Package },
+      { id: 'ledger', label: 'Stock Ledger', icon: FileText },
       { id: 'purchase-orders', label: 'Purchase Orders', icon: ClipboardList },
       { id: 'templates', label: 'Templates', icon: FileText },
     ]
@@ -299,7 +300,17 @@ export default function OakInventory() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
-  const [activeSection, setActiveSection] = useState<Section>('items');
+  const [activeSection, setActiveSectionState] = useState<Section>(() => {
+    const saved = localStorage.getItem('oak_inventory_active_section');
+    if (saved && ['items', 'ledger', 'event-inventory', 'rentals', 'templates', 'purchase-orders', 'production-plans', 'decor-planning', 'transportation', 'manpower'].includes(saved)) {
+      return saved as Section;
+    }
+    return 'items';
+  });
+  const setActiveSection = (section: Section) => {
+    localStorage.setItem('oak_inventory_active_section', section);
+    setActiveSectionState(section);
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -472,6 +483,9 @@ export default function OakInventory() {
               setSearchQuery={setSearchQuery}
             />
           )}
+          {activeSection === 'ledger' && (
+            <LedgerSection items={inventoryItems} events={events} />
+          )}
           {activeSection === 'event-inventory' && (
             <EventInventorySection
               sessions={inventorySessions}
@@ -550,6 +564,24 @@ function InventoryItemsSection({
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategory, setNewCategory] = useState('');
+  const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+  const [stockInData, setStockInData] = useState({
+    itemId: '',
+    quantity: '',
+    unitCost: '',
+    supplier: '',
+    invoiceNumber: '',
+    purchaseDate: new Date().toISOString().split('T')[0],
+    notes: '',
+  });
+  const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
+  const [issueData, setIssueData] = useState({ itemId: '', eventId: '', quantity: '', notes: '' });
+  const [issueEventOpen, setIssueEventOpen] = useState(false);
+  const [issueEventSearch, setIssueEventSearch] = useState('');
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnData, setReturnData] = useState({ itemId: '', eventId: '', quantity: '', condition: 'good' as 'good' | 'damaged' | 'lost', notes: '' });
+  const [returnEventOpen, setReturnEventOpen] = useState(false);
+  const [returnEventSearch, setReturnEventSearch] = useState('');
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
     const saved = localStorage.getItem('oak-inventory-categories');
     return saved ? JSON.parse(saved) : [];
@@ -561,10 +593,15 @@ function InventoryItemsSection({
     return combined.sort();
   }, [items, customCategories]);
 
+  const { data: events = [] } = useQuery<Event[]>({
+    queryKey: ['/api/events'],
+  });
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category: 'Other',
+    itemType: 'reusable' as 'consumable' | 'reusable',
     sku: '',
     unitCost: '',
     stockQuantity: '',
@@ -581,6 +618,7 @@ function InventoryItemsSection({
       name: '',
       description: '',
       category: 'Other',
+      itemType: 'reusable' as 'consumable' | 'reusable',
       sku: '',
       unitCost: '',
       stockQuantity: '',
@@ -686,13 +724,87 @@ function InventoryItemsSection({
     },
   });
 
+  const stockInMutation = useMutation({
+    mutationFn: async (data: typeof stockInData) => {
+      return apiRequest('POST', '/api/inventory/purchases', {
+        itemId: data.itemId,
+        quantity: parseInt(data.quantity),
+        unitCost: data.unitCost,
+        supplier: data.supplier || null,
+        invoiceNumber: data.invoiceNumber || null,
+        purchaseDate: data.purchaseDate,
+        notes: data.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/items'] });
+      toast({ title: 'Stock added successfully' });
+      setIsStockInModalOpen(false);
+      setStockInData({
+        itemId: '',
+        quantity: '',
+        unitCost: '',
+        supplier: '',
+        invoiceNumber: '',
+        purchaseDate: new Date().toISOString().split('T')[0],
+        notes: '',
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to add stock', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const issueMutation = useMutation({
+    mutationFn: async (data: typeof issueData) => {
+      return apiRequest('POST', '/api/inventory/issue', {
+        itemId: data.itemId,
+        eventId: data.eventId,
+        quantity: parseInt(data.quantity),
+        notes: data.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/items'] });
+      toast({ title: 'Items issued to event successfully' });
+      setIsIssueModalOpen(false);
+      setIssueData({ itemId: '', eventId: '', quantity: '', notes: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to issue items', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const returnMutation = useMutation({
+    mutationFn: async (data: typeof returnData) => {
+      return apiRequest('POST', '/api/inventory/return', {
+        itemId: data.itemId,
+        eventId: data.eventId,
+        quantity: parseInt(data.quantity),
+        condition: data.condition,
+        notes: data.notes || null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/inventory/items'] });
+      toast({ title: 'Items returned successfully' });
+      setIsReturnModalOpen(false);
+      setReturnData({ itemId: '', eventId: '', quantity: '', condition: 'good', notes: '' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to return items', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
       name: formData.name,
       description: formData.description || null,
       category: formData.category,
-      sku: formData.sku || `SKU-${Date.now()}`,
+      itemType: formData.itemType,
+      // Let server auto-generate SKU if not provided - just pass the value or empty string
+      sku: formData.sku || '',
       unitCost: formData.unitCost || '0',
       stockQuantity: parseInt(formData.stockQuantity) || 0,
       minStockLevel: parseInt(formData.minStockLevel) || 0,
@@ -714,6 +826,7 @@ function InventoryItemsSection({
       name: item.name,
       description: item.description || '',
       category: item.category || 'Other',
+      itemType: (item.itemType as 'consumable' | 'reusable') || 'reusable',
       sku: item.sku || '',
       unitCost: item.unitCost || '',
       stockQuantity: String(item.stockQuantity || 0),
@@ -736,24 +849,43 @@ function InventoryItemsSection({
 
   const handleDownloadExcel = async () => {
     try {
-      const XLSX = await import('xlsx');
-      const data = filteredItems.map((item, index) => ({
-        'SL No': index + 1,
-        'Item Name': item.name,
-        'Category': item.category,
-        'SKU': item.sku || '',
-        'Stock Qty': item.stockQuantity,
-        'Min Level': item.minStockLevel || 0,
-        'Unit Cost': safeNumber(item.unitCost),
-        'Total Value': item.stockQuantity * safeNumber(item.unitCost),
-        'Location': item.location || '',
-        'Status': item.isActive ? 'Active' : 'Inactive',
-      }));
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
-      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 20 }, { wch: 10 }];
-      XLSX.writeFile(wb, `Inventory_Items_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      const ExcelJS = await import('exceljs');
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Inventory');
+      ws.columns = [
+        { header: 'SL No', key: 'slNo', width: 8 },
+        { header: 'Item Name', key: 'name', width: 30 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'SKU', key: 'sku', width: 20 },
+        { header: 'Stock Qty', key: 'stockQty', width: 10 },
+        { header: 'Min Level', key: 'minLevel', width: 10 },
+        { header: 'Unit Cost', key: 'unitCost', width: 12 },
+        { header: 'Total Value', key: 'totalValue', width: 14 },
+        { header: 'Location', key: 'location', width: 20 },
+        { header: 'Status', key: 'status', width: 10 },
+      ];
+      filteredItems.forEach((item, index) => {
+        ws.addRow({
+          slNo: index + 1,
+          name: item.name,
+          category: item.category,
+          sku: item.sku || '',
+          stockQty: item.stockQuantity,
+          minLevel: item.minStockLevel || 0,
+          unitCost: safeNumber(item.unitCost),
+          totalValue: item.stockQuantity * safeNumber(item.unitCost),
+          location: item.location || '',
+          status: item.isActive ? 'Active' : 'Inactive',
+        });
+      });
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Inventory_Items_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
       toast({ title: 'Excel downloaded successfully' });
     } catch (error) {
       toast({ title: 'Failed to download', variant: 'destructive' });
@@ -786,6 +918,21 @@ function InventoryItemsSection({
             Add Item
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 bg-muted/50 p-3 rounded-lg">
+        <Button variant="default" size="sm" onClick={() => setIsStockInModalOpen(true)} data-testid="button-stock-in" className="bg-green-600 hover:bg-green-700">
+          <ArrowUp className="w-4 h-4 mr-2" />
+          Stock IN
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setIsIssueModalOpen(true)} data-testid="button-issue-to-event" className="border-amber-500 text-amber-700 hover:bg-amber-50">
+          <ArrowDown className="w-4 h-4 mr-2" />
+          Issue to Event
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setIsReturnModalOpen(true)} data-testid="button-return-from-event" className="border-blue-500 text-blue-700 hover:bg-blue-50">
+          <ArrowUp className="w-4 h-4 mr-2" />
+          Return from Event
+        </Button>
       </div>
 
       <div className="grid gap-3 sm:gap-4 grid-cols-2 sm:grid-cols-3">
@@ -829,6 +976,46 @@ function InventoryItemsSection({
           </CardContent>
         </Card>
       </div>
+
+      {lowStockCount > 0 && (() => {
+        const lowStockItems = filteredItems.filter(item => item.stockQuantity < (item.minStockLevel || 0));
+        const consumableLowStock = lowStockItems.filter(item => (item as any).itemType === 'consumable');
+        const reusableLowStock = lowStockItems.filter(item => (item as any).itemType !== 'consumable');
+        return (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <span className="font-semibold text-red-800">Low Stock Alert</span>
+              </div>
+              {consumableLowStock.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-red-700 mb-2">CON - Consumables (Urgent - cannot be returned)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {consumableLowStock.map(item => (
+                      <Badge key={item.id} variant="destructive" className="px-3 py-1 bg-red-700" data-testid={`badge-low-stock-${item.id}`}>
+                        {item.name}: {item.stockQuantity}/{item.minStockLevel}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {reusableLowStock.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-amber-700 mb-2">REU - Reusables (May return from events)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {reusableLowStock.map(item => (
+                      <Badge key={item.id} variant="outline" className="px-3 py-1 border-amber-500 text-amber-800" data-testid={`badge-low-stock-${item.id}`}>
+                        {item.name}: {item.stockQuantity}/{item.minStockLevel}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Card>
         <CardHeader className="p-3 sm:p-6">
@@ -918,18 +1105,21 @@ function InventoryItemsSection({
           </div>
 
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
+          <div className="hidden md:block overflow-x-auto -mx-3 sm:-mx-6 px-3 sm:px-6">
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Category</TableHead>
                   <TableHead>SKU</TableHead>
-                  <TableHead className="text-right">Stock Qty</TableHead>
+                  <TableHead className="text-right">Available</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Issued</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Damaged</TableHead>
                   <TableHead className="text-right">Min Stock</TableHead>
-                  <TableHead className="text-right">Unit Cost</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
-                  <TableHead>Location</TableHead>
+                  <TableHead className="text-right">Avg Cost</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Total Value</TableHead>
+                  <TableHead className="hidden lg:table-cell">Location</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -944,43 +1134,36 @@ function InventoryItemsSection({
                 ) : (
                   filteredItems.map((item) => {
                     const isLowStock = item.stockQuantity < (item.minStockLevel || 0);
+                    const issuedQty = (item as any).issuedQuantity || 0;
+                    const damagedQty = (item as any).damagedQuantity || 0;
+                    const itemType = (item as any).itemType || 'reusable';
                     return (
                       <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                         <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={itemType === 'consumable' ? 'secondary' : 'default'} className="text-xs">
+                            {itemType === 'consumable' ? 'CON' : 'REU'}
+                          </Badge>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="outline">{item.category}</Badge>
                         </TableCell>
                         <TableCell className="font-mono text-sm">{item.sku || '-'}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => adjustStockMutation.mutate({ itemId: item.id, type: 'out', quantity: 1 })}
-                              disabled={item.stockQuantity <= 0}
-                              data-testid={`button-stock-out-${item.id}`}
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                            <span className={isLowStock ? 'text-red-600 font-semibold' : ''}>
-                              {item.stockQuantity}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => adjustStockMutation.mutate({ itemId: item.id, type: 'in', quantity: 1 })}
-                              data-testid={`button-stock-in-${item.id}`}
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                          </div>
+                          <span className={isLowStock ? 'text-red-600 font-semibold' : ''}>
+                            {item.stockQuantity}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right hidden lg:table-cell text-amber-600">
+                          {issuedQty > 0 ? issuedQty : '-'}
+                        </TableCell>
+                        <TableCell className="text-right hidden lg:table-cell text-red-600">
+                          {damagedQty > 0 ? damagedQty : '-'}
                         </TableCell>
                         <TableCell className="text-right">{item.minStockLevel || 0}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.unitCost)}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(item.stockQuantity * safeNumber(item.unitCost))}</TableCell>
-                        <TableCell>{item.location || '-'}</TableCell>
+                        <TableCell className="text-right font-semibold hidden lg:table-cell">{formatCurrency(item.stockQuantity * safeNumber(item.unitCost))}</TableCell>
+                        <TableCell className="hidden lg:table-cell">{item.location || '-'}</TableCell>
                         <TableCell>
                           {isLowStock && (
                             <Badge variant="destructive" className="mr-1">Low Stock</Badge>
@@ -1088,15 +1271,37 @@ function InventoryItemsSection({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={2}
-                data-testid="input-item-description"
-              />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="itemType">Item Type *</Label>
+                <Select
+                  value={formData.itemType}
+                  onValueChange={(v) => setFormData({ ...formData, itemType: v as 'consumable' | 'reusable' })}
+                >
+                  <SelectTrigger data-testid="select-item-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reusable">REU - Reusable</SelectItem>
+                    <SelectItem value="consumable">CON - Consumable</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {formData.itemType === 'consumable' 
+                    ? 'CON: Used once (e.g., flowers, tape)' 
+                    : 'REU: Return after events (e.g., furniture, décor)'}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={2}
+                  data-testid="input-item-description"
+                />
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -1287,6 +1492,332 @@ function InventoryItemsSection({
             <Button variant="outline" onClick={() => setViewingItem(null)}>Close</Button>
             <Button onClick={() => { if (viewingItem) handleEdit(viewingItem); setViewingItem(null); }}>Edit</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isStockInModalOpen} onOpenChange={setIsStockInModalOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Stock IN (Purchase Entry)</DialogTitle>
+            <DialogDescription>Record a new purchase to add stock</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); stockInMutation.mutate(stockInData); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Item *</Label>
+              <Select value={stockInData.itemId} onValueChange={(v) => setStockInData({ ...stockInData, itemId: v })}>
+                <SelectTrigger data-testid="select-stock-in-item">
+                  <SelectValue placeholder="Select inventory item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.filter(i => i.isActive).map(item => (
+                    <SelectItem key={item.id} value={item.id}>{item.name} ({item.sku})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Quantity *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={stockInData.quantity}
+                  onChange={(e) => setStockInData({ ...stockInData, quantity: e.target.value })}
+                  required
+                  data-testid="input-stock-in-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unit Cost *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={stockInData.unitCost}
+                  onChange={(e) => setStockInData({ ...stockInData, unitCost: e.target.value })}
+                  required
+                  data-testid="input-stock-in-cost"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Supplier</Label>
+              <Input
+                value={stockInData.supplier}
+                onChange={(e) => setStockInData({ ...stockInData, supplier: e.target.value })}
+                placeholder="Supplier name"
+                data-testid="input-stock-in-supplier"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Invoice Number</Label>
+                <Input
+                  value={stockInData.invoiceNumber}
+                  onChange={(e) => setStockInData({ ...stockInData, invoiceNumber: e.target.value })}
+                  placeholder="INV-001"
+                  data-testid="input-stock-in-invoice"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Purchase Date</Label>
+                <Input
+                  type="date"
+                  value={stockInData.purchaseDate}
+                  onChange={(e) => setStockInData({ ...stockInData, purchaseDate: e.target.value })}
+                  data-testid="input-stock-in-date"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={stockInData.notes}
+                onChange={(e) => setStockInData({ ...stockInData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={2}
+                data-testid="input-stock-in-notes"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsStockInModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!stockInData.itemId || !stockInData.quantity || !stockInData.unitCost || stockInMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                {stockInMutation.isPending ? 'Adding...' : 'Add Stock'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isIssueModalOpen} onOpenChange={setIsIssueModalOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Issue to Event</DialogTitle>
+            <DialogDescription>Issue inventory items to an event</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); issueMutation.mutate(issueData); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Item *</Label>
+              <Select value={issueData.itemId} onValueChange={(v) => setIssueData({ ...issueData, itemId: v })}>
+                <SelectTrigger data-testid="select-issue-item">
+                  <SelectValue placeholder="Select inventory item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.filter(i => i.isActive && i.stockQuantity > 0).map(item => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} (Available: {item.stockQuantity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Select Event *</Label>
+              <Popover open={issueEventOpen} onOpenChange={setIssueEventOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={issueEventOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-issue-event"
+                  >
+                    {issueData.eventId
+                      ? events.find(e => e.id === issueData.eventId)?.title + ' (' + events.find(e => e.id === issueData.eventId)?.date + ')'
+                      : "Search and select event..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={issueEventSearch}
+                      onValueChange={setIssueEventSearch}
+                    />
+                    <CommandList className="max-h-[200px]">
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {events
+                          .filter(e => e.status === 'active')
+                          .filter(e => 
+                            !issueEventSearch || 
+                            e.title.toLowerCase().includes(issueEventSearch.toLowerCase()) ||
+                            e.date.includes(issueEventSearch)
+                          )
+                          .map(event => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.title + ' ' + event.date}
+                              onSelect={() => {
+                                setIssueData({ ...issueData, eventId: event.id });
+                                setIssueEventOpen(false);
+                                setIssueEventSearch('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", issueData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                              {event.title} ({event.date})
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity *</Label>
+              <Input
+                type="number"
+                min="1"
+                max={items.find(i => i.id === issueData.itemId)?.stockQuantity || 999}
+                value={issueData.quantity}
+                onChange={(e) => setIssueData({ ...issueData, quantity: e.target.value })}
+                required
+                data-testid="input-issue-quantity"
+              />
+              {issueData.itemId && (
+                <p className="text-xs text-muted-foreground">
+                  Available: {items.find(i => i.id === issueData.itemId)?.stockQuantity || 0}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={issueData.notes}
+                onChange={(e) => setIssueData({ ...issueData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={2}
+                data-testid="input-issue-notes"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsIssueModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!issueData.itemId || !issueData.eventId || !issueData.quantity || issueMutation.isPending} className="bg-amber-600 hover:bg-amber-700">
+                {issueMutation.isPending ? 'Issuing...' : 'Issue Items'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReturnModalOpen} onOpenChange={setIsReturnModalOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Return from Event</DialogTitle>
+            <DialogDescription>Return inventory items from an event</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => { e.preventDefault(); returnMutation.mutate(returnData); }} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Item *</Label>
+              <Select value={returnData.itemId} onValueChange={(v) => setReturnData({ ...returnData, itemId: v })}>
+                <SelectTrigger data-testid="select-return-item">
+                  <SelectValue placeholder="Select inventory item" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.filter(i => (i as any).issuedQuantity > 0 || (i as any).itemType === 'reusable').map(item => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name} (Issued: {(item as any).issuedQuantity || 0})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>From Event *</Label>
+              <Popover open={returnEventOpen} onOpenChange={setReturnEventOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={returnEventOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-return-event"
+                  >
+                    {returnData.eventId
+                      ? events.find(e => e.id === returnData.eventId)?.title + ' (' + events.find(e => e.id === returnData.eventId)?.date + ')'
+                      : "Search and select event..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search events..." 
+                      value={returnEventSearch}
+                      onValueChange={setReturnEventSearch}
+                    />
+                    <CommandList className="max-h-[200px]">
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {events
+                          .filter(e => 
+                            !returnEventSearch || 
+                            e.title.toLowerCase().includes(returnEventSearch.toLowerCase()) ||
+                            e.date.includes(returnEventSearch)
+                          )
+                          .map(event => (
+                            <CommandItem
+                              key={event.id}
+                              value={event.title + ' ' + event.date}
+                              onSelect={() => {
+                                setReturnData({ ...returnData, eventId: event.id });
+                                setReturnEventOpen(false);
+                                setReturnEventSearch('');
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", returnData.eventId === event.id ? "opacity-100" : "opacity-0")} />
+                              {event.title} ({event.date})
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label>Quantity *</Label>
+              <Input
+                type="number"
+                min="1"
+                value={returnData.quantity}
+                onChange={(e) => setReturnData({ ...returnData, quantity: e.target.value })}
+                required
+                data-testid="input-return-quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Condition *</Label>
+              <Select value={returnData.condition} onValueChange={(v) => setReturnData({ ...returnData, condition: v as 'good' | 'damaged' | 'lost' })}>
+                <SelectTrigger data-testid="select-return-condition">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="good">Good - Returns to available stock</SelectItem>
+                  <SelectItem value="damaged">Damaged - Moves to damaged bucket</SelectItem>
+                  <SelectItem value="lost">Lost - Permanent deduction</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={returnData.notes}
+                onChange={(e) => setReturnData({ ...returnData, notes: e.target.value })}
+                placeholder="Additional notes..."
+                rows={2}
+                data-testid="input-return-notes"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsReturnModalOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={!returnData.itemId || !returnData.eventId || !returnData.quantity || returnMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+                {returnMutation.isPending ? 'Returning...' : 'Return Items'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
@@ -1714,28 +2245,44 @@ function EventInventorySection({
   const handleDownloadDeliveryNoteExcel = async () => {
     if (!selectedSession) return;
     try {
-      const XLSX = await import('xlsx');
+      const ExcelJS = await import('exceljs');
       const eventName = getEventName(selectedSession.eventId);
-      const data = sessionItemsForSelected.map((item, index) => {
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Delivery Note');
+      ws.columns = [
+        { header: 'SL No', key: 'slNo', width: 8 },
+        { header: 'Item Name', key: 'name', width: 30 },
+        { header: 'Category', key: 'category', width: 15 },
+        { header: 'Qty Issued', key: 'qtyIssued', width: 12 },
+        { header: 'Qty Returned', key: 'qtyReturned', width: 12 },
+        { header: 'Qty Damaged', key: 'qtyDamaged', width: 12 },
+        { header: 'Qty Lost', key: 'qtyLost', width: 10 },
+        { header: 'Status', key: 'status', width: 12 },
+        { header: 'Notes', key: 'notes', width: 25 },
+      ];
+      sessionItemsForSelected.forEach((item, index) => {
         const invItem = getItemDetails(item.itemId);
-        return {
-          'SL No': index + 1,
-          'Item Name': invItem?.name || 'Unknown',
-          'Category': invItem?.category || '-',
-          'Qty Issued': item.quantityIssued || 0,
-          'Qty Returned': item.quantityReturned || 0,
-          'Qty Damaged': item.quantityDamaged || 0,
-          'Qty Lost': item.quantityLost || 0,
-          'Status': item.quantityReturned === item.quantityIssued ? 'Returned' : 
+        ws.addRow({
+          slNo: index + 1,
+          name: invItem?.name || 'Unknown',
+          category: invItem?.category || '-',
+          qtyIssued: item.quantityIssued || 0,
+          qtyReturned: item.quantityReturned || 0,
+          qtyDamaged: item.quantityDamaged || 0,
+          qtyLost: item.quantityLost || 0,
+          status: item.quantityReturned === item.quantityIssued ? 'Returned' :
                    (item.quantityDamaged || item.quantityLost) > 0 ? 'Damaged/Lost' : 'Issued',
-          'Notes': item.damageNotes || '',
-        };
+          notes: item.damageNotes || '',
+        });
       });
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Delivery Note');
-      ws['!cols'] = [{ wch: 8 }, { wch: 30 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 25 }];
-      XLSX.writeFile(wb, `Delivery_Note_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Delivery_Note_${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
       toast({ title: 'Excel file downloaded' });
     } catch (error) {
       toast({ title: 'Failed to download', variant: 'destructive' });
@@ -2692,26 +3239,43 @@ function RentalsSection({
 
   const handleDownloadRentalItems = async () => {
     if (!selectedRental || rentalItemsForSelected.length === 0) return;
-    
-    const XLSX = await import('xlsx');
-    const data = rentalItemsForSelected.map((item, index) => ({
-      'SL No': index + 1,
-      'Item Name': item.itemName,
-      'Qty Issued': item.quantity,
-      'Qty Returned': item.quantityReturned || 0,
-      'Pending': item.quantity - (item.quantityReturned || 0),
-      'Unit Rate': item.unitRate || '0',
-      'Condition': item.condition || '',
-      'Return Condition': item.returnCondition || '',
-    }));
-    
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Rental Items');
-    
+
+    const ExcelJS = await import('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Rental Items');
+    ws.columns = [
+      { header: 'SL No', key: 'slNo', width: 8 },
+      { header: 'Item Name', key: 'itemName', width: 30 },
+      { header: 'Qty Issued', key: 'qtyIssued', width: 12 },
+      { header: 'Qty Returned', key: 'qtyReturned', width: 12 },
+      { header: 'Pending', key: 'pending', width: 10 },
+      { header: 'Unit Rate', key: 'unitRate', width: 12 },
+      { header: 'Condition', key: 'condition', width: 15 },
+      { header: 'Return Condition', key: 'returnCondition', width: 15 },
+    ];
+    rentalItemsForSelected.forEach((item, index) => {
+      ws.addRow({
+        slNo: index + 1,
+        itemName: item.itemName,
+        qtyIssued: item.quantity,
+        qtyReturned: item.quantityReturned || 0,
+        pending: item.quantity - (item.quantityReturned || 0),
+        unitRate: item.unitRate || '0',
+        condition: item.condition || '',
+        returnCondition: item.returnCondition || '',
+      });
+    });
+
     const vendorName = getVendorName(selectedRental.vendorId);
     const eventName = getEventName(selectedRental.eventId);
-    XLSX.writeFile(wb, `Rental_${vendorName}_${eventName}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Rental_${vendorName}_${eventName}_${format(new Date(), 'yyyyMMdd')}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
     toast({ title: 'Rental items downloaded successfully' });
   };
 
@@ -5053,7 +5617,7 @@ const PASTEL_COLORS: Record<string, { bg: string; border: string; badge: string 
   pink: { bg: 'bg-pink-50', border: 'border-pink-200', badge: 'bg-pink-100 text-pink-700' },
   green: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700' },
   yellow: { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' },
-  purple: { bg: 'bg-green-50', border: 'border-green-200', badge: 'bg-green-100 text-green-700' },
+  purple: { bg: 'bg-purple-50', border: 'border-purple-200', badge: 'bg-purple-100 text-purple-700' },
   orange: { bg: 'bg-orange-50', border: 'border-orange-200', badge: 'bg-orange-100 text-orange-700' },
   teal: { bg: 'bg-teal-50', border: 'border-teal-200', badge: 'bg-teal-100 text-teal-700' },
   rose: { bg: 'bg-rose-50', border: 'border-rose-200', badge: 'bg-rose-100 text-rose-700' },
@@ -5377,7 +5941,7 @@ function DecorPlanningSection({
     const colors: Record<string, string> = {
       in_stock: 'bg-green-100 text-green-700',
       to_buy: 'bg-blue-100 text-blue-700',
-      to_rent: 'bg-green-100 text-green-700',
+      to_rent: 'bg-purple-100 text-purple-700',
     };
     const labels: Record<string, string> = { in_stock: 'In Stock', to_buy: 'To Buy', to_rent: 'To Rent' };
     return <Badge className={colors[source] || 'bg-gray-100 text-gray-700'}>{labels[source] || source}</Badge>;
@@ -7500,6 +8064,148 @@ function EventManpowerSection({ events }: { events: Event[] }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function LedgerSection({ items, events }: { items: InventoryItem[]; events: Event[] }) {
+  const [selectedItem, setSelectedItem] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  
+  const { data: transactions = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/inventory/transactions', { itemId: selectedItem, from: dateFrom, to: dateTo }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedItem) params.append('itemId', selectedItem);
+      if (dateFrom) params.append('from', dateFrom);
+      if (dateTo) params.append('to', dateTo);
+      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
+      if (!res.ok) throw new Error('Failed to fetch transactions');
+      return res.json();
+    },
+  });
+
+  const getEventName = (eventId: string | null) => {
+    if (!eventId) return '-';
+    const event = events.find(e => e.id === eventId);
+    return event?.title || eventId;
+  };
+
+  const getItemName = (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    return item?.name || itemId;
+  };
+
+  const getActionBadge = (type: string, actionType: string | null) => {
+    if (actionType === 'purchase') return <Badge className="bg-green-600">Purchase IN</Badge>;
+    if (actionType === 'issue') return <Badge className="bg-amber-600">Issued OUT</Badge>;
+    if (actionType === 'return_good') return <Badge className="bg-blue-600">Return Good</Badge>;
+    if (actionType === 'return_damaged') return <Badge className="bg-red-600">Return Damaged</Badge>;
+    if (actionType === 'return_lost') return <Badge variant="destructive">Lost</Badge>;
+    if (type === 'in') return <Badge className="bg-green-600">Stock IN</Badge>;
+    if (type === 'out') return <Badge className="bg-amber-600">Stock OUT</Badge>;
+    return <Badge variant="secondary">{type}</Badge>;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Stock Ledger</h1>
+          <p className="text-muted-foreground">Immutable audit trail of all inventory movements</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Filter by Item</Label>
+              <Select value={selectedItem} onValueChange={setSelectedItem}>
+                <SelectTrigger data-testid="select-ledger-item">
+                  <SelectValue placeholder="All items" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All items</SelectItem>
+                  {items.map(item => (
+                    <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>From Date</Label>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                data-testid="input-ledger-from"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>To Date</Label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                data-testid="input-ledger-to"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading ledger...</div>
+          ) : transactions.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">No transactions found</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Item</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Unit Cost</TableHead>
+                  <TableHead className="text-right hidden lg:table-cell">Total Value</TableHead>
+                  <TableHead className="hidden lg:table-cell">Event</TableHead>
+                  <TableHead className="hidden lg:table-cell">Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactions.map((tx: any) => (
+                  <TableRow key={tx.id} data-testid={`row-ledger-${tx.id}`}>
+                    <TableCell className="text-sm">
+                      {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString('en-IN') : '-'}
+                    </TableCell>
+                    <TableCell className="font-medium">{getItemName(tx.itemId)}</TableCell>
+                    <TableCell>{getActionBadge(tx.type, tx.actionType)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={tx.type === 'in' ? 'text-green-600' : 'text-red-600'}>
+                        {tx.type === 'in' ? '+' : '-'}{tx.quantity}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right hidden lg:table-cell">
+                      {tx.unitCost ? formatCurrency(tx.unitCost) : '-'}
+                    </TableCell>
+                    <TableCell className="text-right hidden lg:table-cell">
+                      {tx.totalValue ? formatCurrency(tx.totalValue) : '-'}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">{getEventName(tx.eventId)}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground truncate max-w-[200px]">
+                      {tx.notes || '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

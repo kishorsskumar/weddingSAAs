@@ -1,12 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "wouter";
 import { format } from "date-fns";
+import html2pdf from "html2pdf.js";
 import logo from "@assets/OAK_1_1766646679471.jpg";
 import yepmanLogo from "@assets/Yepman_1767319118647.png";
+const metaEventsLogo = logo;
 
-// Brand colors
 const BRAND_COLOR = '#6b9937';
-const YEPMAN_BRAND_COLOR = '#9d2966';  // Yepman brand color (maroon/magenta)
+const YEPMAN_BRAND_COLOR = '#9d2966';
+const META_EVENTS_BRAND_COLOR = '#2d3436';
+
+// Helper function to safely format dates
+function safeFormatDate(dateValue: any, formatStr: string = 'dd/MM/yyyy'): string {
+  if (!dateValue) return '—';
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return '—';
+    return format(date, formatStr);
+  } catch {
+    return '—';
+  }
+}
+
+// Company info constants
+const META_EVENTS_INFO = {
+  name: 'Meta Events',
+  address: 'Kottodimukku Stop,\nManjummel, Edappally - 683501',
+};
 
 interface LineItem {
   slNo?: number;
@@ -22,6 +42,7 @@ interface LineItem {
   sgstPercent?: number;
   sgstAmount?: number;
   isHeading?: boolean;
+  isInternalOnly?: boolean;
 }
 
 interface DocumentData {
@@ -88,57 +109,229 @@ function formatIndianCurrency(amount: number): string {
   return formatted;
 }
 
-export default function PrintDocument({ injectedData, injectedType }: { injectedData?: DocumentData; injectedType?: string } = {}) {
+export default function PrintDocument() {
   const params = useParams<{ type: string; id: string }>();
-  const [data, setData] = useState<DocumentData | null>(injectedData || null);
-  const [loading, setLoading] = useState(!injectedData);
+  const [data, setData] = useState<DocumentData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const searchParams = new URLSearchParams(window.location.search);
-  const hideHeader = searchParams.get('noHeader') === 'true';
-
-  const docType = injectedType || params.type;
+  // Check for noHeader - using both localStorage and URL for reliability
+  const [hideHeader] = useState(() => {
+    // First check localStorage (most reliable for cross-window communication)
+    const localStorageValue = localStorage.getItem('print_hideHeader');
+    if (localStorageValue === 'true') {
+      // Clear it after reading to prevent stale values on future prints
+      localStorage.removeItem('print_hideHeader');
+      console.log('PrintDocument - hideHeader from localStorage: true');
+      return true;
+    }
+    
+    // Fallback to URL query parameter
+    // Try window.location.search first
+    let searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('noHeader') === 'true') {
+      console.log('PrintDocument - hideHeader from URL search: true');
+      return true;
+    }
+    
+    // Try parsing from the hash (in case of hash-based routing)
+    const hashParts = window.location.hash.split('?');
+    if (hashParts.length > 1) {
+      searchParams = new URLSearchParams(hashParts[1]);
+      if (searchParams.get('noHeader') === 'true') {
+        console.log('PrintDocument - hideHeader from hash: true');
+        return true;
+      }
+    }
+    
+    // Try parsing from the full href
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('noHeader') === 'true') {
+        console.log('PrintDocument - hideHeader from URL: true');
+        return true;
+      }
+    } catch (e) {
+      // URL parsing failed
+    }
+    
+    console.log('PrintDocument - hideHeader: false (default)');
+    return false;
+  });
+  
+  // Debug log
+  console.log('PrintDocument - Full URL:', window.location.href);
+  console.log('PrintDocument - Final hideHeader value:', hideHeader);
 
   useEffect(() => {
-    if (injectedData) return;
-
     async function fetchData() {
       try {
         const type = params.type;
         const id = params.id;
+        
+        // Check for portal token (for portal users who don't have session auth)
+        const urlParams = new URLSearchParams(window.location.search);
+        const portalToken = urlParams.get('portalToken');
 
-        if (type === 'checklist') {
-          const safeFetch = async (url: string) => {
-            const r = await fetch(url, { credentials: 'include' });
-            if (!r.ok) throw new Error(`Failed to fetch ${url}: ${r.status}`);
-            return r.json();
-          };
-          const safeArray = (d: any) => Array.isArray(d) ? d : [];
-          const settingsRes = await fetch('/api/company-settings', { credentials: 'include' });
-          const companySettings = await settingsRes.json();
-          const [plans, checklist, events] = await Promise.all([
-            safeFetch(`/api/execution-plans`),
-            safeFetch(`/api/execution-plans/${id}/checklist`),
-            safeFetch('/api/events'),
+        const [settingsRes] = await Promise.all([
+          fetch('/api/company-settings', { credentials: 'include' }),
+        ]);
+        const companySettings = await settingsRes.json();
+
+        let docData: DocumentData = { companySettings };
+
+        if (type === 'quote') {
+          // Use portal API if portal token is provided
+          if (portalToken) {
+            const portalRes = await fetch(`/api/portal/estimate/${id}?token=${portalToken}`);
+            if (!portalRes.ok) {
+              throw new Error('Failed to fetch estimate from portal');
+            }
+            const portalData = await portalRes.json();
+            docData.estimate = portalData.estimate;
+            if (portalData.companySettings) {
+              docData.companySettings = portalData.companySettings;
+            }
+          } else {
+            const [estimateRes, customersRes, leadsRes] = await Promise.all([
+              fetch(`/api/estimates/${id}`, { credentials: 'include' }),
+              fetch('/api/customers', { credentials: 'include' }),
+              fetch('/api/leads', { credentials: 'include' }),
+            ]);
+            const estimate = await estimateRes.json();
+            const customers = customersRes.ok ? await customersRes.json() : [];
+            const leads = leadsRes.ok ? await leadsRes.json() : [];
+          
+            // If estimate has a leadId but no customerId, attach leadName
+            if (estimate.leadId && !estimate.customerId) {
+              const lead = leads.find((l: any) => l.id === estimate.leadId);
+              if (lead) {
+                estimate.leadName = lead.name;
+              }
+            }
+          
+            docData.estimate = estimate;
+            docData.customer = customers.find((c: any) => c.id === estimate.customerId);
+          }
+        } else if (type === 'invoice') {
+          const [invoiceRes, customersRes, leadsRes] = await Promise.all([
+            fetch(`/api/invoices/${id}`, { credentials: 'include' }),
+            fetch('/api/customers', { credentials: 'include' }),
+            fetch('/api/leads', { credentials: 'include' }),
           ]);
-          const plan = safeArray(plans).find((p: any) => p.id === id);
-          const docData: DocumentData = { companySettings };
+          const invoice = await invoiceRes.json();
+          const customers = customersRes.ok ? await customersRes.json() : [];
+          const leads = leadsRes.ok ? await leadsRes.json() : [];
+          
+          // If invoice has a leadId but no customerId, attach leadName
+          if (invoice.leadId && !invoice.customerId) {
+            const lead = leads.find((l: any) => l.id === invoice.leadId);
+            if (lead) {
+              invoice.leadName = lead.name;
+            }
+          }
+          
+          docData.invoice = invoice;
+          docData.customer = customers.find((c: any) => c.id === invoice.customerId);
+        } else if (type === 'receipt') {
+          // Fetch single payment directly instead of all payments
+          console.log('[ReceiptPrint] Fetching payment:', id);
+          const paymentRes = await fetch(`/api/customer-payments/${id}`, { credentials: 'include' });
+          if (!paymentRes.ok) {
+            const errorText = await paymentRes.text();
+            console.error('[ReceiptPrint] Payment fetch failed:', paymentRes.status, errorText);
+            throw new Error(`Failed to fetch payment: ${paymentRes.status}`);
+          }
+          const payment = await paymentRes.json();
+          console.log('[ReceiptPrint] Payment loaded:', payment.number);
+          
+          // Now fetch related data in parallel
+          const [customersRes, invoicesRes, banksRes] = await Promise.all([
+            fetch('/api/customers', { credentials: 'include' }),
+            fetch('/api/invoices', { credentials: 'include' }),
+            fetch('/api/banks', { credentials: 'include' }),
+          ]);
+          const customers = customersRes.ok ? await customersRes.json() : [];
+          const invoices = invoicesRes.ok ? await invoicesRes.json() : [];
+          const banks = banksRes.ok ? await banksRes.json() : [];
+          
+          docData.payment = payment;
+          docData.customer = customers.find((c: any) => c.id === payment.customerId);
+          docData.invoice = invoices.find((i: any) => i.id === payment.invoiceId);
+          docData.bank = banks.find((b: any) => b.id === payment.bankId);
+          console.log('[ReceiptPrint] Data loaded successfully');
+        } else if (type === 'checklist') {
+          const [planRes, checklistRes, eventsRes] = await Promise.all([
+            fetch(`/api/execution-plans`, { credentials: 'include' }),
+            fetch(`/api/execution-plans/${id}/checklist`, { credentials: 'include' }),
+            fetch('/api/events', { credentials: 'include' }),
+          ]);
+          const plans = planRes.ok ? await planRes.json() : [];
+          const checklist = checklistRes.ok ? await checklistRes.json() : [];
+          const events = eventsRes.ok ? await eventsRes.json() : [];
+          const plan = plans.find((p: any) => p.id === id);
           if (plan) {
             docData.plan = plan;
             docData.checklist = checklist;
-            docData.event = safeArray(events).find((e: any) => e.id === plan.eventId);
+            docData.event = events.find((e: any) => e.id === plan.eventId);
           }
-          setData(docData);
-        } else {
-          const res = await fetch(`/api/print-data/${type}/${id}`, { credentials: 'include' });
-          if (!res.ok) throw new Error(`Failed to load document data: ${res.status}`);
-          const docData = await res.json();
-          setData(docData);
+        } else if (type === 'delivery-challan') {
+          const challanRes = await fetch(`/api/delivery-challans/${id}`, { credentials: 'include' });
+          const deliveryChallan = challanRes.ok ? await challanRes.json() : null;
+          docData.deliveryChallan = deliveryChallan;
         }
 
+        setData(docData);
         setLoading(false);
+
         setTimeout(() => {
           (window as any).printReady = true;
+          
+          // Auto-trigger PDF download if download parameter is present
+          const urlParams = new URLSearchParams(window.location.search);
+          if (urlParams.get('download') === 'true') {
+            setTimeout(async () => {
+              const element = document.getElementById('print-content');
+              if (element) {
+                // Generate filename based on document type and number
+                let filename = 'document.pdf';
+                if (type === 'quote' && docData.estimate) {
+                  filename = `${docData.estimate.number || 'Quote'}.pdf`;
+                } else if (type === 'invoice' && docData.invoice) {
+                  filename = `${docData.invoice.number || 'Invoice'}.pdf`;
+                } else if (type === 'receipt' && docData.payment) {
+                  filename = `Receipt-${docData.payment.number || id}.pdf`;
+                } else if (type === 'delivery-challan' && docData.deliveryChallan) {
+                  filename = `Challan-${docData.deliveryChallan.challanNumber || id}.pdf`;
+                }
+                
+                const opt = {
+                  margin: [10, 10, 10, 10],
+                  filename: filename,
+                  image: { type: 'jpeg', quality: 0.98 },
+                  html2canvas: { scale: 2, useCORS: true, logging: true },
+                  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                try {
+                  console.log('[PDF] Starting PDF generation for:', filename);
+                  await html2pdf().set(opt).from(element).save();
+                  console.log('[PDF] PDF generation completed');
+                } catch (pdfError) {
+                  console.error('[PDF] Error generating PDF:', pdfError);
+                  // Fallback to print dialog
+                  alert('PDF download failed. Opening print dialog instead - select "Save as PDF" to download.');
+                  window.print();
+                }
+              } else {
+                console.error('[PDF] print-content element not found');
+              }
+            }, 800);
+          } else if (urlParams.get('print') === 'true') {
+            setTimeout(() => {
+              window.print();
+            }, 500);
+          }
         }, 500);
       } catch (err) {
         setError(String(err));
@@ -147,7 +340,7 @@ export default function PrintDocument({ injectedData, injectedType }: { injected
     }
 
     fetchData();
-  }, [params.type, params.id, injectedData]);
+  }, [params.type, params.id]);
 
   if (loading) {
     return <div className="p-8 text-center">Loading...</div>;
@@ -159,23 +352,23 @@ export default function PrintDocument({ injectedData, injectedType }: { injected
 
   const { estimate, invoice, payment, customer, bank, companySettings } = data!;
 
-  if (docType === 'quote' && estimate) {
+  if (params.type === 'quote' && estimate) {
     return <QuotePrint estimate={estimate} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (docType === 'invoice' && invoice) {
+  if (params.type === 'invoice' && invoice) {
     return <InvoicePrint invoice={invoice} customer={customer} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (docType === 'receipt' && payment) {
+  if (params.type === 'receipt' && payment) {
     return <ReceiptPrint payment={payment} customer={customer} invoice={invoice} bank={bank} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
-  if (docType === 'checklist' && data?.checklist) {
+  if (params.type === 'checklist' && data?.checklist) {
     return <ChecklistPrint checklist={data.checklist} plan={data.plan} event={data.event} companySettings={companySettings} />;
   }
 
-  if (docType === 'delivery-challan' && data?.deliveryChallan) {
+  if (params.type === 'delivery-challan' && data?.deliveryChallan) {
     return <DeliveryChallanPrint challan={data.deliveryChallan} companySettings={companySettings} hideHeader={hideHeader} />;
   }
 
@@ -197,6 +390,8 @@ const baseStyles = `
   .company-info { flex: 1; }
   .company-logo { width: 180px; height: auto; background: white; padding: 4px; border-radius: 4px; margin-bottom: 8px; }
   .company-logo img { width: 100%; height: auto; max-height: 80px; object-fit: contain; }
+  .company-logo.meta-logo { width: 140px; }
+  .company-logo.meta-logo img { max-height: 70px; }
   .company-name { display: none; }
   .company-address { font-size: 11px; color: #444; line-height: 1.5; }
   .doc-type-box { text-align: right; }
@@ -227,16 +422,18 @@ const baseStyles = `
   .items-table td { padding: 6px; border-bottom: 1px solid #eee; vertical-align: top; }
   .items-table td.text-right { text-align: right; }
   .items-table td.text-center { text-align: center; }
+  .items-table tr { break-inside: avoid; page-break-inside: avoid; }
   .items-table .heading-row td { background: #f9f9f9; font-weight: bold; padding: 8px 6px; }
+  .items-table .heading-row { break-after: avoid; page-break-after: avoid; }
   .items-table .item-name { font-weight: 500; }
   .items-table .item-desc { color: #666; font-size: 9px; white-space: pre-line; margin-top: 2px; }
   .items-table .sl-no { width: 35px; text-align: center; }
-  .items-table .qty-col { width: 50px; text-align: right; }
+  .items-table .qty-col { width: 70px; text-align: right; }
   .items-table .rate-col { width: 80px; text-align: right; }
   .items-table .amount-col { width: 90px; text-align: right; }
   
   /* Totals */
-  .totals-section { display: flex; justify-content: flex-end; margin-bottom: 15px; }
+  .totals-section { display: flex; justify-content: flex-end; margin-bottom: 15px; break-inside: avoid; page-break-inside: avoid; }
   .totals-table { width: 280px; }
   .totals-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
   .totals-row.total-row { font-weight: bold; font-size: 13px; border-top: 2px solid #6b9937; border-bottom: none; padding-top: 8px; margin-top: 5px; }
@@ -269,8 +466,9 @@ const baseStyles = `
 `;
 
 function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
-  const rawLineItems: LineItem[] = estimate.lineItems || [];
+  const rawLineItems: LineItem[] = (estimate.lineItems || []).filter((item: LineItem) => !item.isInternalOnly);
   const isTaxDocument = estimate.isTaxDocument === true;
+  const isMetaEvents = estimate.companyBrand === 'meta_events';
   
   // Calculate serial numbers for non-heading items
   let slNoCounter = 0;
@@ -289,22 +487,48 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
   const cgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.cgstAmount || 0), 0) : 0;
   const sgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.sgstAmount || 0), 0) : 0;
 
+  // Determine company branding
+  const getBrandColor = () => {
+    if (isTaxDocument) return YEPMAN_BRAND_COLOR;
+    if (isMetaEvents) return META_EVENTS_BRAND_COLOR;
+    return BRAND_COLOR;
+  };
+  
+  const getCompanyLogo = () => {
+    if (isTaxDocument) return yepmanLogo;
+    if (isMetaEvents) return metaEventsLogo;
+    return logo;
+  };
+  
+  const getCompanyName = () => {
+    if (isTaxDocument) return 'Yepman International';
+    if (isMetaEvents) return META_EVENTS_INFO.name;
+    return companySettings?.companyName || 'Company';
+  };
+  
+  const getCompanyAddress = () => {
+    if (isMetaEvents) return META_EVENTS_INFO.address;
+    return companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia';
+  };
+
+  const brandColor = getBrandColor();
+
   return (
-    <div className="document">
+    <div id="print-content" className="document">
       <style>{quoteStyles}</style>
 
       {/* Header */}
       <div className="header">
         {!hideHeader && (
           <div className="company-info">
-            <div className="company-logo">
-              <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
+            <div className={`company-logo ${isMetaEvents ? 'meta-logo' : ''}`}>
+              <img src={getCompanyLogo()} alt="Logo" />
             </div>
-            <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
-              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company')}
+            <div className="company-name" style={{ color: brandColor }}>
+              {getCompanyName()}
             </div>
             <div className="company-address">
-              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
+              {getCompanyAddress().split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -313,7 +537,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>{isTaxDocument ? 'TAX ESTIMATE' : 'Quote'}</div>
+          <div className="doc-type" style={{ color: brandColor }}>{isTaxDocument ? 'TAX ESTIMATE' : 'Quote'}</div>
         </div>
       </div>
 
@@ -325,7 +549,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
         </div>
         <div className="doc-info-row">
           <span className="doc-info-label">{isTaxDocument ? 'Estimate Date' : 'Quote Date'}</span>
-          <span>: {format(new Date(estimate.date), 'dd/MM/yyyy')}</span>
+          <span>: {safeFormatDate(estimate.date)}</span>
         </div>
         {isTaxDocument && estimate.placeOfSupply && (
           <div className="doc-info-row">
@@ -339,7 +563,7 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
       <div className="bill-to-section">
         <div className="bill-to-label">Bill To</div>
         <div className="bill-to-content">
-          <div className="customer-name">{customer?.name || '—'}</div>
+          <div className="customer-name">{customer?.name || (estimate as any).leadName || '—'}</div>
           {(estimate.customerAddress || customer?.billingAddress || '').split('\n').map((line: string, i: number) => (
             <div key={i}>{line}</div>
           ))}
@@ -444,7 +668,26 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
             <span className="totals-label">Sub Total</span>
             <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.subtotal || estimate.total))}</span>
           </div>
-          {isTaxDocument ? (
+          {/* Service Charge - available for both standard and tax documents */}
+          {parseFloat(estimate.serviceChargeAmount) > 0 && (
+            <div className="totals-row" style={{ color: '#16a34a' }}>
+              <span className="totals-label">
+                Service Charge
+              </span>
+              <span className="totals-value">+{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
+            </div>
+          )}
+          {/* Discount - available for both standard and tax documents */}
+          {parseFloat(estimate.discountAmount) > 0 && (
+            <div className="totals-row" style={{ color: '#dc2626' }}>
+              <span className="totals-label">
+                Discount{parseFloat(estimate.discountPercent) > 0 ? ` (${estimate.discountPercent}%)` : ''}
+              </span>
+              <span className="totals-value">-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
+            </div>
+          )}
+          {/* GST for tax documents */}
+          {isTaxDocument && (
             <>
               {cgstTotal > 0 && (
                 <div className="totals-row">
@@ -456,21 +699,6 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
                 <div className="totals-row">
                   <span className="totals-label">SGST</span>
                   <span className="totals-value">{formatIndianCurrency(sgstTotal)}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {parseFloat(estimate.discountPercent) > 0 && (
-                <div className="totals-row" style={{ color: '#dc2626' }}>
-                  <span className="totals-label">Discount ({estimate.discountPercent}%)</span>
-                  <span className="totals-value">-{formatIndianCurrency(parseFloat(estimate.discountAmount))}</span>
-                </div>
-              )}
-              {parseFloat(estimate.serviceChargePercent) > 0 && (
-                <div className="totals-row">
-                  <span className="totals-label">Service Charge</span>
-                  <span className="totals-value">{formatIndianCurrency(parseFloat(estimate.serviceChargeAmount))}</span>
                 </div>
               )}
             </>
@@ -523,8 +751,9 @@ function QuotePrint({ estimate, customer, companySettings, hideHeader }: any) {
 }
 
 function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
-  const rawLineItems: LineItem[] = invoice.lineItems || [];
+  const rawLineItems: LineItem[] = (invoice.lineItems || []).filter((item: LineItem) => !item.isInternalOnly);
   const isTaxDocument = invoice.isTaxDocument === true;
+  const isMetaEvents = invoice.companyBrand === 'meta_events';
 
   // Calculate serial numbers for non-heading items
   let slNoCounter = 0;
@@ -543,8 +772,34 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
   const cgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.cgstAmount || 0), 0) : 0;
   const sgstTotal = isTaxDocument ? lineItems.filter(i => !i.isHeading).reduce((sum, item) => sum + (item.sgstAmount || 0), 0) : 0;
 
+  // Determine company branding
+  const getBrandColor = () => {
+    if (isTaxDocument) return YEPMAN_BRAND_COLOR;
+    if (isMetaEvents) return META_EVENTS_BRAND_COLOR;
+    return BRAND_COLOR;
+  };
+  
+  const getCompanyLogo = () => {
+    if (isTaxDocument) return yepmanLogo;
+    if (isMetaEvents) return metaEventsLogo;
+    return logo;
+  };
+  
+  const getCompanyName = () => {
+    if (isTaxDocument) return 'Yepman International';
+    if (isMetaEvents) return META_EVENTS_INFO.name;
+    return companySettings?.companyName || 'Company';
+  };
+  
+  const getCompanyAddress = () => {
+    if (isMetaEvents) return META_EVENTS_INFO.address;
+    return companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia';
+  };
+
+  const brandColor = getBrandColor();
+
   return (
-    <div className="document">
+    <div id="print-content" className="document">
       <style>{invoiceStyles}</style>
 
       {/* Header */}
@@ -552,13 +807,13 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
         {!hideHeader && (
           <div className="company-info">
             <div className="company-logo">
-              <img src={isTaxDocument ? yepmanLogo : logo} alt="Logo" />
+              <img src={getCompanyLogo()} alt="Logo" />
             </div>
-            <div className="company-name" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>
-              {isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company')}
+            <div className="company-name" style={{ color: brandColor }}>
+              {getCompanyName()}
             </div>
             <div className="company-address">
-              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
+              {getCompanyAddress().split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -567,7 +822,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
         )}
         {hideHeader && <div className="company-info" />}
         <div className="doc-type-box">
-          <div className="doc-type" style={{ color: isTaxDocument ? '#9d2966' : '#6b9937' }}>{isTaxDocument ? 'TAX INVOICE' : 'Invoice'}</div>
+          <div className="doc-type" style={{ color: brandColor }}>{isTaxDocument ? 'TAX INVOICE' : 'Invoice'}</div>
         </div>
       </div>
 
@@ -599,7 +854,7 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
       <div className="bill-to-section">
         <div className="bill-to-label">Bill To</div>
         <div className="bill-to-content">
-          <div className="customer-name">{customer?.name || '—'}</div>
+          <div className="customer-name">{customer?.name || (invoice as any).leadName || '—'}</div>
           {(invoice.customerAddress || customer?.billingAddress || '').split('\n').map((line: string, i: number) => (
             <div key={i}>{line}</div>
           ))}
@@ -705,7 +960,26 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
             <span className="totals-label">Sub Total</span>
             <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.subtotal || invoice.total))}</span>
           </div>
-          {isTaxDocument ? (
+          {/* Service Charge - available for both standard and tax documents */}
+          {parseFloat(invoice.serviceChargeAmount) > 0 && (
+            <div className="totals-row" style={{ color: '#16a34a' }}>
+              <span className="totals-label">
+                Service Charge
+              </span>
+              <span className="totals-value">+{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
+            </div>
+          )}
+          {/* Discount - available for both standard and tax documents */}
+          {parseFloat(invoice.discountAmount) > 0 && (
+            <div className="totals-row" style={{ color: '#dc2626' }}>
+              <span className="totals-label">
+                Discount{parseFloat(invoice.discountPercent) > 0 ? ` (${invoice.discountPercent}%)` : ''}
+              </span>
+              <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
+            </div>
+          )}
+          {/* GST for tax documents */}
+          {isTaxDocument && (
             <>
               {cgstTotal > 0 && (
                 <div className="totals-row">
@@ -717,21 +991,6 @@ function InvoicePrint({ invoice, customer, companySettings, hideHeader }: any) {
                 <div className="totals-row">
                   <span className="totals-label">SGST</span>
                   <span className="totals-value">{formatIndianCurrency(sgstTotal)}</span>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {parseFloat(invoice.discountPercent) > 0 && (
-                <div className="totals-row" style={{ color: '#dc2626' }}>
-                  <span className="totals-label">Discount ({invoice.discountPercent}%)</span>
-                  <span className="totals-value">-{formatIndianCurrency(parseFloat(invoice.discountAmount))}</span>
-                </div>
-              )}
-              {parseFloat(invoice.serviceChargePercent) > 0 && (
-                <div className="totals-row">
-                  <span className="totals-label">Service Charge</span>
-                  <span className="totals-value">{formatIndianCurrency(parseFloat(invoice.serviceChargeAmount))}</span>
                 </div>
               )}
             </>
@@ -810,13 +1069,13 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
   // Determine if this is a tax document based on invoice or customer company
   const isTaxDocument = invoice?.isTaxDocument === true || customer?.company === 'yepman';
   const brandColor = isTaxDocument ? YEPMAN_BRAND_COLOR : '#6b9937';
-  const companyName = isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Your Company');
+  const companyName = isTaxDocument ? 'Yepman International' : (companySettings?.companyName || 'Company');
   const companyLogo = isTaxDocument ? yepmanLogo : logo;
   
   const receiptStyles = baseStyles;
 
   return (
-    <div className="document">
+    <div id="print-content" className="document">
       <style>{receiptStyles}</style>
 
       {/* Header */}
@@ -828,7 +1087,7 @@ function ReceiptPrint({ payment, customer, invoice, bank, companySettings, hideH
             </div>
             <div className="company-name" style={{ color: brandColor }}>{companyName}</div>
             <div className="company-address">
-              {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
+              {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
                 <div key={i}>{line}</div>
               ))}
               {isTaxDocument && <div style={{ fontWeight: 'bold' }}>GSTIN: {companySettings?.gstin || '32AALCS5678K1Z5'}</div>}
@@ -968,7 +1227,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
   const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
   return (
-    <div className="document">
+    <div id="print-content" className="document">
       <style>{checklistStyles}</style>
 
       {/* Header */}
@@ -977,9 +1236,9 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
           <div className="company-logo">
             <img src={logo} alt="Logo" />
           </div>
-          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Your Company'}</div>
+          <div className="company-name" style={{ color: '#6b9937' }}>{companySettings?.companyName || 'Company'}</div>
           <div className="company-address">
-            {(companySettings?.address || '').split('\n').map((line: string, i: number) => (
+            {(companySettings?.address || '2nd Floor, Above Devas Studio\nDeshabhimani press road\nKochi Kerala 682017\nIndia').split('\n').map((line: string, i: number) => (
               <div key={i}>{line}</div>
             ))}
           </div>
@@ -1079,7 +1338,7 @@ function ChecklistPrint({ checklist, plan, event, companySettings }: any) {
       </div>
 
       {/* Footer */}
-      <div className="footer">{companySettings?.companyName || 'Your Company'}</div>
+      <div className="footer">{companySettings?.companyName || 'Company'}</div>
     </div>
   );
 }
@@ -1157,7 +1416,7 @@ function DeliveryChallanPrint({ challan, companySettings, hideHeader }: { challa
   `;
 
   return (
-    <div className="dc-container">
+    <div id="print-content" className="dc-container">
       <style>{challanStyles}</style>
       
       {/* Header */}

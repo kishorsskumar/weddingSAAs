@@ -90,6 +90,9 @@ const ALL_PAGES = [
     { id: "hr", label: "HR Management", path: "/hr" },
     { id: "employee-portal", label: "Employee Portal", path: "/employee-portal" },
     { id: "team-calendar", label: "Team Calendar", path: "/team" },
+    { id: "attendance", label: "Attendance", path: "/attendance" },
+    { id: "attendance-admin", label: "Attendance Admin", path: "/attendance-admin" },
+    { id: "oak-incentives", label: "Incentives", path: "/oak-incentives" },
   ] },
   { id: "knotvite", label: "KnotVite RSVP", path: "/knotvite/dashboard", subPages: [
     { id: "knotvite-dashboard", label: "Dashboard", path: "/knotvite/dashboard" },
@@ -100,6 +103,7 @@ const ALL_PAGES = [
     { id: "whatsapp-inbox", label: "WhatsApp Inbox", path: "/whatsapp-inbox" },
     { id: "oak-rsvp", label: "RSVP Manager", path: "/oak-rsvp" },
     { id: "oaksy", label: "AI Assistant", path: "/oaksy" },
+    { id: "oaksy-help", label: "Help Center", path: "/oaksy-help" },
     { id: "oak-creative", label: "Creative Studio", path: "/oak-creative" },
   ] },
   { id: "client-portal", label: "Client Portal", path: "/portal-admin", subPages: [
@@ -170,6 +174,10 @@ const ICONS: Record<string, any> = {
   "client-portal": Users,
   "portal-admin": LayoutDashboard,
   "portfolio-admin": Image,
+  attendance: CheckSquare,
+  "attendance-admin": ClipboardList,
+  "oak-incentives": DollarSign,
+  "oaksy-help": HelpCircle,
   admin: Shield,
 };
 

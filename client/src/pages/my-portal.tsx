@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -54,7 +54,13 @@ import {
   AlertCircle,
   MapPin,
   Banknote,
-  RefreshCw
+  RefreshCw,
+  Upload,
+  FileSpreadsheet,
+  UserCheck,
+  UserX,
+  ClipboardList,
+  Search
 } from "lucide-react";
 import { format } from "date-fns";
 import { OaksyPortalChat } from "@/components/OaksyPortalChat";
@@ -71,6 +77,8 @@ interface PortalSession {
   assignedPlannerName: string | null;
   assignedPlannerPhone: string | null;
   portalToken?: string;
+  rsvpEnabled?: boolean;
+  eventId?: string | null;
 }
 
 interface SharedEstimate {
@@ -81,6 +89,7 @@ interface SharedEstimate {
   status: string;
   sharedAt: string;
   customerName: string;
+  url?: string;
 }
 
 interface SharedPresentation {
@@ -172,16 +181,39 @@ function StarRating({ value, onChange, label }: { value: number; onChange: (v: n
   );
 }
 
-export default function MyPortal() {
+export default function MyPortal({ previewLeadId }: { previewLeadId?: string } = {}) {
+  const isPreviewMode = !!previewLeadId;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   
-  const [step, setStep] = useState<'phone' | 'otp' | 'dashboard'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp' | 'dashboard'>(isPreviewMode ? 'dashboard' : 'phone');
   const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
   const [otp, setOtp] = useState("");
   const [leadId, setLeadId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [tokenClientName, setTokenClientName] = useState<string | null>(null);
+  const [tokenMaskedPhone, setTokenMaskedPhone] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token && step === 'phone') {
+      fetch(`/api/my-portal/token-lookup/${token}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setTokenClientName(data.name);
+            setTokenMaskedPhone(data.maskedPhone);
+            if (data.countryCode) {
+              setCountryCode(data.countryCode);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [step]);
   
   const [newInput, setNewInput] = useState({ inputType: '', title: '', content: '', urls: [''] });
   const [showAddInput, setShowAddInput] = useState(false);
@@ -207,14 +239,30 @@ export default function MyPortal() {
   });
 
   const { data: portalSession, isLoading: sessionLoading, refetch: refetchSession } = useQuery<PortalSession | null>({
-    queryKey: ['portal-session'],
+    queryKey: isPreviewMode ? ['portal-preview-session', previewLeadId] : ['portal-session'],
     queryFn: async () => {
+      if (isPreviewMode) {
+        const res = await fetch(`/api/admin/portal-leads/${previewLeadId}/preview`, { credentials: 'include' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.lead;
+      }
       const res = await fetch('/api/my-portal/session', { credentials: 'include' });
       if (res.status === 401) return null;
       if (!res.ok) return null;
       return res.json();
     },
     staleTime: 0,
+  });
+
+  const { data: portalAdmins = [] } = useQuery<Array<{ id: string; name: string; role: string; whatsappNumber: string; email: string | null; photoUrl: string | null }>>({
+    queryKey: ['/api/portal/admins'],
+    queryFn: async () => {
+      const res = await fetch('/api/portal/admins');
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {
@@ -291,13 +339,18 @@ export default function MyPortal() {
   });
 
   const { data: dashboardData, isLoading: dashboardLoading } = useQuery<PortalDashboardData>({
-    queryKey: ['portal-dashboard'],
+    queryKey: isPreviewMode ? ['portal-preview-dashboard', previewLeadId] : ['portal-dashboard'],
     queryFn: async () => {
+      if (isPreviewMode) {
+        const res = await fetch(`/api/admin/portal-leads/${previewLeadId}/preview`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to load preview');
+        return res.json();
+      }
       const res = await fetch('/api/my-portal/dashboard', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load dashboard');
       return res.json();
     },
-    enabled: step === 'dashboard' && !!portalSession,
+    enabled: step === 'dashboard' && (isPreviewMode || !!portalSession),
   });
 
   const { data: timelineData } = useQuery<TimelineItem[]>({
@@ -337,6 +390,22 @@ export default function MyPortal() {
       return res.json();
     },
     enabled: !!portalSession?.portalToken,
+  });
+
+  const isRsvpEnabled = dashboardData?.lead?.rsvpEnabled || false;
+
+  // RSVP data for portal clients (uses preview endpoint for wedding planners)
+  const { data: rsvpData, isLoading: rsvpLoading, refetch: refetchRsvp } = useQuery<any>({
+    queryKey: ['portal-rsvp', isPreviewMode ? previewLeadId : portalSession?.id],
+    queryFn: async () => {
+      const url = isPreviewMode
+        ? `/api/admin/portal-leads/${previewLeadId}/preview-rsvp`
+        : '/api/my-portal/rsvp';
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: step === 'dashboard' && isRsvpEnabled,
   });
 
   // Financial milestones (payment schedule)
@@ -466,11 +535,12 @@ export default function MyPortal() {
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone || phone.length < 10) {
+    if (!phone || phone.length < 7) {
       toast({ title: "Invalid Phone", description: "Please enter a valid phone number", variant: "destructive" });
       return;
     }
-    sendOtpMutation.mutate(phone);
+    const fullPhone = countryCode + phone;
+    sendOtpMutation.mutate(fullPhone);
   };
 
   const handleVerifyOtp = (e: React.FormEvent) => {
@@ -486,6 +556,10 @@ export default function MyPortal() {
 
   const handleSubmitInput = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPreviewMode) {
+      toast({ title: "Preview Mode", description: "Cannot submit data in preview mode", variant: "destructive" });
+      return;
+    }
     if (!newInput.inputType || !newInput.title) {
       toast({ title: "Required", description: "Please select a type and add a title", variant: "destructive" });
       return;
@@ -531,26 +605,66 @@ export default function MyPortal() {
               <span className="text-white font-bold text-3xl">O</span>
             </div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-[#4b7c29] to-[#3d6621] bg-clip-text text-transparent">
-              Welcome to Your Portal
+              {tokenClientName ? `Welcome, ${tokenClientName}!` : 'Welcome to Your Portal'}
             </CardTitle>
             <CardDescription className="text-gray-600">
-              Enter your phone number to access your event details
+              {tokenClientName
+                ? 'Verify your identity to access your event portal'
+                : 'Enter your phone number to access your event details'}
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-8">
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-gray-700">Phone Number</Label>
+                {tokenMaskedPhone && (
+                  <p className="text-xs text-gray-500 mb-1">Your registered number: {countryCode} {tokenMaskedPhone}</p>
+                )}
                 <div className="flex gap-2">
-                  <div className="flex items-center px-4 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg border">
-                    <span className="text-sm font-medium text-gray-600">+91</span>
-                  </div>
+                  <select
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                    className="h-12 px-2 text-sm font-medium text-gray-600 bg-gradient-to-r from-gray-100 to-gray-50 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4b7c29]"
+                    data-testid="select-country-code"
+                  >
+                    <option value="+91">🇮🇳 +91</option>
+                    <option value="+1">🇺🇸 +1</option>
+                    <option value="+44">🇬🇧 +44</option>
+                    <option value="+971">🇦🇪 +971</option>
+                    <option value="+966">🇸🇦 +966</option>
+                    <option value="+968">🇴🇲 +968</option>
+                    <option value="+974">🇶🇦 +974</option>
+                    <option value="+973">🇧🇭 +973</option>
+                    <option value="+965">🇰🇼 +965</option>
+                    <option value="+61">🇦🇺 +61</option>
+                    <option value="+65">🇸🇬 +65</option>
+                    <option value="+60">🇲🇾 +60</option>
+                    <option value="+49">🇩🇪 +49</option>
+                    <option value="+33">🇫🇷 +33</option>
+                    <option value="+39">🇮🇹 +39</option>
+                    <option value="+81">🇯🇵 +81</option>
+                    <option value="+86">🇨🇳 +86</option>
+                    <option value="+82">🇰🇷 +82</option>
+                    <option value="+27">🇿🇦 +27</option>
+                    <option value="+234">🇳🇬 +234</option>
+                    <option value="+254">🇰🇪 +254</option>
+                    <option value="+62">🇮🇩 +62</option>
+                    <option value="+66">🇹🇭 +66</option>
+                    <option value="+63">🇵🇭 +63</option>
+                    <option value="+94">🇱🇰 +94</option>
+                    <option value="+977">🇳🇵 +977</option>
+                    <option value="+880">🇧🇩 +880</option>
+                    <option value="+92">🇵🇰 +92</option>
+                    <option value="+7">🇷🇺 +7</option>
+                    <option value="+55">🇧🇷 +55</option>
+                    <option value="+52">🇲🇽 +52</option>
+                  </select>
                   <Input
                     id="phone"
                     type="tel"
                     placeholder="Enter your phone number"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 15))}
                     className="flex-1 h-12 text-lg"
                     data-testid="input-phone"
                   />
@@ -641,6 +755,7 @@ export default function MyPortal() {
     { id: 'financials', label: 'Financials', icon: DollarSign },
     { id: 'creatives', label: 'Creatives', icon: Palette },
     { id: 'inputs', label: 'Your Inputs', icon: Lightbulb },
+    ...(isRsvpEnabled ? [{ id: 'rsvp', label: 'RSVP', icon: ClipboardList }] : []),
     { id: 'feedback', label: 'Feedback', icon: MessageCircle },
   ];
 
@@ -665,34 +780,51 @@ export default function MyPortal() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-[#4b7c29]/5">
-      <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50 shadow-sm">
+      {isPreviewMode && (
+        <div className="bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium sticky top-0 z-[60] flex items-center justify-center gap-2">
+          <Eye className="w-4 h-4" />
+          <span>Admin Preview Mode - Viewing as: {portalSession?.name || 'Client'}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-white hover:text-amber-900 hover:bg-amber-400 ml-4 h-7 px-3"
+            onClick={() => window.close()}
+          >
+            <X className="w-4 h-4 mr-1" />
+            Close Preview
+          </Button>
+        </div>
+      )}
+      <header className={`bg-white/80 backdrop-blur-md border-b sticky ${isPreviewMode ? 'top-[36px]' : 'top-0'} z-50 shadow-sm`}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
               src="/oakstreet-icon-192.png" 
-              alt="Event Planner" 
+              alt="Company Logo" 
               className="h-10 w-10 object-contain rounded-full"
             />
             <div>
-              <h1 className="font-semibold text-gray-900">Event Planner</h1>
-              <p className="text-xs text-gray-500">Client Portal</p>
+              <h1 className="font-semibold text-gray-900">Client Portal</h1>
+              <p className="text-xs text-gray-500">Client Portal{isPreviewMode ? ' (Preview)' : ''}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600 hidden sm:block font-medium">{portalSession?.name}</span>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              className="text-gray-600 hover:text-red-600"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
+            {!isPreviewMode && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => logoutMutation.mutate()}
+                className="text-gray-600 hover:text-red-600"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
-      <nav className="bg-white/60 backdrop-blur-sm border-b sticky top-[57px] z-40">
+      <nav className={`bg-white/60 backdrop-blur-sm border-b sticky ${isPreviewMode ? 'top-[93px]' : 'top-[57px]'} z-40`}>
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-1 overflow-x-auto scrollbar-hide py-1">
             {navItems.map((item) => (
@@ -850,7 +982,7 @@ export default function MyPortal() {
                     </Card>
                   )}
 
-                  {/* Event Manager Contact Card */}
+                  {/* Contact Cards - Planner + Portal Admins */}
                   {portalSession?.assignedPlannerName && (
                     <Card className="border-0 shadow-lg overflow-hidden min-h-[140px]" data-testid="planner-contact-card">
                       <CardContent className="p-5 h-full flex flex-col justify-between">
@@ -894,6 +1026,30 @@ export default function MyPortal() {
                       </CardContent>
                     </Card>
                   )}
+                  {portalAdmins.map((admin) => (
+                    <Card key={admin.id} className="border-0 shadow-lg overflow-hidden min-h-[140px]" data-testid={`portal-admin-contact-${admin.id}`}>
+                      <CardContent className="p-5 h-full flex flex-col justify-between">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-8 h-8 rounded-full bg-[#4b7c29]/10 flex items-center justify-center text-[#4b7c29] font-bold text-sm">
+                            {admin.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-sm font-medium text-[#3d6622]/80">{admin.role}</span>
+                        </div>
+                        <p className="font-semibold text-[#3d6622] mb-3">{admin.name}</p>
+                        <Button 
+                          size="sm" 
+                          className="w-full bg-[#4b7c29] hover:bg-[#3d6622] text-white h-8"
+                          data-testid={`button-whatsapp-admin-${admin.id}`}
+                          onClick={() => {
+                            const phone = admin.whatsappNumber.replace(/\D/g, '');
+                            window.open(`https://wa.me/${phone}`, '_blank');
+                          }}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 mr-1" /> WhatsApp
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
 
                 {/* Recent Activity Feed - Dynamic from milestones data */}
@@ -1189,9 +1345,11 @@ export default function MyPortal() {
                                 </p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="font-bold text-xl text-[#4b7c29]">
-                                  ₹{parseFloat(est.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
+                                {est.total && est.total !== '' ? (
+                                  <p className="font-bold text-xl text-[#4b7c29]">
+                                    ₹{parseFloat(est.total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </p>
+                                ) : null}
                                 <Badge 
                                   variant={est.status === 'approved' ? 'default' : 'secondary'} 
                                   className={`mt-1 text-[11px] px-3 py-1 tracking-wide flex items-center justify-center ${
@@ -1205,23 +1363,46 @@ export default function MyPortal() {
                               </div>
                             </div>
                             <div className="mt-4 flex gap-2">
-                              <Button 
-                                size="sm" 
-                                className="bg-[#4b7c29] hover:bg-[#3d6621]"
-                                onClick={() => viewEstimate(est.id)}
-                              >
-                                <Eye className="w-4 h-4 mr-1" /> View
-                              </Button>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                className="border-[#4b7c29] text-[#4b7c29] hover:bg-[#4b7c29]/10"
-                                onClick={() => {
-                                  window.open(`/print/quote/${est.id}?download=true&portalToken=${portalSession?.portalToken}`, '_blank');
-                                }}
-                              >
-                                <Download className="w-4 h-4 mr-1" /> Download
-                              </Button>
+                              {est.url ? (
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    className="bg-[#4b7c29] hover:bg-[#3d6621]"
+                                    onClick={() => window.open(est.url, '_blank')}
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" /> View
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="border-[#4b7c29] text-[#4b7c29] hover:bg-[#4b7c29]/10"
+                                    onClick={() => window.open(est.url, '_blank')}
+                                  >
+                                    <Download className="w-4 h-4 mr-1" /> Download
+                                  </Button>
+                                </>
+                              
+                              ) : (
+                                <>
+                                  <Button 
+                                    size="sm" 
+                                    className="bg-[#4b7c29] hover:bg-[#3d6621]"
+                                    onClick={() => viewEstimate(est.id)}
+                                  >
+                                    <Eye className="w-4 h-4 mr-1" /> View
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    className="border-[#4b7c29] text-[#4b7c29] hover:bg-[#4b7c29]/10"
+                                    onClick={() => {
+                                      window.open(`/print/quote/${est.id}?download=true&portalToken=${portalSession?.portalToken}`, '_blank');
+                                    }}
+                                  >
+                                    <Download className="w-4 h-4 mr-1" /> Download
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -1299,12 +1480,17 @@ export default function MyPortal() {
                       {/* Payment Milestones List */}
                       <div className="space-y-3">
                         {financialMilestonesData.milestones.map((milestone: any, idx: number) => {
-                          const isOverdue = milestone.dueDate && !milestone.isPaid && new Date(milestone.dueDate) < new Date();
-                          const isDueSoon = milestone.dueDate && !milestone.isPaid && !isOverdue && 
+                          const milestoneAmt = parseFloat(milestone.amount || '0');
+                          const paidAmt = parseFloat(milestone.paidAmount || '0');
+                          const isPartiallyPaid = !milestone.isPaid && paidAmt > 0 && paidAmt < milestoneAmt;
+                          const balanceAmt = milestoneAmt - paidAmt;
+                          const isOverdue = milestone.dueDate && !milestone.isPaid && !isPartiallyPaid && new Date(milestone.dueDate) < new Date();
+                          const isDueSoon = milestone.dueDate && !milestone.isPaid && !isPartiallyPaid && !isOverdue && 
                             (new Date(milestone.dueDate).getTime() - new Date().getTime()) < (7 * 24 * 60 * 60 * 1000);
                           
                           const getStatusColor = () => {
                             if (milestone.isPaid) return 'bg-green-100 text-green-700';
+                            if (isPartiallyPaid) return 'bg-amber-100 text-amber-700';
                             if (isOverdue) return 'bg-red-100 text-red-700';
                             if (isDueSoon) return 'bg-orange-100 text-orange-700';
                             return 'bg-gray-100 text-gray-600';
@@ -1312,6 +1498,7 @@ export default function MyPortal() {
                           
                           const getStatusText = () => {
                             if (milestone.isPaid) return 'Paid';
+                            if (isPartiallyPaid) return 'Partial';
                             if (isOverdue) return 'Overdue';
                             if (isDueSoon) return 'Due Soon';
                             return 'Pending';
@@ -1322,6 +1509,7 @@ export default function MyPortal() {
                               key={milestone.id} 
                               className={`border-0 shadow-lg animate-slideIn overflow-hidden ${
                                 milestone.isPaid ? 'bg-green-50 ring-2 ring-green-200' : 
+                                isPartiallyPaid ? 'bg-amber-50 ring-2 ring-amber-200' :
                                 isOverdue ? 'bg-red-50 ring-2 ring-red-200' :
                                 isDueSoon ? 'ring-2 ring-orange-200' : 'bg-white'
                               }`}
@@ -1333,15 +1521,18 @@ export default function MyPortal() {
                                   <div className={`relative w-14 h-14 rounded-full flex items-center justify-center ${
                                     milestone.isPaid 
                                       ? 'bg-green-500' 
+                                      : isPartiallyPaid ? 'bg-amber-500'
                                       : isOverdue ? 'bg-red-100 border-[3px] border-red-400'
                                       : isDueSoon ? 'bg-orange-100 border-[3px] border-orange-400'
                                       : 'bg-gray-100 border-[3px] border-dashed border-gray-300'
                                   }`}>
                                     {milestone.isPaid ? (
                                       <CheckCircle2 className="w-7 h-7 text-white" />
+                                    ) : isPartiallyPaid ? (
+                                      <span className="text-sm font-bold text-white">{Math.round((paidAmt / milestoneAmt) * 100)}%</span>
                                     ) : (
                                       <span className={`text-lg font-bold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-orange-600' : 'text-gray-400'}`}>
-                                        {milestone.percentage}%
+                                        {parseFloat(milestone.percentage).toFixed(0)}%
                                       </span>
                                     )}
                                   </div>
@@ -1353,7 +1544,7 @@ export default function MyPortal() {
                                       </Badge>
                                     </div>
                                     <p className="text-sm text-gray-500 mt-1">{milestone.dueDescription}</p>
-                                    {milestone.dueDate && !milestone.isPaid && (
+                                    {milestone.dueDate && !milestone.isPaid && !isPartiallyPaid && (
                                       <div className={`inline-flex items-center gap-1.5 mt-2 px-2 py-1 rounded-md ${
                                         isOverdue ? 'bg-red-100' : isDueSoon ? 'bg-orange-100' : 'bg-gray-100'
                                       }`}>
@@ -1366,12 +1557,23 @@ export default function MyPortal() {
                                     {milestone.isPaid && milestone.paidAt && (
                                       <p className="text-xs text-green-600 mt-2 font-medium">Paid on {format(new Date(milestone.paidAt), 'MMM dd, yyyy')}</p>
                                     )}
+                                    {isPartiallyPaid && (
+                                      <div className="mt-2 space-y-1">
+                                        {milestone.paidAt && (
+                                          <p className="text-xs text-amber-600 font-medium">Partial payment on {format(new Date(milestone.paidAt), 'MMM dd, yyyy')}</p>
+                                        )}
+                                        <div className="flex items-center gap-3 text-xs">
+                                          <span className="text-green-600">Paid: ₹{paidAmt.toLocaleString('en-IN')}</span>
+                                          <span className="text-red-500 font-medium">Balance: ₹{balanceAmt.toLocaleString('en-IN')}</span>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                   <div className="text-right flex flex-col items-end gap-2">
-                                    <p className={`text-xl font-bold ${milestone.isPaid ? 'text-green-600' : 'text-[#4b7c29]'}`}>
-                                      ₹{parseFloat(milestone.amount || '0').toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    <p className={`text-xl font-bold ${milestone.isPaid ? 'text-green-600' : isPartiallyPaid ? 'text-amber-600' : 'text-[#4b7c29]'}`}>
+                                      ₹{milestoneAmt.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </p>
-                                    <p className="text-xs text-gray-400">{milestone.percentage}% of total</p>
+                                    <p className="text-xs text-gray-400">{parseFloat(milestone.percentage).toFixed(0)}% of total</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1449,12 +1651,12 @@ export default function MyPortal() {
 
                 <div>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <Image className="w-5 h-5 text-primary" /> Photos
+                    <Image className="w-5 h-5 text-purple-600" /> Photos
                   </h2>
                   <Card className="border-0 shadow-lg">
                     <CardContent className="p-12 text-center">
-                      <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Camera className="w-8 h-8 text-green-400" />
+                      <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Camera className="w-8 h-8 text-purple-400" />
                       </div>
                       <p className="font-medium text-gray-600">No photos shared yet</p>
                       <p className="text-sm text-gray-400 mt-1">Event photos will be shared here</p>
@@ -2216,6 +2418,16 @@ export default function MyPortal() {
               </div>
             )}
 
+            {activeTab === 'rsvp' && isRsvpEnabled && (
+              <PortalRsvpTab
+                rsvpData={rsvpData}
+                rsvpLoading={rsvpLoading}
+                refetchRsvp={refetchRsvp}
+                isPreviewMode={isPreviewMode}
+                previewLeadId={previewLeadId}
+              />
+            )}
+
             {activeTab === 'feedback' && (
               <div className="space-y-6 animate-fadeIn">
                 <Card className="border-0 shadow-xl overflow-hidden">
@@ -2228,7 +2440,7 @@ export default function MyPortal() {
                     <CardDescription>Help us improve by sharing your experience</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-6">
-                    <form onSubmit={(e) => { e.preventDefault(); submitFeedbackMutation.mutate(feedback); }} className="space-y-6">
+                    <form onSubmit={(e) => { e.preventDefault(); if (isPreviewMode) { toast({ title: "Preview Mode", description: "Cannot submit data in preview mode", variant: "destructive" }); return; } submitFeedbackMutation.mutate(feedback); }} className="space-y-6">
                       <div className="grid gap-6 md:grid-cols-2">
                         <StarRating 
                           value={feedback.overallRating || 0}
@@ -2261,7 +2473,7 @@ export default function MyPortal() {
 
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="comments" className="text-sm font-medium">What made your event special?</Label>
+                          <Label htmlFor="comments" className="text-sm font-medium">What made your event special with Oakstreet?</Label>
                           <Textarea
                             id="comments"
                             placeholder="Share the moments that stood out..."
@@ -2286,7 +2498,7 @@ export default function MyPortal() {
 
                       <div className="space-y-4">
                         <div>
-                          <Label className="text-sm font-medium">Would you recommend us to friends and family?</Label>
+                          <Label className="text-sm font-medium">Would you recommend Oakstreet Events to friends and family?</Label>
                           <div className="flex gap-3 mt-2">
                             <Button
                               type="button"
@@ -2312,7 +2524,7 @@ export default function MyPortal() {
                           </Label>
                           <Textarea
                             id="testimonial"
-                            placeholder="Write a few words about your experience..."
+                            placeholder="Write a few words about your experience with Oakstreet Events..."
                             value={feedback.testimonial || ''}
                             onChange={(e) => setFeedback({ ...feedback, testimonial: e.target.value })}
                             className="mt-2 min-h-[80px]"
@@ -2345,7 +2557,7 @@ export default function MyPortal() {
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-12">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center">
           <p className="text-xs text-[#4b7c29]/50 tracking-wide">
-            © {new Date().getFullYear()} All rights reserved.
+            © 2026 Oakstreet Events. All rights reserved.
           </p>
           <p className="text-[10px] text-[#4b7c29]/40 mt-1 tracking-wider">Crafted with care for your special moments.</p>
         </div>
@@ -2505,6 +2717,496 @@ export default function MyPortal() {
         portalToken={portalSession?.portalToken}
         clientName={portalSession?.name}
       />
+    </div>
+  );
+}
+
+function PortalRsvpTab({ rsvpData, rsvpLoading, refetchRsvp, isPreviewMode, previewLeadId }: {
+  rsvpData: any;
+  rsvpLoading: boolean;
+  refetchRsvp: () => void;
+  isPreviewMode: boolean;
+  previewLeadId?: string;
+}) {
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [uploading, setUploading] = useState(false);
+  const [addGuestOpen, setAddGuestOpen] = useState(false);
+  const [addingGuest, setAddingGuest] = useState(false);
+  const [newGuest, setNewGuest] = useState({ name: '', phone: '', email: '', relationship: '', guestGroup: '', maxAttendees: '1' });
+
+  const handleAddGuest = async () => {
+    if (!newGuest.name.trim()) {
+      toast({ title: 'Name is required', variant: 'destructive' });
+      return;
+    }
+    if (isPreviewMode) {
+      toast({ title: 'Preview Mode', description: 'Cannot add guests in preview mode', variant: 'destructive' });
+      return;
+    }
+    setAddingGuest(true);
+    try {
+      const res = await fetch('/api/my-portal/rsvp/add-guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(newGuest),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add guest');
+      toast({ title: 'Guest added', description: `${newGuest.name} has been added to the guest list` });
+      setNewGuest({ name: '', phone: '', email: '', relationship: '', guestGroup: '', maxAttendees: '1' });
+      setAddGuestOpen(false);
+      refetchRsvp();
+    } catch (error: any) {
+      toast({ title: 'Failed to add guest', description: error.message, variant: 'destructive' });
+    } finally {
+      setAddingGuest(false);
+    }
+  };
+
+  const stats = rsvpData?.stats || { total: 0, attending: 0, declined: 0, pending: 0, totalAdults: 0, totalChildren: 0 };
+  const guests = rsvpData?.guests || [];
+  const event = rsvpData?.event;
+
+  const filteredGuests = useMemo(() => {
+    return guests.filter((g: any) => {
+      const matchSearch = !searchQuery || 
+        g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        g.phone?.includes(searchQuery) ||
+        g.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchStatus = filterStatus === 'all' || g.rsvpStatus === filterStatus;
+      return matchSearch && matchStatus;
+    });
+  }, [guests, searchQuery, filterStatus]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (isPreviewMode) {
+      toast({ title: "Preview Mode", description: "Cannot upload in preview mode", variant: "destructive" });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/my-portal/rsvp/upload-guests', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      toast({ title: 'Guest list uploaded', description: `${data.imported} guests imported successfully${data.skipped ? `, ${data.skipped} rows skipped` : ''}` });
+      refetchRsvp();
+    } catch (error: any) {
+      toast({ title: 'Upload failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const downloadTemplate = () => {
+    window.open('/api/my-portal/rsvp/template', '_blank');
+  };
+
+  const downloadGuestList = () => {
+    const url = isPreviewMode && previewLeadId
+      ? `/api/my-portal/rsvp/download?previewLeadId=${previewLeadId}`
+      : '/api/my-portal/rsvp/download';
+    window.open(url, '_blank');
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'yes': return 'bg-green-100 text-green-800';
+      case 'no': return 'bg-red-100 text-red-800';
+      case 'maybe': return 'bg-amber-100 text-amber-800';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'yes': return 'Attending';
+      case 'no': return 'Declined';
+      case 'maybe': return 'Maybe';
+      default: return 'Pending';
+    }
+  };
+
+  if (rsvpLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[#4b7c29]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <Card className="border-0 shadow-xl overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-[#5a8a35] via-[#4b7c29] to-[#5a8a35]" />
+        <CardHeader className="bg-gradient-to-br from-[#4b7c29]/5 to-white">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-[#4b7c29]" />
+                Guest RSVP Management
+              </CardTitle>
+              <CardDescription>Track and manage your guest responses</CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setNewGuest({ name: '', phone: '', email: '', relationship: '', guestGroup: '', maxAttendees: '1' });
+                  setAddGuestOpen(true);
+                }}
+                className="border-[#4b7c29] text-[#4b7c29] hover:bg-green-50"
+                data-testid="button-add-guest"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Guest
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadTemplate}
+                className="border-[#4b7c29] text-[#4b7c29] hover:bg-green-50"
+                data-testid="button-download-template"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1" />
+                Template
+              </Button>
+              <div>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                  id="rsvp-guest-upload"
+                  data-testid="input-upload-guests"
+                />
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-[#4b7c29] hover:bg-[#3d6622] text-white cursor-pointer"
+                  onClick={() => document.getElementById('rsvp-guest-upload')?.click()}
+                  disabled={uploading}
+                  data-testid="button-upload-guests"
+                >
+                  {uploading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+                  Upload Guest List
+                </Button>
+              </div>
+              {guests.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadGuestList}
+                  className="border-[#4b7c29] text-[#4b7c29] hover:bg-green-50"
+                  data-testid="button-download-guest-list"
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Download List
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+            <div className="bg-white border rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+              <div className="text-xs text-gray-500 mt-1">Total Guests</div>
+            </div>
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-green-700">{stats.attending}</div>
+              <div className="text-xs text-green-600 mt-1">Attending</div>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-red-700">{stats.declined}</div>
+              <div className="text-xs text-red-600 mt-1">Declined</div>
+            </div>
+            <div className="bg-gray-50 border rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-gray-600">{stats.pending}</div>
+              <div className="text-xs text-gray-500 mt-1">Pending</div>
+            </div>
+            <div className="bg-[#4b7c29]/5 border border-[#4b7c29]/20 rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-[#4b7c29]">{stats.totalAdults}</div>
+              <div className="text-xs text-[#4b7c29]/70 mt-1">Adults</div>
+            </div>
+            <div className="bg-[#4b7c29]/5 border border-[#4b7c29]/20 rounded-xl p-4 text-center shadow-sm">
+              <div className="text-2xl font-bold text-[#4b7c29]">{stats.totalChildren}</div>
+              <div className="text-xs text-[#4b7c29]/70 mt-1">Children</div>
+            </div>
+          </div>
+
+          {event?.rsvpCode && (
+            <div className="bg-[#4b7c29]/5 border border-[#4b7c29]/20 rounded-xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-[#4b7c29]">RSVP Link for Guests</div>
+                <div className="text-xs text-gray-600 mt-1">Share this link with your guests to collect their RSVP responses</div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-[#4b7c29] text-[#4b7c29] hover:bg-green-50"
+                onClick={() => {
+                  const url = `${window.location.origin}/rsvp/e/${event.rsvpCode}`;
+                  navigator.clipboard.writeText(url);
+                  toast({ title: 'Link copied', description: 'RSVP link copied to clipboard' });
+                }}
+                data-testid="button-copy-rsvp-link"
+              >
+                <Link className="w-4 h-4 mr-1" />
+                Copy RSVP Link
+              </Button>
+            </div>
+          )}
+
+          {(() => {
+            const confirmedGuests = guests.filter((g: any) => g.rsvpStatus === 'yes');
+            if (confirmedGuests.length === 0) return null;
+            return (
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-[#4b7c29] flex items-center gap-2">
+                    <UserCheck className="w-4 h-4" />
+                    Confirmed Guests ({confirmedGuests.length})
+                  </h4>
+                  <span className="text-xs text-gray-500">
+                    Total Pax: {confirmedGuests.reduce((sum: number, g: any) => sum + (g.numberOfAdults || 0) + (g.numberOfChildren || 0), 0)}
+                  </span>
+                </div>
+                <div className="bg-green-50/50 border border-green-200 rounded-xl overflow-hidden">
+                  <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-green-100/50 text-xs font-medium text-green-800 border-b border-green-200">
+                    <div className="col-span-4 sm:col-span-3">Name</div>
+                    <div className="col-span-3 sm:col-span-3 hidden sm:block">Phone</div>
+                    <div className="col-span-2 text-center">Adults</div>
+                    <div className="col-span-2 text-center">Children</div>
+                    <div className="col-span-4 sm:col-span-2 text-center">Total</div>
+                  </div>
+                  {confirmedGuests.map((g: any) => (
+                    <div key={g.id} className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b border-green-100 last:border-b-0 text-sm items-center" data-testid={`confirmed-guest-${g.id}`}>
+                      <div className="col-span-4 sm:col-span-3 font-medium text-gray-900 truncate flex items-center gap-1">
+                        {g.name}
+                        {g.isVip && <Star className="w-3 h-3 text-amber-500 flex-shrink-0" />}
+                      </div>
+                      <div className="col-span-3 sm:col-span-3 text-gray-600 truncate hidden sm:block">{g.phone || '-'}</div>
+                      <div className="col-span-2 text-center text-gray-700">{g.numberOfAdults || 0}</div>
+                      <div className="col-span-2 text-center text-gray-700">{g.numberOfChildren || 0}</div>
+                      <div className="col-span-4 sm:col-span-2 text-center font-semibold text-[#4b7c29]">{(g.numberOfAdults || 0) + (g.numberOfChildren || 0)}</div>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-green-100/70 text-sm font-semibold">
+                    <div className="col-span-4 sm:col-span-3 text-green-800">Total</div>
+                    <div className="col-span-3 sm:col-span-3 hidden sm:block"></div>
+                    <div className="col-span-2 text-center text-green-800">{confirmedGuests.reduce((s: number, g: any) => s + (g.numberOfAdults || 0), 0)}</div>
+                    <div className="col-span-2 text-center text-green-800">{confirmedGuests.reduce((s: number, g: any) => s + (g.numberOfChildren || 0), 0)}</div>
+                    <div className="col-span-4 sm:col-span-2 text-center text-[#4b7c29]">{confirmedGuests.reduce((s: number, g: any) => s + (g.numberOfAdults || 0) + (g.numberOfChildren || 0), 0)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search guests by name, phone, or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-10"
+                data-testid="input-search-guests"
+              />
+            </div>
+            <div className="flex gap-1 flex-wrap">
+              {['all', 'yes', 'no', 'pending'].map(status => (
+                <Button
+                  key={status}
+                  variant={filterStatus === status ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFilterStatus(status)}
+                  className={filterStatus === status ? 'bg-[#4b7c29] hover:bg-[#3d6622] text-white' : ''}
+                  data-testid={`button-filter-${status}`}
+                >
+                  {status === 'all' ? 'All' : status === 'yes' ? 'Attending' : status === 'no' ? 'Declined' : 'Pending'}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {filteredGuests.length > 0 ? (
+            <div className="space-y-2">
+              {filteredGuests.map((guest: any) => (
+                <div
+                  key={guest.id}
+                  className="flex items-center justify-between p-3 bg-white border rounded-xl hover:shadow-sm transition-shadow"
+                  data-testid={`card-guest-${guest.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900 truncate">{guest.name}</span>
+                      {guest.isVip && (
+                        <Badge className="bg-amber-100 text-amber-700 text-[10px] px-1.5">VIP</Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-gray-500">
+                      {guest.phone && guest.phone !== 'N/A' && (
+                        <span>{guest.phone}</span>
+                      )}
+                      {guest.relationship && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span>{guest.relationship}</span>
+                        </>
+                      )}
+                      {guest.guestGroup && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span>{guest.guestGroup}</span>
+                        </>
+                      )}
+                      {guest.rsvpStatus === 'yes' && (
+                        <>
+                          <span className="text-gray-300">|</span>
+                          <span className="text-green-600">{guest.numberOfAdults} adults{guest.numberOfChildren > 0 ? `, ${guest.numberOfChildren} children` : ''}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Badge className={`${getStatusColor(guest.rsvpStatus)} text-xs whitespace-nowrap ml-2`}>
+                    {getStatusLabel(guest.rsvpStatus)}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <ClipboardList className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-lg font-medium text-gray-600 mb-2">
+                {guests.length === 0 ? 'No guests yet' : 'No matching guests'}
+              </h3>
+              <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
+                {guests.length === 0 
+                  ? 'Upload your guest list using an Excel file to get started. Download the template for the correct format.'
+                  : 'Try adjusting your search or filter criteria.'}
+              </p>
+              {guests.length === 0 && (
+                <div className="flex justify-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadTemplate}
+                    className="border-[#4b7c29] text-[#4b7c29]"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-1" />
+                    Download Template
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={addGuestOpen} onOpenChange={setAddGuestOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-[#4b7c29]" />
+              Add Guest
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium">Name *</Label>
+              <Input
+                placeholder="Guest name"
+                value={newGuest.name}
+                onChange={(e) => setNewGuest(prev => ({ ...prev, name: e.target.value }))}
+                data-testid="input-new-guest-name"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium">Phone</Label>
+                <Input
+                  placeholder="Phone number"
+                  value={newGuest.phone}
+                  onChange={(e) => setNewGuest(prev => ({ ...prev, phone: e.target.value }))}
+                  data-testid="input-new-guest-phone"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Email</Label>
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={newGuest.email}
+                  onChange={(e) => setNewGuest(prev => ({ ...prev, email: e.target.value }))}
+                  data-testid="input-new-guest-email"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm font-medium">Relationship</Label>
+                <Input
+                  placeholder="e.g. Bride's side"
+                  value={newGuest.relationship}
+                  onChange={(e) => setNewGuest(prev => ({ ...prev, relationship: e.target.value }))}
+                  data-testid="input-new-guest-relationship"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Group</Label>
+                <Input
+                  placeholder="e.g. Family"
+                  value={newGuest.guestGroup}
+                  onChange={(e) => setNewGuest(prev => ({ ...prev, guestGroup: e.target.value }))}
+                  data-testid="input-new-guest-group"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Max Attendees</Label>
+              <Input
+                type="number"
+                min="1"
+                value={newGuest.maxAttendees}
+                onChange={(e) => setNewGuest(prev => ({ ...prev, maxAttendees: e.target.value }))}
+                className="w-24"
+                data-testid="input-new-guest-max-attendees"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddGuestOpen(false)} data-testid="button-cancel-add-guest">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddGuest}
+              disabled={addingGuest || !newGuest.name.trim()}
+              className="bg-[#4b7c29] hover:bg-[#3d6622] text-white"
+              data-testid="button-save-guest"
+            >
+              {addingGuest ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Plus className="w-4 h-4 mr-1" />}
+              Add Guest
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

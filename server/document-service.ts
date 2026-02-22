@@ -1,9 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { storage } from './storage';
 import { randomUUID } from 'crypto';
-import { config } from '../shared/config';
 
 interface GeneratedDocument {
   id: string;
@@ -114,7 +113,7 @@ export async function generateSalesReportPdf(options: {
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.company.name, 105, 20, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
@@ -203,7 +202,7 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.company.name, 105, 18, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('INVOICE', 105, 30, { align: 'center' });
@@ -262,8 +261,8 @@ export async function generateInvoicePdf(options: {
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text(`Thank you for choosing ${config.company.name}!`, 105, 270, { align: 'center' });
-  doc.text(`For queries, please contact us at ${config.company.email}`, 105, 276, { align: 'center' });
+  doc.text('Thank you for choosing Oakstreet Events!', 105, 270, { align: 'center' });
+  doc.text('For queries, please contact us at events@oakstreet.in', 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const filename = `invoice-${invoiceNumber}.pdf`;
@@ -292,7 +291,7 @@ export async function generateQuotePdf(options: {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(24);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.company.name, 105, 18, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
   
   doc.setFontSize(14);
   doc.text('QUOTATION', 105, 30, { align: 'center' });
@@ -342,7 +341,7 @@ export async function generateQuotePdf(options: {
   
   doc.setFontSize(9);
   doc.text('Terms & Conditions apply. This quote is valid for 30 days.', 105, 270, { align: 'center' });
-  doc.text(`Thank you for considering ${config.company.name}!`, 105, 276, { align: 'center' });
+  doc.text('Thank you for considering Oakstreet Events!', 105, 276, { align: 'center' });
   
   const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
   const filename = `quote-${quoteNumber}.pdf`;
@@ -361,80 +360,106 @@ export async function generateFinancialReportExcel(options: {
   includeEvents?: boolean;
   includeDaybook?: boolean;
 }): Promise<{ documentId: string; filename: string; message: string }> {
-  const wb = XLSX.utils.book_new();
-  
+  const wb = new ExcelJS.Workbook();
+
   if (options.includeEvents !== false) {
     let events = await storage.getAllEvents();
     if (options.startDate) events = events.filter(e => e.date >= options.startDate!);
     if (options.endDate) events = events.filter(e => e.date <= options.endDate!);
-    
-    const eventData = events.map(e => ({
-      'Date': e.date,
-      'Event Title': e.title,
-      'Customer': e.customer,
-      'Venue': e.venue,
-      'Planner': e.planner,
-      'Type': e.type,
-      'Sales Value': Number(e.salesValue || 0),
-      'Payment Received': Number(e.paymentReceived || 0),
-      'Cost': Number(e.cost || 0),
-      'Outstanding': Number(e.salesValue || 0) - Number(e.paymentReceived || 0),
-      'Profit': Number(e.paymentReceived || 0) - Number(e.cost || 0),
-    }));
-    
-    const wsEvents = XLSX.utils.json_to_sheet(eventData);
-    XLSX.utils.book_append_sheet(wb, wsEvents, 'Events');
-    
+
+    const wsEvents = wb.addWorksheet('Events');
+    wsEvents.columns = [
+      { header: 'Date', key: 'date' },
+      { header: 'Event Title', key: 'title' },
+      { header: 'Customer', key: 'customer' },
+      { header: 'Venue', key: 'venue' },
+      { header: 'Planner', key: 'planner' },
+      { header: 'Type', key: 'type' },
+      { header: 'Sales Value', key: 'salesValue' },
+      { header: 'Payment Received', key: 'paymentReceived' },
+      { header: 'Cost', key: 'cost' },
+      { header: 'Outstanding', key: 'outstanding' },
+      { header: 'Profit', key: 'profit' },
+    ];
+    events.forEach(e => {
+      wsEvents.addRow({
+        date: e.date,
+        title: e.title,
+        customer: e.customer,
+        venue: e.venue,
+        planner: e.planner,
+        type: e.type,
+        salesValue: Number(e.salesValue || 0),
+        paymentReceived: Number(e.paymentReceived || 0),
+        cost: Number(e.cost || 0),
+        outstanding: Number(e.salesValue || 0) - Number(e.paymentReceived || 0),
+        profit: Number(e.paymentReceived || 0) - Number(e.cost || 0),
+      });
+    });
+
     const totalSales = events.reduce((sum, e) => sum + Number(e.salesValue || 0), 0);
     const totalReceived = events.reduce((sum, e) => sum + Number(e.paymentReceived || 0), 0);
     const totalCost = events.reduce((sum, e) => sum + Number(e.cost || 0), 0);
-    
-    const summaryData = [
-      { 'Metric': 'Total Events', 'Value': events.length },
-      { 'Metric': 'Total Booked Sales', 'Value': totalSales },
-      { 'Metric': 'Total Payments Received', 'Value': totalReceived },
-      { 'Metric': 'Total Costs', 'Value': totalCost },
-      { 'Metric': 'Outstanding Amount', 'Value': totalSales - totalReceived },
-      { 'Metric': 'Gross Profit', 'Value': totalReceived - totalCost },
+
+    const wsSummary = wb.addWorksheet('Summary');
+    wsSummary.columns = [
+      { header: 'Metric', key: 'metric' },
+      { header: 'Value', key: 'value' },
     ];
-    
-    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+    [
+      { metric: 'Total Events', value: events.length },
+      { metric: 'Total Booked Sales', value: totalSales },
+      { metric: 'Total Payments Received', value: totalReceived },
+      { metric: 'Total Costs', value: totalCost },
+      { metric: 'Outstanding Amount', value: totalSales - totalReceived },
+      { metric: 'Gross Profit', value: totalReceived - totalCost },
+    ].forEach(row => wsSummary.addRow(row));
   }
-  
+
   if (options.includeDaybook !== false) {
     let entries = await storage.getAllDaybookEntries();
     if (options.startDate) entries = entries.filter(e => e.date >= options.startDate!);
     if (options.endDate) entries = entries.filter(e => e.date <= options.endDate!);
-    
-    const daybookData = entries.map(e => ({
-      'Date': e.date,
-      'Description': e.description,
-      'Type': e.type,
-      'Category': e.category,
-      'Amount': Number(e.amount || 0),
-      'Event': e.eventName || '',
-      'Vendor': e.vendorName || '',
-    }));
-    
-    const wsDaybook = XLSX.utils.json_to_sheet(daybookData);
-    XLSX.utils.book_append_sheet(wb, wsDaybook, 'Daybook');
-    
+
+    const wsDaybook = wb.addWorksheet('Daybook');
+    wsDaybook.columns = [
+      { header: 'Date', key: 'date' },
+      { header: 'Description', key: 'description' },
+      { header: 'Type', key: 'type' },
+      { header: 'Category', key: 'category' },
+      { header: 'Amount', key: 'amount' },
+      { header: 'Event', key: 'event' },
+      { header: 'Vendor', key: 'vendor' },
+    ];
+    entries.forEach(e => {
+      wsDaybook.addRow({
+        date: e.date,
+        description: e.description,
+        type: e.type,
+        category: e.category,
+        amount: Number(e.amount || 0),
+        event: e.eventName || '',
+        vendor: e.vendorName || '',
+      });
+    });
+
     const totalIncome = entries.filter(e => e.type === 'income').reduce((sum, e) => sum + Number(e.amount || 0), 0);
     const totalExpense = entries.filter(e => e.type === 'expense').reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    
-    const daybookSummary = [
-      { 'Metric': 'Total Entries', 'Value': entries.length },
-      { 'Metric': 'Total Income', 'Value': totalIncome },
-      { 'Metric': 'Total Expense', 'Value': totalExpense },
-      { 'Metric': 'Net Balance', 'Value': totalIncome - totalExpense },
+
+    const wsDaybookSummary = wb.addWorksheet('Daybook Summary');
+    wsDaybookSummary.columns = [
+      { header: 'Metric', key: 'metric' },
+      { header: 'Value', key: 'value' },
     ];
-    
-    const wsDaybookSummary = XLSX.utils.json_to_sheet(daybookSummary);
-    XLSX.utils.book_append_sheet(wb, wsDaybookSummary, 'Daybook Summary');
+    [
+      { metric: 'Total Entries', value: entries.length },
+      { metric: 'Total Income', value: totalIncome },
+      { metric: 'Total Expense', value: totalExpense },
+      { metric: 'Net Balance', value: totalIncome - totalExpense },
+    ].forEach(row => wsDaybookSummary.addRow(row));
   }
-  
-  const excelBuffer = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+
+  const excelBuffer = Buffer.from(await wb.xlsx.writeBuffer());
   const filename = `financial-report-${new Date().toISOString().split('T')[0]}.xlsx`;
   const documentId = storeDocument(filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', excelBuffer);
   
@@ -452,7 +477,7 @@ export async function generateEmployeeReportPdf(): Promise<{ documentId: string;
   
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
-  doc.text(config.company.name, 105, 20, { align: 'center' });
+  doc.text('Oakstreet Events', 105, 20, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
@@ -521,8 +546,8 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100);
-  doc.text(config.company.address || '', 14, 27);
-  doc.text(`Ph: ${config.company.phone} | GSTIN: 32AALCS5678K1Z5`, 14, 32);
+  doc.text('2nd floor, above Devas Studio, Deshabhimani Road, Kaloor, Kochi-682017', 14, 27);
+  doc.text('Ph: +91 9895810975 | GSTIN: 32AALCS5678K1Z5', 14, 32);
   
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
@@ -558,11 +583,8 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.setFontSize(11);
   doc.text('Yepman International', 17, 68);
   doc.setFontSize(9);
-  const addressParts = (config.company.address || '').split(',').map(s => s.trim());
-  const addressLine1 = addressParts.slice(0, Math.ceil(addressParts.length / 2)).join(', ');
-  const addressLine2 = addressParts.slice(Math.ceil(addressParts.length / 2)).join(', ');
-  doc.text(addressLine1, 17, 74);
-  doc.text(addressLine2, 17, 79);
+  doc.text('2nd floor, above Devas Studio,', 17, 74);
+  doc.text('Deshabhimani Road, Kaloor, Kochi-682017', 17, 79);
   
   doc.setFillColor(248, 249, 250);
   doc.rect(105, 55, 91, 40, 'F');
@@ -674,4 +696,102 @@ export async function generateDeliveryChallanPdf(challan: {
   doc.text('This is a computer generated document and does not require a signature.', 105, 285, { align: 'center' });
   
   return Buffer.from(doc.output('arraybuffer'));
+}
+
+export async function generatePaymentReceipt(options: {
+  eventId: string;
+  amount: number;
+  description: string;
+  date: string;
+}): Promise<{ documentId: string; filename: string; message: string }> {
+  const event = await storage.getEvent(options.eventId);
+  if (!event) {
+    throw new Error('Event not found for receipt generation');
+  }
+
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const seq = String(Math.floor(Math.random() * 999) + 1).padStart(3, '0');
+  const receiptNumber = `PR-${yy}${mm}${dd}-${seq}`;
+
+  const salesValue = Number(event.salesValue || 0);
+  const totalReceived = Number(event.paymentReceived || 0);
+  const balance = salesValue - totalReceived;
+
+  const doc = new jsPDF();
+
+  doc.setFillColor(139, 90, 43);
+  doc.rect(0, 0, 210, 40, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(24);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Oakstreet Events', 105, 18, { align: 'center' });
+
+  doc.setFontSize(14);
+  doc.text('PAYMENT RECEIPT', 105, 30, { align: 'center' });
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  doc.text(`Receipt #: ${receiptNumber}`, 14, 50);
+  doc.text(`Date: ${formatDate(options.date)}`, 14, 56);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Received From:', 14, 70);
+  doc.setFont('helvetica', 'normal');
+  doc.text(event.customer || 'Customer', 14, 76);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Event:', 120, 70);
+  doc.setFont('helvetica', 'normal');
+  doc.text(event.title || 'Event', 120, 76);
+  doc.text(`Date: ${formatDate(event.date)}`, 120, 82);
+  doc.text(`Venue: ${event.venue || 'TBD'}`, 120, 88);
+
+  autoTable(doc, {
+    startY: 100,
+    head: [['Description', 'Amount']],
+    body: [
+      ['Amount Received', formatCurrency(options.amount)],
+      ['Payment Mode', options.description || '-'],
+    ],
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [139, 90, 43] },
+    columnStyles: { 1: { halign: 'right' } },
+  });
+
+  const finalY = (doc as any).lastAutoTable.finalY || 140;
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total Event Value:', 130, finalY + 10);
+  doc.text(formatCurrency(salesValue), 196, finalY + 10, { align: 'right' });
+
+  doc.text('Total Received So Far:', 130, finalY + 18);
+  doc.text(formatCurrency(totalReceived), 196, finalY + 18, { align: 'right' });
+
+  doc.setFillColor(139, 90, 43);
+  doc.rect(125, finalY + 22, 71, 10, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.text('Balance Remaining:', 130, finalY + 29);
+  doc.text(formatCurrency(balance), 191, finalY + 29, { align: 'right' });
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Thank you for your payment!', 105, 260, { align: 'center' });
+  doc.text('Oakstreet Events | events@oakstreet.in', 105, 266, { align: 'center' });
+
+  const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+  const filename = `receipt-${receiptNumber}.pdf`;
+  const documentId = storeDocument(filename, 'application/pdf', pdfBuffer);
+
+  return {
+    documentId,
+    filename,
+    message: `Payment receipt ${receiptNumber} generated for ${event.customer}. Amount: ${formatCurrency(options.amount)}, Balance: ${formatCurrency(balance)}`,
+  };
 }

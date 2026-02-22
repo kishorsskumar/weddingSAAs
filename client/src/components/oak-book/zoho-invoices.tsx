@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,7 +43,10 @@ import {
   Phone,
   MapPin,
   DollarSign,
-  CreditCard
+  CreditCard,
+  MessageSquare,
+  Undo2,
+  Redo2
 } from "lucide-react";
 
 type Customer = {
@@ -83,11 +86,11 @@ type Event = {
 };
 
 interface ZohoInvoicesProps {
-  filterType?: "standard" | "tax";
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
+  filterType?: "oakstreet" | "meta_events" | "yepman";
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
 }
 
-export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInvoicesProps) {
+export function ZohoInvoices({ filterType = "oakstreet", onDownloadPdf }: ZohoInvoicesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -95,9 +98,11 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [weddingPlannerFilter, setWeddingPlannerFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false);
+  const [pendingWhatsAppCopy, setPendingWhatsAppCopy] = useState(false);
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
@@ -112,16 +117,39 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   });
 
   const { data: nextNumber } = useQuery<{ number: string }>({
-    queryKey: ["/api/invoices/next-number"],
+    queryKey: ["/api/invoices/next-number", filterType],
+    queryFn: () => fetch(`/api/invoices/next-number?companyBrand=${filterType}`).then(res => res.json()),
   });
 
+  // Get unique wedding planner names from invoices
+  const weddingPlannerNames = useMemo(() => {
+    const names = invoices
+      .map((i) => (i as any).weddingPlannerName)
+      .filter((name): name is string => !!name && name.trim() !== "");
+    return Array.from(new Set(names)).sort();
+  }, [invoices]);
+
   const filteredInvoices = useMemo(() => {
-    let filtered = filterType === "tax"
-      ? invoices.filter((i) => i.isTaxDocument === true)
-      : invoices.filter((i) => !i.isTaxDocument);
+    let filtered = invoices;
+    
+    // Filter by company type
+    if (filterType === "yepman") {
+      // Yepman = Tax documents (GST)
+      filtered = invoices.filter((i) => i.isTaxDocument === true);
+    } else if (filterType === "meta_events") {
+      // Meta Events = non-tax documents with companyBrand = meta_events
+      filtered = invoices.filter((i) => !i.isTaxDocument && (i as any).companyBrand === "meta_events");
+    } else {
+      // Oakstreet = non-tax documents with companyBrand = oakstreet or undefined
+      filtered = invoices.filter((i) => !i.isTaxDocument && ((i as any).companyBrand === "oakstreet" || !(i as any).companyBrand));
+    }
 
     if (statusFilter !== "all") {
       filtered = filtered.filter((i) => i.status === statusFilter);
+    }
+
+    if (weddingPlannerFilter !== "all") {
+      filtered = filtered.filter((i) => (i as any).weddingPlannerName === weddingPlannerFilter);
     }
 
     if (searchQuery) {
@@ -134,7 +162,7 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
     }
 
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [invoices, filterType, statusFilter, searchQuery, customers]);
+  }, [invoices, filterType, statusFilter, weddingPlannerFilter, searchQuery, customers]);
 
   const selectedInvoice = useMemo(
     () => filteredInvoices.find((i) => i.id === selectedInvoiceId),
@@ -142,12 +170,27 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   );
 
   const createInvoice = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/invoices", data),
-    onSuccess: () => {
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/invoices", data);
+      return { invoice: await res.json() };
+    },
+    onSuccess: async ({ invoice }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices/next-number"] });
       setIsCreateModalOpen(false);
       setEditingInvoice(null);
+      
+      // Send WhatsApp copy to current user if requested
+      if (pendingWhatsAppCopy && invoice?.id) {
+        try {
+          await apiRequest("POST", `/api/invoices/${invoice.id}/send-whatsapp-copy`);
+          toast({ title: "WhatsApp Copy Sent", description: "A copy has been sent to your WhatsApp." });
+        } catch (err: any) {
+          toast({ title: "WhatsApp Failed", description: err.message || "Could not send WhatsApp copy.", variant: "destructive" });
+        }
+        setPendingWhatsAppCopy(false);
+      }
+      
       toast({ title: "Invoice Created", description: "Invoice has been saved successfully." });
     },
     onError: (error: any) => {
@@ -156,12 +199,26 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   });
 
   const updateInvoice = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest("PATCH", `/api/invoices/${id}`, data),
-    onSuccess: () => {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await apiRequest("PATCH", `/api/invoices/${id}`, data);
+      return { id };
+    },
+    onSuccess: async ({ id }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       setIsCreateModalOpen(false);
       setEditingInvoice(null);
+      
+      // Send WhatsApp copy to current user if requested
+      if (pendingWhatsAppCopy && id) {
+        try {
+          await apiRequest("POST", `/api/invoices/${id}/send-whatsapp-copy`);
+          toast({ title: "WhatsApp Copy Sent", description: "A copy has been sent to your WhatsApp." });
+        } catch (err: any) {
+          toast({ title: "WhatsApp Failed", description: err.message || "Could not send WhatsApp copy.", variant: "destructive" });
+        }
+        setPendingWhatsAppCopy(false);
+      }
+      
       toast({ title: "Invoice Updated", description: "Invoice has been updated successfully." });
     },
     onError: (error: any) => {
@@ -237,70 +294,163 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
   };
 
   return (
-    <div className="flex h-full">
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", selectedInvoice ? "md:mr-[480px]" : "")}>
-        {/* Mobile-optimized header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3">
-          <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-800">
-              {filterType === "tax" ? "Tax Invoices" : "Invoices"}
-            </h2>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
-                  <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={() => setStatusFilter("all")}>All Invoices</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setStatusFilter("draft")}>Draft</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("sent")}>Sent</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("partial")}>Partially Paid</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("paid")}>Paid</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("overdue")}>Overdue</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+    <div className="flex h-full overflow-hidden">
+      <div
+        className={cn(
+          "overflow-auto transition-all duration-300 w-full flex flex-col",
+          selectedInvoiceId && "hidden md:flex md:border-r md:w-[360px] md:flex-shrink-0"
+        )}
+      >
+        {/* Full header when no preview panel */}
+        {!selectedInvoiceId && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 border-b bg-white gap-3 flex-shrink-0">
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800">
+                {filterType === "yepman" ? "Yep Invoices" : filterType === "meta_events" ? "Meta Invoices" : "Oak Invoices"}
+              </h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                    <Filter className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                    <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => setStatusFilter("all")}>All Invoices</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setStatusFilter("draft")}>Draft</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("sent")}>Sent</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("partial")}>Partially Paid</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("paid")}>Paid</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("overdue")}>Overdue</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* New button visible on mobile in top row */}
-            <Button
-              onClick={() => {
-                setEditingInvoice(null);
-                setIsCreateModalOpen(true);
-              }}
-              size="sm"
-              className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              New
-            </Button>
-          </div>
+              {weddingPlannerNames.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8 text-xs sm:text-sm">
+                      <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      {weddingPlannerFilter === "all" ? "All Planners" : weddingPlannerFilter}
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 ml-1 sm:ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => setWeddingPlannerFilter("all")}>All Planners</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {weddingPlannerNames.map((name) => (
+                      <DropdownMenuItem key={name} onClick={() => setWeddingPlannerFilter(name)}>
+                        {name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="relative flex-1 sm:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full sm:w-48 lg:w-64 h-9"
-              />
+              <Button
+                onClick={() => {
+                  setEditingInvoice(null);
+                  setIsCreateModalOpen(true);
+                }}
+                size="sm"
+                className="bg-primary hover:bg-primary/90 h-8 sm:hidden ml-auto"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                New
+              </Button>
             </div>
-            {/* Desktop New button */}
-            <Button
-              onClick={() => {
-                setEditingInvoice(null);
-                setIsCreateModalOpen(true);
-              }}
-              className="bg-primary hover:bg-primary/90 hidden sm:flex"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New
-            </Button>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="relative flex-1 sm:flex-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-full sm:w-48 lg:w-64 h-9"
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingInvoice(null);
+                  setIsCreateModalOpen(true);
+                }}
+                className="bg-primary hover:bg-primary/90 hidden sm:flex"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Compact header inside left list when panel is open */}
+        {selectedInvoiceId && (
+          <div className="hidden md:flex items-center justify-between p-2.5 border-b bg-card gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1 h-8 text-xs">
+                    {statusFilter === "all" ? "All" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setStatusFilter("all")}>All Invoices</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setStatusFilter("draft")}>Draft</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("sent")}>Sent</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("partial")}>Partially Paid</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("paid")}>Paid</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setStatusFilter("overdue")}>Overdue</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {weddingPlannerNames.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1 h-8 text-xs">
+                      <User className="h-3 w-3" />
+                      {weddingPlannerFilter === "all" ? "All Planners" : weddingPlannerFilter}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => setWeddingPlannerFilter("all")}>All Planners</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {weddingPlannerNames.map((name) => (
+                      <DropdownMenuItem key={name} onClick={() => setWeddingPlannerFilter(name)}>
+                        {name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+            <div className="flex items-center gap-1 pr-1">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  className="pl-7 w-24 h-7 text-xs"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingInvoice(null);
+                  setIsCreateModalOpen(true);
+                }}
+                size="icon"
+                className="bg-primary hover:bg-primary/90 h-7 w-7 rounded-full flex-shrink-0"
+                title="New Invoice"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className={cn(
           "flex-1 overflow-auto bg-gray-50",
@@ -345,67 +495,105 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
             )}
           </div>
 
-          {/* Desktop Table View */}
-          <table className="w-full hidden md:table">
-            <thead className="bg-gray-100 sticky top-0">
-              <tr className="text-left text-sm text-gray-600">
-                <th className="p-3 w-10">
-                  <Checkbox />
-                </th>
-                <th className="p-3 font-medium">DATE</th>
-                <th className="p-3 font-medium">INVOICE NUMBER</th>
-                <th className="p-3 font-medium hidden lg:table-cell">EVENT</th>
-                <th className="p-3 font-medium">CUSTOMER NAME</th>
-                <th className="p-3 font-medium text-right">AMOUNT</th>
-                <th className="p-3 font-medium text-right">BALANCE DUE</th>
-                <th className="p-3 font-medium">STATUS</th>
-              </tr>
-            </thead>
-            <tbody>
+          {/* Desktop Table View - full table when no panel, compact cards when panel open */}
+          {selectedInvoiceId ? (
+            <div className="hidden md:block divide-y">
               {filteredInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-500">
-                    <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p>No invoices found</p>
-                  </td>
-                </tr>
+                <div className="p-8 text-center text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <p>No invoices found</p>
+                </div>
               ) : (
                 filteredInvoices.map((invoice) => (
-                  <tr
+                  <div
                     key={invoice.id}
                     onClick={() => setSelectedInvoiceId(invoice.id)}
                     className={cn(
-                      "border-b border-gray-100 cursor-pointer hover:bg-blue-50/50 transition-colors",
-                      selectedInvoiceId === invoice.id && "bg-blue-50"
+                      "px-3 py-2.5 cursor-pointer hover:bg-blue-50/50 transition-colors",
+                      selectedInvoiceId === invoice.id && "bg-blue-50 border-l-2 border-l-primary"
                     )}
                   >
-                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox />
-                    </td>
-                    <td className="p-3 text-sm text-gray-700">
-                      {format(new Date(invoice.date), "dd MMM yyyy")}
-                    </td>
-                    <td className="p-3">
-                      <span className="text-primary hover:underline font-medium">{invoice.number}</span>
-                    </td>
-                    <td className="p-3 text-sm text-gray-600 hidden lg:table-cell">
-                      {getEventName(invoice.eventId)}
-                    </td>
-                    <td className="p-3 text-sm text-gray-700">{getCustomerName(invoice.customerId)}</td>
-                    <td className="p-3 text-sm text-gray-700 text-right font-medium">
-                      ₹{parseFloat(invoice.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-3 text-sm text-right font-medium">
-                      <span className={parseFloat(invoice.balanceDue) > 0 ? "text-red-600" : "text-green-600"}>
-                        ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </span>
-                    </td>
-                    <td className="p-3">{getStatusBadge(invoice.status)}</td>
-                  </tr>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <Checkbox className="h-3.5 w-3.5" onClick={(e) => e.stopPropagation()} />
+                          <p className="text-sm font-medium text-gray-900 truncate">{getCustomerName(invoice.customerId)}</p>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5 ml-5">
+                          {invoice.number} • {format(new Date(invoice.date), "dd/MM/yyyy")}
+                        </p>
+                        <div className="mt-1 ml-5">{getStatusBadge(invoice.status)}</div>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">
+                        ₹{parseFloat(invoice.total).toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
                 ))
               )}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <table className="w-full hidden md:table">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr className="text-left text-sm text-gray-600">
+                  <th className="p-3 w-10">
+                    <Checkbox />
+                  </th>
+                  <th className="p-3 font-medium">DATE</th>
+                  <th className="p-3 font-medium">INVOICE NUMBER</th>
+                  <th className="p-3 font-medium hidden lg:table-cell">EVENT</th>
+                  <th className="p-3 font-medium">CUSTOMER NAME</th>
+                  <th className="p-3 font-medium text-right">AMOUNT</th>
+                  <th className="p-3 font-medium text-right">BALANCE DUE</th>
+                  <th className="p-3 font-medium">STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                      <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p>No invoices found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInvoices.map((invoice) => (
+                    <tr
+                      key={invoice.id}
+                      onClick={() => setSelectedInvoiceId(invoice.id)}
+                      className={cn(
+                        "border-b border-gray-100 cursor-pointer hover:bg-blue-50/50 transition-colors",
+                        selectedInvoiceId === invoice.id && "bg-blue-50"
+                      )}
+                    >
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox />
+                      </td>
+                      <td className="p-3 text-sm text-gray-700">
+                        {format(new Date(invoice.date), "dd MMM yyyy")}
+                      </td>
+                      <td className="p-3">
+                        <span className="text-primary hover:underline font-medium">{invoice.number}</span>
+                      </td>
+                      <td className="p-3 text-sm text-gray-600 hidden lg:table-cell">
+                        {getEventName(invoice.eventId)}
+                      </td>
+                      <td className="p-3 text-sm text-gray-700">{getCustomerName(invoice.customerId)}</td>
+                      <td className="p-3 text-sm text-gray-700 text-right font-medium">
+                        ₹{parseFloat(invoice.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-3 text-sm text-right font-medium">
+                        <span className={parseFloat(invoice.balanceDue) > 0 ? "text-red-600" : "text-green-600"}>
+                          ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="p-3">{getStatusBadge(invoice.status)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
 
         <div className={cn(
@@ -447,7 +635,11 @@ export function ZohoInvoices({ filterType = "standard", onDownloadPdf }: ZohoInv
         customerSearchOpen={customerSearchOpen}
         setCustomerSearchOpen={setCustomerSearchOpen}
         onOpenNewCustomer={() => setIsNewCustomerDialogOpen(true)}
-        onSubmit={(data, isDraft) => {
+        onSubmit={(data, isDraft, sendWhatsAppCopy) => {
+          // Set the WhatsApp copy flag before mutation
+          if (sendWhatsAppCopy) {
+            setPendingWhatsAppCopy(true);
+          }
           if (editingInvoice) {
             updateInvoice.mutate({ id: editingInvoice.id, data });
           } else {
@@ -492,282 +684,492 @@ function InvoiceDetailPanel({
   onDelete: () => void;
   onSend: () => void;
   onRecordPayment: () => void;
-  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string) => void;
+  onDownloadPdf?: (type: "invoice" | "quote" | "receipt" | "delivery-challan", id: string, hideHeader?: boolean) => void;
 }) {
   const [activeTab, setActiveTab] = useState("details");
+  const [sendEmailDialogOpen, setSendEmailDialogOpen] = useState(false);
+  const [sendWhatsAppDialogOpen, setSendWhatsAppDialogOpen] = useState(false);
+  const [sendEmail, setSendEmail] = useState((invoice as any).customerEmail || "");
+  const [sendPhone, setSendPhone] = useState((invoice as any).customerWhatsapp || "");
+  const [sending, setSending] = useState(false);
+  const { toast } = useToast();
+
+  const handleSendEmail = async () => {
+    if (!sendEmail) {
+      toast({ title: "Error", description: "Please enter an email address", variant: "destructive" });
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: sendEmail }),
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Success", description: "Invoice sent via email" });
+        setSendEmailDialogOpen(false);
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to send email", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send email", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    if (!sendPhone) {
+      toast({ title: "Error", description: "Please enter a phone number", variant: "destructive" });
+      return;
+    }
+    setSending(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoice.id}/send-whatsapp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: sendPhone }),
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: "Success", description: "Invoice sent via WhatsApp" });
+        setSendWhatsAppDialogOpen(false);
+      } else {
+        toast({ title: "Error", description: data.error || "Failed to send WhatsApp", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to send WhatsApp", variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const getInvoiceStatusStyle = (status: string) => {
+    switch (status) {
+      case "draft": return "bg-gray-100 text-gray-700";
+      case "sent": return "bg-blue-100 text-blue-700";
+      case "partial": return "bg-yellow-100 text-yellow-700";
+      case "paid": return "bg-green-100 text-green-700";
+      case "overdue": return "bg-red-100 text-red-700";
+      default: return "bg-gray-100 text-gray-700";
+    }
+  };
 
   return (
-    <div className="fixed inset-0 md:right-0 md:left-auto md:top-0 h-full w-full md:w-[480px] bg-white md:border-l shadow-lg flex flex-col z-50">
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+    <div className="fixed inset-0 md:relative md:inset-auto flex flex-col bg-white md:border-l z-50 md:z-auto overflow-hidden flex-1 min-h-0">
+      <div className="flex-shrink-0 bg-white">
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-50/80">
           <div>
-            <h3 className="font-semibold text-gray-900">{invoice.number}</h3>
-            <p className="text-sm text-gray-500">{customer?.name || "No customer"}</p>
+            <p className="text-[11px] text-gray-400 font-medium tracking-wide uppercase">Invoice</p>
+            <h2 className="text-base font-bold text-gray-900 -mt-0.5">{invoice.number}</h2>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500 hover:text-gray-700" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDownloadPdf?.("invoice", invoice.id, false)}>
-              <Download className="h-4 w-4 mr-2" />
-              Download PDF
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-white">
-        <Button variant="outline" size="sm" onClick={onEdit}>
-          <Edit className="h-4 w-4 sm:mr-1" />
-          <span className="hidden sm:inline">Edit</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b bg-white">
+          <Button variant="outline" size="sm" onClick={onEdit} className="h-8 rounded-md text-xs font-medium border-gray-300 text-gray-700 hover:bg-gray-50">
+            <Edit className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Edit</span>
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 rounded-md text-xs font-medium border-gray-300 text-gray-700 hover:bg-gray-50">
+                <Send className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Send</span>
+                <ChevronDown className="h-3 w-3 ml-1 text-gray-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem data-testid="btn-send-invoice-email" onClick={() => setSendEmailDialogOpen(true)}>
+                <Mail className="h-4 w-4 mr-2" />
+                Send via Email
+              </DropdownMenuItem>
+              <DropdownMenuItem data-testid="btn-send-invoice-whatsapp" onClick={() => setSendWhatsAppDialogOpen(true)}>
+                <Phone className="h-4 w-4 mr-2" />
+                Send via WhatsApp
+              </DropdownMenuItem>
+              {invoice.status === "draft" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem data-testid="btn-mark-invoice-sent" onClick={onSend}>
+                    <Check className="h-4 w-4 mr-2" />
+                    Mark as Sent
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {(invoice.status === "sent" || invoice.status === "partial") && parseFloat(invoice.balanceDue) > 0 && (
+            <Button data-testid="btn-record-payment" variant="outline" size="sm" onClick={onRecordPayment} className="h-8 rounded-md text-xs font-medium text-green-700 border-green-300 hover:bg-green-50">
+              <CreditCard className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Record Payment</span>
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 rounded-md text-xs font-medium border-gray-300 text-gray-700 hover:bg-gray-50">
+                <Printer className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">PDF</span>
+                <ChevronDown className="h-3 w-3 ml-1 text-gray-400" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => onDownloadPdf?.("invoice", invoice.id, false)}>
+                Download with Header
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onDownloadPdf?.("invoice", invoice.id, true)}>
+                Download without Header
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => window.open(`/print/invoice/${invoice.id}`, '_blank')}>
+                Print
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Dialog open={sendEmailDialogOpen} onOpenChange={setSendEmailDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send Invoice via Email</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Recipient Email</Label>
+                  <Input 
+                    data-testid="input-invoice-email"
+                    type="email" 
+                    value={sendEmail} 
+                    onChange={(e) => setSendEmail(e.target.value)}
+                    placeholder="customer@example.com"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  An email with a link to view <strong>{invoice.number}</strong> will be sent.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button data-testid="btn-cancel-invoice-email" variant="outline" onClick={() => setSendEmailDialogOpen(false)}>Cancel</Button>
+                <Button data-testid="btn-submit-invoice-email" onClick={handleSendEmail} disabled={sending}>
+                  {sending ? "Sending..." : "Send Email"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={sendWhatsAppDialogOpen} onOpenChange={setSendWhatsAppDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Send Invoice via WhatsApp</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Phone Number (with country code)</Label>
+                  <Input 
+                    data-testid="input-invoice-phone"
+                    type="tel" 
+                    value={sendPhone} 
+                    onChange={(e) => setSendPhone(e.target.value)}
+                    placeholder="+919876543210"
+                  />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  A WhatsApp message with a link to view <strong>{invoice.number}</strong> will be sent.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button data-testid="btn-cancel-invoice-whatsapp" variant="outline" onClick={() => setSendWhatsAppDialogOpen(false)}>Cancel</Button>
+                <Button data-testid="btn-submit-invoice-whatsapp" onClick={handleSendWhatsApp} disabled={sending}>
+                  {sending ? "Sending..." : "Send WhatsApp"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-500">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Link
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
         {invoice.status === "draft" && (
-          <Button variant="outline" size="sm" onClick={onSend}>
-            <Send className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">Send</span>
-          </Button>
+          <div className="mx-4 mt-3 mb-2 p-3.5 rounded-lg bg-blue-50/80 border border-blue-100">
+            <div className="flex items-start gap-2">
+              <span className="text-blue-500 text-base mt-0.5">✦</span>
+              <div className="flex-1">
+                <p className="text-[13px] font-semibold text-blue-800">WHAT'S NEXT?</p>
+                <p className="text-xs text-blue-600 mt-0.5">Go ahead and email this invoice to your customer or simply mark it as sent.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-2.5 ml-6">
+              <Button size="sm" className="h-7 text-xs bg-[#4b7c29] hover:bg-[#3d6622] text-white rounded-md px-3" onClick={() => setSendEmailDialogOpen(true)}>
+                Send Invoice
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs border-gray-300 text-gray-700 rounded-md px-3" onClick={onSend}>
+                Mark As Sent
+              </Button>
+            </div>
+          </div>
         )}
-        {(invoice.status === "sent" || invoice.status === "partial") && parseFloat(invoice.balanceDue) > 0 && (
-          <Button variant="outline" size="sm" onClick={onRecordPayment} className="text-green-600 border-green-200 hover:bg-green-50">
-            <CreditCard className="h-4 w-4 sm:mr-1" />
-            <span className="hidden sm:inline">Pay</span>
-          </Button>
+
+        {parseFloat(invoice.balanceDue) > 0 && invoice.status !== "draft" && (
+          <div className="mx-4 mt-3 mb-2 p-3.5 rounded-lg bg-amber-50/80 border border-amber-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-amber-600" />
+                <span className="text-[13px] font-semibold text-amber-800">BALANCE DUE</span>
+              </div>
+              <p className="text-lg font-bold text-amber-800">
+                ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+          </div>
         )}
-        <Button variant="outline" size="sm" onClick={() => onDownloadPdf?.("invoice", invoice.id, false)}>
-          <Printer className="h-4 w-4 sm:mr-1" />
-          <span className="hidden sm:inline">PDF</span>
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>
-              <Share2 className="h-4 w-4 mr-2" />
-              Share Link
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Mail className="h-4 w-4 mr-2" />
-              Email Invoice
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+        <div className="flex items-center justify-between px-4 border-b">
+          <div className="flex gap-0">
+            <button
+              onClick={() => setActiveTab("details")}
+              className={cn(
+                "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors",
+                activeTab === "details" ? "border-[#4b7c29] text-[#4b7c29]" : "border-transparent text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Invoice Details
+            </button>
+            <button
+              onClick={() => setActiveTab("activity")}
+              className={cn(
+                "px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors",
+                activeTab === "activity" ? "border-[#4b7c29] text-[#4b7c29]" : "border-transparent text-gray-500 hover:text-gray-700"
+              )}
+            >
+              Activity Logs
+            </button>
+          </div>
+        </div>
       </div>
 
-      {parseFloat(invoice.balanceDue) > 0 && invoice.status !== "draft" && (
-        <div className="p-3 bg-yellow-50 border-b border-yellow-100">
-          <div className="flex items-center gap-2 text-yellow-700">
-            <DollarSign className="h-4 w-4" />
-            <span className="text-sm font-medium">BALANCE DUE</span>
-          </div>
-          <p className="text-lg font-bold text-yellow-800 mt-1">
-            ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-          </p>
-        </div>
-      )}
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="mx-4 mt-2 justify-start bg-transparent border-b rounded-none h-auto p-0 flex-shrink-0">
-          <TabsTrigger
-            value="details"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-4 py-2"
-          >
-            Invoice Details
-          </TabsTrigger>
-          <TabsTrigger
-            value="activity"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:bg-transparent px-4 py-2"
-          >
-            Activity Logs
-          </TabsTrigger>
-        </TabsList>
-
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <TabsContent value="details" className="p-4 m-0">
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Invoice Date</p>
-                  <p className="text-sm font-medium">{format(new Date(invoice.date), "dd MMM yyyy")}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Due Date</p>
-                  <p className="text-sm font-medium">
-                    {invoice.dueDate ? format(new Date(invoice.dueDate), "dd MMM yyyy") : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Status</p>
-                  <div className="mt-1">
-                    {invoice.status === "draft" && <Badge variant="outline" className="bg-gray-100">Draft</Badge>}
-                    {invoice.status === "sent" && <Badge variant="outline" className="bg-blue-50 text-primary">Sent</Badge>}
-                    {invoice.status === "partial" && <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Partial</Badge>}
-                    {invoice.status === "paid" && <Badge variant="outline" className="bg-green-50 text-green-700">Paid</Badge>}
-                    {invoice.status === "overdue" && <Badge variant="outline" className="bg-red-50 text-red-700">Overdue</Badge>}
-                  </div>
-                </div>
-                {event && (
-                  <div>
-                    <p className="text-xs text-gray-500 uppercase mb-1">Event</p>
-                    <p className="text-sm font-medium">{event.title}</p>
-                  </div>
-                )}
+      <div className="flex-1 overflow-y-auto bg-white">
+        {activeTab === "details" && (
+          <div className="p-5 space-y-5">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-gray-900">{invoice.number}</h3>
+                <span className={cn(
+                  "text-[10px] font-semibold uppercase px-2 py-0.5 rounded",
+                  getInvoiceStatusStyle(invoice.status)
+                )}>
+                  {invoice.status}
+                </span>
               </div>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Total : <span className="text-gray-800 font-medium">₹{parseFloat(invoice.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              </p>
+            </div>
 
-              {customer && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 uppercase mb-2">Customer Details</p>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm font-medium">{customer.name}</span>
-                    </div>
-                    {customer.email && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">{customer.email}</span>
-                      </div>
-                    )}
-                    {customer.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">{customer.phone}</span>
-                      </div>
-                    )}
-                    {customer.billingAddress && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
-                        <span className="text-sm text-gray-600">{customer.billingAddress}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {invoice.lineItems && invoice.lineItems.length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-2">Line Items</p>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="p-2 text-left font-medium text-gray-600">Item</th>
-                          <th className="p-2 text-right font-medium text-gray-600">Qty</th>
-                          <th className="p-2 text-right font-medium text-gray-600">Rate</th>
-                          <th className="p-2 text-right font-medium text-gray-600">Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoice.lineItems.map((item: any, idx: number) => (
-                          <tr key={idx} className="border-t">
-                            <td className="p-2">{item.description || item.name}</td>
-                            <td className="p-2 text-right">{item.quantity}</td>
-                            <td className="p-2 text-right">₹{parseFloat(item.rate || item.unitPrice || 0).toLocaleString("en-IN")}</td>
-                            <td className="p-2 text-right">₹{parseFloat(item.amount || item.total || 0).toLocaleString("en-IN")}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2 pt-4 border-t">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Subtotal</span>
-                  <span>₹{parseFloat(invoice.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-                {parseFloat(invoice.discountAmount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Discount ({invoice.discountPercent}%)</span>
-                    <span className="text-red-600">-₹{parseFloat(invoice.discountAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-semibold pt-2 border-t">
-                  <span>Total</span>
-                  <span>₹{parseFloat(invoice.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-gray-500">Balance Due</span>
-                  <span className={parseFloat(invoice.balanceDue) > 0 ? "text-red-600" : "text-green-600"}>
-                    ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm py-3 border-t border-b border-gray-100">
+              <div>
+                <p className="text-gray-400 text-xs mb-0.5">Invoice Number</p>
+                <p className="font-medium text-gray-900">{invoice.number}</p>
               </div>
-
-              {invoice.notes && (
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Notes</p>
-                  <p className="text-sm text-gray-700">{invoice.notes}</p>
-                </div>
-              )}
-
-              {invoice.terms && (
-                <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Terms & Conditions</p>
-                  <p className="text-sm text-gray-700">{invoice.terms}</p>
+              <div>
+                <p className="text-gray-400 text-xs mb-0.5">Invoice Date</p>
+                <p className="font-medium text-gray-900">{format(new Date(invoice.date), "dd/MM/yyyy")}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs mb-0.5">Due Date</p>
+                <p className="font-medium text-gray-900">{invoice.dueDate ? format(new Date(invoice.dueDate), "dd/MM/yyyy") : "-"}</p>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs mb-0.5">Balance Due</p>
+                <p className={cn("font-medium", parseFloat(invoice.balanceDue) > 0 ? "text-red-600" : "text-green-600")}>
+                  ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              {event && (
+                <div className="col-span-2">
+                  <p className="text-gray-400 text-xs mb-0.5">Event</p>
+                  <p className="font-medium text-gray-900">{event.title}</p>
                 </div>
               )}
             </div>
-          </TabsContent>
 
-          <TabsContent value="activity" className="p-4 m-0">
+            <div>
+              <h4 className="text-sm font-bold text-gray-900 mb-3">Customer Details</h4>
+              {customer ? (
+                <div className="space-y-2.5 text-sm">
+                  <div className="flex items-center gap-2.5">
+                    <User className="h-4 w-4 text-gray-400" />
+                    <span className="font-medium text-gray-900">{customer.name}</span>
+                  </div>
+                  {customer.email && (
+                    <div className="flex items-center gap-2.5">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-600">{customer.email}</span>
+                    </div>
+                  )}
+                  {customer.phone && (
+                    <div className="flex items-center gap-2.5">
+                      <Phone className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-600">{customer.phone}</span>
+                    </div>
+                  )}
+                  {customer.billingAddress && (
+                    <div className="flex items-start gap-2.5">
+                      <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                      <span className="text-gray-600">{customer.billingAddress}</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-gray-400 text-sm">No customer assigned</p>
+              )}
+            </div>
+
+            {invoice.lineItems && invoice.lineItems.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold text-gray-900 mb-3">Line Items</h4>
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left px-3 py-2 font-semibold text-gray-600 text-xs">Item</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-600 text-xs">Qty</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-600 text-xs">Rate</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-600 text-xs">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoice.lineItems.map((item: any, idx: number) => (
+                        <tr key={idx} className={cn(
+                          "border-t border-gray-100",
+                          item.isHeading && "bg-gray-50/50"
+                        )}>
+                          <td className="px-3 py-2" colSpan={item.isHeading ? 4 : 1}>
+                            {item.isHeading ? (
+                              <span className="font-semibold text-[#4b7c29] text-xs uppercase tracking-wide">{item.name || item.description}</span>
+                            ) : (
+                              <span className="text-gray-800">{item.name || item.description}</span>
+                            )}
+                          </td>
+                          {!item.isHeading && (
+                            <>
+                              <td className="px-3 py-2 text-right text-gray-600">{item.quantity}</td>
+                              <td className="px-3 py-2 text-right text-gray-600">₹{parseFloat(item.rate || item.unitPrice || 0).toLocaleString("en-IN")}</td>
+                              <td className="px-3 py-2 text-right font-medium text-gray-900">₹{parseFloat(item.amount || item.total || 0).toLocaleString("en-IN")}</td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between py-1">
+                <span className="text-gray-500">Sub Total</span>
+                <span className="font-medium text-gray-900">₹{parseFloat(invoice.subtotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              </div>
+              {parseFloat(invoice.discountAmount) > 0 && (
+                <div className="flex justify-between py-1">
+                  <span className="text-gray-500">Discount ({invoice.discountPercent}%)</span>
+                  <span className="text-red-500">-₹{parseFloat(invoice.discountAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 border-t border-gray-200 mt-1">
+                <span className="text-base font-bold text-gray-900">Total</span>
+                <span className="text-base font-bold text-gray-900">₹{parseFloat(invoice.total).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-gray-500 font-medium">Balance Due</span>
+                <span className={cn("font-bold", parseFloat(invoice.balanceDue) > 0 ? "text-red-600" : "text-green-600")}>
+                  ₹{parseFloat(invoice.balanceDue).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {invoice.notes && (
+              <div className="border-t border-gray-100 pt-4">
+                <h4 className="text-sm font-bold text-gray-900 mb-2">Notes</h4>
+                <p className="text-sm text-gray-600">{invoice.notes}</p>
+              </div>
+            )}
+
+            {invoice.terms && (
+              <div className="border-t border-gray-100 pt-4">
+                <h4 className="text-sm font-bold text-gray-900 mb-2">Terms & Conditions</h4>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">{invoice.terms}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "activity" && (
+          <div className="p-5">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                  <FileText className="h-4 w-4 text-primary" />
+                <div className="w-8 h-8 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-3.5 w-3.5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Invoice Created</p>
-                  <p className="text-xs text-gray-500">
-                    {format(new Date(invoice.createdAt), "dd MMM yyyy 'at' hh:mm a")}
+                  <p className="text-sm font-medium text-gray-900">Invoice Created</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {format(new Date(invoice.createdAt), "dd MMM yyyy, hh:mm a")}
                   </p>
                 </div>
               </div>
-              {invoice.status === "sent" && (
+              {(invoice.status === "sent" || invoice.status === "partial" || invoice.status === "paid") && (
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                    <Send className="h-4 w-4 text-green-600" />
+                  <div className="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
+                    <Send className="h-3.5 w-3.5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Invoice Sent</p>
-                    <p className="text-xs text-gray-500">Sent to customer</p>
+                    <p className="text-sm font-medium text-gray-900">Invoice Sent</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Sent to customer</p>
                   </div>
                 </div>
               )}
-              {invoice.status === "paid" && (
+              {(invoice.status === "partial" || invoice.status === "paid") && (
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                    <Check className="h-4 w-4 text-green-600" />
+                  <div className="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
+                    <CreditCard className="h-3.5 w-3.5 text-green-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Payment Received</p>
-                    <p className="text-xs text-gray-500">Invoice marked as paid</p>
+                    <p className="text-sm font-medium text-gray-900">Payment Received</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {invoice.status === "paid" ? "Full payment received" : "Partial payment received"}
+                    </p>
                   </div>
                 </div>
               )}
             </div>
-          </TabsContent>
-        </div>
-      </Tabs>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -804,14 +1206,15 @@ function InvoiceFormModal({
   customers: Customer[];
   events: Event[];
   nextNumber: string;
-  filterType: "standard" | "tax";
+  filterType: "oakstreet" | "meta_events" | "yepman";
   customerSearchOpen: boolean;
   setCustomerSearchOpen: (open: boolean) => void;
   onOpenNewCustomer: () => void;
-  onSubmit: (data: any, isDraft: boolean) => void;
+  onSubmit: (data: any, isDraft: boolean, sendWhatsAppCopy?: boolean) => void;
   isSubmitting: boolean;
 }) {
-  const isTaxInvoice = filterType === "tax";
+  const [sendWhatsAppCopy, setSendWhatsAppCopy] = useState(false);
+  const isTaxInvoice = filterType === "yepman";
   
   const [formData, setFormData] = useState({
     number: editingInvoice?.number || nextNumber,
@@ -820,9 +1223,11 @@ function InvoiceFormModal({
     date: editingInvoice?.date || format(new Date(), "yyyy-MM-dd"),
     dueDate: editingInvoice?.dueDate || "",
     subject: editingInvoice?.subject || "",
+    weddingPlannerName: (editingInvoice as any)?.weddingPlannerName || "",
     notes: editingInvoice?.notes || "",
     terms: editingInvoice?.terms || "",
     placeOfSupply: (editingInvoice as any)?.placeOfSupply || "Kerala (32)",
+    companyBrand: editingInvoice ? (editingInvoice as any)?.companyBrand : filterType,
   });
 
   // Initialize line items with tax fields for tax invoices
@@ -855,21 +1260,111 @@ function InvoiceFormModal({
     amount: editingInvoice?.discountAmount || "0",
   });
 
+  const undoHistoryRef = useRef<any[]>([]);
+  const undoPointerRef = useRef(0);
+  const isUndoingRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const initRef = useRef(false);
+
+  const updateUndoButtons = useCallback(() => {
+    setCanUndo(undoPointerRef.current > 0);
+    setCanRedo(undoPointerRef.current < undoHistoryRef.current.length - 1);
+  }, []);
+
+  const saveToUndoHistory = useCallback((snapshot: any) => {
+    if (isUndoingRef.current) {
+      isUndoingRef.current = false;
+      return;
+    }
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      const trimmed = undoHistoryRef.current.slice(0, undoPointerRef.current + 1);
+      trimmed.push(snapshot);
+      if (trimmed.length > 50) {
+        trimmed.shift();
+      }
+      undoHistoryRef.current = trimmed;
+      undoPointerRef.current = trimmed.length - 1;
+      updateUndoButtons();
+    }, 300);
+  }, [updateUndoButtons]);
+
+  const handleUndo = useCallback(() => {
+    if (undoPointerRef.current > 0) {
+      undoPointerRef.current -= 1;
+      const prev = undoHistoryRef.current[undoPointerRef.current];
+      if (prev) {
+        isUndoingRef.current = true;
+        setFormData(JSON.parse(JSON.stringify(prev.formData)));
+        setLineItems(JSON.parse(JSON.stringify(prev.lineItems)));
+        setDiscount(JSON.parse(JSON.stringify(prev.discount)));
+        updateUndoButtons();
+      }
+    }
+  }, [updateUndoButtons]);
+
+  const handleRedo = useCallback(() => {
+    if (undoPointerRef.current < undoHistoryRef.current.length - 1) {
+      undoPointerRef.current += 1;
+      const next = undoHistoryRef.current[undoPointerRef.current];
+      if (next) {
+        isUndoingRef.current = true;
+        setFormData(JSON.parse(JSON.stringify(next.formData)));
+        setLineItems(JSON.parse(JSON.stringify(next.lineItems)));
+        setDiscount(JSON.parse(JSON.stringify(next.discount)));
+        updateUndoButtons();
+      }
+    }
+  }, [updateUndoButtons]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleUndo, handleRedo]);
+
   useEffect(() => {
     if (isOpen) {
+      let newFormData: any;
+      let newLineItems: any[];
+      let newDiscount: any;
       if (editingInvoice) {
-        setFormData({
+        newFormData = {
           number: editingInvoice.number,
           customerId: editingInvoice.customerId || "",
           eventId: editingInvoice.eventId || "",
           date: editingInvoice.date,
           dueDate: editingInvoice.dueDate || "",
           subject: editingInvoice.subject || "",
+          weddingPlannerName: (editingInvoice as any)?.weddingPlannerName || "",
           notes: editingInvoice.notes || "",
           terms: editingInvoice.terms || "",
           placeOfSupply: (editingInvoice as any)?.placeOfSupply || "Kerala (32)",
-        });
-        setLineItems(editingInvoice.lineItems?.length 
+        };
+        newLineItems = editingInvoice.lineItems?.length 
           ? editingInvoice.lineItems.map((item: any) => ({
               ...item,
               description: item.name || item.description || "",
@@ -882,28 +1377,45 @@ function InvoiceFormModal({
                 sgstAmount: item.sgstAmount || 0
               } : {})
             }))
-          : [getDefaultLineItem()]);
-        setDiscount({
+          : [getDefaultLineItem()];
+        newDiscount = {
           percent: editingInvoice.discountPercent || "0",
           amount: editingInvoice.discountAmount || "0",
-        });
+        };
       } else {
-        setFormData({
+        newFormData = {
           number: nextNumber,
           customerId: "",
           eventId: "",
           date: format(new Date(), "yyyy-MM-dd"),
           dueDate: "",
           subject: "",
+          weddingPlannerName: "",
           notes: "",
           terms: "",
           placeOfSupply: "Kerala (32)",
-        });
-        setLineItems([getDefaultLineItem()]);
-        setDiscount({ percent: "0", amount: "0" });
+        };
+        newLineItems = [getDefaultLineItem()];
+        newDiscount = { percent: "0", amount: "0" };
       }
+      setFormData(newFormData);
+      setLineItems(newLineItems);
+      setDiscount(newDiscount);
+      undoHistoryRef.current = [JSON.parse(JSON.stringify({ formData: newFormData, lineItems: newLineItems, discount: newDiscount }))];
+      undoPointerRef.current = 0;
+      initRef.current = true;
+      setCanUndo(false);
+      setCanRedo(false);
+    } else {
+      initRef.current = false;
     }
   }, [isOpen, editingInvoice, nextNumber, isTaxInvoice]);
+
+  useEffect(() => {
+    if (isOpen && initRef.current) {
+      saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems, discount })));
+    }
+  }, [formData]);
 
   const calculateSubtotal = () => {
     return lineItems
@@ -948,25 +1460,34 @@ function InvoiceFormModal({
     }
 
     setLineItems(updated);
+    saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems: updated, discount })));
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, getDefaultLineItem()]);
+    const newItems = [...lineItems, getDefaultLineItem()];
+    setLineItems(newItems);
+    saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems: newItems, discount })));
   };
 
   const addSectionHeading = () => {
-    setLineItems([...lineItems, { type: "section", heading: "" }]);
+    const newItems = [...lineItems, { type: "section", heading: "" }];
+    setLineItems(newItems);
+    saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems: newItems, discount })));
   };
 
   const removeLineItem = (index: number) => {
-    setLineItems(lineItems.filter((_, i) => i !== index));
+    const newItems = lineItems.filter((_, i) => i !== index);
+    setLineItems(newItems);
+    saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems: newItems, discount })));
   };
 
   const handleDiscountPercentChange = (percentStr: string) => {
     const percent = parseFloat(percentStr) || 0;
     const subtotal = calculateSubtotal();
     const amount = (subtotal * percent) / 100;
-    setDiscount({ percent: percentStr, amount: amount.toFixed(2) });
+    const newDiscount = { percent: percentStr, amount: amount.toFixed(2) };
+    setDiscount(newDiscount);
+    saveToUndoHistory(JSON.parse(JSON.stringify({ formData, lineItems, discount: newDiscount })));
   };
 
   const handleSubmit = (isDraft: boolean) => {
@@ -1032,15 +1553,44 @@ function InvoiceFormModal({
         isTaxDocument: isTaxInvoice,
         placeOfSupply: isTaxInvoice ? formData.placeOfSupply : null,
       },
-      isDraft
+      isDraft,
+      sendWhatsAppCopy
     );
+    // Reset the checkbox after save
+    setSendWhatsAppCopy(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{editingInvoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-3">
+            {editingInvoice ? "Edit Invoice" : "New Invoice"}
+            <div className="flex items-center gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleUndo}
+                disabled={!canUndo}
+                title="Undo (Ctrl+Z)"
+                data-testid="button-undo-invoice"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleRedo}
+                disabled={!canRedo}
+                title="Redo (Ctrl+Shift+Z)"
+                data-testid="button-redo-invoice"
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
@@ -1109,9 +1659,9 @@ function InvoiceFormModal({
           </div>
 
           {isTaxInvoice && (
-            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-sm font-medium text-green-800 mb-1">Tax Invoice (GST)</p>
-              <p className="text-xs text-primary">This invoice will be issued under Yepman International</p>
+            <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
+              <p className="text-sm font-medium text-purple-800 mb-1">Tax Invoice (GST)</p>
+              <p className="text-xs text-purple-600">This invoice will be issued under Yepman International</p>
             </div>
           )}
 
@@ -1134,6 +1684,24 @@ function InvoiceFormModal({
                 className="mt-1"
               />
             </div>
+            {/* Company Brand Selector - Only for Standard (non-tax) invoices */}
+            {!isTaxInvoice && (
+              <div>
+                <Label>Company</Label>
+                <Select
+                  value={formData.companyBrand}
+                  onValueChange={(value) => setFormData({ ...formData, companyBrand: value })}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="oakstreet">Default Company</SelectItem>
+                    <SelectItem value="meta_events">Meta Events</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label>Event</Label>
               <Select
@@ -1180,6 +1748,16 @@ function InvoiceFormModal({
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
               placeholder="Let your customer know what this invoice is for"
+              className="mt-1"
+            />
+          </div>
+
+          <div>
+            <Label>Wedding Planner</Label>
+            <Input
+              value={formData.weddingPlannerName || ""}
+              onChange={(e) => setFormData({ ...formData, weddingPlannerName: e.target.value })}
+              placeholder="Enter wedding planner name (optional)"
               className="mt-1"
             />
           </div>
@@ -1396,6 +1974,18 @@ function InvoiceFormModal({
         </div>
 
         <DialogFooter className="gap-2">
+          <div className="flex items-center gap-2 mr-auto">
+            <input
+              type="checkbox"
+              id="sendWhatsAppCopyInvoice"
+              checked={sendWhatsAppCopy}
+              onChange={(e) => setSendWhatsAppCopy(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <label htmlFor="sendWhatsAppCopyInvoice" className="text-sm text-muted-foreground cursor-pointer">
+              Send me a WhatsApp copy
+            </label>
+          </div>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
