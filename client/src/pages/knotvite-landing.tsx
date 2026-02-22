@@ -57,7 +57,7 @@ const PLANS = [
     name: "Basic",
     price: "₹4,999",
     originalPrice: "₹9,999",
-    period: "per event",
+    period: "",
     description: "Perfect for intimate weddings and small celebrations",
     highlight: false,
     trial: true,
@@ -80,7 +80,7 @@ const PLANS = [
     name: "Pro",
     price: "₹14,999",
     originalPrice: "₹24,999",
-    period: "per event",
+    period: "",
     description: "For couples who want the complete RSVP experience",
     highlight: true,
     trial: false,
@@ -103,7 +103,7 @@ const PLANS = [
     name: "Premium",
     price: "₹24,999",
     originalPrice: "₹39,999",
-    period: "per event",
+    period: "",
     description: "Full-service RSVP with wedding page, QR check-in & automation",
     highlight: false,
     trial: false,
@@ -608,7 +608,7 @@ export default function KnotViteLanding() {
                     </div>
                     <div className="flex items-baseline gap-1 mt-1">
                       <span className="text-3xl sm:text-4xl font-bold" style={plan.highlight ? { color: BRAND } : { color: '#111' }}>{plan.price}<span className="text-xs font-normal align-super">*</span></span>
-                      <span className="text-sm text-gray-500">/{plan.period}</span>
+                      {plan.period && <span className="text-sm text-gray-500">/{plan.period}</span>}
                     </div>
                     {plan.trial && (
                       <p className="text-xs mt-2 font-medium" style={{ color: BRAND }}>14-day free trial included</p>
