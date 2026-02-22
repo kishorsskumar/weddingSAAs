@@ -338,7 +338,7 @@ export default function KnotViteLanding() {
     if (user) {
       navigate("/knotvite/dashboard");
     } else {
-      navigate("/register?plan=knotvite_basic&trial=14");
+      navigate("/knotvite/signup?plan=basic");
     }
   };
 
@@ -633,7 +633,13 @@ export default function KnotViteLanding() {
                     style={plan.highlight ? { backgroundColor: BRAND } : {}}
                     variant={plan.ctaVariant}
                     size="lg"
-                    onClick={plan.name === 'Premium' ? handleContactSales : handleGetStarted}
+                    onClick={() => {
+                      if (user) {
+                        navigate("/knotvite/dashboard");
+                      } else {
+                        navigate(`/knotvite/signup?plan=${plan.name.toLowerCase()}`);
+                      }
+                    }}
                     data-testid={`pricing-${plan.name.toLowerCase()}-cta`}
                   >
                     {plan.cta}

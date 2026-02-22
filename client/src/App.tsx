@@ -48,6 +48,8 @@ import KnotViteForms from "@/pages/knotvite-forms";
 import KnotViteSubmissions from "@/pages/knotvite-submissions";
 import KnotViteDashboard from "@/pages/knotvite-dashboard";
 import KnotViteLanding from "@/pages/knotvite-landing";
+import KnotViteSignup from "@/pages/knotvite-signup";
+import KnotViteBilling from "@/pages/knotvite-billing";
 import PublicRsvpForm from "@/pages/public-rsvp";
 import PortfolioAdmin from "@/pages/portfolio-admin";
 import PortalAdmin from "@/pages/portal-admin";
@@ -279,6 +281,10 @@ function PublicPages() {
         <Route path="/terms" component={Terms} />
         <Route path="/refund-policy" component={RefundPolicy} />
         <Route path="/contact" component={Contact} />
+        <Route path="/knotvite/signup" component={KnotViteSignup} />
+        <Route path="/knotvite/billing">
+          <PrivateRoute component={KnotViteBilling} path="/knotvite/billing" skipSubscriptionCheck={true} />
+        </Route>
         <Route path="/knotvite" component={KnotViteLanding} />
         <Route path="/rsvp/:slug" component={PublicRsvpForm} />
         <Route path="/rsvp-landing/:code" component={RsvpLanding} />

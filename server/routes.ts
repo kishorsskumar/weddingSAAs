@@ -205,6 +205,57 @@ const PLAN_CATALOG: Record<string, { name: string; amount: number }> = {
   growth_annual: { name: 'Growth Annual', amount: 14999 },
 };
 
+function generateGSTInvoiceHTML(invoice: any): string {
+  const paidDate = invoice.paidAt ? new Date(invoice.paidAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tax Invoice - ${invoice.invoiceNumber}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:20px;color:#333;max-width:800px;margin:0 auto}
+.header{background:linear-gradient(135deg,#2FA4BC,#268fa5);color:white;padding:30px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center}
+.header h1{margin:0;font-size:24px}
+.header .inv-num{font-size:14px;opacity:0.9}
+.content{border:1px solid #e5e5e5;border-top:none;padding:30px;border-radius:0 0 12px 12px}
+.row{display:flex;justify-content:space-between;margin-bottom:20px}
+.col{flex:1}
+.col h3{font-size:12px;text-transform:uppercase;color:#999;margin:0 0 6px}
+.col p{margin:2px 0;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th{background:#f8fafb;text-align:left;padding:10px 12px;font-size:12px;text-transform:uppercase;color:#666;border-bottom:2px solid #e5e5e5}
+td{padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:14px}
+.total-row td{font-weight:bold;border-top:2px solid #2FA4BC;font-size:16px}
+.badge{display:inline-block;background:#e0f4f8;color:#2FA4BC;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.footer{text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #e5e5e5;color:#999;font-size:12px}
+@media print{body{padding:0}.header{border-radius:0}.content{border-radius:0;border:none}}
+</style></head><body>
+<div class="header">
+  <div><h1>KnotVite</h1><p style="margin:4px 0 0;font-size:13px;opacity:0.8">by AtBott Solutions</p></div>
+  <div style="text-align:right"><div class="inv-num">TAX INVOICE</div><div style="font-size:20px;font-weight:bold;margin-top:4px">${invoice.invoiceNumber}</div></div>
+</div>
+<div class="content">
+  <div class="row">
+    <div class="col"><h3>Bill To</h3><p><strong>${invoice.customerName}</strong></p><p>${invoice.customerEmail}</p>${invoice.customerGstin ? `<p>GSTIN: ${invoice.customerGstin}</p>` : ''}${invoice.billingAddress ? `<p>${invoice.billingAddress}</p>` : ''}</div>
+    <div class="col" style="text-align:right"><h3>Invoice Details</h3><p>Date: ${paidDate}</p><p>Status: <span class="badge">PAID</span></p>${invoice.razorpayPaymentId ? `<p style="font-size:12px;color:#999">Ref: ${invoice.razorpayPaymentId}</p>` : ''}</div>
+  </div>
+  <table><thead><tr><th>Description</th><th style="text-align:center">HSN/SAC</th><th style="text-align:right">Amount</th></tr></thead>
+  <tbody>
+    <tr><td>${invoice.planName}</td><td style="text-align:center">998314</td><td style="text-align:right">₹${invoice.baseAmount.toLocaleString('en-IN')}</td></tr>
+    <tr><td style="color:#666">CGST @ 9%</td><td></td><td style="text-align:right">₹${invoice.cgst.toLocaleString('en-IN')}</td></tr>
+    <tr><td style="color:#666">SGST @ 9%</td><td></td><td style="text-align:right">₹${invoice.sgst.toLocaleString('en-IN')}</td></tr>
+    <tr class="total-row"><td>Total</td><td></td><td style="text-align:right;color:#2FA4BC">₹${invoice.totalAmount.toLocaleString('en-IN')}</td></tr>
+  </tbody></table>
+  <div style="background:#f8fafb;padding:16px;border-radius:8px;font-size:12px;color:#666">
+    <p style="margin:0"><strong>Note:</strong> This is a computer-generated invoice. No signature required.</p>
+    <p style="margin:4px 0 0">SAC Code 998314 - Online content (SaaS / Software services)</p>
+  </div>
+</div>
+<div class="footer">
+  <p>AtBott Solutions | atbottsaas@gmail.com</p>
+  <p>Thank you for choosing KnotVite!</p>
+</div>
+</body></html>`;
+}
+
 // Helper function to escape XML special characters for TwiML responses
 function escapeXml(text: string): string {
   return text
@@ -1069,6 +1120,7 @@ export async function registerRoutes(
     '/api/auth/', '/api/billing/', '/api/health', '/api/system-notifications',
     '/api/admin', '/api/demo-bookings', '/api/enterprise-leads', '/api/contact',
     '/api/email-logs', '/api/admin-event-logs', '/api/modules',
+    '/api/knotvite/signup', '/api/knotvite/billing/',
   ];
 
   app.use('/api/', async (req, res, next) => {
@@ -20785,6 +20837,282 @@ As you collect information through conversation, keep track of what you've gathe
     } catch (error: any) {
       console.error('[Chat] Error:', error);
       res.status(500).json({ error: 'Failed to process chat request' });
+    }
+  });
+
+  // ============ KnotVite Client Signup & Billing ============
+  app.post('/api/knotvite/signup', async (req, res) => {
+    try {
+      const { name, email, password, phone, plan } = req.body;
+      if (!name || !email || !password) {
+        return res.status(400).json({ error: 'Name, email, and password are required' });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ error: 'Email already registered. Please sign in.' });
+      }
+      const company = await storage.createCompany({ name: `KnotVite - ${name}` });
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        name,
+        email,
+        password: hashedPassword,
+        role: 'admin',
+        companyId: company.id,
+        createdVia: 'knotvite_signup',
+      });
+      const selectedPlan = plan || 'basic';
+      const isTrial = selectedPlan === 'basic';
+      const now = new Date();
+      const trialEnd = new Date(now);
+      trialEnd.setDate(trialEnd.getDate() + 14);
+      await storage.createKnotviteSubscription({
+        companyId: company.id,
+        plan: selectedPlan,
+        status: isTrial ? 'trial' : 'pending_payment',
+        trialStartDate: isTrial ? now : null,
+        trialEndDate: isTrial ? trialEnd : null,
+      });
+      try {
+        await storage.createSubscription({
+          companyId: company.id,
+          planName: 'knotvite_' + selectedPlan,
+          status: 'active',
+          startDate: now,
+          endDate: isTrial ? trialEnd : null,
+        });
+      } catch (subErr) {
+        console.error('[KnotVite Signup] Platform subscription creation error (non-fatal):', subErr);
+      }
+      (async () => {
+        try {
+          await storage.createAdminEventLog({
+            eventType: 'knotvite_signup',
+            title: 'New KnotVite Signup',
+            message: `New KnotVite signup: ${name} (${email}). Plan: ${selectedPlan}.`,
+            userName: name,
+            userEmail: email,
+            companyName: company.name,
+            planName: selectedPlan,
+          });
+        } catch (err) { console.error('[KnotVite Signup] Admin log error:', err); }
+        try {
+          await sendSignupAdminNotification(name, company.name, email, phone || '', `KnotVite ${selectedPlan}`);
+        } catch (err) { console.error('[KnotVite Signup] Admin notification error:', err); }
+        try {
+          await sendSignupWelcomeEmail(email, name, company.name, `KnotVite ${selectedPlan}`);
+        } catch (err) { console.error('[KnotVite Signup] Welcome email error:', err); }
+      })();
+      const token = jwt.sign(
+        { userId: user.id, companyId: company.id, email: user.email, role: user.role },
+        JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+      (req.session as any).userId = user.id;
+      res.status(201).json({
+        token,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role, companyId: company.id },
+      });
+    } catch (error) {
+      console.error('[KnotVite Signup] Error:', error);
+      res.status(500).json({ error: 'Signup failed. Please try again.' });
+    }
+  });
+
+  app.get('/api/knotvite/billing/status', verifyJWT, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const sub = await storage.getKnotviteSubscription(companyId);
+      if (!sub) {
+        return res.json({
+          plan: 'basic', status: 'none', isTrial: false, trialDaysRemaining: 0,
+          isTrialExpired: true, isActive: false, razorpayConfigured: razorpayService.isRazorpayConfigured(),
+          razorpayKeyId: razorpayService.getRazorpayKeyId(),
+        });
+      }
+      let trialDaysRemaining: number | null = null;
+      let isTrialExpired = false;
+      if (sub.status === 'trial' && sub.trialEndDate) {
+        const diffMs = new Date(sub.trialEndDate).getTime() - Date.now();
+        trialDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        isTrialExpired = trialDaysRemaining <= 0;
+      }
+      const isActive = sub.status === 'active' || (sub.status === 'trial' && !isTrialExpired);
+      const invoices = await storage.getKnotviteInvoices(companyId);
+      res.json({
+        subscription: sub,
+        plan: sub.plan,
+        status: sub.status,
+        isTrial: sub.status === 'trial',
+        trialDaysRemaining,
+        isTrialExpired,
+        isActive,
+        razorpayConfigured: razorpayService.isRazorpayConfigured(),
+        razorpayKeyId: razorpayService.getRazorpayKeyId(),
+        invoices,
+      });
+    } catch (error) {
+      console.error('[KnotVite Billing] Status error:', error);
+      res.status(500).json({ error: 'Failed to fetch billing status' });
+    }
+  });
+
+  app.post('/api/knotvite/billing/create-order', verifyJWT, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const { plan } = req.body;
+      if (!razorpayService.isRazorpayConfigured()) {
+        return res.status(503).json({ error: 'Payment system not configured' });
+      }
+      const { KNOTVITE_PLAN_CATALOG, calculateGSTBreakdown } = await import('../shared/knotvite-limits');
+      const catalogKey = `knotvite_${plan}`;
+      const catalogItem = KNOTVITE_PLAN_CATALOG[catalogKey];
+      if (!catalogItem) {
+        return res.status(400).json({ error: 'Invalid plan' });
+      }
+      const { totalAmount } = calculateGSTBreakdown(catalogItem.amount);
+      const order = await razorpayService.createOrder({
+        amount: totalAmount,
+        currency: 'INR',
+        companyId,
+        planName: catalogKey,
+      });
+      const sub = await storage.getKnotviteSubscription(companyId);
+      if (sub) {
+        await storage.updateKnotviteSubscription(sub.id, {
+          plan,
+          razorpayOrderId: order.id,
+          status: sub.status === 'trial' ? 'trial' : 'pending_payment',
+        });
+      } else {
+        await storage.createKnotviteSubscription({
+          companyId,
+          plan,
+          status: 'pending_payment',
+          razorpayOrderId: order.id,
+        });
+      }
+      res.json({
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: razorpayService.getRazorpayKeyId(),
+        planName: catalogItem.name,
+        baseAmount: catalogItem.amount,
+        gstBreakdown: calculateGSTBreakdown(catalogItem.amount),
+      });
+    } catch (error) {
+      console.error('[KnotVite Billing] Create order error:', error);
+      res.status(500).json({ error: 'Failed to create payment order' });
+    }
+  });
+
+  app.post('/api/knotvite/billing/verify-payment', verifyJWT, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const userId = req.user!.userId;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      const isValid = razorpayService.verifyPaymentSignature({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      });
+      if (!isValid) {
+        return res.status(400).json({ error: 'Invalid payment signature' });
+      }
+      const sub = await storage.getKnotviteSubscriptionByOrderId(razorpay_order_id);
+      if (!sub) {
+        return res.status(404).json({ error: 'Subscription not found' });
+      }
+      const { KNOTVITE_PLAN_CATALOG, calculateGSTBreakdown } = await import('../shared/knotvite-limits');
+      const catalogKey = `knotvite_${sub.plan}`;
+      const catalogItem = KNOTVITE_PLAN_CATALOG[catalogKey];
+      const gst = calculateGSTBreakdown(catalogItem?.amount || 0);
+      const now = new Date();
+      await storage.updateKnotviteSubscription(sub.id, {
+        status: 'active',
+        razorpayPaymentId: razorpay_payment_id,
+        amountPaid: gst.totalAmount,
+        paidAt: now,
+      });
+      const user = await storage.getUser(userId);
+      const invoiceNumber = await storage.getNextKnotviteInvoiceNumber();
+      const invoice = await storage.createKnotviteInvoice({
+        companyId,
+        subscriptionId: sub.id,
+        invoiceNumber,
+        planName: catalogItem?.name || sub.plan,
+        baseAmount: gst.baseAmount,
+        gstAmount: gst.gstAmount,
+        cgst: gst.cgst,
+        sgst: gst.sgst,
+        totalAmount: gst.totalAmount,
+        gstRate: '18',
+        customerName: user?.name || 'Customer',
+        customerEmail: user?.email || '',
+        razorpayPaymentId: razorpay_payment_id,
+        status: 'paid',
+        paidAt: now,
+      });
+      (async () => {
+        try {
+          const { sendKnotviteInvoiceEmail } = await import('./email-service');
+          await sendKnotviteInvoiceEmail(
+            user?.email || '',
+            user?.name || 'Customer',
+            invoice
+          );
+          await storage.updateKnotviteInvoice(invoice.id, { emailSent: true });
+        } catch (err) {
+          console.error('[KnotVite] Invoice email error:', err);
+        }
+        try {
+          await sendPaymentSuccessAdminNotification(
+            user?.name || '',
+            user?.email || '',
+            `KnotVite - ${user?.name || ''}`,
+            catalogItem?.name || sub.plan,
+            gst.totalAmount
+          );
+        } catch (err) {
+          console.error('[KnotVite] Admin notification error:', err);
+        }
+      })();
+      res.json({ success: true, invoice });
+    } catch (error) {
+      console.error('[KnotVite Billing] Verify payment error:', error);
+      res.status(500).json({ error: 'Failed to verify payment' });
+    }
+  });
+
+  app.get('/api/knotvite/invoices', verifyJWT, async (req, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      const invoices = await storage.getKnotviteInvoices(companyId);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch invoices' });
+    }
+  });
+
+  app.get('/api/knotvite/invoices/:id/download', verifyJWT, async (req, res) => {
+    try {
+      const invoice = await storage.getKnotviteInvoice(req.params.id);
+      if (!invoice) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+      if (invoice.companyId !== req.user!.companyId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      const html = generateGSTInvoiceHTML(invoice);
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Content-Disposition', `inline; filename="${invoice.invoiceNumber}.html"`);
+      res.send(html);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to generate invoice' });
     }
   });
 

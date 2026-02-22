@@ -3244,3 +3244,50 @@ export const cashflowVendorPayments = pgTable("cashflow_vendor_payments", {
 export const insertCashflowVendorPaymentSchema = createInsertSchema(cashflowVendorPayments).omit({ id: true, createdAt: true });
 export type InsertCashflowVendorPayment = z.infer<typeof insertCashflowVendorPaymentSchema>;
 export type CashflowVendorPayment = typeof cashflowVendorPayments.$inferSelect;
+
+export const knotviteSubscriptions = pgTable("knotvite_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  plan: text("plan").notNull().default('basic'),
+  status: text("status").notNull().default('trial'),
+  razorpayOrderId: text("razorpay_order_id"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  amountPaid: integer("amount_paid"),
+  trialStartDate: timestamp("trial_start_date"),
+  trialEndDate: timestamp("trial_end_date"),
+  paidAt: timestamp("paid_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertKnotviteSubscriptionSchema = createInsertSchema(knotviteSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKnotviteSubscription = z.infer<typeof insertKnotviteSubscriptionSchema>;
+export type KnotviteSubscription = typeof knotviteSubscriptions.$inferSelect;
+
+export const knotviteInvoices = pgTable("knotvite_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  subscriptionId: varchar("subscription_id").references(() => knotviteSubscriptions.id),
+  invoiceNumber: text("invoice_number").notNull(),
+  planName: text("plan_name").notNull(),
+  baseAmount: integer("base_amount").notNull(),
+  gstAmount: integer("gst_amount").notNull(),
+  cgst: integer("cgst").notNull(),
+  sgst: integer("sgst").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  gstRate: text("gst_rate").notNull().default('18'),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email").notNull(),
+  customerGstin: text("customer_gstin"),
+  billingAddress: text("billing_address"),
+  razorpayPaymentId: text("razorpay_payment_id"),
+  status: text("status").notNull().default('paid'),
+  emailSent: boolean("email_sent").notNull().default(false),
+  paidAt: timestamp("paid_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnotviteInvoiceSchema = createInsertSchema(knotviteInvoices).omit({ id: true, createdAt: true });
+export type InsertKnotviteInvoice = z.infer<typeof insertKnotviteInvoiceSchema>;
+export type KnotviteInvoice = typeof knotviteInvoices.$inferSelect;

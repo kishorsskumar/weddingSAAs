@@ -321,6 +321,56 @@ export async function sendPaymentFailedAdminNotification(userName: string, userE
   return sendAdminNotificationEmail('❌ Payment Failed - ' + companyName, bodyHtml);
 }
 
+export async function sendKnotviteInvoiceEmail(toEmail: string, customerName: string, invoice: any): Promise<{ success: boolean }> {
+  try {
+    const { client, fromEmail } = await getResendClient();
+    const paidDate = invoice.paidAt ? new Date(invoice.paidAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A';
+
+    const result = await client.emails.send({
+      from: fromEmail || 'noreply@resend.dev',
+      to: toEmail,
+      subject: `KnotVite Payment Receipt - ${invoice.invoiceNumber}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #2FA4BC 0%, #268fa5 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">KnotVite</h1>
+            <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0; font-size: 14px;">Payment Confirmation</p>
+          </div>
+          <div style="background: #ffffff; padding: 40px 30px; border: 1px solid #e5e5e5; border-top: none; border-radius: 0 0 12px 12px;">
+            <p>Hi ${customerName},</p>
+            <p>Thank you for your payment! Here's your GST invoice:</p>
+            <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0;">
+              <p style="margin: 4px 0;"><strong>Invoice:</strong> ${invoice.invoiceNumber}</p>
+              <p style="margin: 4px 0;"><strong>Plan:</strong> ${invoice.planName}</p>
+              <p style="margin: 4px 0;"><strong>Base Amount:</strong> ₹${invoice.baseAmount.toLocaleString('en-IN')}</p>
+              <p style="margin: 4px 0;"><strong>CGST (9%):</strong> ₹${invoice.cgst.toLocaleString('en-IN')}</p>
+              <p style="margin: 4px 0;"><strong>SGST (9%):</strong> ₹${invoice.sgst.toLocaleString('en-IN')}</p>
+              <p style="margin: 4px 0; font-size: 18px;"><strong>Total Paid:</strong> ₹${invoice.totalAmount.toLocaleString('en-IN')}</p>
+              <p style="margin: 4px 0;"><strong>Date:</strong> ${paidDate}</p>
+            </div>
+            <p>You can download your GST invoice anytime from your KnotVite dashboard under the Billing section.</p>
+            <p>Your ${invoice.planName} plan is now active. Enjoy all the features!</p>
+            <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">KnotVite by AtBott Solutions | SAC: 998314</p>
+          </div>
+        </body>
+        </html>
+      `
+    });
+
+    console.log('[Email] KnotVite invoice email sent to:', toEmail, 'Result:', result);
+    await storage.createEmailLog({ recipient: toEmail, type: 'knotvite_invoice', status: 'sent' });
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Email] Failed to send KnotVite invoice:', error);
+    try { await storage.createEmailLog({ recipient: toEmail, type: 'knotvite_invoice', status: 'failed', errorMessage: error?.message }); } catch {}
+    return { success: false };
+  }
+}
+
 export async function sendEnterpriseAcknowledgmentEmail(toEmail: string, contactName: string, companyName: string): Promise<{ success: boolean }> {
   try {
     const { client, fromEmail } = await getResendClient();

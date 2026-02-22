@@ -12,10 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -691,6 +692,7 @@ function OutreachTab({ eventId, guests, responses }: {
 }
 
 export default function KnotViteDashboard() {
+  const [, navigate] = useLocation();
   const [mainTab, setMainTab] = useState("dashboard");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [eventComboOpen, setEventComboOpen] = useState(false);
@@ -946,6 +948,14 @@ export default function KnotViteDashboard() {
             <p className="text-slate-500 mt-1 text-sm">Manage event guest lists and track RSVP responses</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/knotvite/billing")}
+              data-testid="button-billing"
+            >
+              <CreditCard className="w-4 h-4 mr-2" /> Billing
+            </Button>
             <Popover open={eventComboOpen} onOpenChange={setEventComboOpen}>
               <PopoverTrigger asChild>
                 <Button

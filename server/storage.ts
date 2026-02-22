@@ -428,6 +428,12 @@ import {
   type InsertEmailLog,
   type AdminEventLog,
   type InsertAdminEventLog,
+  knotviteSubscriptions,
+  type KnotviteSubscription,
+  type InsertKnotviteSubscription,
+  knotviteInvoices,
+  type KnotviteInvoice,
+  type InsertKnotviteInvoice,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -6351,6 +6357,64 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(budgetPlanEntries.createdAt);
+  }
+
+  async getKnotviteSubscription(companyId: string): Promise<KnotviteSubscription | undefined> {
+    const [sub] = await db.select().from(knotviteSubscriptions)
+      .where(eq(knotviteSubscriptions.companyId, companyId))
+      .orderBy(desc(knotviteSubscriptions.createdAt))
+      .limit(1);
+    return sub || undefined;
+  }
+
+  async createKnotviteSubscription(data: InsertKnotviteSubscription): Promise<KnotviteSubscription> {
+    const [created] = await db.insert(knotviteSubscriptions).values(data).returning();
+    return created;
+  }
+
+  async updateKnotviteSubscription(id: string, data: Partial<InsertKnotviteSubscription>): Promise<KnotviteSubscription | undefined> {
+    const [updated] = await db.update(knotviteSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(knotviteSubscriptions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getKnotviteSubscriptionByOrderId(orderId: string): Promise<KnotviteSubscription | undefined> {
+    const [sub] = await db.select().from(knotviteSubscriptions)
+      .where(eq(knotviteSubscriptions.razorpayOrderId, orderId));
+    return sub || undefined;
+  }
+
+  async getKnotviteInvoices(companyId: string): Promise<KnotviteInvoice[]> {
+    return await db.select().from(knotviteInvoices)
+      .where(eq(knotviteInvoices.companyId, companyId))
+      .orderBy(desc(knotviteInvoices.createdAt));
+  }
+
+  async createKnotviteInvoice(data: InsertKnotviteInvoice): Promise<KnotviteInvoice> {
+    const [created] = await db.insert(knotviteInvoices).values(data).returning();
+    return created;
+  }
+
+  async updateKnotviteInvoice(id: string, data: Partial<InsertKnotviteInvoice>): Promise<KnotviteInvoice | undefined> {
+    const [updated] = await db.update(knotviteInvoices)
+      .set(data)
+      .where(eq(knotviteInvoices.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getKnotviteInvoice(id: string): Promise<KnotviteInvoice | undefined> {
+    const [inv] = await db.select().from(knotviteInvoices)
+      .where(eq(knotviteInvoices.id, id));
+    return inv || undefined;
+  }
+
+  async getNextKnotviteInvoiceNumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteInvoices);
+    const num = (result?.count || 0) + 1;
+    return `KV-INV-${String(num).padStart(5, '0')}`;
   }
 }
 
