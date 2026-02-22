@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
-import logo from "@assets/OAK_1_1766646679471.jpg";
+import logo from "../assets/atbott-logo-dark.png";
 import html2pdf from "html2pdf.js";
 
 export default function RsvpFlowPdf() {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.title = "Oak RSVP - Customer Flow | Oakstreet Events";
+    document.title = "RSVP - Customer Flow";
     // Auto-trigger PDF download
     const timer = setTimeout(() => {
       if (contentRef.current) {
@@ -295,9 +295,9 @@ export default function RsvpFlowPdf() {
 
       {/* Header */}
       <div className="header">
-        <img src={logo} alt="Oakstreet Events" className="logo" />
+        <img src={logo} alt="Company Logo" className="logo" />
         <div className="header-title">
-          <h1>Oak RSVP Service</h1>
+          <h1>RSVP Service</h1>
           <p>Smart Guest Management for Your Events</p>
         </div>
       </div>
@@ -317,7 +317,7 @@ export default function RsvpFlowPdf() {
             </div>
             <div className="chat-header-text">
               <h3>Oaksy</h3>
-              <p>Oakstreet AI Assistant</p>
+              <p>AI Assistant</p>
             </div>
           </div>
           <div className="message-bot">
@@ -349,7 +349,7 @@ export default function RsvpFlowPdf() {
               </div>
               <div className="chat-header-text">
                 <h3>Oaksy</h3>
-                <p>Oakstreet AI Assistant</p>
+                <p>AI Assistant</p>
               </div>
             </div>
             <div className="message-user">✅ Attending</div>
@@ -445,7 +445,7 @@ export default function RsvpFlowPdf() {
       {/* Benefits */}
       <div className="section-title">
         <span className="step-number">★</span>
-        Why Choose Oak RSVP?
+        Why Choose Our RSVP Service?
       </div>
       <div className="benefits-list">
         <div className="benefit-item">
@@ -481,14 +481,10 @@ export default function RsvpFlowPdf() {
       {/* Footer */}
       <div className="footer">
         <div className="footer-address">
-          <strong>Oakstreet Events</strong><br />
-          2nd Floor, Above Devas Studio<br />
-          Deshabhimani Press Road<br />
-          Kochi, Kerala 682017, India
+          <strong>RSVP Service</strong>
         </div>
         <div className="contact-info">
-          <span>📞 +91 79023 73354</span>
-          <span>✉️ info@oakstreetevents.com</span>
+          <span>📞 Contact Us</span>
         </div>
       </div>
     </div>

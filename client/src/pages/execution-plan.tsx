@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import oakstreetLogo from "@assets/Oakstreet_1765077046310.png";
+import oakstreetLogo from "../assets/atbott-logo-dark.png";
 import {
   ClipboardList,
   Package,

@@ -10,7 +10,7 @@ export default function ClientPortalGuidePDF() {
     if (element && (window as any).html2pdf) {
       const opt = {
         margin: [10, 10, 10, 10],
-        filename: 'Oakstreet-Client-Portal-Development-Guide.pdf',
+        filename: 'Client-Portal-Development-Guide.pdf',
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -57,14 +57,14 @@ export default function ClientPortalGuidePDF() {
       
       <div id="pdf-content" className="max-w-4xl mx-auto bg-white" style={{ fontFamily: 'Arial, sans-serif', fontSize: '11px', lineHeight: '1.4' }}>
         <div style={{ textAlign: 'center', marginBottom: '20px', paddingBottom: '15px', borderBottom: '2px solid #2d5a3d' }}>
-          <h1 style={{ color: '#2d5a3d', fontSize: '22px', margin: '0 0 5px 0' }}>Oakstreet Client Portal</h1>
+          <h1 style={{ color: '#2d5a3d', fontSize: '22px', margin: '0 0 5px 0' }}>Client Portal</h1>
           <p style={{ fontSize: '14px', color: '#666', margin: 0 }}>Development Guide</p>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h2 style={{ color: '#2d5a3d', fontSize: '14px', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Overview</h2>
           <p>The Client Portal allows customers to view their estimates and invoices, track event progress, chat with Oaksy AI, manage RSVPs, upload documents, and view payment status.</p>
-          <p><strong>Subdomain:</strong> clients.oakstreetevent.com</p>
+          <p><strong>Subdomain:</strong> clients.yourdomain.com</p>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
@@ -73,13 +73,13 @@ export default function ClientPortalGuidePDF() {
             <li>Go to replit.com</li>
             <li>Click "Create Repl"</li>
             <li>Select Node.js template</li>
-            <li>Name it: oakstreet-client-portal</li>
+            <li>Name it: client-portal</li>
           </ol>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h2 style={{ color: '#2d5a3d', fontSize: '14px', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Step 2: Project Structure</h2>
-          <pre style={{ background: '#f5f5f5', padding: '10px', fontSize: '10px', overflow: 'auto' }}>{`oakstreet-client-portal/
+          <pre style={{ background: '#f5f5f5', padding: '10px', fontSize: '10px', overflow: 'auto' }}>{`client-portal/
 ├── client/
 │   ├── src/
 │   │   ├── components/
@@ -137,7 +137,7 @@ TWILIO_WHATSAPP_NUMBER=<your WhatsApp number>`}</pre>
           
           <h3 style={{ fontSize: '12px', color: '#444', marginTop: '10px' }}>1. Token-Based Authentication</h3>
           <p>Clients access via secure portal links (no login required):</p>
-          <pre style={{ background: '#f5f5f5', padding: '8px', fontSize: '9px' }}>{`https://clients.oakstreetevent.com/portal/abc123xyz...`}</pre>
+          <pre style={{ background: '#f5f5f5', padding: '8px', fontSize: '9px' }}>{`https://clients.yourdomain.com/portal/abc123xyz...`}</pre>
           
           <h3 style={{ fontSize: '12px', color: '#444', marginTop: '10px' }}>2. Client Dashboard</h3>
           <p>Show: Active events, pending invoices, RSVP statistics, recent activity</p>
@@ -159,15 +159,15 @@ TWILIO_WHATSAPP_NUMBER=<your WhatsApp number>`}</pre>
             <li>Choose Autoscale or Reserved VM</li>
             <li>After deployment, go to Deployments → Settings</li>
             <li>Click Link a domain</li>
-            <li>Enter: clients.oakstreetevent.com</li>
+            <li>Enter: clients.yourdomain.com</li>
             <li>Add the DNS records to your domain registrar</li>
           </ol>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h2 style={{ color: '#2d5a3d', fontSize: '14px', borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Step 7: Connecting Both Apps</h2>
-          <p>In the main Oakstreet app, generate portal links when creating quotes/invoices:</p>
-          <pre style={{ background: '#f5f5f5', padding: '8px', fontSize: '9px' }}>{`const portalUrl = \`https://clients.oakstreetevent.com/portal/\${token}\`;
+          <p>In the main app, generate portal links when creating quotes/invoices:</p>
+          <pre style={{ background: '#f5f5f5', padding: '8px', fontSize: '9px' }}>{`const portalUrl = \`https://clients.yourdomain.com/portal/\${token}\`;
 // Send this URL to customer via WhatsApp or email`}</pre>
         </div>
 
@@ -193,7 +193,7 @@ TWILIO_WHATSAPP_NUMBER=<your WhatsApp number>`}</pre>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '30px', paddingTop: '15px', borderTop: '1px solid #ddd', color: '#666', fontSize: '10px' }}>
-          <p>Oakstreet Events - Client Portal Development Guide</p>
+          <p>Client Portal Development Guide</p>
           <p>For assistance, contact the development team</p>
         </div>
       </div>

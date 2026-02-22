@@ -3,7 +3,7 @@ import { storage } from './storage';
 
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@oakstreetevent.com';
+const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@example.com';
 
 if (vapidPublicKey && vapidPrivateKey) {
   webPush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
@@ -127,7 +127,7 @@ export async function sendOaksyNotification(
   await storage.createNotificationRecipients(notification.id, [userId]);
 
   await sendPushToUser(userId, {
-    title: 'Oaksy - Oakstreet Events',
+    title: 'AI Assistant',
     body: `${userName}, ${message}`,
     actionUrl,
     notificationId: notification.id,

@@ -762,7 +762,7 @@ export default function EventRsvp() {
             </Button>
           </div>
           <p className="text-center text-xs tracking-wide" style={{ color: '#bbb' }}>
-            Powered by <span style={{ color: '#999' }}>Oakstreet Events</span>
+            Powered by <span style={{ color: '#999' }}>KnotVite</span>
           </p>
         </div>
       </div>
@@ -923,7 +923,7 @@ export default function EventRsvp() {
           </div>
 
           <p className="text-center text-xs tracking-wide" style={{ color: '#bbb' }}>
-            Powered by <span style={{ color: '#999' }}>Oakstreet Events</span>
+            Powered by <span style={{ color: '#999' }}>KnotVite</span>
           </p>
         </div>
       </div>
@@ -1300,7 +1300,7 @@ export default function EventRsvp() {
         </div>
 
         <p className="text-center text-xs tracking-wide" style={{ color: '#bbb' }}>
-          Powered by <span style={{ color: '#999' }}>Oakstreet Events</span>
+          Powered by <span style={{ color: '#999' }}>KnotVite</span>
         </p>
       </div>
     </div>

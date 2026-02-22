@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Monitor, Smartphone, Apple, Chrome, Download, CheckCircle2, ArrowRight } from "lucide-react";
-import logo from "@assets/OAK_1_1768844040105.jpg";
+import logo from "../assets/atbott-logo-dark.png";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;

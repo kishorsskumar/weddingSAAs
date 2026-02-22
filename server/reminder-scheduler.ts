@@ -386,7 +386,7 @@ export async function processRsvpReminders(): Promise<void> {
             if (rsvpPageLink) {
               await sendRsvpWhatsApp(guest.phone, guest.name, eventName, rsvpPageLink);
             } else {
-              const message = `🎉 *RSVP Reminder*\n\nHi ${guest.name}! 👋\n\nFriendly reminder about *${eventName}* on ${format(eventDate, 'MMM d')}!\n\nWe noticed you haven't responded yet. Will you be attending?\n\n_Oakstreet Events_`;
+              const message = `🎉 *RSVP Reminder*\n\nHi ${guest.name}! 👋\n\nFriendly reminder about *${eventName}* on ${format(eventDate, 'MMM d')}!\n\nWe noticed you haven't responded yet. Will you be attending?`;
               await sendGeneralNotification(guest.phone, guest.name, message, 'rsvp_7day_reminder');
             }
             await storage.updateEventGuest(guest.id, { reminder7DaySent: true } as any);
@@ -409,7 +409,7 @@ export async function processRsvpReminders(): Promise<void> {
             if (rsvpPageLink) {
               await sendRsvpWhatsApp(guest.phone, guest.name, eventName, rsvpPageLink);
             } else {
-              const message = `⏰ *Final RSVP Reminder*\n\nHi ${guest.name}!\n\n*${eventName}* is TOMORROW!\n\nThis is your final reminder to confirm attendance.\n\n_Oakstreet Events_`;
+              const message = `⏰ *Final RSVP Reminder*\n\nHi ${guest.name}!\n\n*${eventName}* is TOMORROW!\n\nThis is your final reminder to confirm attendance.`;
               await sendGeneralNotification(guest.phone, guest.name, message, 'rsvp_24h_reminder');
             }
             await storage.updateEventGuest(guest.id, { reminder24hSent: true });
@@ -489,7 +489,7 @@ export async function processConfigurableRsvpReminders(): Promise<void> {
           if (rsvpLink) {
             await sendRsvpWhatsApp(guest.phone, guest.name, eventName, rsvpLink);
           } else {
-            const message = `🔔 *RSVP Follow-up*\n\nHi ${guest.name}! 👋\n\n${statusText} for *${eventName}* on *${format(eventDate, 'MMM d, yyyy')}*.\n\nWe'd love to have you! Please confirm your attendance so we can make the best arrangements for you.\n\n_Oakstreet Events_`;
+            const message = `🔔 *RSVP Follow-up*\n\nHi ${guest.name}! 👋\n\n${statusText} for *${eventName}* on *${format(eventDate, 'MMM d, yyyy')}*.\n\nWe'd love to have you! Please confirm your attendance so we can make the best arrangements for you.`;
             await sendGeneralNotification(guest.phone, guest.name, message, 'rsvp_configurable_reminder');
           }
           sentCount++;
@@ -574,7 +574,7 @@ async function processPortalLeadReminders(): Promise<void> {
           `📧 Email: ${lead.email}\n` +
           `${lead.eventType ? `🎉 Event: ${lead.eventType}` : ''}\n\n` +
           `Please contact the customer and update the lead status in Oak Sales.\n\n` +
-          `— Oakstreet Events System`;
+          `— Event Management System`;
         
         try {
           await sendGeneralNotification(employee.phone, planner.name, reminderMessage, 'stale_portal_lead_reminder', lead.id);

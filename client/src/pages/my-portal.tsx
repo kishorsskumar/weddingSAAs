@@ -799,7 +799,7 @@ export default function MyPortal({ previewLeadId }: { previewLeadId?: string } =
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="/oakstreet-icon-192.png" 
+              src="/favicon.ico" 
               alt="Company Logo" 
               className="h-10 w-10 object-contain rounded-full"
             />
@@ -2473,7 +2473,7 @@ export default function MyPortal({ previewLeadId }: { previewLeadId?: string } =
 
                       <div className="space-y-4">
                         <div>
-                          <Label htmlFor="comments" className="text-sm font-medium">What made your event special with Oakstreet?</Label>
+                          <Label htmlFor="comments" className="text-sm font-medium">What made your event special?</Label>
                           <Textarea
                             id="comments"
                             placeholder="Share the moments that stood out..."
@@ -2498,7 +2498,7 @@ export default function MyPortal({ previewLeadId }: { previewLeadId?: string } =
 
                       <div className="space-y-4">
                         <div>
-                          <Label className="text-sm font-medium">Would you recommend Oakstreet Events to friends and family?</Label>
+                          <Label className="text-sm font-medium">Would you recommend us to friends and family?</Label>
                           <div className="flex gap-3 mt-2">
                             <Button
                               type="button"
@@ -2524,7 +2524,7 @@ export default function MyPortal({ previewLeadId }: { previewLeadId?: string } =
                           </Label>
                           <Textarea
                             id="testimonial"
-                            placeholder="Write a few words about your experience with Oakstreet Events..."
+                            placeholder="Write a few words about your experience..."
                             value={feedback.testimonial || ''}
                             onChange={(e) => setFeedback({ ...feedback, testimonial: e.target.value })}
                             className="mt-2 min-h-[80px]"
@@ -2557,7 +2557,7 @@ export default function MyPortal({ previewLeadId }: { previewLeadId?: string } =
       <footer className="border-t bg-white/50 backdrop-blur-sm mt-12">
         <div className="max-w-6xl mx-auto px-4 py-6 text-center">
           <p className="text-xs text-[#4b7c29]/50 tracking-wide">
-            © 2026 Oakstreet Events. All rights reserved.
+            © 2026 All rights reserved.
           </p>
           <p className="text-[10px] text-[#4b7c29]/40 mt-1 tracking-wider">Crafted with care for your special moments.</p>
         </div>

@@ -256,7 +256,7 @@ export default function PortfolioPage() {
             </Link>
             <div className="flex items-center gap-3">
               <img 
-                src="https://client.oakstreetevents.in/assets/logo-CuwGMaVB.png" 
+                src="" 
                 alt="Portfolio" 
                 className="h-10 w-auto"
               />
@@ -277,7 +277,7 @@ export default function PortfolioPage() {
       <footer className="bg-gray-900 text-white py-8 mt-16">
         <div className="container mx-auto px-4 text-center">
           <img 
-            src="https://client.oakstreetevents.in/assets/logo-CuwGMaVB.png" 
+            src="" 
             alt="Portfolio" 
             className="h-12 w-auto mx-auto mb-4 brightness-0 invert"
           />

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { format, parseISO, differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds } from "date-fns";
 import { Calendar, MapPin, Clock, Heart, ChevronDown, Loader2, Sparkles, Search, UserPlus, User } from "lucide-react";
-import sampleCouple from "@assets/sample-couple.jpg";
+const sampleCouple = "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&h=800&fit=crop";
 
 interface LandingConfig {
   heroImageUrl?: string;
@@ -305,7 +305,7 @@ export default function RsvpWeddingPage() {
   const welcomeTitle = lp.welcomeTitle || (isWedding ? 'Join Us on Our Special Day' : 'Event Details');
   const welcomeMessage = lp.welcomeMessage || 'We would be honored by your presence';
   const rsvpButtonText = lp.rsvpButtonText || 'Kindly Respond';
-  const footerMessage = lp.footerMessage || 'Crafted with love by Oakstreet Events';
+  const footerMessage = lp.footerMessage || 'Crafted with love';
   const showCountdown = lp.showCountdown !== false;
   const showCeremonies = lp.showCeremonies !== false;
 

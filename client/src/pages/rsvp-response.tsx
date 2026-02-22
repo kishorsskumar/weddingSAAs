@@ -297,8 +297,8 @@ ${specialNotes ? `Notes: ${specialNotes}` : ''}
 Confirmed on: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}
 
 ═══════════════════════════════════════════════════
-           Managed by Oakstreet Events
-             www.oakstreetevent.com
+           Managed by KnotVite
+
 ═══════════════════════════════════════════════════
     `.trim();
     
@@ -584,7 +584,7 @@ Confirmed on: ${format(new Date(), "MMMM d, yyyy 'at' h:mm a")}
         </div>
 
         <p className="text-center text-xs tracking-wide" style={{ color: '#bbb' }}>
-          Powered by <span style={{ color: '#999' }}>Oakstreet Events</span>
+          Powered by <span style={{ color: '#999' }}>KnotVite</span>
         </p>
       </div>
     </div>

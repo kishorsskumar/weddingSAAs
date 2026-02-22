@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import type { Employee } from "@/lib/types";
-import yepmanLogo from "@assets/Yepman_1767319118647.png";
+import yepmanLogo from "../assets/atbott-logo-dark.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

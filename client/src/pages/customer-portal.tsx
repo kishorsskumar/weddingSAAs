@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Download, Loader2, FileText, Receipt, AlertCircle } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import logo from "@assets/oakstreet_white_1764858814551.png";
+import logo from "../assets/atbott-logo.png";
 
 type LineItem = {
   slNo: number;

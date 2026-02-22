@@ -2,12 +2,12 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "wouter";
 import { format } from "date-fns";
 import html2pdf from "html2pdf.js";
-import logo from "@assets/OAK_1_1766646679471.jpg";
-import yepmanLogo from "@assets/Yepman_1767319118647.png";
+import logo from "../assets/atbott-logo-dark.png";
+const yepmanLogo = logo;
 const metaEventsLogo = logo;
 
-const BRAND_COLOR = '#6b9937';
-const YEPMAN_BRAND_COLOR = '#9d2966';
+const BRAND_COLOR = '#2FA4BC';
+const YEPMAN_BRAND_COLOR = '#2FA4BC';
 const META_EVENTS_BRAND_COLOR = '#2d3436';
 
 // Helper function to safely format dates

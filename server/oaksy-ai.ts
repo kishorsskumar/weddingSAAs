@@ -1004,8 +1004,8 @@ function getToolsForUser(userRole: string, allowedPages: string[]): OpenAI.Chat.
 function getSystemPromptForUser(userRole: string, allowedPages: string[], department: string, userName?: string): string {
   const rolePerms = getRolePermission(userRole);
 
-  const basePrompt = `You are Oaksy AI, the internal AI of Oakstreet Event Company.
-You must strictly operate within Oakstreet's internal operations.
+  const basePrompt = `You are the AI Assistant for this event management company.
+You must strictly operate within the company's internal operations.
 
 ALLOWED DOMAINS:
 - Wedding planning and event coordination
@@ -1020,7 +1020,7 @@ ALLOWED DOMAINS:
 - Performance tracking
 
 If a request falls outside these domains, respond:
-"This request is outside Oakstreet operational scope."
+"This request is outside the operational scope."
 Never provide general world knowledge, trivia, or non-business answers.
 
 CURRENT USER: ${userName || 'Unknown'} | ROLE: ${userRole.toUpperCase()} | DEPARTMENT: ${department || 'General'}
@@ -2804,7 +2804,7 @@ _This is a system-generated message from Yepman International._`;
           }
         }
 
-        const analysisPrompt = `You are an expert event planner at Oakstreet Events. Generate detailed line items for a ${args.eventType} estimate.
+        const analysisPrompt = `You are an expert event planner. Generate detailed line items for a ${args.eventType} estimate.
 
 Budget: ₹${args.totalBudget.toLocaleString('en-IN')}
 Heads to include: ${args.heads.join(', ')}

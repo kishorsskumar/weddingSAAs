@@ -59,6 +59,12 @@ import Attendance from "@/pages/attendance";
 import AttendanceAdmin from "@/pages/attendance-admin";
 import OakIncentives from "@/pages/oak-incentives";
 import OaksyHelp from "@/pages/oaksy-help";
+import EventRsvp from "@/pages/event-rsvp";
+import RsvpLanding from "@/pages/rsvp-landing";
+import RsvpResponse from "@/pages/rsvp-response";
+import RsvpWeddingPage from "@/pages/rsvp-wedding-page";
+import RsvpFlowPdf from "@/pages/rsvp-flow-pdf";
+import RsvpServicePdf from "@/pages/rsvp-service-pdf";
 import { AIChatbot } from "@/components/ai-chatbot";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -244,6 +250,9 @@ function AppRoutes() {
         <Route path="/oaksy-help">
           <PrivateRoute component={OaksyHelp} path="/oaksy-help" />
         </Route>
+        <Route path="/event-rsvp/:eventId">
+          <PrivateRoute component={EventRsvp} path="/event-rsvp/:eventId" />
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </Layout>
@@ -272,6 +281,9 @@ function PublicPages() {
         <Route path="/contact" component={Contact} />
         <Route path="/knotvite" component={KnotViteLanding} />
         <Route path="/rsvp/:slug" component={PublicRsvpForm} />
+        <Route path="/rsvp-landing/:code" component={RsvpLanding} />
+        <Route path="/rsvp-response/:code" component={RsvpResponse} />
+        <Route path="/rsvp-wedding/:code" component={RsvpWeddingPage} />
         <Route path="/portfolio" component={PortfolioPage} />
         <Route path="/client-portal" component={PortalLanding} />
         <Route>
@@ -303,6 +315,12 @@ function App() {
             </Route>
             <Route path="/docs/knotvite-plan">
               <KnotVitePlanPDF />
+            </Route>
+            <Route path="/docs/rsvp-flow">
+              <RsvpFlowPdf />
+            </Route>
+            <Route path="/docs/rsvp-service">
+              <RsvpServicePdf />
             </Route>
             <Route>
               <PublicPages />

@@ -219,7 +219,7 @@ export default function PrintMilestones() {
           <div className="flex justify-between items-start">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Event Timeline</h1>
-              <p className="text-gray-500 text-sm">{companySettings?.companyName || 'Oakstreet Events'}</p>
+              <p className="text-gray-500 text-sm">{companySettings?.companyName || 'Company'}</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Generated on</p>
@@ -300,7 +300,7 @@ export default function PrintMilestones() {
         </div>
 
         <div className="mt-8 pt-6 border-t text-center text-xs text-gray-400">
-          <p>{companySettings?.companyName || 'Oakstreet Events'} | {companySettings?.phone} | {companySettings?.email}</p>
+          <p>{companySettings?.companyName || 'Company'} | {companySettings?.phone} | {companySettings?.email}</p>
         </div>
       </div>
     </>

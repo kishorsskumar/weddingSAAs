@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import logo from "@assets/OAK_1_1766646679471.jpg";
+import logo from "../assets/atbott-logo-dark.png";
 import html2pdf from "html2pdf.js";
 
-const OAK_GREEN = '#4b7c29';
-const OAK_DARK = '#3d6b3d';
+const OAK_GREEN = '#2FA4BC';
+const OAK_DARK = '#1a8a9e';
 
 export default function RsvpServicePdf() {
   const contentRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    document.title = "Oak RSVP Service - Brochure | Oakstreet Events";
+    document.title = "RSVP Service - Brochure";
   }, []);
 
   const handleDownload = () => {
@@ -18,7 +18,7 @@ export default function RsvpServicePdf() {
     setDownloading(true);
     const opt = {
       margin: 0,
-      filename: 'Oakstreet-RSVP-Service-Brochure.pdf',
+      filename: 'RSVP-Service-Brochure.pdf',
       image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, scrollY: 0 },
       jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
@@ -54,7 +54,7 @@ export default function RsvpServicePdf() {
         <div className="page page-break" style={{ background: `linear-gradient(135deg, #f8faf5 0%, #eef5e6 30%, #dcecc8 70%, ${OAK_GREEN}15 100%)`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '40px' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '6px', background: `linear-gradient(90deg, ${OAK_GREEN}, #7ab840, ${OAK_GREEN})` }} />
           <div style={{ position: 'absolute', top: '30px', left: '30px' }}>
-            <img src={logo} alt="Oakstreet" style={{ height: '50px', borderRadius: '8px' }} />
+            <img src={logo} alt="Company Logo" style={{ height: '50px', borderRadius: '8px' }} />
           </div>
           <div style={{ textAlign: 'center', marginTop: '60px' }}>
             <div style={{ width: '90px', height: '90px', borderRadius: '50%', background: `linear-gradient(135deg, ${OAK_GREEN}, #7ab840)`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 30px', boxShadow: '0 8px 32px rgba(75,124,41,0.3)' }}>
@@ -85,7 +85,7 @@ export default function RsvpServicePdf() {
             </div>
           </div>
           <div style={{ position: 'absolute', bottom: '30px', textAlign: 'center', width: '100%' }}>
-            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}>www.oakstreetevent.com</p>
+            <p style={{ fontSize: '11px', color: '#999', margin: 0 }}></p>
           </div>
         </div>
 
@@ -96,7 +96,7 @@ export default function RsvpServicePdf() {
               <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Beautiful Wedding Landing Pages</h2>
               <p style={{ fontSize: '12px', color: '#777', margin: '4px 0 0' }}>TheKnot-inspired design with full customization</p>
             </div>
-            <img src={logo} alt="Oakstreet" style={{ height: '35px', borderRadius: '6px' }} />
+            <img src={logo} alt="Company Logo" style={{ height: '35px', borderRadius: '6px' }} />
           </div>
 
           <div style={{ background: '#fafbf8', borderRadius: '12px', border: '1px solid #e8ede3', padding: '20px', marginBottom: '20px' }}>
@@ -129,7 +129,7 @@ export default function RsvpServicePdf() {
                 <div style={{ display: 'grid', gap: '8px' }}>
                   {[
                     { icon: '🎨', title: 'Custom Branding', desc: 'Hero images, couple photos, colour themes' },
-                    { icon: '🔗', title: 'Unique Event URL', desc: 'e.g. oakstreetevent.com/rsvp/e/VARUNNEHA' },
+                    { icon: '🔗', title: 'Unique Event URL', desc: 'e.g. yourdomain.com/rsvp/e/EXAMPLE' },
                     { icon: '📱', title: 'QR Code Access', desc: 'Print on physical invites for instant access' },
                     { icon: '🔍', title: 'Name Search', desc: 'Guests find their invitation instantly' },
                     { icon: '➕', title: 'Self-Registration', desc: 'New guests can register themselves' },
@@ -221,7 +221,7 @@ export default function RsvpServicePdf() {
           </div>
 
           <div style={{ position: 'absolute', bottom: '15px', left: '35px', right: '35px', textAlign: 'center', fontSize: '9px', color: '#ccc' }}>
-            Oakstreet Events — Oak RSVP Service Brochure — Page 2
+            RSVP Service Brochure — Page 2
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function RsvpServicePdf() {
               <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>Powerful Management Dashboard</h2>
               <p style={{ fontSize: '12px', color: '#777', margin: '4px 0 0' }}>Complete visibility into guest responses & analytics</p>
             </div>
-            <img src={logo} alt="Oakstreet" style={{ height: '35px', borderRadius: '6px' }} />
+            <img src={logo} alt="Company Logo" style={{ height: '35px', borderRadius: '6px' }} />
           </div>
 
           <div style={{ background: '#fafbf8', borderRadius: '12px', border: '1px solid #e8ede3', padding: '20px', marginBottom: '18px' }}>
@@ -285,7 +285,7 @@ export default function RsvpServicePdf() {
               </h3>
               <div style={{ background: '#e5ddd5', borderRadius: '8px', padding: '10px' }}>
                 <div style={{ background: '#075e54', color: 'white', padding: '6px 10px', borderRadius: '6px 6px 0 0', margin: '-10px -10px 8px', fontSize: '11px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '14px' }}>💬</span> Oakstreet Events
+                  <span style={{ fontSize: '14px' }}>💬</span> RSVP Service
                 </div>
                 <div style={{ background: 'white', borderRadius: '6px', padding: '8px', marginBottom: '6px', fontSize: '10px', lineHeight: 1.5, borderTopLeftRadius: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.08)' }}>
                   Dear Raj Sharma,<br/>
@@ -337,7 +337,7 @@ export default function RsvpServicePdf() {
           </div>
 
           <div style={{ position: 'absolute', bottom: '15px', left: '35px', right: '35px', textAlign: 'center', fontSize: '9px', color: '#ccc' }}>
-            Oakstreet Events — Oak RSVP Service Brochure — Page 3
+            RSVP Service Brochure — Page 3
           </div>
         </div>
 
@@ -348,7 +348,7 @@ export default function RsvpServicePdf() {
               <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#1a1a1a', margin: 0 }}>The Complete Guest Journey</h2>
               <p style={{ fontSize: '12px', color: '#777', margin: '4px 0 0' }}>From invitation to arrival — everything managed</p>
             </div>
-            <img src={logo} alt="Oakstreet" style={{ height: '35px', borderRadius: '6px' }} />
+            <img src={logo} alt="Company Logo" style={{ height: '35px', borderRadius: '6px' }} />
           </div>
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -443,14 +443,13 @@ export default function RsvpServicePdf() {
             <p style={{ fontSize: '12px', opacity: 0.9, margin: '0 0 12px' }}>Contact us to set up Oak RSVP for your next event</p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', fontSize: '11px' }}>
               <span>📞 +91 70126 96353</span>
-              <span>🌐 www.oakstreetevent.com</span>
-              <span>✉️ hello@oakstreetevent.com</span>
+              <span>🌐 Contact Us</span>
             </div>
           </div>
 
           <div style={{ marginTop: '15px', textAlign: 'center' }}>
-            <img src={logo} alt="Oakstreet Events" style={{ height: '30px', borderRadius: '6px', opacity: 0.5 }} />
-            <p style={{ fontSize: '9px', color: '#bbb', margin: '6px 0 0' }}>© 2026 Oakstreet Events. All rights reserved.</p>
+            <img src={logo} alt="Company Logo" style={{ height: '30px', borderRadius: '6px', opacity: 0.5 }} />
+            <p style={{ fontSize: '9px', color: '#bbb', margin: '6px 0 0' }}>© 2026 All rights reserved.</p>
           </div>
         </div>
       </div>

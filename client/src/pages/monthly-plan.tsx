@@ -60,7 +60,7 @@ import { MonthlyProductionPlan } from "@shared/schema";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import logoWhite from "@assets/oakstreet_white_1764858814551.png";
+import logoWhite from "../assets/atbott-logo.png";
 
 type CellKey = `${string}::${string}`;
 

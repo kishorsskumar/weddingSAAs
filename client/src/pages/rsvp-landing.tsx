@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import whiteLogo from "@assets/oakstreet_white_1764858814551.png";
+import whiteLogo from "../assets/atbott-logo.png";
 import { 
   Check, 
   Users, 
@@ -154,7 +154,7 @@ export default function RsvpLanding() {
     { icon: Bot, title: "AI Powered Follow-ups", desc: "Oaksy AI automatically reminds pending guests" },
     { icon: BarChart3, title: "Live Attendance Tracking", desc: "Real-time dashboard with response analytics" },
     { icon: ChefHat, title: "Meal Planning Automation", desc: "Automatic veg/non-veg counts for caterers" },
-    { icon: Star, title: "Fully Managed Service", desc: "Oakstreet handles everything - you just share the guest list" },
+    { icon: Star, title: "Fully Managed Service", desc: "We handle everything - you just share the guest list" },
   ];
 
   const scrollToDemo = () => {
@@ -170,17 +170,17 @@ export default function RsvpLanding() {
       {/* Hero Section - Using Oak primary color */}
       <section className="bg-primary text-white py-10 sm:py-16 lg:py-24 relative">
         <div className="absolute top-6 left-6 sm:top-8 sm:left-8">
-          <img src={whiteLogo} alt="Oakstreet Events" className="h-16 sm:h-20 w-auto" />
+          <img src={whiteLogo} alt="Company Logo" className="h-16 sm:h-20 w-auto" />
         </div>
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <Badge className="bg-white/20 text-white border-0 mb-6 text-sm px-4 py-1" data-testid="badge-oakstreet">
-              Powered by Oakstreet Events
+              Powered by KnotVite
             </Badge>
             
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-6 leading-tight" data-testid="text-hero-title">
               Smart WhatsApp RSVP System
-              <span className="block text-white/80 mt-2">Managed by Oakstreet</span>
+              
             </h1>
             
             <p className="text-lg sm:text-xl text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed" data-testid="text-hero-subtitle">
@@ -255,7 +255,7 @@ export default function RsvpLanding() {
                   </div>
                   <div>
                     <p className="font-semibold">Oaksy</p>
-                    <p className="text-xs text-green-200">Oakstreet AI Assistant</p>
+                    <p className="text-xs text-green-200">AI Assistant</p>
                   </div>
                 </div>
               </CardHeader>
@@ -620,7 +620,7 @@ export default function RsvpLanding() {
             Ready to Simplify Your Guest Management?
           </h2>
           <p className="text-green-100 mb-8 max-w-xl mx-auto">
-            Get started today. Share your guest list with Oakstreet and let Oaksy handle the rest.
+            Get started today. Share your guest list and let our AI handle the rest.
           </p>
           <Button 
             size="lg" 
@@ -641,7 +641,7 @@ export default function RsvpLanding() {
       <footer className="bg-gray-900 text-gray-400 py-8">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm">
-            Oak RSVP — A Service by <strong className="text-white">Oakstreet Events</strong>
+            KnotVite RSVP Service
           </p>
         </div>
       </footer>

@@ -267,7 +267,7 @@ const ROLE_GUIDES: Record<string, RoleGuide> = {
       "What's the process for submitting an expense?",
     ],
     tips: [
-      "Oaksy can answer general Oakstreet workflow questions",
+      "The AI can answer general workflow questions",
       "For expense or leave requests, use the Employee Portal or WhatsApp",
     ],
   },
@@ -307,7 +307,7 @@ const GENERAL_SECTIONS = [
           <strong className="text-foreground">How to open Oaksy:</strong> Click the <Sparkles className="inline h-4 w-4 text-[#4b7c29]" /> Oaksy icon on any page, or navigate to the Oaksy page from the sidebar.
         </p>
         <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">Domain Lock:</strong> Oaksy only responds to Oakstreet business topics. General knowledge questions will be politely declined.
+          <strong className="text-foreground">Domain Lock:</strong> The AI only responds to business-related topics. General knowledge questions will be politely declined.
         </p>
       </div>
     ),
@@ -642,7 +642,7 @@ export default function OaksyHelp() {
       </motion.div>
 
       <div className="text-center pb-4">
-        <p className="text-xs text-muted-foreground">Oaksy AI is powered by OpenAI GPT-4o and is exclusive to Oakstreet Events.</p>
+        <p className="text-xs text-muted-foreground">AI Assistant is powered by OpenAI GPT-4o.</p>
       </div>
     </div>
   );

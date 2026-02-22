@@ -345,7 +345,7 @@ export default function PortalLanding() {
         <header className="bg-white border-b sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src={companySettings?.logo || "/oakstreet-logo.jpg"} alt={companyName} className="h-10 w-auto" />
+              <img src={companySettings?.logo || ""} alt={companyName} className="h-10 w-auto" />
             </div>
             <Button variant="ghost" onClick={() => setStep("landing")}>← Back</Button>
           </div>
@@ -553,7 +553,7 @@ export default function PortalLanding() {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={companySettings?.logo || "/oakstreet-logo.jpg"} alt={companyName} className="h-10 w-auto" />
+            <img src={companySettings?.logo || ""} alt={companyName} className="h-10 w-auto" />
           </div>
           <div className="flex items-center gap-4">
             {socialLinks?.instagram && (
