@@ -21194,6 +21194,10 @@ As you collect information through conversation, keep track of what you've gathe
         });
       }
 
+      const slugChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let rsvpSlug = '';
+      for (let i = 0; i < 6; i++) rsvpSlug += slugChars.charAt(Math.floor(Math.random() * slugChars.length));
+
       const event = await storage.createKnotviteEvent({
         userId,
         companyId,
@@ -21208,6 +21212,9 @@ As you collect information through conversation, keep track of what you've gathe
         brideName: req.body.brideName,
         contactPhone: req.body.contactPhone,
         contactEmail: req.body.contactEmail,
+        invitationTitle: req.body.invitationTitle,
+        ceremonies: req.body.ceremonies,
+        rsvpSlug,
         status: 'active',
       });
       res.json(event);
@@ -21223,20 +21230,10 @@ As you collect information through conversation, keep track of what you've gathe
       if (!event) return res.status(404).json({ error: 'Event not found' });
       if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
 
-      const updated = await storage.updateKnotviteEvent(req.params.id, {
-        title: req.body.title,
-        eventType: req.body.eventType,
-        date: req.body.date,
-        endDate: req.body.endDate,
-        venue: req.body.venue,
-        city: req.body.city,
-        description: req.body.description,
-        groomName: req.body.groomName,
-        brideName: req.body.brideName,
-        contactPhone: req.body.contactPhone,
-        contactEmail: req.body.contactEmail,
-        status: req.body.status,
-      });
+      const updateData: any = {};
+      const fields = ['title','eventType','date','endDate','venue','city','description','groomName','brideName','contactPhone','contactEmail','invitationTitle','ceremonies','rsvpSlug','status'];
+      for (const f of fields) { if (req.body[f] !== undefined) updateData[f] = req.body[f]; }
+      const updated = await storage.updateKnotviteEvent(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: 'Failed to update event' });
@@ -21335,6 +21332,34 @@ As you collect information through conversation, keep track of what you've gathe
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: 'Failed to update guest' });
+    }
+  });
+
+  app.post("/api/knotvite/guests/:id/mark-sent", verifyJWT, async (req, res) => {
+    try {
+      const guest = await storage.getKnotviteGuest(req.params.id);
+      if (!guest) return res.status(404).json({ error: 'Guest not found' });
+      const event = await storage.getKnotviteEvent(guest.eventId);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const updated = await storage.updateKnotviteGuest(req.params.id, { inviteSentAt: new Date() } as any);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to mark invite sent' });
+    }
+  });
+
+  app.post("/api/knotvite/guests/bulk-mark-sent", verifyJWT, async (req, res) => {
+    try {
+      const { guestIds, eventId } = req.body;
+      if (!eventId || !Array.isArray(guestIds)) return res.status(400).json({ error: 'Invalid request' });
+      const event = await storage.getKnotviteEvent(eventId);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      for (const gid of guestIds) {
+        await storage.updateKnotviteGuest(gid, { inviteSentAt: new Date() } as any);
+      }
+      res.json({ success: true, count: guestIds.length });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to mark invites sent' });
     }
   });
 

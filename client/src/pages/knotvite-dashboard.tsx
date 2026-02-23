@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard, Crown, Clock, ArrowUpRight, X, LogOut, Heart } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard, Crown, Clock, ArrowUpRight, X, LogOut, Heart, Copy, Link, Settings, ExternalLink } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -36,6 +36,8 @@ interface EventGuest {
   reminderSentAt?: string;
   reminderCount: number;
   notes?: string;
+  rsvpStatus?: string;
+  attendeeCount?: number;
   createdAt: string;
 }
 
@@ -706,6 +708,9 @@ interface KnotviteEvent {
   brideName: string | null;
   contactPhone: string | null;
   contactEmail: string | null;
+  invitationTitle: string | null;
+  ceremonies: string[] | null;
+  rsvpSlug: string | null;
   status: string;
   guestCount: number;
   createdAt: string | null;
@@ -749,6 +754,8 @@ export default function KnotViteDashboard() {
   const [individualMsgGuest, setIndividualMsgGuest] = useState<EventGuest | null>(null);
   const [individualMessage, setIndividualMessage] = useState("");
   const [isSendingIndividual, setIsSendingIndividual] = useState(false);
+  const [editInvTitle, setEditInvTitle] = useState("");
+  const [newCeremony, setNewCeremony] = useState("");
 
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
@@ -986,6 +993,56 @@ export default function KnotViteDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
       setGuestToDelete(null);
       toast({ title: "Guest removed" });
+    },
+  });
+
+  const updateEventMeta = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await fetch(`/api/knotvite/events/${id}`, {
+        method: 'PATCH',
+        headers: { ...kvHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      toast({ title: "Saved successfully" });
+    },
+  });
+
+  const markInviteSent = useMutation({
+    mutationFn: async (guestId: string) => {
+      const res = await fetch(`/api/knotvite/guests/${guestId}/mark-sent`, {
+        method: 'POST',
+        headers: kvHeaders(),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
+      toast({ title: "Invite marked as sent" });
+    },
+  });
+
+  const bulkMarkSent = useMutation({
+    mutationFn: async (guestIds: string[]) => {
+      const res = await fetch('/api/knotvite/guests/bulk-mark-sent', {
+        method: 'POST',
+        headers: { ...kvHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ guestIds, eventId: selectedEventId }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
+      toast({ title: `${data.count} invite(s) marked as sent` });
     },
   });
 
@@ -1332,6 +1389,7 @@ export default function KnotViteDashboard() {
               <TabsTrigger value="responses" data-testid="tab-responses">Responses</TabsTrigger>
               <TabsTrigger value="follow-ups" data-testid="tab-followups">Follow-ups</TabsTrigger>
               <TabsTrigger value="outreach" data-testid="tab-outreach">Outreach</TabsTrigger>
+              <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
               <TabsTrigger value="my-events" data-testid="tab-events">My Events</TabsTrigger>
             </TabsList>
           </div>
@@ -1509,160 +1567,250 @@ export default function KnotViteDashboard() {
 
           {/* GUEST LIST TAB */}
           <TabsContent value="guests" className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 gap-3">
-              <div className="flex flex-col sm:flex-row gap-2 flex-1">
-                <div className="relative flex-1 sm:flex-none">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
-                    placeholder="Search guests..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 w-full sm:w-48 lg:w-64"
-                    data-testid="search-guests"
-                  />
+            {!selectedEventId ? (
+              <Card className="bg-white">
+                <CardContent className="py-12 text-center">
+                  <Users className="h-12 w-12 mx-auto mb-4" style={{ color: TEAL }} />
+                  <p className="text-lg mb-2" style={{ color: TEXT_DARK }}>Select an event to manage guests</p>
+                  <p className="text-sm text-slate-500">Use the dropdown above to choose an event</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex flex-col sm:flex-row gap-2 flex-1">
+                    <div className="relative flex-1 sm:flex-none">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input placeholder="Search guests..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 w-full sm:w-48 lg:w-64" data-testid="search-guests" />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-full sm:w-[130px]" data-testid="status-filter"><SelectValue placeholder="All" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="declined">Declined</SelectItem>
+                        <SelectItem value="maybe">Maybe</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Button onClick={() => { setEditingGuest(null); setIsGuestDialogOpen(true); }} style={{ backgroundColor: TEAL }} className="text-white hover:brightness-110" data-testid="add-guest-btn">
+                      <Plus className="h-4 w-4 mr-1" /> Add Guest
+                    </Button>
+                    {selectedKvEvent?.rsvpSlug && (
+                      <Button variant="outline" size="sm" onClick={() => {
+                        const rsvpUrl = `${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`;
+                        navigator.clipboard.writeText(rsvpUrl);
+                        toast({ title: "RSVP link copied!" });
+                      }} data-testid="copy-rsvp-link">
+                        <Link className="h-4 w-4 mr-1" /> Copy RSVP Link
+                      </Button>
+                    )}
+                    {guests.filter(g => !g.inviteSentAt).length > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => {
+                        const unsent = guests.filter(g => !g.inviteSentAt).map(g => g.id);
+                        bulkMarkSent.mutate(unsent);
+                      }} data-testid="send-invites-btn">
+                        <Send className="h-4 w-4 mr-1" /> Send Invites ({guests.filter(g => !g.inviteSentAt).length})
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[130px]" data-testid="status-filter">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="yes">Confirmed</SelectItem>
-                    <SelectItem value="no">Declined</SelectItem>
-                    <SelectItem value="maybe">Maybe</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={() => {
-                  if (!selectedEventId) {
-                    toast({ title: "Please select an event first", variant: "destructive" });
-                    return;
-                  }
-                  setEditingGuest(null);
-                  setIsGuestDialogOpen(true);
-                }}
-                style={{ backgroundColor: TEAL }}
-                className="w-full sm:w-auto"
-                data-testid="add-guest-btn"
-              >
-                <Plus className="h-4 w-4 mr-2" />Add Guest
-              </Button>
-            </div>
 
-            <Card className="bg-white">
-              {guestsLoading ? (
-                <div className="text-center py-8">
-                  <RefreshCw className="h-5 w-5 animate-spin mx-auto text-slate-400" />
-                </div>
-              ) : filteredGuestsWithResponses.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                  {selectedEventId ? "No guests found" : "Select an event to view guests"}
-                </div>
-              ) : (
-                <>
-                  <div className="md:hidden divide-y">
-                    {filteredGuestsWithResponses.map(({ guest, response }) => (
-                      <div key={guest.id} className="p-3 space-y-2" data-testid={`guest-card-${guest.id}`}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-sm truncate">{guest.name}</div>
-                            <div className="flex items-center gap-1 text-xs text-slate-500">
-                              <Phone className="h-3 w-3 shrink-0" />
-                              <span className="truncate">{guest.phone}</span>
-                            </div>
-                          </div>
-                          <div className="shrink-0">
-                            {getStatusBadge(response?.attendanceStatus || 'pending')}
+                {selectedKvEvent?.rsvpSlug && (
+                  <Card className="bg-white border-l-4" style={{ borderLeftColor: TEAL }}>
+                    <CardContent className="py-3 px-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Link className="h-4 w-4 flex-shrink-0" style={{ color: TEAL }} />
+                          <div>
+                            <span className="font-medium" style={{ color: TEAL }}>Event RSVP Link (share with all guests): </span>
+                            <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{window.location.host}/knotvite/rsvp/{selectedKvEvent.rsvpSlug}</code>
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-                          {guest.relationship && <span>{guest.relationship}</span>}
-                          {guest.guestGroup && <span>• {guest.guestGroup}</span>}
-                          <span>• Max: {guest.maxAttendees}</span>
-                          {response?.attendanceStatus === 'yes' && <span>• {response.numberOfAttendees} attending</span>}
-                        </div>
-                        <div className="flex justify-end gap-1 pt-1">
-                          {(user?.role === 'superadmin' || user?.role === 'wedding_planner' || user?.role === 'admin' || user?.role === 'tenant_admin') && guest.phone && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
-                              const event = selectedEvent;
-                              const defaultMsg = event
-                                ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
-                                : `Hello ${guest.name}! Please confirm your attendance.`;
-                              setIndividualMessage(defaultMsg);
-                              setIndividualMsgGuest(guest);
-                            }}>
-                              <MessageSquare className="h-4 w-4 text-green-600" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingGuest(guest); setIsGuestDialogOpen(true); }}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setGuestToDelete(guest)}>
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`);
+                            toast({ title: "Copied!" });
+                          }} data-testid="copy-link-btn">
+                            <Copy className="h-3.5 w-3.5 mr-1" /> Copy
                           </Button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                  <Table className="hidden md:table">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Contact</TableHead>
-                        <TableHead>Relationship</TableHead>
-                        <TableHead>Group</TableHead>
-                        <TableHead>Max Guests</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Attendees</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredGuestsWithResponses.map(({ guest, response }) => (
-                        <TableRow key={guest.id} data-testid={`guest-row-${guest.id}`}>
-                          <TableCell className="font-medium">{guest.name}</TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1 text-sm"><Phone className="h-3 w-3" />{guest.phone}</div>
-                              {guest.email && <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" />{guest.email}</div>}
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card className="bg-white">
+                  <CardContent className="py-3 px-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium" style={{ color: TEAL }}>Invitation Title (shown to guests)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={editInvTitle || selectedKvEvent?.invitationTitle || ''}
+                          onChange={(e) => setEditInvTitle(e.target.value)}
+                          placeholder={`You are warmly invited to the wedding celebration of ${selectedKvEvent?.groomName || 'Groom'} & ${selectedKvEvent?.brideName || 'Bride'}.`}
+                          className="flex-1"
+                          data-testid="invitation-title-input"
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          if (selectedEventId && editInvTitle) {
+                            updateEventMeta.mutate({ id: selectedEventId, data: { invitationTitle: editInvTitle } });
+                          }
+                        }} data-testid="save-title-btn">
+                          <Check className="h-3.5 w-3.5 mr-1" /> Save Title
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white">
+                  <CardContent className="py-3 px-4">
+                    <div className="space-y-2">
+                      <div>
+                        <Label className="text-sm font-medium" style={{ color: TEAL }}>Event Functions / Ceremonies</Label>
+                        <p className="text-xs text-slate-500">Guests will choose which ceremonies they're attending</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedKvEvent?.ceremonies || []).map((c, i) => (
+                          <Badge key={i} variant="secondary" className="text-sm py-1 px-3 gap-1" style={{ backgroundColor: TEAL_LIGHT, color: TEAL }}>
+                            {c}
+                            <button onClick={() => {
+                              const updated = (selectedKvEvent?.ceremonies || []).filter((_, idx) => idx !== i);
+                              if (selectedEventId) updateEventMeta.mutate({ id: selectedEventId, data: { ceremonies: updated } });
+                            }} className="ml-1 hover:text-red-500" data-testid={`remove-ceremony-${i}`}>
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={newCeremony}
+                          onChange={(e) => setNewCeremony(e.target.value)}
+                          placeholder="Add ceremony (e.g. Haldi, Sangeet)"
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newCeremony.trim()) {
+                              e.preventDefault();
+                              const updated = [...(selectedKvEvent?.ceremonies || []), newCeremony.trim()];
+                              if (selectedEventId) updateEventMeta.mutate({ id: selectedEventId, data: { ceremonies: updated } });
+                              setNewCeremony("");
+                            }
+                          }}
+                          data-testid="add-ceremony-input"
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          if (newCeremony.trim() && selectedEventId) {
+                            const updated = [...(selectedKvEvent?.ceremonies || []), newCeremony.trim()];
+                            updateEventMeta.mutate({ id: selectedEventId, data: { ceremonies: updated } });
+                            setNewCeremony("");
+                          }
+                        }} data-testid="add-ceremony-btn">
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white">
+                  {guestsLoading ? (
+                    <div className="text-center py-8">
+                      <RefreshCw className="h-5 w-5 animate-spin mx-auto text-slate-400" />
+                    </div>
+                  ) : filteredGuestsWithResponses.length === 0 ? (
+                    <div className="text-center py-8 text-slate-500">No guests found. Add your first guest above.</div>
+                  ) : (
+                    <>
+                      <div className="md:hidden divide-y">
+                        {filteredGuestsWithResponses.map(({ guest, response }) => (
+                          <div key={guest.id} className="p-3 space-y-2" data-testid={`guest-card-${guest.id}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm truncate">{guest.name}</div>
+                                <div className="flex items-center gap-1 text-xs text-slate-500"><Phone className="h-3 w-3 shrink-0" /><span className="truncate">{guest.phone}</span></div>
+                              </div>
+                              <div className="shrink-0">{getStatusBadge(guest.rsvpStatus || response?.attendanceStatus || 'pending')}</div>
                             </div>
-                          </TableCell>
-                          <TableCell>{guest.relationship || '-'}</TableCell>
-                          <TableCell>{guest.guestGroup || '-'}</TableCell>
-                          <TableCell>{guest.maxAttendees}</TableCell>
-                          <TableCell>{getStatusBadge(response?.attendanceStatus || 'pending')}</TableCell>
-                          <TableCell>{response?.attendanceStatus === 'yes' ? response.numberOfAttendees : '-'}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-1">
-                              {(user?.role === 'superadmin' || user?.role === 'wedding_planner' || user?.role === 'admin' || user?.role === 'tenant_admin') && guest.phone && (
-                                <Button variant="ghost" size="icon" onClick={() => {
-                                  const event = selectedEvent;
-                                  const defaultMsg = event
-                                    ? `Hello ${guest.name}! We're looking forward to seeing you at ${event.customer || event.title}. Please confirm your attendance.`
-                                    : `Hello ${guest.name}! Please confirm your attendance.`;
-                                  setIndividualMessage(defaultMsg);
-                                  setIndividualMsgGuest(guest);
-                                }} title="Send WhatsApp message" data-testid={`whatsapp-guest-${guest.id}`}>
-                                  <MessageSquare className="h-4 w-4 text-green-600" />
-                                </Button>
+                            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                              {guest.relationship && <span>{guest.relationship}</span>}
+                              {guest.guestGroup && <span>• {guest.guestGroup}</span>}
+                              <span>• Max: {guest.maxAttendees}</span>
+                              {guest.inviteSentAt && <span className="text-green-600">• Sent {format(new Date(guest.inviteSentAt), 'd MMM')}</span>}
+                            </div>
+                            <div className="flex justify-end gap-1 pt-1">
+                              {!guest.inviteSentAt && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => markInviteSent.mutate(guest.id)} title="Mark invite sent"><Send className="h-4 w-4" style={{ color: TEAL }} /></Button>
                               )}
-                              <Button variant="ghost" size="icon" onClick={() => { setEditingGuest(guest); setIsGuestDialogOpen(true); }} data-testid={`edit-guest-${guest.id}`}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => setGuestToDelete(guest)} data-testid={`delete-guest-${guest.id}`}>
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingGuest(guest); setIsGuestDialogOpen(true); }}><Pencil className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setGuestToDelete(guest)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </>
-              )}
-            </Card>
+                          </div>
+                        ))}
+                      </div>
+                      <Table className="hidden md:table">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>NAME</TableHead>
+                            <TableHead>CONTACT</TableHead>
+                            <TableHead className="hidden lg:table-cell">RELATIONSHIP</TableHead>
+                            <TableHead>GROUP</TableHead>
+                            <TableHead>MAX GUESTS</TableHead>
+                            <TableHead>INVITE SENT</TableHead>
+                            <TableHead>STATUS</TableHead>
+                            <TableHead>ATTENDEES</TableHead>
+                            <TableHead>ACTIONS</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredGuestsWithResponses.map(({ guest, response }) => (
+                            <TableRow key={guest.id} data-testid={`guest-row-${guest.id}`}>
+                              <TableCell className="font-medium">{guest.name}</TableCell>
+                              <TableCell>
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-1 text-sm"><Phone className="h-3 w-3" />{guest.phone}</div>
+                                  {guest.email && <div className="flex items-center gap-1 text-xs text-slate-500"><Mail className="h-3 w-3" />{guest.email}</div>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell">{guest.relationship || '-'}</TableCell>
+                              <TableCell>{guest.guestGroup || '-'}</TableCell>
+                              <TableCell>{guest.maxAttendees}</TableCell>
+                              <TableCell>
+                                {guest.inviteSentAt ? (
+                                  <span className="text-xs text-green-600">{format(new Date(guest.inviteSentAt), 'd MMM')}</span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">Not sent</span>
+                                )}
+                              </TableCell>
+                              <TableCell>{getStatusBadge(guest.rsvpStatus || response?.attendanceStatus || 'pending')}</TableCell>
+                              <TableCell>{guest.attendeeCount || (response?.attendanceStatus === 'yes' ? response.numberOfAttendees : '-')}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-0.5">
+                                  {!guest.inviteSentAt && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => markInviteSent.mutate(guest.id)} title="Mark invite sent" data-testid={`send-guest-${guest.id}`}>
+                                      <Send className="h-4 w-4" style={{ color: TEAL }} />
+                                    </Button>
+                                  )}
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingGuest(guest); setIsGuestDialogOpen(true); }} data-testid={`edit-guest-${guest.id}`}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setGuestToDelete(guest)} data-testid={`delete-guest-${guest.id}`}>
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </>
+                  )}
+                </Card>
+              </>
+            )}
           </TabsContent>
 
           {/* RESPONSES TAB */}
@@ -1815,6 +1963,115 @@ export default function KnotViteDashboard() {
           {/* OUTREACH TAB */}
           <TabsContent value="outreach" className="space-y-4">
             <OutreachTab eventId={selectedEventId} guests={guests} responses={responses} />
+          </TabsContent>
+
+          {/* SETTINGS TAB */}
+          <TabsContent value="settings" className="space-y-4">
+            {!selectedEventId ? (
+              <Card className="bg-white">
+                <CardContent className="py-12 text-center">
+                  <Settings className="h-12 w-12 mx-auto mb-4" style={{ color: TEAL }} />
+                  <p className="text-lg mb-2" style={{ color: TEXT_DARK }}>Select an event to configure settings</p>
+                </CardContent>
+              </Card>
+            ) : selectedKvEvent && (
+              <div className="space-y-4">
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base" style={{ color: TEXT_DARK }}>RSVP Page Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">RSVP Link</Label>
+                      <div className="flex items-center gap-2">
+                        <Input value={`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug || ''}`} readOnly className="bg-gray-50 text-sm" />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`);
+                          toast({ title: "Copied!" });
+                        }}>
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => window.open(`/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`, '_blank')}>
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Invitation Title</Label>
+                      <Input
+                        value={editInvTitle || selectedKvEvent.invitationTitle || ''}
+                        onChange={(e) => setEditInvTitle(e.target.value)}
+                        placeholder={`You are warmly invited to the wedding celebration of ${selectedKvEvent.groomName || 'Groom'} & ${selectedKvEvent.brideName || 'Bride'}.`}
+                      />
+                      <Button variant="outline" size="sm" onClick={() => {
+                        if (selectedEventId && editInvTitle) {
+                          updateEventMeta.mutate({ id: selectedEventId, data: { invitationTitle: editInvTitle } });
+                        }
+                      }}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> Save Title
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Event Functions / Ceremonies</Label>
+                      <p className="text-xs text-slate-500">Guests will choose which ceremonies they plan to attend</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(selectedKvEvent.ceremonies || []).map((c, i) => (
+                          <Badge key={i} variant="secondary" className="text-sm py-1 px-3 gap-1" style={{ backgroundColor: TEAL_LIGHT, color: TEAL }}>
+                            {c}
+                            <button onClick={() => {
+                              const updated = (selectedKvEvent.ceremonies || []).filter((_, idx) => idx !== i);
+                              updateEventMeta.mutate({ id: selectedEventId!, data: { ceremonies: updated } });
+                            }} className="ml-1 hover:text-red-500"><X className="h-3 w-3" /></button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input value={newCeremony} onChange={(e) => setNewCeremony(e.target.value)} placeholder="Add ceremony (e.g. Haldi, Sangeet)" className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newCeremony.trim()) {
+                              e.preventDefault();
+                              const updated = [...(selectedKvEvent.ceremonies || []), newCeremony.trim()];
+                              updateEventMeta.mutate({ id: selectedEventId!, data: { ceremonies: updated } });
+                              setNewCeremony("");
+                            }
+                          }}
+                        />
+                        <Button variant="outline" size="sm" onClick={() => {
+                          if (newCeremony.trim()) {
+                            const updated = [...(selectedKvEvent.ceremonies || []), newCeremony.trim()];
+                            updateEventMeta.mutate({ id: selectedEventId!, data: { ceremonies: updated } });
+                            setNewCeremony("");
+                          }
+                        }}>
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base" style={{ color: TEXT_DARK }}>Event Details</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><span className="text-slate-500">Event Name:</span> <span className="font-medium">{selectedKvEvent.title}</span></div>
+                      <div><span className="text-slate-500">Type:</span> <span className="font-medium">{selectedKvEvent.eventType || '-'}</span></div>
+                      <div><span className="text-slate-500">Date:</span> <span className="font-medium">{selectedKvEvent.date ? format(parseISO(selectedKvEvent.date), 'PPP') : '-'}</span></div>
+                      <div><span className="text-slate-500">Venue:</span> <span className="font-medium">{selectedKvEvent.venue || '-'}</span></div>
+                      <div><span className="text-slate-500">Groom:</span> <span className="font-medium">{selectedKvEvent.groomName || '-'}</span></div>
+                      <div><span className="text-slate-500">Bride:</span> <span className="font-medium">{selectedKvEvent.brideName || '-'}</span></div>
+                    </div>
+                    <div className="mt-4">
+                      <Button variant="outline" size="sm" onClick={() => { setEditingKvEvent(selectedKvEvent); setIsEventDialogOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Event Details
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           {/* MY EVENTS TAB */}
