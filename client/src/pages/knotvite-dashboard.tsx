@@ -908,14 +908,18 @@ export default function KnotViteDashboard() {
   const canCreateEvent = !planLimits || (planLimits.usage.events < planLimits.limits.maxEvents);
   const maxGuests = planLimits?.limits?.maxGuestsPerForm || 200;
 
+  const kvHeaders = (): Record<string, string> => {
+    const h: Record<string, string> = {};
+    const token = localStorage.getItem('auth_token');
+    if (token) h['Authorization'] = `Bearer ${token}`;
+    return h;
+  };
+
   const { data: guests = [], isLoading: guestsLoading } = useQuery<any[]>({
     queryKey: ['/api/knotvite/guests', selectedEventId],
     queryFn: async () => {
       if (!selectedEventId) return [];
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`/api/knotvite/guests?eventId=${selectedEventId}`, { headers });
+      const res = await fetch(`/api/knotvite/guests?eventId=${selectedEventId}`, { headers: kvHeaders(), credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch guests');
       return res.json();
     },
@@ -925,25 +929,12 @@ export default function KnotViteDashboard() {
   const responses: any[] = [];
   const responsesLoading = false;
 
-  const { data: stats } = useQuery<RsvpStats>({
-    queryKey: ['/api/rsvp-stats', selectedEventId],
-    queryFn: async () => {
-      if (!selectedEventId) return null;
-      const res = await fetch(`/api/rsvp-stats/${selectedEventId}`);
-      if (!res.ok) throw new Error('Failed to fetch stats');
-      return res.json();
-    },
-    enabled: !!selectedEventId,
-  });
-
   const createGuestMutation = useMutation({
     mutationFn: async (data: any) => {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch('/api/knotvite/guests', {
         method: 'POST',
-        headers,
+        headers: { ...kvHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
       if (!res.ok) {
@@ -965,12 +956,10 @@ export default function KnotViteDashboard() {
 
   const updateGuestMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
       const res = await fetch(`/api/knotvite/guests/${id}`, {
         method: 'PATCH',
-        headers,
+        headers: { ...kvHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Failed to update guest');
@@ -989,10 +978,7 @@ export default function KnotViteDashboard() {
 
   const deleteGuestMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch(`/api/knotvite/guests/${id}`, { method: 'DELETE', headers });
+      const res = await fetch(`/api/knotvite/guests/${id}`, { method: 'DELETE', headers: kvHeaders(), credentials: 'include' });
       if (!res.ok) throw new Error('Failed to delete guest');
       return res.json();
     },

@@ -1120,7 +1120,7 @@ export async function registerRoutes(
     '/api/auth/', '/api/billing/', '/api/health', '/api/system-notifications',
     '/api/admin', '/api/demo-bookings', '/api/enterprise-leads', '/api/contact',
     '/api/email-logs', '/api/admin-event-logs', '/api/modules',
-    '/api/knotvite/signup', '/api/knotvite/billing/', '/api/knotvite/events', '/api/knotvite/events-limits',
+    '/api/knotvite/',
   ];
 
   app.use('/api/', async (req, res, next) => {
