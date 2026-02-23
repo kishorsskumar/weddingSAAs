@@ -434,6 +434,9 @@ import {
   knotviteInvoices,
   type KnotviteInvoice,
   type InsertKnotviteInvoice,
+  knotviteEvents,
+  type KnotviteEvent,
+  type InsertKnotviteEvent,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -6415,6 +6418,47 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteInvoices);
     const num = (result?.count || 0) + 1;
     return `KV-INV-${String(num).padStart(5, '0')}`;
+  }
+
+  async getKnotviteEvents(userId: string): Promise<KnotviteEvent[]> {
+    return await db.select().from(knotviteEvents)
+      .where(eq(knotviteEvents.userId, userId))
+      .orderBy(desc(knotviteEvents.createdAt));
+  }
+
+  async getKnotviteEventsByCompany(companyId: string): Promise<KnotviteEvent[]> {
+    return await db.select().from(knotviteEvents)
+      .where(eq(knotviteEvents.companyId, companyId))
+      .orderBy(desc(knotviteEvents.createdAt));
+  }
+
+  async getKnotviteEvent(id: string): Promise<KnotviteEvent | undefined> {
+    const [event] = await db.select().from(knotviteEvents)
+      .where(eq(knotviteEvents.id, id));
+    return event || undefined;
+  }
+
+  async createKnotviteEvent(data: InsertKnotviteEvent): Promise<KnotviteEvent> {
+    const [created] = await db.insert(knotviteEvents).values(data).returning();
+    return created;
+  }
+
+  async updateKnotviteEvent(id: string, data: Partial<InsertKnotviteEvent>): Promise<KnotviteEvent | undefined> {
+    const [updated] = await db.update(knotviteEvents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(knotviteEvents.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteKnotviteEvent(id: string): Promise<void> {
+    await db.delete(knotviteEvents).where(eq(knotviteEvents.id, id));
+  }
+
+  async countKnotviteEvents(userId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteEvents)
+      .where(eq(knotviteEvents.userId, userId));
+    return result?.count || 0;
   }
 }
 

@@ -3291,3 +3291,28 @@ export const knotviteInvoices = pgTable("knotvite_invoices", {
 export const insertKnotviteInvoiceSchema = createInsertSchema(knotviteInvoices).omit({ id: true, createdAt: true });
 export type InsertKnotviteInvoice = z.infer<typeof insertKnotviteInvoiceSchema>;
 export type KnotviteInvoice = typeof knotviteInvoices.$inferSelect;
+
+export const knotviteEvents = pgTable("knotvite_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  title: text("title").notNull(),
+  eventType: text("event_type").default('wedding'),
+  date: text("date"),
+  endDate: text("end_date"),
+  venue: text("venue"),
+  city: text("city"),
+  description: text("description"),
+  groomName: text("groom_name"),
+  brideName: text("bride_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  status: text("status").notNull().default('active'),
+  guestCount: integer("guest_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertKnotviteEventSchema = createInsertSchema(knotviteEvents).omit({ id: true, createdAt: true, updatedAt: true, guestCount: true });
+export type InsertKnotviteEvent = z.infer<typeof insertKnotviteEventSchema>;
+export type KnotviteEvent = typeof knotviteEvents.$inferSelect;

@@ -691,6 +691,46 @@ function OutreachTab({ eventId, guests, responses }: {
   );
 }
 
+interface KnotviteEvent {
+  id: string;
+  userId: string;
+  companyId: string;
+  title: string;
+  eventType: string | null;
+  date: string | null;
+  endDate: string | null;
+  venue: string | null;
+  city: string | null;
+  description: string | null;
+  groomName: string | null;
+  brideName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  status: string;
+  guestCount: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+interface PlanLimitsInfo {
+  plan: string;
+  limits: {
+    maxEvents: number;
+    maxGuestsPerForm: number;
+    maxForms: number;
+    maxCustomFields: number;
+    canExportExcel: boolean;
+    canBulkImport: boolean;
+    canRemoveBranding: boolean;
+    canUseWhatsApp: boolean;
+    canUseQrCheckin: boolean;
+    canUseWeddingPage: boolean;
+    canUseCustomDomain: boolean;
+    canUseWhatsAppAutomation: boolean;
+  };
+  usage: { events: number };
+}
+
 export default function KnotViteDashboard() {
   const [, navigate] = useLocation();
   const [mainTab, setMainTab] = useState("dashboard");
@@ -698,9 +738,12 @@ export default function KnotViteDashboard() {
   const [eventComboOpen, setEventComboOpen] = useState(false);
   const [isGuestDialogOpen, setIsGuestDialogOpen] = useState(false);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const [editingKvEvent, setEditingKvEvent] = useState<KnotviteEvent | null>(null);
   const [editingGuest, setEditingGuest] = useState<EventGuest | null>(null);
   const [editingResponse, setEditingResponse] = useState<RsvpResponse | null>(null);
   const [guestToDelete, setGuestToDelete] = useState<EventGuest | null>(null);
+  const [eventToDelete, setEventToDelete] = useState<KnotviteEvent | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [individualMsgGuest, setIndividualMsgGuest] = useState<EventGuest | null>(null);
@@ -726,11 +769,144 @@ export default function KnotViteDashboard() {
     staleTime: 60000,
   });
 
-  const { data: events = [] } = useQuery<Event[]>({
-    queryKey: ['/api/events'],
+  const { data: kvEvents = [] } = useQuery<KnotviteEvent[]>({
+    queryKey: ['/api/knotvite/events'],
+    queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/knotvite/events', { headers, credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
+  const { data: planLimits } = useQuery<PlanLimitsInfo>({
+    queryKey: ['/api/knotvite/events-limits'],
+    queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/knotvite/events-limits', { headers, credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const events: Event[] = kvEvents.map(e => ({
+    id: e.id,
+    title: e.title,
+    customer: e.groomName && e.brideName ? `${e.groomName} & ${e.brideName}` : e.title,
+    date: e.date || '',
+    venue: e.venue || undefined,
+    status: e.status,
+  }));
+
   const selectedEvent = events.find(e => e.id === selectedEventId);
+  const selectedKvEvent = kvEvents.find(e => e.id === selectedEventId);
+
+  const createEventMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/knotvite/events', {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to create event');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events-limits'] });
+      setIsEventDialogOpen(false);
+      setEditingKvEvent(null);
+      setSelectedEventId(data.id);
+      toast({ title: "Event created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateEventMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/knotvite/events/${id}`, {
+        method: 'PATCH',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      setIsEventDialogOpen(false);
+      setEditingKvEvent(null);
+      toast({ title: "Event updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteEventMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/knotvite/events/${id}`, {
+        method: 'DELETE',
+        headers,
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to delete event');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events-limits'] });
+      setEventToDelete(null);
+      if (selectedEventId === eventToDelete?.id) setSelectedEventId(null);
+      toast({ title: "Event deleted" });
+    },
+  });
+
+  const handleEventSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      title: formData.get('title') as string,
+      eventType: formData.get('eventType') as string || 'wedding',
+      date: formData.get('date') as string || undefined,
+      endDate: formData.get('endDate') as string || undefined,
+      venue: formData.get('venue') as string || undefined,
+      city: formData.get('city') as string || undefined,
+      groomName: formData.get('groomName') as string || undefined,
+      brideName: formData.get('brideName') as string || undefined,
+      contactPhone: formData.get('contactPhone') as string || undefined,
+      contactEmail: formData.get('contactEmail') as string || undefined,
+      description: formData.get('description') as string || undefined,
+    };
+    if (editingKvEvent) {
+      updateEventMutation.mutate({ id: editingKvEvent.id, data });
+    } else {
+      createEventMutation.mutate(data);
+    }
+  };
+
+  const canCreateEvent = !planLimits || (planLimits.usage.events < planLimits.limits.maxEvents);
+  const maxGuests = planLimits?.limits?.maxGuestsPerForm || 200;
 
   const { data: guests = [], isLoading: guestsLoading } = useQuery<EventGuest[]>({
     queryKey: ['/api/event-guests', selectedEventId],
@@ -1058,64 +1234,120 @@ export default function KnotViteDashboard() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold" style={{ color: TEXT_DARK }}>RSVP Manager</h1>
-            <p className="text-slate-500 mt-1 text-sm">Manage event guest lists and track RSVP responses</p>
+            <p className="text-slate-500 mt-1 text-sm">
+              Manage event guest lists and track RSVP responses
+              {planLimits && (
+                <span className="ml-2 text-xs">
+                  ({planLimits.usage.events}/{planLimits.limits.maxEvents === 999999 ? 'Unlimited' : planLimits.limits.maxEvents} events used)
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-3">
-            <Popover open={eventComboOpen} onOpenChange={setEventComboOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={eventComboOpen}
-                  className="w-full sm:w-[280px] justify-between"
-                  data-testid="event-selector"
-                >
-                  {selectedEvent ? (selectedEvent.customer || selectedEvent.title) : "Select an event..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[350px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search by name, customer, or venue..." />
-                  <CommandList className="max-h-[300px] overflow-y-auto">
-                    <CommandEmpty>No events found.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="all"
-                        onSelect={() => { setSelectedEventId(null); setEventComboOpen(false); }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4", !selectedEventId ? "opacity-100" : "opacity-0")} />
-                        All Events
-                      </CommandItem>
-                      {events.map((event) => (
-                        <CommandItem
-                          key={event.id}
-                          value={`${event.customer || ''} ${event.title} ${event.venue || ''}`}
-                          onSelect={() => { setSelectedEventId(event.id); setEventComboOpen(false); }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", selectedEventId === event.id ? "opacity-100" : "opacity-0")} />
-                          <div className="flex flex-col">
-                            <span className="font-medium">{event.customer || event.title}</span>
-                            {event.venue && <span className="text-xs text-slate-500">{event.venue}</span>}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <Button
+              size="sm"
+              onClick={() => {
+                if (!canCreateEvent) {
+                  toast({ title: "Event limit reached", description: `Your ${planLimits?.plan || 'basic'} plan allows ${planLimits?.limits?.maxEvents || 1} event(s). Upgrade for more.`, variant: "destructive" });
+                  return;
+                }
+                setEditingKvEvent(null);
+                setIsEventDialogOpen(true);
+              }}
+              style={{ backgroundColor: TEAL }}
+              className="text-white hover:brightness-110"
+              data-testid="create-event-btn"
+            >
+              <Plus className="h-4 w-4 mr-1" /> New Event
+            </Button>
+            {events.length > 0 && (
+              <Popover open={eventComboOpen} onOpenChange={setEventComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={eventComboOpen}
+                    className="w-full sm:w-[280px] justify-between"
+                    data-testid="event-selector"
+                  >
+                    {selectedEvent ? (selectedEvent.customer || selectedEvent.title) : "Select an event..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Search by name or venue..." />
+                    <CommandList className="max-h-[300px] overflow-y-auto">
+                      <CommandEmpty>No events found.</CommandEmpty>
+                      <CommandGroup>
+                        {events.length > 1 && (
+                          <CommandItem
+                            value="all"
+                            onSelect={() => { setSelectedEventId(null); setEventComboOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", !selectedEventId ? "opacity-100" : "opacity-0")} />
+                            All Events
+                          </CommandItem>
+                        )}
+                        {events.map((event) => (
+                          <CommandItem
+                            key={event.id}
+                            value={`${event.customer || ''} ${event.title} ${event.venue || ''}`}
+                            onSelect={() => { setSelectedEventId(event.id); setEventComboOpen(false); }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", selectedEventId === event.id ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col">
+                              <span className="font-medium">{event.customer || event.title}</span>
+                              {event.venue && <span className="text-xs text-slate-500">{event.venue}</span>}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         </div>
 
+        {events.length === 0 ? (
+          <Card className="bg-white">
+            <CardContent className="py-16 text-center">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: TEAL_LIGHT }}>
+                <Calendar className="h-8 w-8" style={{ color: TEAL }} />
+              </div>
+              <h3 className="text-lg font-semibold mb-2" style={{ color: TEXT_DARK }}>Create Your First Event</h3>
+              <p className="text-slate-500 max-w-md mx-auto mb-6">
+                Get started by creating an event. You can then add guests, manage RSVPs, and send invitations.
+              </p>
+              <Button
+                onClick={() => { setEditingKvEvent(null); setIsEventDialogOpen(true); }}
+                style={{ backgroundColor: TEAL }}
+                className="text-white hover:brightness-110"
+                data-testid="create-first-event-btn"
+              >
+                <Plus className="h-4 w-4 mr-2" /> Create Event
+              </Button>
+              {planLimits && (
+                <p className="text-xs text-slate-400 mt-4">
+                  Your {planLimits.plan} plan allows up to {planLimits.limits.maxEvents === 999999 ? 'unlimited' : planLimits.limits.maxEvents} event(s) and {planLimits.limits.maxGuestsPerForm === 999999 ? 'unlimited' : planLimits.limits.maxGuestsPerForm} guests per event.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
         <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-          <TabsList className="bg-white border w-full sm:w-auto overflow-x-auto">
-            <TabsTrigger value="dashboard" data-testid="tab-dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="guests" data-testid="tab-guests">Guest List</TabsTrigger>
-            <TabsTrigger value="responses" data-testid="tab-responses">Responses</TabsTrigger>
-            <TabsTrigger value="follow-ups" data-testid="tab-followups">Follow-ups</TabsTrigger>
-            <TabsTrigger value="outreach" data-testid="tab-outreach">Outreach</TabsTrigger>
-          </TabsList>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <TabsList className="bg-white border w-full sm:w-auto overflow-x-auto">
+              <TabsTrigger value="dashboard" data-testid="tab-dashboard">Dashboard</TabsTrigger>
+              <TabsTrigger value="guests" data-testid="tab-guests">Guest List</TabsTrigger>
+              <TabsTrigger value="responses" data-testid="tab-responses">Responses</TabsTrigger>
+              <TabsTrigger value="follow-ups" data-testid="tab-followups">Follow-ups</TabsTrigger>
+              <TabsTrigger value="outreach" data-testid="tab-outreach">Outreach</TabsTrigger>
+              <TabsTrigger value="my-events" data-testid="tab-events">My Events</TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* DASHBOARD TAB */}
           <TabsContent value="dashboard" className="space-y-4">
@@ -1597,7 +1829,51 @@ export default function KnotViteDashboard() {
           <TabsContent value="outreach" className="space-y-4">
             <OutreachTab eventId={selectedEventId} guests={guests} responses={responses} />
           </TabsContent>
+
+          {/* MY EVENTS TAB */}
+          <TabsContent value="my-events" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {kvEvents.map(evt => (
+                <Card key={evt.id} className={cn("bg-white cursor-pointer transition-shadow hover:shadow-md", selectedEventId === evt.id && "ring-2")} style={selectedEventId === evt.id ? { borderColor: TEAL, ringColor: TEAL } : {}} data-testid={`event-card-${evt.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold truncate" style={{ color: TEXT_DARK }}>{evt.title}</h3>
+                        {evt.groomName && evt.brideName && (
+                          <p className="text-sm text-slate-500">{evt.groomName} & {evt.brideName}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 flex-shrink-0 ml-2">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingKvEvent(evt); setIsEventDialogOpen(true); }} data-testid={`edit-event-${evt.id}`}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={(e) => { e.stopPropagation(); setEventToDelete(evt); }} data-testid={`delete-event-${evt.id}`}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-sm text-slate-500">
+                      {evt.date && <div className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{evt.date}</div>}
+                      {evt.venue && <div className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{evt.venue}{evt.city ? `, ${evt.city}` : ''}</div>}
+                      {evt.eventType && <Badge variant="outline" className="text-xs mt-1">{evt.eventType}</Badge>}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-3 text-xs"
+                      style={selectedEventId === evt.id ? { backgroundColor: TEAL, color: 'white' } : {}}
+                      onClick={() => { setSelectedEventId(evt.id); setMainTab("dashboard"); }}
+                      data-testid={`select-event-${evt.id}`}
+                    >
+                      {selectedEventId === evt.id ? 'Currently Selected' : 'Select Event'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
         </Tabs>
+        )}
       </div>
 
       {/* ADD/EDIT GUEST DIALOG */}
@@ -1744,6 +2020,110 @@ export default function KnotViteDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* CREATE/EDIT EVENT DIALOG */}
+      <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingKvEvent ? 'Edit Event' : 'Create New Event'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEventSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Event Title *</Label>
+              <Input id="title" name="title" defaultValue={editingKvEvent?.title || ''} required placeholder="e.g., Sharma & Patel Wedding" data-testid="input-event-title" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="eventType">Event Type</Label>
+                <Select name="eventType" defaultValue={editingKvEvent?.eventType || 'wedding'}>
+                  <SelectTrigger data-testid="select-event-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="wedding">Wedding</SelectItem>
+                    <SelectItem value="engagement">Engagement</SelectItem>
+                    <SelectItem value="reception">Reception</SelectItem>
+                    <SelectItem value="sangeet">Sangeet</SelectItem>
+                    <SelectItem value="mehndi">Mehndi</SelectItem>
+                    <SelectItem value="haldi">Haldi</SelectItem>
+                    <SelectItem value="birthday">Birthday</SelectItem>
+                    <SelectItem value="anniversary">Anniversary</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date">Event Date</Label>
+                <Input id="date" name="date" type="date" defaultValue={editingKvEvent?.date || ''} data-testid="input-event-date" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="groomName">Groom's Name</Label>
+                <Input id="groomName" name="groomName" defaultValue={editingKvEvent?.groomName || ''} placeholder="Groom's name" data-testid="input-groom-name" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="brideName">Bride's Name</Label>
+                <Input id="brideName" name="brideName" defaultValue={editingKvEvent?.brideName || ''} placeholder="Bride's name" data-testid="input-bride-name" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="venue">Venue</Label>
+                <Input id="venue" name="venue" defaultValue={editingKvEvent?.venue || ''} placeholder="Venue name" data-testid="input-event-venue" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input id="city" name="city" defaultValue={editingKvEvent?.city || ''} placeholder="City" data-testid="input-event-city" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contactPhone">Contact Phone</Label>
+                <Input id="contactPhone" name="contactPhone" defaultValue={editingKvEvent?.contactPhone || ''} placeholder="+91 9876543210" data-testid="input-event-phone" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contactEmail">Contact Email</Label>
+                <Input id="contactEmail" name="contactEmail" type="email" defaultValue={editingKvEvent?.contactEmail || ''} placeholder="contact@example.com" data-testid="input-event-email" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea id="description" name="description" defaultValue={editingKvEvent?.description || ''} placeholder="Event details..." rows={3} data-testid="input-event-description" />
+            </div>
+            {planLimits && (
+              <div className="text-xs text-slate-400 bg-slate-50 rounded p-2">
+                Your {planLimits.plan} plan: {planLimits.limits.maxEvents === 999999 ? 'Unlimited' : planLimits.limits.maxEvents} events, {planLimits.limits.maxGuestsPerForm === 999999 ? 'unlimited' : planLimits.limits.maxGuestsPerForm} guests per event
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEventDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" style={{ backgroundColor: TEAL }} className="text-white" data-testid="save-event-btn">
+                {editingKvEvent ? 'Update Event' : 'Create Event'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE EVENT CONFIRM */}
+      <AlertDialog open={!!eventToDelete} onOpenChange={(open) => !open && setEventToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{eventToDelete?.title}</strong>? This will also remove all associated guests and RSVP data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => eventToDelete && deleteEventMutation.mutate(eventToDelete.id)}
+            >
+              Delete Event
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* DELETE GUEST CONFIRM */}
       <AlertDialog open={!!guestToDelete} onOpenChange={(open) => !open && setGuestToDelete(null)}>

@@ -1120,7 +1120,7 @@ export async function registerRoutes(
     '/api/auth/', '/api/billing/', '/api/health', '/api/system-notifications',
     '/api/admin', '/api/demo-bookings', '/api/enterprise-leads', '/api/contact',
     '/api/email-logs', '/api/admin-event-logs', '/api/modules',
-    '/api/knotvite/signup', '/api/knotvite/billing/',
+    '/api/knotvite/signup', '/api/knotvite/billing/', '/api/knotvite/events', '/api/knotvite/events-limits',
   ];
 
   app.use('/api/', async (req, res, next) => {
@@ -21147,6 +21147,126 @@ As you collect information through conversation, keep track of what you've gathe
     } catch (error) {
       console.error('[KnotVite] Plan status error:', error);
       res.status(500).json({ error: 'Failed to fetch plan status' });
+    }
+  });
+
+  // KnotVite Events CRUD
+  app.get("/api/knotvite/events", verifyJWT, async (req, res) => {
+    try {
+      const userId = String(req.user!.id);
+      const events = await storage.getKnotviteEvents(userId);
+      res.json(events);
+    } catch (error) {
+      console.error('[KnotVite] Events fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch events' });
+    }
+  });
+
+  app.get("/api/knotvite/events/:id", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch event' });
+    }
+  });
+
+  app.post("/api/knotvite/events", verifyJWT, async (req, res) => {
+    try {
+      const userId = String(req.user!.id);
+      const companyId = req.user!.companyId;
+
+      const kvSub = await storage.getKnotviteSubscription(companyId);
+      const plan = (kvSub?.plan || 'basic') as any;
+
+      const { getKnotViteLimits } = await import('../shared/knotvite-limits');
+      const limits = getKnotViteLimits(plan);
+      const currentCount = await storage.countKnotviteEvents(userId);
+
+      if (currentCount >= limits.maxEvents) {
+        return res.status(403).json({
+          error: `You've reached the limit of ${limits.maxEvents} event(s) on your ${plan} plan. Upgrade to create more events.`,
+          code: 'EVENT_LIMIT_REACHED',
+          limit: limits.maxEvents,
+          current: currentCount,
+        });
+      }
+
+      const event = await storage.createKnotviteEvent({
+        userId,
+        companyId,
+        title: req.body.title,
+        eventType: req.body.eventType || 'wedding',
+        date: req.body.date,
+        endDate: req.body.endDate,
+        venue: req.body.venue,
+        city: req.body.city,
+        description: req.body.description,
+        groomName: req.body.groomName,
+        brideName: req.body.brideName,
+        contactPhone: req.body.contactPhone,
+        contactEmail: req.body.contactEmail,
+        status: 'active',
+      });
+      res.json(event);
+    } catch (error) {
+      console.error('[KnotVite] Event create error:', error);
+      res.status(500).json({ error: 'Failed to create event' });
+    }
+  });
+
+  app.patch("/api/knotvite/events/:id", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+
+      const updated = await storage.updateKnotviteEvent(req.params.id, {
+        title: req.body.title,
+        eventType: req.body.eventType,
+        date: req.body.date,
+        endDate: req.body.endDate,
+        venue: req.body.venue,
+        city: req.body.city,
+        description: req.body.description,
+        groomName: req.body.groomName,
+        brideName: req.body.brideName,
+        contactPhone: req.body.contactPhone,
+        contactEmail: req.body.contactEmail,
+        status: req.body.status,
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update event' });
+    }
+  });
+
+  app.delete("/api/knotvite/events/:id", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+      await storage.deleteKnotviteEvent(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete event' });
+    }
+  });
+
+  app.get("/api/knotvite/events-limits", verifyJWT, async (req, res) => {
+    try {
+      const userId = String(req.user!.id);
+      const companyId = req.user!.companyId;
+      const kvSub = await storage.getKnotviteSubscription(companyId);
+      const plan = (kvSub?.plan || 'basic') as any;
+      const { getKnotViteLimits } = await import('../shared/knotvite-limits');
+      const limits = getKnotViteLimits(plan);
+      const eventCount = await storage.countKnotviteEvents(userId);
+      res.json({ plan, limits, usage: { events: eventCount } });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch limits' });
     }
   });
 
