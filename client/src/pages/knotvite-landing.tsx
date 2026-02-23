@@ -378,7 +378,7 @@ export default function KnotViteLanding() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" onClick={() => navigate("/login")} className="text-sm" data-testid="nav-signin-btn">
+                  <Button variant="ghost" size="sm" onClick={() => navigate("/knotvite/signup?mode=signin")} className="text-sm" data-testid="nav-signin-btn">
                     Sign In
                   </Button>
                   <Button onClick={handleGetStarted} style={{ backgroundColor: BRAND }} className="hover:brightness-110 text-white text-sm" data-testid="nav-getstarted-btn">
