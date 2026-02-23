@@ -225,15 +225,6 @@ function AppRoutes() {
         <Route path="/billing">
           <PrivateRoute component={Billing} path="/billing" skipSubscriptionCheck={true} />
         </Route>
-        <Route path="/knotvite/dashboard">
-          <PrivateRoute component={KnotViteDashboard} path="/knotvite/dashboard" skipSubscriptionCheck={true} />
-        </Route>
-        <Route path="/knotvite/forms">
-          <PrivateRoute component={KnotViteForms} path="/knotvite/forms" skipSubscriptionCheck={true} />
-        </Route>
-        <Route path="/knotvite/submissions">
-          <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" skipSubscriptionCheck={true} />
-        </Route>
         <Route path="/portfolio-admin">
           <PrivateRoute component={PortfolioAdmin} path="/portfolio-admin" />
         </Route>
@@ -282,6 +273,15 @@ function PublicPages() {
         <Route path="/refund-policy" component={RefundPolicy} />
         <Route path="/contact" component={Contact} />
         <Route path="/knotvite/signup" component={KnotViteSignup} />
+        <Route path="/knotvite/dashboard">
+          <PrivateRoute component={KnotViteDashboard} path="/knotvite/dashboard" skipSubscriptionCheck={true} />
+        </Route>
+        <Route path="/knotvite/forms">
+          <PrivateRoute component={KnotViteForms} path="/knotvite/forms" skipSubscriptionCheck={true} />
+        </Route>
+        <Route path="/knotvite/submissions">
+          <PrivateRoute component={KnotViteSubmissions} path="/knotvite/submissions" skipSubscriptionCheck={true} />
+        </Route>
         <Route path="/knotvite/billing">
           <PrivateRoute component={KnotViteBilling} path="/knotvite/billing" skipSubscriptionCheck={true} />
         </Route>
