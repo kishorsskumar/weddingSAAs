@@ -21153,7 +21153,7 @@ As you collect information through conversation, keep track of what you've gathe
   // KnotVite Events CRUD
   app.get("/api/knotvite/events", verifyJWT, async (req, res) => {
     try {
-      const userId = String(req.user!.id);
+      const userId = String(req.user!.userId);
       const events = await storage.getKnotviteEvents(userId);
       res.json(events);
     } catch (error) {
@@ -21166,7 +21166,7 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
       res.json(event);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch event' });
@@ -21175,7 +21175,7 @@ As you collect information through conversation, keep track of what you've gathe
 
   app.post("/api/knotvite/events", verifyJWT, async (req, res) => {
     try {
-      const userId = String(req.user!.id);
+      const userId = String(req.user!.userId);
       const companyId = req.user!.companyId;
 
       const kvSub = await storage.getKnotviteSubscription(companyId);
@@ -21221,7 +21221,7 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
 
       const updated = await storage.updateKnotviteEvent(req.params.id, {
         title: req.body.title,
@@ -21247,7 +21247,7 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.id)) return res.status(403).json({ error: 'Unauthorized' });
+      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
       await storage.deleteKnotviteEvent(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -21257,7 +21257,7 @@ As you collect information through conversation, keep track of what you've gathe
 
   app.get("/api/knotvite/events-limits", verifyJWT, async (req, res) => {
     try {
-      const userId = String(req.user!.id);
+      const userId = String(req.user!.userId);
       const companyId = req.user!.companyId;
       const kvSub = await storage.getKnotviteSubscription(companyId);
       const plan = (kvSub?.plan || 'basic') as any;
