@@ -3316,3 +3316,26 @@ export const knotviteEvents = pgTable("knotvite_events", {
 export const insertKnotviteEventSchema = createInsertSchema(knotviteEvents).omit({ id: true, createdAt: true, updatedAt: true, guestCount: true });
 export type InsertKnotviteEvent = z.infer<typeof insertKnotviteEventSchema>;
 export type KnotviteEvent = typeof knotviteEvents.$inferSelect;
+
+export const knotviteGuests = pgTable("knotvite_guests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => knotviteEvents.id, { onDelete: 'cascade' }),
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  relationship: text("relationship"),
+  guestGroup: text("guest_group"),
+  invitedBy: text("invited_by"),
+  maxAttendees: integer("max_attendees").default(1),
+  inviteSentAt: timestamp("invite_sent_at"),
+  reminderSentAt: timestamp("reminder_sent_at"),
+  reminderCount: integer("reminder_count").default(0),
+  notes: text("notes"),
+  rsvpStatus: text("rsvp_status").default('pending'),
+  attendeeCount: integer("attendee_count"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnotviteGuestSchema = createInsertSchema(knotviteGuests).omit({ id: true, createdAt: true });
+export type InsertKnotviteGuest = z.infer<typeof insertKnotviteGuestSchema>;
+export type KnotviteGuest = typeof knotviteGuests.$inferSelect;

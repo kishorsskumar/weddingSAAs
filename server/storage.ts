@@ -437,6 +437,9 @@ import {
   knotviteEvents,
   type KnotviteEvent,
   type InsertKnotviteEvent,
+  knotviteGuests,
+  type KnotviteGuest,
+  type InsertKnotviteGuest,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -6458,6 +6461,41 @@ export class DatabaseStorage implements IStorage {
   async countKnotviteEvents(userId: string): Promise<number> {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteEvents)
       .where(eq(knotviteEvents.userId, userId));
+    return result?.count || 0;
+  }
+
+  async getKnotviteGuestsByEvent(eventId: string): Promise<KnotviteGuest[]> {
+    return await db.select().from(knotviteGuests)
+      .where(eq(knotviteGuests.eventId, eventId))
+      .orderBy(desc(knotviteGuests.createdAt));
+  }
+
+  async getKnotviteGuest(id: string): Promise<KnotviteGuest | undefined> {
+    const [guest] = await db.select().from(knotviteGuests)
+      .where(eq(knotviteGuests.id, id));
+    return guest;
+  }
+
+  async createKnotviteGuest(data: InsertKnotviteGuest): Promise<KnotviteGuest> {
+    const [created] = await db.insert(knotviteGuests).values(data).returning();
+    return created;
+  }
+
+  async updateKnotviteGuest(id: string, data: Partial<InsertKnotviteGuest>): Promise<KnotviteGuest | undefined> {
+    const [updated] = await db.update(knotviteGuests)
+      .set(data)
+      .where(eq(knotviteGuests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteKnotviteGuest(id: string): Promise<void> {
+    await db.delete(knotviteGuests).where(eq(knotviteGuests.id, id));
+  }
+
+  async countKnotviteGuests(eventId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteGuests)
+      .where(eq(knotviteGuests.eventId, eventId));
     return result?.count || 0;
   }
 }

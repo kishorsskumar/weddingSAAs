@@ -21270,6 +21270,87 @@ As you collect information through conversation, keep track of what you've gathe
     }
   });
 
+  // KnotVite Guests CRUD
+  app.get("/api/knotvite/guests", verifyJWT, async (req, res) => {
+    try {
+      const { eventId } = req.query;
+      if (!eventId) return res.json([]);
+      const event = await storage.getKnotviteEvent(eventId as string);
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const guests = await storage.getKnotviteGuestsByEvent(eventId as string);
+      res.json(guests);
+    } catch (error) {
+      console.error('[KnotVite] Guests fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch guests' });
+    }
+  });
+
+  app.post("/api/knotvite/guests", verifyJWT, async (req, res) => {
+    try {
+      const { eventId } = req.body;
+      if (!eventId) return res.status(400).json({ error: 'eventId is required' });
+      const event = await storage.getKnotviteEvent(eventId);
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+
+      const companyId = req.user!.companyId;
+      const kvSub = await storage.getKnotviteSubscription(companyId);
+      const plan = (kvSub?.plan || 'basic') as any;
+      const { getKnotViteLimits } = await import('../shared/knotvite-limits');
+      const limits = getKnotViteLimits(plan);
+      const currentGuestCount = await storage.countKnotviteGuests(eventId);
+      if (currentGuestCount >= limits.maxGuestsPerForm) {
+        return res.status(403).json({
+          error: `Guest limit of ${limits.maxGuestsPerForm} reached on your ${plan} plan.`,
+          code: 'GUEST_LIMIT_REACHED',
+        });
+      }
+
+      const guest = await storage.createKnotviteGuest({
+        eventId,
+        name: req.body.name,
+        phone: req.body.phone,
+        email: req.body.email,
+        relationship: req.body.relationship,
+        guestGroup: req.body.guestGroup,
+        invitedBy: req.body.invitedBy,
+        maxAttendees: req.body.maxAttendees || 1,
+        notes: req.body.notes,
+      });
+      res.json(guest);
+    } catch (error) {
+      console.error('[KnotVite] Guest create error:', error);
+      res.status(500).json({ error: 'Failed to create guest' });
+    }
+  });
+
+  app.patch("/api/knotvite/guests/:id", verifyJWT, async (req, res) => {
+    try {
+      const guest = await storage.getKnotviteGuest(req.params.id);
+      if (!guest) return res.status(404).json({ error: 'Guest not found' });
+      const event = await storage.getKnotviteEvent(guest.eventId);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const updated = await storage.updateKnotviteGuest(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update guest' });
+    }
+  });
+
+  app.delete("/api/knotvite/guests/:id", verifyJWT, async (req, res) => {
+    try {
+      const guest = await storage.getKnotviteGuest(req.params.id);
+      if (!guest) return res.status(404).json({ error: 'Guest not found' });
+      const event = await storage.getKnotviteEvent(guest.eventId);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      await storage.deleteKnotviteGuest(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete guest' });
+    }
+  });
+
   // RSVP Form Templates CRUD
   app.get("/api/rsvp/templates", verifyJWT, async (req, res) => {
     try {

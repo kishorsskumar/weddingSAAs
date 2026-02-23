@@ -908,31 +908,21 @@ export default function KnotViteDashboard() {
   const canCreateEvent = !planLimits || (planLimits.usage.events < planLimits.limits.maxEvents);
   const maxGuests = planLimits?.limits?.maxGuestsPerForm || 200;
 
-  const { data: guests = [], isLoading: guestsLoading } = useQuery<EventGuest[]>({
-    queryKey: ['/api/event-guests', selectedEventId],
+  const { data: guests = [], isLoading: guestsLoading } = useQuery<any[]>({
+    queryKey: ['/api/knotvite/guests', selectedEventId],
     queryFn: async () => {
-      const url = selectedEventId
-        ? `/api/event-guests?eventId=${selectedEventId}`
-        : '/api/event-guests';
-      const res = await fetch(url);
+      if (!selectedEventId) return [];
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/knotvite/guests?eventId=${selectedEventId}`, { headers });
       if (!res.ok) throw new Error('Failed to fetch guests');
       return res.json();
     },
-    enabled: true,
+    enabled: !!selectedEventId,
   });
 
-  const { data: responses = [], isLoading: responsesLoading } = useQuery<RsvpResponse[]>({
-    queryKey: ['/api/rsvp-responses', selectedEventId],
-    queryFn: async () => {
-      const url = selectedEventId
-        ? `/api/rsvp-responses?eventId=${selectedEventId}`
-        : '/api/rsvp-responses';
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to fetch responses');
-      return res.json();
-    },
-    enabled: true,
-  });
+  const responses: any[] = [];
 
   const { data: stats } = useQuery<RsvpStats>({
     queryKey: ['/api/rsvp-stats', selectedEventId],
@@ -946,18 +936,23 @@ export default function KnotViteDashboard() {
   });
 
   const createGuestMutation = useMutation({
-    mutationFn: async (data: Partial<EventGuest>) => {
-      const res = await fetch('/api/event-guests', {
+    mutationFn: async (data: any) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/knotvite/guests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Failed to create guest');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create guest');
+      }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/event-guests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
       setIsGuestDialogOpen(false);
       setEditingGuest(null);
       toast({ title: "Guest added successfully" });
@@ -968,17 +963,20 @@ export default function KnotViteDashboard() {
   });
 
   const updateGuestMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<EventGuest> }) => {
-      const res = await fetch(`/api/event-guests/${id}`, {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/knotvite/guests/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Failed to update guest');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/event-guests'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
       setIsGuestDialogOpen(false);
       setEditingGuest(null);
       toast({ title: "Guest updated successfully" });
@@ -990,13 +988,15 @@ export default function KnotViteDashboard() {
 
   const deleteGuestMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/event-guests/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`/api/knotvite/guests/${id}`, { method: 'DELETE', headers });
       if (!res.ok) throw new Error('Failed to delete guest');
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/event-guests'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/rsvp-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/guests'] });
       setGuestToDelete(null);
       toast({ title: "Guest removed" });
     },
