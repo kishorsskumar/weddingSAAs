@@ -923,6 +923,7 @@ export default function KnotViteDashboard() {
   });
 
   const responses: any[] = [];
+  const responsesLoading = false;
 
   const { data: stats } = useQuery<RsvpStats>({
     queryKey: ['/api/rsvp-stats', selectedEventId],
