@@ -19,7 +19,15 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user) setLocation("/dashboard");
+    if (user) {
+      if (user.createdVia === 'knotvite_signup') {
+        setLocation("/knotvite/dashboard");
+      } else if (user.createdVia === 'employee_onboarding') {
+        setLocation("/employee-portal");
+      } else {
+        setLocation("/dashboard");
+      }
+    }
   }, [user, setLocation]);
 
   const handleSubmit = async (e: React.FormEvent) => {

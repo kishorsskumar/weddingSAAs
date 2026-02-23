@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard, Crown, Clock, ArrowUpRight, X, LogOut, Heart } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -708,9 +708,23 @@ export default function KnotViteDashboard() {
   const [isSendingIndividual, setIsSendingIndividual] = useState(false);
 
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const isSuperAdmin = user?.role === 'superadmin';
+  const [trialBannerDismissed, setTrialBannerDismissed] = useState(false);
+
+  const { data: billingStatus } = useQuery({
+    queryKey: ['/api/knotvite/billing/status'],
+    queryFn: async () => {
+      const token = localStorage.getItem('auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch('/api/knotvite/billing/status', { headers, credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 60000,
+  });
 
   const { data: events = [] } = useQuery<Event[]>({
     queryKey: ['/api/events'],
@@ -939,23 +953,114 @@ export default function KnotViteDashboard() {
     updateResponseMutation.mutate({ id: editingResponse.id, data });
   };
 
+  const trialDays = billingStatus?.trialDaysRemaining;
+  const isTrial = billingStatus?.isTrial;
+  const isTrialExpired = billingStatus?.isTrialExpired;
+  const currentPlan = billingStatus?.plan || 'basic';
+  const isActive = billingStatus?.isActive;
+  const showTrialBanner = (isTrial || isTrialExpired) && !trialBannerDismissed;
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="p-4 sm:p-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold" style={{ color: TEXT_DARK }} data-testid="dashboard-title">KnotVite Dashboard</h1>
-            <p className="text-slate-500 mt-1 text-sm">Manage event guest lists and track RSVP responses</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {showTrialBanner && (
+        <div
+          className={`px-4 py-2.5 flex items-center justify-between text-sm ${
+            isTrialExpired
+              ? 'bg-red-500 text-white'
+              : trialDays !== null && trialDays <= 3
+                ? 'bg-amber-500 text-white'
+                : 'bg-[#2FA4BC] text-white'
+          }`}
+          data-testid="trial-banner"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <Clock className="w-4 h-4 flex-shrink-0" />
+            <span className="font-medium">
+              {isTrialExpired
+                ? 'Your free trial has expired.'
+                : `${trialDays} day${trialDays !== 1 ? 's' : ''} left in your free trial.`}
+            </span>
+            <span className="hidden sm:inline opacity-90">
+              {isTrialExpired
+                ? 'Upgrade now to continue using KnotVite.'
+                : 'Upgrade to unlock all premium features.'}
+            </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-white text-gray-900 hover:bg-gray-100 h-7 text-xs font-semibold px-3"
+              onClick={() => navigate("/knotvite/billing")}
+              data-testid="banner-upgrade-btn"
+            >
+              <Crown className="w-3 h-3 mr-1" /> Upgrade Now
+            </Button>
+            {!isTrialExpired && (
+              <button
+                onClick={() => setTrialBannerDismissed(true)}
+                className="text-white/70 hover:text-white p-0.5"
+                data-testid="banner-dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border-b sticky top-0 z-40">
+        <div className="px-4 sm:px-6 flex items-center justify-between h-14">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#2FA4BC' }}>
+              <Heart className="h-4 w-4 text-white fill-white" />
+            </div>
+            <span className="font-bold text-base" style={{ color: TEXT_DARK }} data-testid="dashboard-title">KnotVite</span>
+            {currentPlan !== 'basic' && isActive && (
+              <Badge className="bg-[#e0f4f8] text-[#2FA4BC] border-[#2FA4BC]/20 text-[10px] ml-1">{currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
+              className="h-8 text-xs"
               onClick={() => navigate("/knotvite/billing")}
               data-testid="button-billing"
             >
-              <CreditCard className="w-4 h-4 mr-2" /> Billing
+              <CreditCard className="w-3.5 h-3.5 mr-1.5" /> Subscription & Billing
             </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full bg-[#2FA4BC] text-white text-xs font-bold p-0" data-testid="user-menu-trigger">
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-1" align="end">
+                <div className="px-3 py-2 border-b">
+                  <p className="text-sm font-medium truncate">{user?.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
+                <button
+                  onClick={() => logout()}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 p-4 sm:p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold" style={{ color: TEXT_DARK }}>RSVP Manager</h1>
+            <p className="text-slate-500 mt-1 text-sm">Manage event guest lists and track RSVP responses</p>
+          </div>
+          <div className="flex items-center gap-3">
             <Popover open={eventComboOpen} onOpenChange={setEventComboOpen}>
               <PopoverTrigger asChild>
                 <Button

@@ -116,6 +116,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (data.user.createdVia === 'employee_onboarding') {
         setLocation("/employee-portal");
+      } else if (data.user.createdVia === 'knotvite_signup') {
+        setLocation("/knotvite/dashboard");
       } else {
         setLocation("/dashboard");
       }
