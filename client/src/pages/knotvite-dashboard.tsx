@@ -1113,6 +1113,25 @@ export default function KnotViteDashboard() {
     });
   }, [guestsWithResponses, searchTerm, statusFilter]);
 
+  const stats = useMemo(() => {
+    const total = guests.length;
+    let confirmed = 0, declined = 0, maybe = 0, pending = 0, totalAttendees = 0;
+    let needsAccommodation = 0, needsTransportation = 0, vegetarian = 0, nonVegetarian = 0, needsFollowUp = 0;
+    for (const { guest, response } of guestsWithResponses) {
+      const status = guest.rsvpStatus || response?.attendanceStatus || 'pending';
+      if (status === 'yes' || status === 'confirmed') { confirmed++; totalAttendees += guest.attendeeCount || response?.numberOfAttendees || 1; }
+      else if (status === 'no' || status === 'declined') declined++;
+      else if (status === 'maybe') maybe++;
+      else pending++;
+      if (response?.needsAccommodation) needsAccommodation++;
+      if (response?.needsTransportation) needsTransportation++;
+      if (response?.mealPreference === 'vegetarian') vegetarian++;
+      if (response?.mealPreference === 'non_vegetarian') nonVegetarian++;
+      if (response?.needsHumanFollowUp) needsFollowUp++;
+    }
+    return { total, confirmed, declined, maybe, pending, totalAttendees, needsAccommodation, needsTransportation, vegetarian, nonVegetarian, needsFollowUp };
+  }, [guests, guestsWithResponses]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'yes': return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>;
