@@ -12,6 +12,7 @@ import {
 import { useLocation } from "wouter";
 import { useAuth } from "@/context/auth-context";
 import atbottLogo from "../assets/atbott-logo-dark.png";
+import knotviteDemoVideo from "@assets/Knotvite_1771825752170.mp4";
 
 const BRAND = "#2FA4BC";
 const BRAND_DARK = "#1a8a9e";
@@ -478,16 +479,14 @@ export default function KnotViteLanding() {
           <div className="max-w-4xl mx-auto mb-12 sm:mb-16">
             <div className="relative rounded-2xl overflow-hidden shadow-2xl border" style={{ aspectRatio: '16/9' }}>
               {showVideo ? (
-                <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                  <div className="text-center text-white space-y-3 p-8">
-                    <Play className="h-16 w-16 mx-auto opacity-50" />
-                    <p className="text-lg font-medium">Demo Video Coming Soon</p>
-                    <p className="text-sm text-gray-400">We're creating an amazing walkthrough for you</p>
-                    <Button variant="outline" className="text-white border-white/30 hover:bg-white/10" onClick={() => setShowVideo(false)}>
-                      Close Preview
-                    </Button>
-                  </div>
-                </div>
+                <video
+                  className="w-full h-full object-cover"
+                  src={knotviteDemoVideo}
+                  controls
+                  autoPlay
+                  playsInline
+                  data-testid="demo-video"
+                />
               ) : (
                 <div 
                   className="w-full h-full flex items-center justify-center cursor-pointer group"
@@ -504,7 +503,7 @@ export default function KnotViteLanding() {
                     </div>
                     <div>
                       <p className="text-lg sm:text-xl font-bold text-gray-900">Watch KnotVite in Action</p>
-                      <p className="text-sm text-gray-500">2 minute walkthrough</p>
+                      <p className="text-sm text-gray-500">See how it works</p>
                     </div>
                   </div>
                 </div>
