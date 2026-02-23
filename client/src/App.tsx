@@ -121,11 +121,17 @@ function PrivateRoute({ component: Component, path, skipSubscriptionCheck = fals
     enabled: !!user && !skipSubscriptionCheck,
   });
 
+  const isKnotViteRoute = path.startsWith("/knotvite");
+
   useEffect(() => {
     if (!isLoading && !user) {
-      setLocation("/login");
+      if (isKnotViteRoute) {
+        setLocation("/knotvite/signup?mode=signin");
+      } else {
+        setLocation("/login");
+      }
     }
-  }, [user, isLoading, setLocation]);
+  }, [user, isLoading, setLocation, isKnotViteRoute]);
 
   useEffect(() => {
     if (!skipSubscriptionCheck && !billingLoading && billingStatus) {
@@ -139,6 +145,10 @@ function PrivateRoute({ component: Component, path, skipSubscriptionCheck = fals
 
   if (isLoading || !user) return null;
   if (!skipSubscriptionCheck && billingLoading) return null;
+
+  if (isKnotViteRoute) {
+    return <Component />;
+  }
 
   if (path === "/billing") {
     const hasUpgradeParam = window.location.search.includes('upgrade=true');
