@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard, Crown, Clock, ArrowUpRight, X, LogOut, Heart, Copy, Link, Settings, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Check, ChevronsUpDown, Send, UserCheck, UserX, HelpCircle, UtensilsCrossed, Hotel, Car, MessageSquare, Search, RefreshCw, Calendar, Phone, Mail, AlertCircle, CreditCard, Crown, Clock, ArrowUpRight, X, LogOut, Heart, Copy, Link, Settings, ExternalLink, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { format, parseISO } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -757,6 +757,12 @@ export default function KnotViteDashboard() {
   const [editInvTitle, setEditInvTitle] = useState("");
   const [newCeremony, setNewCeremony] = useState("");
 
+  const [landingConfig, setLandingConfig] = useState<Record<string, any>>({});
+  const [formConfig, setFormConfig] = useState<Record<string, any>>({});
+  const [savingLanding, setSavingLanding] = useState(false);
+  const [savingForm, setSavingForm] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+
   const queryClient = useQueryClient();
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -811,6 +817,70 @@ export default function KnotViteDashboard() {
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
   const selectedKvEvent = kvEvents.find(e => e.id === selectedEventId);
+
+  useEffect(() => {
+    if (selectedKvEvent) {
+      try { setLandingConfig(selectedKvEvent.landingPageConfig ? JSON.parse(selectedKvEvent.landingPageConfig) : {}); } catch { setLandingConfig({}); }
+      try { setFormConfig(selectedKvEvent.formPageConfig ? JSON.parse(selectedKvEvent.formPageConfig) : {}); } catch { setFormConfig({}); }
+    }
+  }, [selectedEventId, selectedKvEvent?.landingPageConfig, selectedKvEvent?.formPageConfig]);
+
+  const saveLandingConfig = async () => {
+    if (!selectedEventId) return;
+    setSavingLanding(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/knotvite/events/${selectedEventId}/landing-page`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include',
+        body: JSON.stringify(landingConfig),
+      });
+      if (!res.ok) throw new Error('Failed');
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      toast({ title: 'Landing page settings saved!' });
+    } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
+    setSavingLanding(false);
+  };
+
+  const saveFormConfig = async () => {
+    if (!selectedEventId) return;
+    setSavingForm(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`/api/knotvite/events/${selectedEventId}/form-page`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        credentials: 'include',
+        body: JSON.stringify(formConfig),
+      });
+      if (!res.ok) throw new Error('Failed');
+      queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
+      toast({ title: 'Form page settings saved!' });
+    } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
+    setSavingForm(false);
+  };
+
+  const uploadLandingImage = async (file: File, field: string) => {
+    if (!selectedEventId) return;
+    setUploadingImage(field);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch(`/api/knotvite/events/${selectedEventId}/upload-image`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) throw new Error('Upload failed');
+      const { imageUrl } = await res.json();
+      setLandingConfig(prev => ({ ...prev, [field]: imageUrl }));
+      toast({ title: 'Image uploaded!' });
+    } catch { toast({ title: 'Upload failed', variant: 'destructive' }); }
+    setUploadingImage(null);
+  };
 
   const createEventMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -2087,6 +2157,187 @@ export default function KnotViteDashboard() {
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Event Details
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base" style={{ color: TEXT_DARK }}>Landing Page Customization</CardTitle>
+                    <p className="text-xs text-slate-500">Customize the public RSVP landing page for your guests</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium">Hero Image</Label>
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
+                          {landingConfig.heroImageUrl ? (
+                            <div className="relative">
+                              <img src={landingConfig.heroImageUrl} alt="Hero" className="w-full h-32 object-cover rounded-lg" />
+                              <button className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1" onClick={() => setLandingConfig(prev => ({ ...prev, heroImageUrl: '' }))}><X className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <label className="cursor-pointer block py-4">
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLandingImage(f, 'heroImageUrl'); }} />
+                              {uploadingImage === 'heroImageUrl' ? <Loader2 className="h-6 w-6 animate-spin mx-auto mb-1" style={{ color: TEAL }} /> : <Plus className="h-6 w-6 mx-auto mb-1 text-gray-400" />}
+                              <p className="text-xs text-gray-400">Upload hero image</p>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-medium">Venue Image</Label>
+                        <div className="border-2 border-dashed border-gray-200 rounded-xl p-3 text-center">
+                          {landingConfig.venueImageUrl ? (
+                            <div className="relative">
+                              <img src={landingConfig.venueImageUrl} alt="Venue" className="w-full h-32 object-cover rounded-lg" />
+                              <button className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1" onClick={() => setLandingConfig(prev => ({ ...prev, venueImageUrl: '' }))}><X className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <label className="cursor-pointer block py-4">
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadLandingImage(f, 'venueImageUrl'); }} />
+                              {uploadingImage === 'venueImageUrl' ? <Loader2 className="h-6 w-6 animate-spin mx-auto mb-1" style={{ color: TEAL }} /> : <Plus className="h-6 w-6 mx-auto mb-1 text-gray-400" />}
+                              <p className="text-xs text-gray-400">Upload venue image</p>
+                            </label>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Groom Name (override)</Label>
+                        <Input value={landingConfig.groomName || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, groomName: e.target.value }))} placeholder="Leave blank to use event data" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Bride Name (override)</Label>
+                        <Input value={landingConfig.brideName || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, brideName: e.target.value }))} placeholder="Leave blank to use event data" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tagline</Label>
+                      <Input value={landingConfig.tagline || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, tagline: e.target.value }))} placeholder="Together with their families" />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Welcome Title</Label>
+                        <Input value={landingConfig.welcomeTitle || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, welcomeTitle: e.target.value }))} placeholder="Join Us on Our Special Day" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Welcome Message</Label>
+                        <Input value={landingConfig.welcomeMessage || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, welcomeMessage: e.target.value }))} placeholder="We would be honored by your presence" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Custom Message (shown between hero and details)</Label>
+                      <Input value={landingConfig.customMessage || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, customMessage: e.target.value }))} placeholder="Optional personal message..." />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Footer Message</Label>
+                      <Input value={landingConfig.footerMessage || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, footerMessage: e.target.value }))} placeholder="Crafted with love" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">RSVP Button Text</Label>
+                      <Input value={landingConfig.rsvpButtonText || ''} onChange={(e) => setLandingConfig(prev => ({ ...prev, rsvpButtonText: e.target.value }))} placeholder="RSVP Now" />
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Primary Color</Label>
+                        <div className="flex gap-2 items-center">
+                          <input type="color" value={landingConfig.primaryColor || '#0d9488'} onChange={(e) => setLandingConfig(prev => ({ ...prev, primaryColor: e.target.value }))} className="w-8 h-8 rounded cursor-pointer" />
+                          <Input value={landingConfig.primaryColor || '#0d9488'} onChange={(e) => setLandingConfig(prev => ({ ...prev, primaryColor: e.target.value }))} className="flex-1 text-xs" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Accent Color</Label>
+                        <div className="flex gap-2 items-center">
+                          <input type="color" value={landingConfig.accentColor || '#d4a574'} onChange={(e) => setLandingConfig(prev => ({ ...prev, accentColor: e.target.value }))} className="w-8 h-8 rounded cursor-pointer" />
+                          <Input value={landingConfig.accentColor || '#d4a574'} onChange={(e) => setLandingConfig(prev => ({ ...prev, accentColor: e.target.value }))} className="flex-1 text-xs" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Overlay Opacity (%)</Label>
+                        <Input type="number" min="0" max="100" value={landingConfig.backgroundOverlayOpacity ?? 40} onChange={(e) => setLandingConfig(prev => ({ ...prev, backgroundOverlayOpacity: parseInt(e.target.value) || 0 }))} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Hero Image Position (0=top, 100=bottom)</Label>
+                      <Input type="number" min="0" max="100" value={landingConfig.heroImagePosition ?? 35} onChange={(e) => setLandingConfig(prev => ({ ...prev, heroImagePosition: parseInt(e.target.value) || 0 }))} />
+                    </div>
+
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={landingConfig.showCountdown !== false} onCheckedChange={(c) => setLandingConfig(prev => ({ ...prev, showCountdown: !!c }))} />
+                        Show Countdown
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={landingConfig.showCeremonies !== false} onCheckedChange={(c) => setLandingConfig(prev => ({ ...prev, showCeremonies: !!c }))} />
+                        Show Ceremonies
+                      </label>
+                    </div>
+
+                    <Button onClick={saveLandingConfig} disabled={savingLanding} style={{ backgroundColor: TEAL }} className="text-white">
+                      {savingLanding ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving...</> : <><Check className="h-4 w-4 mr-1" /> Save Landing Page Settings</>}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base" style={{ color: TEXT_DARK }}>RSVP Form Sections</CardTitle>
+                    <p className="text-xs text-slate-500">Toggle which sections appear on the guest RSVP form</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { key: 'showEventsSection', label: 'Ceremonies Selection', defaultVal: true },
+                        { key: 'showGuestCount', label: 'Guest Count (Adults + Children)', defaultVal: true },
+                        { key: 'showMealPreference', label: 'Meal Preference', defaultVal: true },
+                        { key: 'showPickupSection', label: 'Airport/Station Pickup', defaultVal: false },
+                        { key: 'showAccommodationSection', label: 'Accommodation', defaultVal: false },
+                        { key: 'showTransportSection', label: 'Local Transport', defaultVal: false },
+                        { key: 'showDietaryRestrictions', label: 'Dietary Restrictions', defaultVal: false },
+                        { key: 'showWhatsAppField', label: 'WhatsApp Number', defaultVal: false },
+                        { key: 'showSpecialNotes', label: 'Special Notes', defaultVal: true },
+                      ].map((section) => (
+                        <label key={section.key} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer">
+                          <Checkbox
+                            checked={formConfig[section.key] ?? section.defaultVal}
+                            onCheckedChange={(c) => setFormConfig(prev => ({ ...prev, [section.key]: !!c }))}
+                          />
+                          <span className="text-sm">{section.label}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Header Top Line</Label>
+                        <Input value={formConfig.headerTopLine || ''} onChange={(e) => setFormConfig(prev => ({ ...prev, headerTopLine: e.target.value }))} placeholder="Together with their families" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Header Invitation Text</Label>
+                        <Input value={formConfig.headerInvitationText || ''} onChange={(e) => setFormConfig(prev => ({ ...prev, headerInvitationText: e.target.value }))} placeholder="cordially invite you to celebrate" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Thank You (Attending)</Label>
+                        <Input value={formConfig.thankYouAttending || ''} onChange={(e) => setFormConfig(prev => ({ ...prev, thankYouAttending: e.target.value }))} placeholder="We're thrilled you'll be joining us!" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Thank You (Not Attending)</Label>
+                        <Input value={formConfig.thankYouNotAttending || ''} onChange={(e) => setFormConfig(prev => ({ ...prev, thankYouNotAttending: e.target.value }))} placeholder="We understand. You'll be missed!" />
+                      </div>
+                    </div>
+
+                    <Button onClick={saveFormConfig} disabled={savingForm} style={{ backgroundColor: TEAL }} className="text-white">
+                      {savingForm ? <><Loader2 className="h-4 w-4 animate-spin mr-1" /> Saving...</> : <><Check className="h-4 w-4 mr-1" /> Save Form Settings</>}
+                    </Button>
                   </CardContent>
                 </Card>
               </div>

@@ -440,6 +440,9 @@ import {
   knotviteGuests,
   type KnotviteGuest,
   type InsertKnotviteGuest,
+  knotviteRsvpResponses,
+  type KnotviteRsvpResponse,
+  type InsertKnotviteRsvpResponse,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, gte, lte, desc, sql, or, isNull } from "drizzle-orm";
@@ -6497,6 +6500,46 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteGuests)
       .where(eq(knotviteGuests.eventId, eventId));
     return result?.count || 0;
+  }
+
+  async getKnotviteEventBySlug(slug: string): Promise<KnotviteEvent | undefined> {
+    const [event] = await db.select().from(knotviteEvents)
+      .where(eq(knotviteEvents.rsvpSlug, slug));
+    return event || undefined;
+  }
+
+  async getKnotviteRsvpResponses(eventId: string): Promise<KnotviteRsvpResponse[]> {
+    return await db.select().from(knotviteRsvpResponses)
+      .where(eq(knotviteRsvpResponses.eventId, eventId))
+      .orderBy(desc(knotviteRsvpResponses.createdAt));
+  }
+
+  async getKnotviteRsvpResponseByGuest(eventId: string, guestId: string): Promise<KnotviteRsvpResponse | undefined> {
+    const [response] = await db.select().from(knotviteRsvpResponses)
+      .where(and(eq(knotviteRsvpResponses.eventId, eventId), eq(knotviteRsvpResponses.guestId, guestId)));
+    return response || undefined;
+  }
+
+  async createKnotviteRsvpResponse(data: InsertKnotviteRsvpResponse): Promise<KnotviteRsvpResponse> {
+    const [created] = await db.insert(knotviteRsvpResponses).values(data).returning();
+    return created;
+  }
+
+  async updateKnotviteRsvpResponse(id: string, data: Partial<InsertKnotviteRsvpResponse>): Promise<KnotviteRsvpResponse | undefined> {
+    const [updated] = await db.update(knotviteRsvpResponses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(knotviteRsvpResponses.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async searchKnotviteGuests(eventId: string, name: string): Promise<KnotviteGuest[]> {
+    return await db.select().from(knotviteGuests)
+      .where(and(
+        eq(knotviteGuests.eventId, eventId),
+        sql`LOWER(${knotviteGuests.name}) LIKE ${'%' + name.toLowerCase() + '%'}`
+      ))
+      .limit(20);
   }
 }
 

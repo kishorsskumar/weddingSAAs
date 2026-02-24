@@ -50,6 +50,8 @@ import KnotViteDashboard from "@/pages/knotvite-dashboard";
 import KnotViteLanding from "@/pages/knotvite-landing";
 import KnotViteSignup from "@/pages/knotvite-signup";
 import KnotViteBilling from "@/pages/knotvite-billing";
+import KnotviteRsvpWedding from "@/pages/knotvite-rsvp-wedding";
+import KnotviteRsvpForm from "@/pages/knotvite-rsvp-form";
 import PublicRsvpForm from "@/pages/public-rsvp";
 import PortfolioAdmin from "@/pages/portfolio-admin";
 import PortalAdmin from "@/pages/portal-admin";
@@ -295,6 +297,8 @@ function PublicPages() {
         <Route path="/knotvite/billing">
           <PrivateRoute component={KnotViteBilling} path="/knotvite/billing" skipSubscriptionCheck={true} />
         </Route>
+        <Route path="/knotvite/rsvp/:slug/respond" component={KnotviteRsvpForm} />
+        <Route path="/knotvite/rsvp/:slug" component={KnotviteRsvpWedding} />
         <Route path="/knotvite" component={KnotViteLanding} />
         <Route path="/rsvp/:slug" component={PublicRsvpForm} />
         <Route path="/rsvp-landing/:code" component={RsvpLanding} />

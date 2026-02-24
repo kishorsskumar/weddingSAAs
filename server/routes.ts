@@ -21376,6 +21376,272 @@ As you collect information through conversation, keep track of what you've gathe
     }
   });
 
+  // KnotVite Admin - Save landing page config
+  app.put("/api/knotvite/events/:id/landing-page", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      await storage.updateKnotviteEvent(req.params.id, { landingPageConfig: JSON.stringify(req.body) } as any);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to save landing page config' });
+    }
+  });
+
+  // KnotVite Admin - Save form page config
+  app.put("/api/knotvite/events/:id/form-page", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      await storage.updateKnotviteEvent(req.params.id, { formPageConfig: JSON.stringify(req.body) } as any);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to save form page config' });
+    }
+  });
+
+  // KnotVite Admin - Upload landing page image
+  const knotviteLandingImageUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req: any, file: any, cb: any) => {
+      if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only JPG, PNG, and WebP images are allowed'));
+      }
+    },
+  });
+
+  app.post("/api/knotvite/events/:id/upload-image", verifyJWT, knotviteLandingImageUpload.single('image'), async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const file = req.file;
+      if (!file) return res.status(400).json({ error: 'No image uploaded' });
+      const objectStorage = new ObjectStorageService();
+      const imageUrl = await objectStorage.uploadPortfolioImage(
+        file.buffer,
+        `knotvite-rsvp-${Date.now()}.${file.originalname.split('.').pop() || 'jpg'}`,
+        file.mimetype
+      );
+      res.json({ imageUrl });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to upload image' });
+    }
+  });
+
+  // KnotVite Admin - Get RSVP responses for event
+  app.get("/api/knotvite/events/:id/responses", verifyJWT, async (req, res) => {
+    try {
+      const event = await storage.getKnotviteEvent(req.params.id);
+      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const responses = await storage.getKnotviteRsvpResponses(req.params.id);
+      res.json(responses);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch responses' });
+    }
+  });
+
+  // KnotVite Public RSVP APIs (no auth required)
+  const knotviteRsvpRateLimits: Record<string, { count: number; resetAt: number }> = {};
+  function checkKnotviteRsvpRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = knotviteRsvpRateLimits[ip];
+    if (!entry || now > entry.resetAt) {
+      knotviteRsvpRateLimits[ip] = { count: 1, resetAt: now + 60000 };
+      return true;
+    }
+    entry.count++;
+    return entry.count <= 60;
+  }
+
+  // Get event info by RSVP slug
+  app.get("/api/knotvite/public/rsvp/:slug", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkKnotviteRsvpRateLimit(clientIp)) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      }
+      const event = await storage.getKnotviteEventBySlug(req.params.slug);
+      if (!event || event.status !== 'active') {
+        return res.status(404).json({ error: 'Event not found or RSVP link is no longer active.' });
+      }
+      const landingPage = event.landingPageConfig ? JSON.parse(event.landingPageConfig) : {};
+      const formPage = event.formPageConfig ? JSON.parse(event.formPageConfig) : {};
+      res.json({
+        eventId: event.id,
+        title: event.title,
+        eventType: event.eventType,
+        date: event.date,
+        endDate: event.endDate,
+        venue: event.venue,
+        city: event.city,
+        groomName: event.groomName,
+        brideName: event.brideName,
+        invitationTitle: event.invitationTitle,
+        ceremonies: event.ceremonies || [],
+        landingPage,
+        formPage,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to load event' });
+    }
+  });
+
+  // Search guests by name
+  app.get("/api/knotvite/public/rsvp/:slug/search", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkKnotviteRsvpRateLimit(clientIp)) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      const event = await storage.getKnotviteEventBySlug(req.params.slug);
+      if (!event || event.status !== 'active') {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const name = (req.query.name as string || '').trim();
+      if (name.length < 1) {
+        return res.json({ guests: [] });
+      }
+      const guests = await storage.searchKnotviteGuests(event.id, name);
+      res.json({ guests: guests.map(g => ({ id: g.id, name: g.name })) });
+    } catch (error) {
+      res.status(500).json({ error: 'Search failed' });
+    }
+  });
+
+  // Get guest details + existing response
+  app.get("/api/knotvite/public/rsvp/:slug/guest/:guestId", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkKnotviteRsvpRateLimit(clientIp)) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      const event = await storage.getKnotviteEventBySlug(req.params.slug);
+      if (!event || event.status !== 'active') {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const guest = await storage.getKnotviteGuest(req.params.guestId);
+      if (!guest || guest.eventId !== event.id) {
+        return res.status(404).json({ error: 'Guest not found' });
+      }
+      const existingResponse = await storage.getKnotviteRsvpResponseByGuest(event.id, guest.id);
+      res.json({
+        guest: { id: guest.id, name: guest.name, maxAttendees: guest.maxAttendees, phone: guest.phone },
+        existingResponse: existingResponse || null,
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get guest details' });
+    }
+  });
+
+  // Submit RSVP response
+  app.post("/api/knotvite/public/rsvp/:slug/respond/:guestId", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkKnotviteRsvpRateLimit(clientIp)) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      const event = await storage.getKnotviteEventBySlug(req.params.slug);
+      if (!event || event.status !== 'active') {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const guest = await storage.getKnotviteGuest(req.params.guestId);
+      if (!guest || guest.eventId !== event.id) {
+        return res.status(404).json({ error: 'Guest not found' });
+      }
+      const {
+        attendanceStatus, numberOfAttendees, numberOfAdults, numberOfChildren,
+        mealPreference, attendingFunctions, needsAirportPickup, pickupFlightTrainNo,
+        pickupPoint, pickupDate, pickupTime, pickupContactPerson,
+        needsAccommodation, accommodationCheckIn, accommodationCheckOut, accommodationRooms,
+        needsTransport, transportPickupDate, transportPickupTime, transportDropDate, transportDropTime,
+        specialNotes, dietaryRestrictions, whatsAppNumber,
+      } = req.body;
+
+      const existingResponse = await storage.getKnotviteRsvpResponseByGuest(event.id, guest.id);
+      const responseData = {
+        eventId: event.id,
+        guestId: guest.id,
+        attendanceStatus: attendanceStatus || 'pending',
+        numberOfAttendees: numberOfAttendees || 1,
+        numberOfAdults: numberOfAdults || numberOfAttendees || 1,
+        numberOfChildren: numberOfChildren || 0,
+        mealPreference: mealPreference || null,
+        attendingFunctions: attendingFunctions || null,
+        needsAirportPickup: needsAirportPickup || false,
+        pickupFlightTrainNo: pickupFlightTrainNo || null,
+        pickupPoint: pickupPoint || null,
+        pickupDate: pickupDate || null,
+        pickupTime: pickupTime || null,
+        pickupContactPerson: pickupContactPerson || null,
+        needsAccommodation: needsAccommodation || false,
+        accommodationCheckIn: accommodationCheckIn || null,
+        accommodationCheckOut: accommodationCheckOut || null,
+        accommodationRooms: accommodationRooms || null,
+        needsTransport: needsTransport || false,
+        transportPickupDate: transportPickupDate || null,
+        transportPickupTime: transportPickupTime || null,
+        transportDropDate: transportDropDate || null,
+        transportDropTime: transportDropTime || null,
+        specialNotes: specialNotes || null,
+        dietaryRestrictions: dietaryRestrictions || null,
+        whatsAppNumber: whatsAppNumber || null,
+        responseSource: 'web',
+        respondedAt: new Date(),
+      };
+
+      if (existingResponse) {
+        await storage.updateKnotviteRsvpResponse(existingResponse.id, responseData);
+      } else {
+        await storage.createKnotviteRsvpResponse(responseData);
+      }
+
+      await storage.updateKnotviteGuest(guest.id, {
+        rsvpStatus: attendanceStatus,
+        attendeeCount: attendanceStatus === 'yes' ? (numberOfAttendees || 1) : 0,
+      } as any);
+
+      res.json({ success: true, message: 'Your RSVP has been recorded. Thank you!' });
+    } catch (error) {
+      console.error('[KnotVite RSVP] Submit error:', error);
+      res.status(500).json({ error: 'Failed to submit RSVP' });
+    }
+  });
+
+  // Self-register as guest and redirect to form
+  app.post("/api/knotvite/public/rsvp/:slug/self-register", async (req, res) => {
+    try {
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      if (!checkKnotviteRsvpRateLimit(clientIp)) {
+        return res.status(429).json({ error: 'Too many requests' });
+      }
+      const event = await storage.getKnotviteEventBySlug(req.params.slug);
+      if (!event || event.status !== 'active') {
+        return res.status(404).json({ error: 'Event not found' });
+      }
+      const { name, phone } = req.body;
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: 'Name must be at least 2 characters' });
+      }
+      if (!phone || phone.trim().length < 5) {
+        return res.status(400).json({ error: 'Valid phone number required' });
+      }
+      const guest = await storage.createKnotviteGuest({
+        eventId: event.id,
+        name: name.trim(),
+        phone: phone.trim(),
+        maxAttendees: 1,
+        rsvpStatus: 'pending',
+      });
+      res.json({ id: guest.id, name: guest.name });
+    } catch (error) {
+      console.error('[KnotVite RSVP] Self-register error:', error);
+      res.status(500).json({ error: 'Registration failed' });
+    }
+  });
+
   // RSVP Form Templates CRUD
   app.get("/api/rsvp/templates", verifyJWT, async (req, res) => {
     try {

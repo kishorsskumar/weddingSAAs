@@ -3310,6 +3310,8 @@ export const knotviteEvents = pgTable("knotvite_events", {
   invitationTitle: text("invitation_title"),
   ceremonies: text("ceremonies").array(),
   rsvpSlug: text("rsvp_slug"),
+  landingPageConfig: text("landing_page_config"),
+  formPageConfig: text("form_page_config"),
   status: text("status").notNull().default('active'),
   guestCount: integer("guest_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
@@ -3342,3 +3344,41 @@ export const knotviteGuests = pgTable("knotvite_guests", {
 export const insertKnotviteGuestSchema = createInsertSchema(knotviteGuests).omit({ id: true, createdAt: true });
 export type InsertKnotviteGuest = z.infer<typeof insertKnotviteGuestSchema>;
 export type KnotviteGuest = typeof knotviteGuests.$inferSelect;
+
+export const knotviteRsvpResponses = pgTable("knotvite_rsvp_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: varchar("event_id").notNull().references(() => knotviteEvents.id, { onDelete: 'cascade' }),
+  guestId: varchar("guest_id").notNull().references(() => knotviteGuests.id, { onDelete: 'cascade' }),
+  attendanceStatus: text("attendance_status").notNull().default('pending'),
+  numberOfAttendees: integer("number_of_attendees").default(1),
+  numberOfAdults: integer("number_of_adults").default(1),
+  numberOfChildren: integer("number_of_children").default(0),
+  mealPreference: text("meal_preference"),
+  attendingFunctions: text("attending_functions").array(),
+  needsAirportPickup: boolean("needs_airport_pickup").default(false),
+  pickupFlightTrainNo: text("pickup_flight_train_no"),
+  pickupPoint: text("pickup_point"),
+  pickupDate: text("pickup_date"),
+  pickupTime: text("pickup_time"),
+  pickupContactPerson: text("pickup_contact_person"),
+  needsAccommodation: boolean("needs_accommodation").default(false),
+  accommodationCheckIn: text("accommodation_check_in"),
+  accommodationCheckOut: text("accommodation_check_out"),
+  accommodationRooms: integer("accommodation_rooms"),
+  needsTransport: boolean("needs_transport").default(false),
+  transportPickupDate: text("transport_pickup_date"),
+  transportPickupTime: text("transport_pickup_time"),
+  transportDropDate: text("transport_drop_date"),
+  transportDropTime: text("transport_drop_time"),
+  specialNotes: text("special_notes"),
+  dietaryRestrictions: text("dietary_restrictions"),
+  whatsAppNumber: text("whats_app_number"),
+  responseSource: text("response_source").default('web'),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertKnotviteRsvpResponseSchema = createInsertSchema(knotviteRsvpResponses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKnotviteRsvpResponse = z.infer<typeof insertKnotviteRsvpResponseSchema>;
+export type KnotviteRsvpResponse = typeof knotviteRsvpResponses.$inferSelect;
