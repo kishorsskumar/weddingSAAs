@@ -836,10 +836,13 @@ export default function KnotViteDashboard() {
         credentials: 'include',
         body: JSON.stringify(landingConfig),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save');
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
       toast({ title: 'Landing page settings saved!' });
-    } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
+    } catch (err: any) { toast({ title: err.message || 'Failed to save', variant: 'destructive' }); }
     setSavingLanding(false);
   };
 
@@ -854,10 +857,13 @@ export default function KnotViteDashboard() {
         credentials: 'include',
         body: JSON.stringify(formConfig),
       });
-      if (!res.ok) throw new Error('Failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to save');
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
       toast({ title: 'Form page settings saved!' });
-    } catch { toast({ title: 'Failed to save', variant: 'destructive' }); }
+    } catch (err: any) { toast({ title: err.message || 'Failed to save', variant: 'destructive' }); }
     setSavingForm(false);
   };
 
@@ -1074,12 +1080,18 @@ export default function KnotViteDashboard() {
         credentials: 'include',
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Failed to update');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to update');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/knotvite/events'] });
       toast({ title: "Saved successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || 'Failed to save', variant: 'destructive' });
     },
   });
 
@@ -2073,17 +2085,43 @@ export default function KnotViteDashboard() {
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">RSVP Link</Label>
                       <div className="flex items-center gap-2">
-                        <Input value={`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug || ''}`} readOnly className="bg-gray-50 text-sm" />
+                        <Input value={`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug || ''}`} readOnly className="bg-gray-50 text-sm" data-testid="input-rsvp-link" />
                         <Button variant="outline" size="sm" onClick={() => {
                           navigator.clipboard.writeText(`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`);
                           toast({ title: "Copied!" });
-                        }}>
+                        }} data-testid="button-copy-rsvp-link">
                           <Copy className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => window.open(`/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`, '_blank')}>
+                        <Button variant="outline" size="sm" onClick={() => window.open(`/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`, '_blank')} data-testid="button-preview-rsvp">
                           <ExternalLink className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">{window.location.host}/knotvite/rsvp/</span>
+                        <Input
+                          defaultValue={selectedKvEvent.rsvpSlug || ''}
+                          placeholder="custom-slug"
+                          className="text-sm flex-1"
+                          data-testid="input-custom-slug"
+                          onBlur={(e) => {
+                            const newSlug = e.target.value.trim();
+                            if (newSlug && newSlug !== selectedKvEvent.rsvpSlug) {
+                              if (!/^[a-zA-Z0-9\-]+$/.test(newSlug)) {
+                                toast({ title: 'Slug can only contain letters, numbers, and hyphens', variant: 'destructive' });
+                                e.target.value = selectedKvEvent.rsvpSlug || '';
+                                return;
+                              }
+                              if (newSlug.length < 3) {
+                                toast({ title: 'Slug must be at least 3 characters', variant: 'destructive' });
+                                e.target.value = selectedKvEvent.rsvpSlug || '';
+                                return;
+                              }
+                              updateEventMeta.mutate({ id: selectedEventId!, data: { rsvpSlug: newSlug } });
+                            }
+                          }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400">Edit the slug above to customize your RSVP link</p>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Invitation Title</Label>

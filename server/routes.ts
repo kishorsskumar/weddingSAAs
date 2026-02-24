@@ -21196,7 +21196,16 @@ As you collect information through conversation, keep track of what you've gathe
 
       const slugChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
       let rsvpSlug = '';
-      for (let i = 0; i < 6; i++) rsvpSlug += slugChars.charAt(Math.floor(Math.random() * slugChars.length));
+      let slugFound = false;
+      for (let attempt = 0; attempt < 10; attempt++) {
+        rsvpSlug = '';
+        for (let i = 0; i < 8; i++) rsvpSlug += slugChars.charAt(Math.floor(Math.random() * slugChars.length));
+        const existing = await storage.getKnotviteEventBySlug(rsvpSlug);
+        if (!existing) { slugFound = true; break; }
+      }
+      if (!slugFound) {
+        return res.status(500).json({ error: 'Failed to generate a unique RSVP link. Please try again.' });
+      }
 
       const event = await storage.createKnotviteEvent({
         userId,
@@ -21228,7 +21237,25 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
+
+      if (req.body.rsvpSlug) {
+        const slugRegex = /^[a-zA-Z0-9\-]+$/;
+        if (!slugRegex.test(req.body.rsvpSlug)) {
+          return res.status(400).json({ error: 'RSVP slug can only contain letters, numbers, and hyphens' });
+        }
+        if (req.body.rsvpSlug.length < 3 || req.body.rsvpSlug.length > 50) {
+          return res.status(400).json({ error: 'RSVP slug must be 3-50 characters' });
+        }
+        const existing = await storage.getKnotviteEventBySlug(req.body.rsvpSlug);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ error: 'This RSVP slug is already taken. Please choose a different one.' });
+        }
+      }
 
       const updateData: any = {};
       const fields = ['title','eventType','date','endDate','venue','city','description','groomName','brideName','contactPhone','contactEmail','invitationTitle','ceremonies','rsvpSlug','status'];
@@ -21236,6 +21263,7 @@ As you collect information through conversation, keep track of what you've gathe
       const updated = await storage.updateKnotviteEvent(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
+      console.error('[KnotVite] Event update error:', error);
       res.status(500).json({ error: 'Failed to update event' });
     }
   });
@@ -21244,7 +21272,11 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
       await storage.deleteKnotviteEvent(req.params.id);
       res.json({ success: true });
     } catch (error) {
@@ -21380,10 +21412,18 @@ As you collect information through conversation, keep track of what you've gathe
   app.put("/api/knotvite/events/:id/landing-page", verifyJWT, async (req, res) => {
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
       await storage.updateKnotviteEvent(req.params.id, { landingPageConfig: JSON.stringify(req.body) } as any);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[KnotVite] Save landing page config error:', error);
       res.status(500).json({ error: 'Failed to save landing page config' });
     }
   });
@@ -21392,10 +21432,18 @@ As you collect information through conversation, keep track of what you've gathe
   app.put("/api/knotvite/events/:id/form-page", verifyJWT, async (req, res) => {
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) {
+        return res.status(403).json({ error: 'Unauthorized' });
+      }
       await storage.updateKnotviteEvent(req.params.id, { formPageConfig: JSON.stringify(req.body) } as any);
       res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[KnotVite] Save form page config error:', error);
       res.status(500).json({ error: 'Failed to save form page config' });
     }
   });
@@ -21416,7 +21464,12 @@ As you collect information through conversation, keep track of what you've gathe
   app.post("/api/knotvite/events/:id/upload-image", verifyJWT, knotviteLandingImageUpload.single('image'), async (req, res) => {
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
       const file = req.file;
       if (!file) return res.status(400).json({ error: 'No image uploaded' });
       const objectStorage = new ObjectStorageService();
@@ -21435,7 +21488,12 @@ As you collect information through conversation, keep track of what you've gathe
   app.get("/api/knotvite/events/:id/responses", verifyJWT, async (req, res) => {
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(404).json({ error: 'Event not found' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
       const responses = await storage.getKnotviteRsvpResponses(req.params.id);
       res.json(responses);
     } catch (error) {
