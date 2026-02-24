@@ -1723,19 +1723,23 @@ export default function KnotViteDashboard() {
                   <Card className="bg-white border-l-4" style={{ borderLeftColor: TEAL }}>
                     <CardContent className="py-3 px-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
                           <Link className="h-4 w-4 flex-shrink-0" style={{ color: TEAL }} />
-                          <div>
-                            <span className="font-medium" style={{ color: TEAL }}>Event RSVP Link (share with all guests): </span>
-                            <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{window.location.host}/knotvite/rsvp/{selectedKvEvent.rsvpSlug}</code>
+                          <div className="min-w-0">
+                            <span className="font-medium" style={{ color: TEAL }}>Event RSVP Link (share with all guests):</span>
+                            <br className="sm:hidden" />
+                            <code className="text-xs bg-gray-100 px-2 py-0.5 rounded break-all">{window.location.host}/knotvite/rsvp/{selectedKvEvent.rsvpSlug}</code>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <Button variant="outline" size="sm" onClick={() => {
                             navigator.clipboard.writeText(`${window.location.origin}/knotvite/rsvp/${selectedKvEvent.rsvpSlug}`);
-                            toast({ title: "Copied!" });
+                            toast({ title: "RSVP link copied!" });
                           }} data-testid="copy-link-btn">
                             <Copy className="h-3.5 w-3.5 mr-1" /> Copy
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setMainTab('settings')} data-testid="edit-page-btn">
+                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit Page
                           </Button>
                         </div>
                       </div>

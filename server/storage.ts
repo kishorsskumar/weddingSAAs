@@ -6467,6 +6467,12 @@ export class DatabaseStorage implements IStorage {
     return result?.count || 0;
   }
 
+  async countKnotviteEventsByCompany(companyId: string): Promise<number> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(knotviteEvents)
+      .where(eq(knotviteEvents.companyId, companyId));
+    return result?.count || 0;
+  }
+
   async getKnotviteGuestsByEvent(eventId: string): Promise<KnotviteGuest[]> {
     return await db.select().from(knotviteGuests)
       .where(eq(knotviteGuests.eventId, eventId))

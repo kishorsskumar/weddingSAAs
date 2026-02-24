@@ -21153,6 +21153,11 @@ As you collect information through conversation, keep track of what you've gathe
   // KnotVite Events CRUD
   app.get("/api/knotvite/events", verifyJWT, async (req, res) => {
     try {
+      const companyId = req.user!.companyId;
+      if (companyId) {
+        const events = await storage.getKnotviteEventsByCompany(String(companyId));
+        return res.json(events);
+      }
       const userId = String(req.user!.userId);
       const events = await storage.getKnotviteEvents(userId);
       res.json(events);
@@ -21166,7 +21171,11 @@ As you collect information through conversation, keep track of what you've gathe
     try {
       const event = await storage.getKnotviteEvent(req.params.id);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
       res.json(event);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch event' });
@@ -21183,7 +21192,9 @@ As you collect information through conversation, keep track of what you've gathe
 
       const { getKnotViteLimits } = await import('../shared/knotvite-limits');
       const limits = getKnotViteLimits(plan);
-      const currentCount = await storage.countKnotviteEvents(userId);
+      const currentCount = companyId 
+        ? await storage.countKnotviteEventsByCompany(String(companyId))
+        : await storage.countKnotviteEvents(userId);
 
       if (currentCount >= limits.maxEvents) {
         return res.status(403).json({
@@ -21292,7 +21303,9 @@ As you collect information through conversation, keep track of what you've gathe
       const plan = (kvSub?.plan || 'basic') as any;
       const { getKnotViteLimits } = await import('../shared/knotvite-limits');
       const limits = getKnotViteLimits(plan);
-      const eventCount = await storage.countKnotviteEvents(userId);
+      const eventCount = companyId 
+        ? await storage.countKnotviteEventsByCompany(String(companyId))
+        : await storage.countKnotviteEvents(userId);
       res.json({ plan, limits, usage: { events: eventCount } });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch limits' });
@@ -21306,7 +21319,11 @@ As you collect information through conversation, keep track of what you've gathe
       if (!eventId) return res.json([]);
       const event = await storage.getKnotviteEvent(eventId as string);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const userId = String(req.user!.userId);
+      const userCompanyId = req.user!.companyId;
+      const isOwner = String(event.userId) === userId;
+      const isSameCompany = userCompanyId && String(event.companyId) === String(userCompanyId);
+      if (!isOwner && !isSameCompany) return res.status(403).json({ error: 'Unauthorized' });
       const guests = await storage.getKnotviteGuestsByEvent(eventId as string);
       res.json(guests);
     } catch (error) {
@@ -21321,7 +21338,11 @@ As you collect information through conversation, keep track of what you've gathe
       if (!eventId) return res.status(400).json({ error: 'eventId is required' });
       const event = await storage.getKnotviteEvent(eventId);
       if (!event) return res.status(404).json({ error: 'Event not found' });
-      if (String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      const guUserId = String(req.user!.userId);
+      const guCompanyId = req.user!.companyId;
+      const guIsOwner = String(event.userId) === guUserId;
+      const guIsSameCompany = guCompanyId && String(event.companyId) === String(guCompanyId);
+      if (!guIsOwner && !guIsSameCompany) return res.status(403).json({ error: 'Unauthorized' });
 
       const companyId = req.user!.companyId;
       const kvSub = await storage.getKnotviteSubscription(companyId);
@@ -21359,7 +21380,10 @@ As you collect information through conversation, keep track of what you've gathe
       const guest = await storage.getKnotviteGuest(req.params.id);
       if (!guest) return res.status(404).json({ error: 'Guest not found' });
       const event = await storage.getKnotviteEvent(guest.eventId);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(403).json({ error: 'Unauthorized' });
+      const pUserId = String(req.user!.userId);
+      const pCompanyId = req.user!.companyId;
+      if (String(event.userId) !== pUserId && !(pCompanyId && String(event.companyId) === String(pCompanyId))) return res.status(403).json({ error: 'Unauthorized' });
       const updated = await storage.updateKnotviteGuest(req.params.id, req.body);
       res.json(updated);
     } catch (error) {
@@ -21372,7 +21396,8 @@ As you collect information through conversation, keep track of what you've gathe
       const guest = await storage.getKnotviteGuest(req.params.id);
       if (!guest) return res.status(404).json({ error: 'Guest not found' });
       const event = await storage.getKnotviteEvent(guest.eventId);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(403).json({ error: 'Unauthorized' });
+      { const u = String(req.user!.userId); const c = req.user!.companyId; if (String(event.userId) !== u && !(c && String(event.companyId) === String(c))) return res.status(403).json({ error: 'Unauthorized' }); }
       const updated = await storage.updateKnotviteGuest(req.params.id, { inviteSentAt: new Date() } as any);
       res.json(updated);
     } catch (error) {
@@ -21385,7 +21410,8 @@ As you collect information through conversation, keep track of what you've gathe
       const { guestIds, eventId } = req.body;
       if (!eventId || !Array.isArray(guestIds)) return res.status(400).json({ error: 'Invalid request' });
       const event = await storage.getKnotviteEvent(eventId);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(403).json({ error: 'Unauthorized' });
+      { const u = String(req.user!.userId); const c = req.user!.companyId; if (String(event.userId) !== u && !(c && String(event.companyId) === String(c))) return res.status(403).json({ error: 'Unauthorized' }); }
       for (const gid of guestIds) {
         await storage.updateKnotviteGuest(gid, { inviteSentAt: new Date() } as any);
       }
@@ -21400,7 +21426,8 @@ As you collect information through conversation, keep track of what you've gathe
       const guest = await storage.getKnotviteGuest(req.params.id);
       if (!guest) return res.status(404).json({ error: 'Guest not found' });
       const event = await storage.getKnotviteEvent(guest.eventId);
-      if (!event || String(event.userId) !== String(req.user!.userId)) return res.status(403).json({ error: 'Unauthorized' });
+      if (!event) return res.status(403).json({ error: 'Unauthorized' });
+      { const u = String(req.user!.userId); const c = req.user!.companyId; if (String(event.userId) !== u && !(c && String(event.companyId) === String(c))) return res.status(403).json({ error: 'Unauthorized' }); }
       await storage.deleteKnotviteGuest(req.params.id);
       res.json({ success: true });
     } catch (error) {
