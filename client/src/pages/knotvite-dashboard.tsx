@@ -2302,11 +2302,14 @@ export default function KnotViteDashboard() {
                         { key: 'showPickupSection', label: 'Airport/Station Pickup', defaultVal: false },
                         { key: 'showAccommodationSection', label: 'Accommodation', defaultVal: false },
                         { key: 'showTransportSection', label: 'Local Transport', defaultVal: false },
+                        { key: 'showTourSection', label: 'City Tours', defaultVal: false },
+                        { key: 'showDepartureSection', label: 'Departure Details', defaultVal: false },
+                        { key: 'showSecondaryContactSection', label: 'Secondary Contact', defaultVal: false },
                         { key: 'showDietaryRestrictions', label: 'Dietary Restrictions', defaultVal: false },
                         { key: 'showWhatsAppField', label: 'WhatsApp Number', defaultVal: false },
                         { key: 'showSpecialNotes', label: 'Special Notes', defaultVal: true },
                       ].map((section) => (
-                        <label key={section.key} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer">
+                        <label key={section.key} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer" data-testid={`toggle-${section.key}`}>
                           <Checkbox
                             checked={formConfig[section.key] ?? section.defaultVal}
                             onCheckedChange={(c) => setFormConfig(prev => ({ ...prev, [section.key]: !!c }))}
